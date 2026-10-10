@@ -1790,6 +1790,30 @@ abstract class AppLocalizations {
   /// **'Voice'**
   String get chatPageVoiceLabel;
 
+  /// No description provided for @voiceTranscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing…'**
+  String get voiceTranscribing;
+
+  /// No description provided for @voiceTranscriptRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed, tap to retry'**
+  String get voiceTranscriptRetry;
+
+  /// No description provided for @voiceTranscriptStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-transcribe available'**
+  String get voiceTranscriptStale;
+
+  /// No description provided for @voiceTranscriptManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to transcribe'**
+  String get voiceTranscriptManual;
+
   /// No description provided for @chatPageAttachmentMetaMissing.
   ///
   /// In en, this message translates to:

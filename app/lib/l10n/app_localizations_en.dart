@@ -1027,6 +1027,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageVoiceLabel => 'Voice';
 
   @override
+  String get voiceTranscribing => 'Transcribing…';
+
+  @override
+  String get voiceTranscriptRetry => 'Transcription failed, tap to retry';
+
+  @override
+  String get voiceTranscriptStale => 'Re-transcribe available';
+
+  @override
+  String get voiceTranscriptManual => 'Tap to transcribe';
+
+  @override
   String get chatPageAttachmentMetaMissing => 'Attachment metadata missing';
 
   @override

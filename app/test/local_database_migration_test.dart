@@ -5,7 +5,7 @@
 // `ALTER TABLE ADD COLUMN space_id` 抛 "duplicate column name" → 迁移失败 → 启动门重试
 // 耗尽 → 界面停在"启动初始化失败"，且无出路（iMac 生产库撞到）。
 //
-// 本测试构造这种"版本戳落后"的库，断言迁移能一路升到 v9 且列改名正确。
+// 本测试构造这种"版本戳落后"的库，断言迁移能一路升到当前版本且列改名正确。
 
 import 'dart:io';
 
@@ -46,7 +46,10 @@ PRAGMA user_version = 6;
 
     final uv = (await db.customSelect('PRAGMA user_version').getSingle())
         .read<int>('user_version');
-    expect(uv, 9, reason: '迁移后版本戳应升到 9');
+    expect(uv, 10, reason: '迁移后版本戳应升到当前 schema 版本（v10：+voice_transcripts）');
+
+    // v10 新表已建（语音转写派生缓存）。
+    expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue);
 
     // v8 列改名已生效，旧列不残留。
     expect(await _has(db, 'spaces', 'member_id'), isTrue);

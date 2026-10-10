@@ -34,6 +34,7 @@ import 'error_text.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
+import 'data/voice_transcript_service.dart';
 import 'data/media_saver.dart';
 import 'data/message_repository.dart';
 import 'data/space_session.dart';
@@ -240,6 +241,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 仅在实际录音/播放时才实例化（widget 测试环境无原生实现，渲染路径不触碰）。
   AudioRecorder? _recorder;
   AudioPlayer? _player;
+  // 语音消息本地转写（aimemo/voiceTranscript.zhcn.md §9）：纯本地派生，
+  // 模型目录 Phase 0 接入前为 null → 行置 unavailable（UI 出手动入口）。
+  VoiceTranscriptService? _transcriber;
   final _picker = ImagePicker();
   // 图片解密缓存（messageId → Future<bytes>），避免重复下载解密。
   final Map<String, Future<Uint8List>> _imageCache = {};
@@ -6542,6 +6546,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 单个失败不影响其它（网络抖动/元数据未就绪）
       }
     }
+    // 语音消息：明文已落盘 → 入本地转写队列（纯本地派生，无网络流量；
+    // 幂等——已有当前模型版本的有效转写会被服务跳过）
+    _enqueueVoiceTranscripts(msgs);
+  }
+
+  /// 语音消息转写入队（§9）：明文音频走解密缓存的确定性路径（stored 模式
+  /// 长期目录 / 否则临时缓存），密文 sha256 取附件元数据（音频变化 → stale）。
+  /// 服务未就绪（如桌面未配模型）时 lazy 构造，行会落 `unavailable` 供手动入口。
+  void _enqueueVoiceTranscripts(List<HistoryMessage> msgs) {
+    final voices = msgs
+        .where((m) => !m.deleted && m.env.type == 'voice' && m.attachment != null)
+        .toList();
+    if (voices.isEmpty) return;
+    unawaited(() async {
+      try {
+        final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
+        for (final m in voices) {
+          final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+          // 明文缓存：stored 模式长期目录已由 _autoStore 落盘；否则确保缓存存在
+          final file = (_storeAttachments
+                  ? await AttachmentStore.ensure(widget.spaceId, m.env.messageId,
+                      ext, () => _attachmentBytes(m))
+                  : null) ??
+              await MediaCache.ensure(
+                  widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m));
+          t.enqueue(
+            messageId: m.env.messageId,
+            plainPath: file.path,
+            cipherSha256: (m.attachment!['sha256'] as String?) ?? '',
+          );
+        }
+        _updateAudioPlayback(() {}); // 状态变化 → 气泡下方转写区刷新
+      } catch (_) {
+        // 单条失败不影响消息流（转写是纯增强功能）
+      }
+    }());
   }
 
   /// 图片明文（发送端本地密文解密 / 接收端服务端拉取）：按 messageId 缓存 future，
@@ -6928,9 +6968,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     final Widget body;
     if (isVoice) {
-      body = Row(
+      // 语音消息：波形行下方挂本地转写行（aimemo/voiceTranscript.zhcn.md §10——
+      // 仅消息流气泡有；无转写数据/纯音频文件消息不加这一行）
+      body = Column(
         mainAxisSize: MainAxisSize.min,
-        children: [playButton, waveformRow],
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [playButton, waveformRow],
+          ),
+          _buildVoiceTranscriptLine(m, foreground),
+        ],
       );
     } else {
       // 音频文件：播放键独占左列，右边一列两行（老板 2026-09-27）——上行波形+时长、
@@ -6985,6 +7034,97 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 录音时长：只用秒（25s；录音上限 60s，老板要求 2026-09-13）。
   String _formatVoiceDuration(int totalSeconds) => '${totalSeconds}s';
+
+  /// 转写用的本地库：与页面其他数据同源（测试注入 [ChatPage.db]，生产用 shared）。
+  LocalDatabase get _voiceDb => widget.db ?? LocalDatabase.shared;
+
+  /// 语音气泡下方的本地转写行（aimemo/voiceTranscript.zhcn.md §10）：
+  /// - done → 转写文本（最多 3 行，可读性优先）；
+  /// - pending → 「转写中…」占位；
+  /// - failed / stale → 可点的「重新转写」入口（不露错误堆栈）；
+  /// - unavailable → 可点的「手动转写」入口（模型未就绪，点了也不报错）；
+  /// - 无行（非语音/还没入队）→ 不占位。
+  Widget _buildVoiceTranscriptLine(HistoryMessage m, Color foreground) {
+    if (m.attachment == null) return const SizedBox.shrink();
+    // watch 单行：转写完成/状态变化时此行自动重建（细粒度刷新，不牵动整个消息列表）
+    return StreamBuilder<LocalVoiceTranscript?>(
+      stream: (_voiceDb.select(
+            _voiceDb.localVoiceTranscripts,
+          )
+                ..where((t) => t.messageId.equals(m.env.messageId)))
+              .watchSingleOrNull(),
+      builder: (context, snap) {
+        final t = snap.data;
+        if (t == null) return const SizedBox.shrink();
+        final l10n = AppLocalizations.of(context)!;
+        final TextStyle style = TextStyle(fontSize: 13, color: foreground.withValues(alpha: 0.85));
+        switch (t.status) {
+          case 'done':
+            if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(t.transcript.trim(),
+                  maxLines: 3, overflow: TextOverflow.ellipsis, style: style),
+            );
+          case 'pending':
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(l10n.voiceTranscribing, style: style),
+            );
+          case 'failed':
+          case 'stale':
+          case 'unavailable':
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Clickable(
+                onTap: () => _retryVoiceTranscript(m),
+                child: Text(
+                  t.status == 'failed'
+                      ? l10n.voiceTranscriptRetry
+                      : t.status == 'stale'
+                          ? l10n.voiceTranscriptStale
+                          : l10n.voiceTranscriptManual,
+                  style: style.copyWith(
+                      decoration: TextDecoration.underline,
+                      color: foreground.withValues(alpha: 0.7)),
+                ),
+              ),
+            );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  /// 手动/重转入口（§10）：把行置回 pending 重新入队。模型未就绪时行保持
+  /// unavailable（不露错误——转写是纯增强功能）。
+  Future<void> _retryVoiceTranscript(HistoryMessage m) async {
+    if (m.attachment == null) return;
+    try {
+      final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
+      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+      final file = (_storeAttachments
+              ? await AttachmentStore.ensure(
+                  widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m))
+              : null) ??
+          await MediaCache.ensure(
+              widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m));
+      // 重转 = 清掉旧行再入队（enqueue 对 done 幂等跳过，failed/stale 行也要重算）
+      await (_voiceDb.delete(
+        _voiceDb.localVoiceTranscripts,
+      )
+            ..where((tbl) => tbl.messageId.equals(m.env.messageId)))
+          .go();
+      t.enqueue(
+        messageId: m.env.messageId,
+        plainPath: file.path,
+        cipherSha256: (m.attachment!['sha256'] as String?) ?? '',
+      );
+      _updateAudioPlayback(() {});
+    } catch (_) {
+      // 纯增强功能：失败静默（行留在原状态，下次还能点）
+    }
+  }
 
   /// 音频文件时长：h/m/s，为零的部分不显示（如 3s、1m 15s、2h 5s）。
   String _formatHmsDuration(int totalSeconds) {

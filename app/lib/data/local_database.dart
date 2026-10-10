@@ -133,8 +133,40 @@ class AppState extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(
-    tables: [LocalMessages, LocalAttachments, SyncState, Drafts, AppState, PeerReceipts, Spaces])
+/// 语音消息本地转写（纯本地派生表，`aimemo/voiceTranscript.zhcn.md` §7）。
+///
+/// 定位是**可丢弃缓存**：转写文本 = f(明文音频, ASR 模型)，各端各自转写、
+/// 不进 E2EE 密文、不参与同步、服务端不可见；换模型/换版本后可对同一音频重算。
+/// 随消息**级联删除**（音频被焚毁/删除时转写必须同时消失）。
+/// 不写进备份快照（能从密文音频重算，不把可能不准的文字固化进备份）。
+class LocalVoiceTranscripts extends Table {
+  TextColumn get messageId => text().references(LocalMessages, #messageId)();
+  // 列名用 transcript（drift Table 基类已有 text() 方法，`text` 列名与之冲突）
+  TextColumn get transcript => text().withDefault(const Constant(''))();
+  TextColumn get modelId => text().withDefault(const Constant(''))(); // 如 sense-voice-small
+  // 模型版本/文件哈希——与当前期望不一致 → stale（可重转的开关）
+  TextColumn get modelVersion => text().withDefault(const Constant(''))();
+  // 音频密文 sha256——音频若变化则转写失效（重发/换附件场景）
+  TextColumn get audioSha256 => text().withDefault(const Constant(''))();
+  TextColumn get language => text().withDefault(const Constant(''))(); // 识别到的语言
+  // pending=排队中 | done=完成 | failed=失败(重试耗尽) | stale=模型/音频已变化 | unavailable=模型未就绪
+  TextColumn get status => text().withDefault(const Constant('pending'))();
+  IntColumn get updatedAt => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {messageId};
+}
+
+@DriftDatabase(tables: [
+  LocalMessages,
+  LocalAttachments,
+  SyncState,
+  Drafts,
+  AppState,
+  PeerReceipts,
+  Spaces,
+  LocalVoiceTranscripts,
+])
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(_openConnection());
 
@@ -146,7 +178,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -233,6 +265,11 @@ class LocalDatabase extends _$LocalDatabase {
             if (await _hasColumn('spaces', 'partner_id')) {
               await m.renameColumn(spaces, 'partner_id', spaces.memberId);
             }
+          }
+          if (from < 10) {
+            // v10（2026-10-09）：新增 local_voice_transcripts 表（语音消息本地转写，
+            // 纯本地派生缓存——aimemo/voiceTranscript.zhcn.md §7）。纯新表，无回填。
+            await m.createTable(localVoiceTranscripts); // CREATE TABLE IF NOT EXISTS
           }
         },
       );

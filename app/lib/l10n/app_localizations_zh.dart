@@ -953,6 +953,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageVoiceLabel => '语音';
 
   @override
+  String get voiceTranscribing => '转写中…';
+
+  @override
+  String get voiceTranscriptRetry => '转写失败，点按重试';
+
+  @override
+  String get voiceTranscriptStale => '可重新转写';
+
+  @override
+  String get voiceTranscriptManual => '点按转写文字';
+
+  @override
   String get chatPageAttachmentMetaMissing => '附件元数据缺失';
 
   @override

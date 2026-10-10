@@ -3180,6 +3180,524 @@ class SpacesCompanion extends UpdateCompanion<Space> {
   }
 }
 
+class $LocalVoiceTranscriptsTable extends LocalVoiceTranscripts
+    with TableInfo<$LocalVoiceTranscriptsTable, LocalVoiceTranscript> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalVoiceTranscriptsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES local_messages (message_id)',
+    ),
+  );
+  static const VerificationMeta _transcriptMeta = const VerificationMeta(
+    'transcript',
+  );
+  @override
+  late final GeneratedColumn<String> transcript = GeneratedColumn<String>(
+    'transcript',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _modelIdMeta = const VerificationMeta(
+    'modelId',
+  );
+  @override
+  late final GeneratedColumn<String> modelId = GeneratedColumn<String>(
+    'model_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _modelVersionMeta = const VerificationMeta(
+    'modelVersion',
+  );
+  @override
+  late final GeneratedColumn<String> modelVersion = GeneratedColumn<String>(
+    'model_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _audioSha256Meta = const VerificationMeta(
+    'audioSha256',
+  );
+  @override
+  late final GeneratedColumn<String> audioSha256 = GeneratedColumn<String>(
+    'audio_sha256',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _languageMeta = const VerificationMeta(
+    'language',
+  );
+  @override
+  late final GeneratedColumn<String> language = GeneratedColumn<String>(
+    'language',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    messageId,
+    transcript,
+    modelId,
+    modelVersion,
+    audioSha256,
+    language,
+    status,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_voice_transcripts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalVoiceTranscript> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('transcript')) {
+      context.handle(
+        _transcriptMeta,
+        transcript.isAcceptableOrUnknown(data['transcript']!, _transcriptMeta),
+      );
+    }
+    if (data.containsKey('model_id')) {
+      context.handle(
+        _modelIdMeta,
+        modelId.isAcceptableOrUnknown(data['model_id']!, _modelIdMeta),
+      );
+    }
+    if (data.containsKey('model_version')) {
+      context.handle(
+        _modelVersionMeta,
+        modelVersion.isAcceptableOrUnknown(
+          data['model_version']!,
+          _modelVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_sha256')) {
+      context.handle(
+        _audioSha256Meta,
+        audioSha256.isAcceptableOrUnknown(
+          data['audio_sha256']!,
+          _audioSha256Meta,
+        ),
+      );
+    }
+    if (data.containsKey('language')) {
+      context.handle(
+        _languageMeta,
+        language.isAcceptableOrUnknown(data['language']!, _languageMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {messageId};
+  @override
+  LocalVoiceTranscript map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalVoiceTranscript(
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      )!,
+      transcript: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transcript'],
+      )!,
+      modelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model_id'],
+      )!,
+      modelVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model_version'],
+      )!,
+      audioSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_sha256'],
+      )!,
+      language: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}language'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalVoiceTranscriptsTable createAlias(String alias) {
+    return $LocalVoiceTranscriptsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalVoiceTranscript extends DataClass
+    implements Insertable<LocalVoiceTranscript> {
+  final String messageId;
+  final String transcript;
+  final String modelId;
+  final String modelVersion;
+  final String audioSha256;
+  final String language;
+  final String status;
+  final int updatedAt;
+  const LocalVoiceTranscript({
+    required this.messageId,
+    required this.transcript,
+    required this.modelId,
+    required this.modelVersion,
+    required this.audioSha256,
+    required this.language,
+    required this.status,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['message_id'] = Variable<String>(messageId);
+    map['transcript'] = Variable<String>(transcript);
+    map['model_id'] = Variable<String>(modelId);
+    map['model_version'] = Variable<String>(modelVersion);
+    map['audio_sha256'] = Variable<String>(audioSha256);
+    map['language'] = Variable<String>(language);
+    map['status'] = Variable<String>(status);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  LocalVoiceTranscriptsCompanion toCompanion(bool nullToAbsent) {
+    return LocalVoiceTranscriptsCompanion(
+      messageId: Value(messageId),
+      transcript: Value(transcript),
+      modelId: Value(modelId),
+      modelVersion: Value(modelVersion),
+      audioSha256: Value(audioSha256),
+      language: Value(language),
+      status: Value(status),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalVoiceTranscript.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalVoiceTranscript(
+      messageId: serializer.fromJson<String>(json['messageId']),
+      transcript: serializer.fromJson<String>(json['transcript']),
+      modelId: serializer.fromJson<String>(json['modelId']),
+      modelVersion: serializer.fromJson<String>(json['modelVersion']),
+      audioSha256: serializer.fromJson<String>(json['audioSha256']),
+      language: serializer.fromJson<String>(json['language']),
+      status: serializer.fromJson<String>(json['status']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'messageId': serializer.toJson<String>(messageId),
+      'transcript': serializer.toJson<String>(transcript),
+      'modelId': serializer.toJson<String>(modelId),
+      'modelVersion': serializer.toJson<String>(modelVersion),
+      'audioSha256': serializer.toJson<String>(audioSha256),
+      'language': serializer.toJson<String>(language),
+      'status': serializer.toJson<String>(status),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  LocalVoiceTranscript copyWith({
+    String? messageId,
+    String? transcript,
+    String? modelId,
+    String? modelVersion,
+    String? audioSha256,
+    String? language,
+    String? status,
+    int? updatedAt,
+  }) => LocalVoiceTranscript(
+    messageId: messageId ?? this.messageId,
+    transcript: transcript ?? this.transcript,
+    modelId: modelId ?? this.modelId,
+    modelVersion: modelVersion ?? this.modelVersion,
+    audioSha256: audioSha256 ?? this.audioSha256,
+    language: language ?? this.language,
+    status: status ?? this.status,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalVoiceTranscript copyWithCompanion(LocalVoiceTranscriptsCompanion data) {
+    return LocalVoiceTranscript(
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      transcript: data.transcript.present
+          ? data.transcript.value
+          : this.transcript,
+      modelId: data.modelId.present ? data.modelId.value : this.modelId,
+      modelVersion: data.modelVersion.present
+          ? data.modelVersion.value
+          : this.modelVersion,
+      audioSha256: data.audioSha256.present
+          ? data.audioSha256.value
+          : this.audioSha256,
+      language: data.language.present ? data.language.value : this.language,
+      status: data.status.present ? data.status.value : this.status,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalVoiceTranscript(')
+          ..write('messageId: $messageId, ')
+          ..write('transcript: $transcript, ')
+          ..write('modelId: $modelId, ')
+          ..write('modelVersion: $modelVersion, ')
+          ..write('audioSha256: $audioSha256, ')
+          ..write('language: $language, ')
+          ..write('status: $status, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    messageId,
+    transcript,
+    modelId,
+    modelVersion,
+    audioSha256,
+    language,
+    status,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalVoiceTranscript &&
+          other.messageId == this.messageId &&
+          other.transcript == this.transcript &&
+          other.modelId == this.modelId &&
+          other.modelVersion == this.modelVersion &&
+          other.audioSha256 == this.audioSha256 &&
+          other.language == this.language &&
+          other.status == this.status &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalVoiceTranscriptsCompanion
+    extends UpdateCompanion<LocalVoiceTranscript> {
+  final Value<String> messageId;
+  final Value<String> transcript;
+  final Value<String> modelId;
+  final Value<String> modelVersion;
+  final Value<String> audioSha256;
+  final Value<String> language;
+  final Value<String> status;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const LocalVoiceTranscriptsCompanion({
+    this.messageId = const Value.absent(),
+    this.transcript = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.modelVersion = const Value.absent(),
+    this.audioSha256 = const Value.absent(),
+    this.language = const Value.absent(),
+    this.status = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalVoiceTranscriptsCompanion.insert({
+    required String messageId,
+    this.transcript = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.modelVersion = const Value.absent(),
+    this.audioSha256 = const Value.absent(),
+    this.language = const Value.absent(),
+    this.status = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : messageId = Value(messageId);
+  static Insertable<LocalVoiceTranscript> custom({
+    Expression<String>? messageId,
+    Expression<String>? transcript,
+    Expression<String>? modelId,
+    Expression<String>? modelVersion,
+    Expression<String>? audioSha256,
+    Expression<String>? language,
+    Expression<String>? status,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (messageId != null) 'message_id': messageId,
+      if (transcript != null) 'transcript': transcript,
+      if (modelId != null) 'model_id': modelId,
+      if (modelVersion != null) 'model_version': modelVersion,
+      if (audioSha256 != null) 'audio_sha256': audioSha256,
+      if (language != null) 'language': language,
+      if (status != null) 'status': status,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalVoiceTranscriptsCompanion copyWith({
+    Value<String>? messageId,
+    Value<String>? transcript,
+    Value<String>? modelId,
+    Value<String>? modelVersion,
+    Value<String>? audioSha256,
+    Value<String>? language,
+    Value<String>? status,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalVoiceTranscriptsCompanion(
+      messageId: messageId ?? this.messageId,
+      transcript: transcript ?? this.transcript,
+      modelId: modelId ?? this.modelId,
+      modelVersion: modelVersion ?? this.modelVersion,
+      audioSha256: audioSha256 ?? this.audioSha256,
+      language: language ?? this.language,
+      status: status ?? this.status,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (transcript.present) {
+      map['transcript'] = Variable<String>(transcript.value);
+    }
+    if (modelId.present) {
+      map['model_id'] = Variable<String>(modelId.value);
+    }
+    if (modelVersion.present) {
+      map['model_version'] = Variable<String>(modelVersion.value);
+    }
+    if (audioSha256.present) {
+      map['audio_sha256'] = Variable<String>(audioSha256.value);
+    }
+    if (language.present) {
+      map['language'] = Variable<String>(language.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalVoiceTranscriptsCompanion(')
+          ..write('messageId: $messageId, ')
+          ..write('transcript: $transcript, ')
+          ..write('modelId: $modelId, ')
+          ..write('modelVersion: $modelVersion, ')
+          ..write('audioSha256: $audioSha256, ')
+          ..write('language: $language, ')
+          ..write('status: $status, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
@@ -3192,6 +3710,8 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $AppStateTable appState = $AppStateTable(this);
   late final $PeerReceiptsTable peerReceipts = $PeerReceiptsTable(this);
   late final $SpacesTable spaces = $SpacesTable(this);
+  late final $LocalVoiceTranscriptsTable localVoiceTranscripts =
+      $LocalVoiceTranscriptsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3204,6 +3724,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     appState,
     peerReceipts,
     spaces,
+    localVoiceTranscripts,
   ];
 }
 
@@ -3271,6 +3792,37 @@ final class $$LocalMessagesTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _localAttachmentsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $LocalVoiceTranscriptsTable,
+    List<LocalVoiceTranscript>
+  >
+  _localVoiceTranscriptsRefsTable(_$LocalDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.localVoiceTranscripts,
+        aliasName:
+            'local_messages__message_id__local_voice_transcripts__message_id',
+      );
+
+  $$LocalVoiceTranscriptsTableProcessedTableManager
+  get localVoiceTranscriptsRefs {
+    final manager =
+        $$LocalVoiceTranscriptsTableTableManager(
+          $_db,
+          $_db.localVoiceTranscripts,
+        ).filter(
+          (f) => f.messageId.messageId.sqlEquals(
+            $_itemColumn<String>('message_id')!,
+          ),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _localVoiceTranscriptsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -3384,6 +3936,32 @@ class $$LocalMessagesTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> localVoiceTranscriptsRefs(
+    Expression<bool> Function($$LocalVoiceTranscriptsTableFilterComposer f) f,
+  ) {
+    final $$LocalVoiceTranscriptsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.messageId,
+          referencedTable: $db.localVoiceTranscripts,
+          getReferencedColumn: (t) => t.messageId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$LocalVoiceTranscriptsTableFilterComposer(
+                $db: $db,
+                $table: $db.localVoiceTranscripts,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -3565,6 +4143,32 @@ class $$LocalMessagesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> localVoiceTranscriptsRefs<T extends Object>(
+    Expression<T> Function($$LocalVoiceTranscriptsTableAnnotationComposer a) f,
+  ) {
+    final $$LocalVoiceTranscriptsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.messageId,
+          referencedTable: $db.localVoiceTranscripts,
+          getReferencedColumn: (t) => t.messageId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$LocalVoiceTranscriptsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.localVoiceTranscripts,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$LocalMessagesTableTableManager
@@ -3580,7 +4184,10 @@ class $$LocalMessagesTableTableManager
           $$LocalMessagesTableUpdateCompanionBuilder,
           (LocalMessage, $$LocalMessagesTableReferences),
           LocalMessage,
-          PrefetchHooks Function({bool localAttachmentsRefs})
+          PrefetchHooks Function({
+            bool localAttachmentsRefs,
+            bool localVoiceTranscriptsRefs,
+          })
         > {
   $$LocalMessagesTableTableManager(
     _$LocalDatabase db,
@@ -3675,40 +4282,66 @@ class $$LocalMessagesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({localAttachmentsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (localAttachmentsRefs) db.localAttachments,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (localAttachmentsRefs)
-                    await $_getPrefetchedData<
-                      LocalMessage,
-                      $LocalMessagesTable,
-                      LocalAttachment
-                    >(
-                      currentTable: table,
-                      referencedTable: $$LocalMessagesTableReferences
-                          ._localAttachmentsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$LocalMessagesTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).localAttachmentsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where(
-                            (e) => e.messageId == item.messageId,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                localAttachmentsRefs = false,
+                localVoiceTranscriptsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (localAttachmentsRefs) db.localAttachments,
+                    if (localVoiceTranscriptsRefs) db.localVoiceTranscripts,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (localAttachmentsRefs)
+                        await $_getPrefetchedData<
+                          LocalMessage,
+                          $LocalMessagesTable,
+                          LocalAttachment
+                        >(
+                          currentTable: table,
+                          referencedTable: $$LocalMessagesTableReferences
+                              ._localAttachmentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$LocalMessagesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).localAttachmentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.messageId == item.messageId,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (localVoiceTranscriptsRefs)
+                        await $_getPrefetchedData<
+                          LocalMessage,
+                          $LocalMessagesTable,
+                          LocalVoiceTranscript
+                        >(
+                          currentTable: table,
+                          referencedTable: $$LocalMessagesTableReferences
+                              ._localVoiceTranscriptsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$LocalMessagesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).localVoiceTranscriptsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.messageId == item.messageId,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -3725,7 +4358,10 @@ typedef $$LocalMessagesTableProcessedTableManager =
       $$LocalMessagesTableUpdateCompanionBuilder,
       (LocalMessage, $$LocalMessagesTableReferences),
       LocalMessage,
-      PrefetchHooks Function({bool localAttachmentsRefs})
+      PrefetchHooks Function({
+        bool localAttachmentsRefs,
+        bool localVoiceTranscriptsRefs,
+      })
     >;
 typedef $$LocalAttachmentsTableCreateCompanionBuilder =
     LocalAttachmentsCompanion Function({
@@ -5125,6 +5761,409 @@ typedef $$SpacesTableProcessedTableManager =
       Space,
       PrefetchHooks Function()
     >;
+typedef $$LocalVoiceTranscriptsTableCreateCompanionBuilder =
+    LocalVoiceTranscriptsCompanion Function({
+      required String messageId,
+      Value<String> transcript,
+      Value<String> modelId,
+      Value<String> modelVersion,
+      Value<String> audioSha256,
+      Value<String> language,
+      Value<String> status,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalVoiceTranscriptsTableUpdateCompanionBuilder =
+    LocalVoiceTranscriptsCompanion Function({
+      Value<String> messageId,
+      Value<String> transcript,
+      Value<String> modelId,
+      Value<String> modelVersion,
+      Value<String> audioSha256,
+      Value<String> language,
+      Value<String> status,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$LocalVoiceTranscriptsTableReferences
+    extends
+        BaseReferences<
+          _$LocalDatabase,
+          $LocalVoiceTranscriptsTable,
+          LocalVoiceTranscript
+        > {
+  $$LocalVoiceTranscriptsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $LocalMessagesTable _messageIdTable(_$LocalDatabase db) =>
+      db.localMessages.createAlias(
+        'local_voice_transcripts__message_id__local_messages__message_id',
+      );
+
+  $$LocalMessagesTableProcessedTableManager get messageId {
+    final $_column = $_itemColumn<String>('message_id')!;
+
+    final manager = $$LocalMessagesTableTableManager(
+      $_db,
+      $_db.localMessages,
+    ).filter((f) => f.messageId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_messageIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$LocalVoiceTranscriptsTableFilterComposer
+    extends Composer<_$LocalDatabase, $LocalVoiceTranscriptsTable> {
+  $$LocalVoiceTranscriptsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get transcript => $composableBuilder(
+    column: $table.transcript,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get modelVersion => $composableBuilder(
+    column: $table.modelVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioSha256 => $composableBuilder(
+    column: $table.audioSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get language => $composableBuilder(
+    column: $table.language,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$LocalMessagesTableFilterComposer get messageId {
+    final $$LocalMessagesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.localMessages,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LocalMessagesTableFilterComposer(
+            $db: $db,
+            $table: $db.localMessages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LocalVoiceTranscriptsTableOrderingComposer
+    extends Composer<_$LocalDatabase, $LocalVoiceTranscriptsTable> {
+  $$LocalVoiceTranscriptsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get transcript => $composableBuilder(
+    column: $table.transcript,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get modelVersion => $composableBuilder(
+    column: $table.modelVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioSha256 => $composableBuilder(
+    column: $table.audioSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get language => $composableBuilder(
+    column: $table.language,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$LocalMessagesTableOrderingComposer get messageId {
+    final $$LocalMessagesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.localMessages,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LocalMessagesTableOrderingComposer(
+            $db: $db,
+            $table: $db.localMessages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LocalVoiceTranscriptsTableAnnotationComposer
+    extends Composer<_$LocalDatabase, $LocalVoiceTranscriptsTable> {
+  $$LocalVoiceTranscriptsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get transcript => $composableBuilder(
+    column: $table.transcript,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get modelId =>
+      $composableBuilder(column: $table.modelId, builder: (column) => column);
+
+  GeneratedColumn<String> get modelVersion => $composableBuilder(
+    column: $table.modelVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get audioSha256 => $composableBuilder(
+    column: $table.audioSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get language =>
+      $composableBuilder(column: $table.language, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$LocalMessagesTableAnnotationComposer get messageId {
+    final $$LocalMessagesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.localMessages,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LocalMessagesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.localMessages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LocalVoiceTranscriptsTableTableManager
+    extends
+        RootTableManager<
+          _$LocalDatabase,
+          $LocalVoiceTranscriptsTable,
+          LocalVoiceTranscript,
+          $$LocalVoiceTranscriptsTableFilterComposer,
+          $$LocalVoiceTranscriptsTableOrderingComposer,
+          $$LocalVoiceTranscriptsTableAnnotationComposer,
+          $$LocalVoiceTranscriptsTableCreateCompanionBuilder,
+          $$LocalVoiceTranscriptsTableUpdateCompanionBuilder,
+          (LocalVoiceTranscript, $$LocalVoiceTranscriptsTableReferences),
+          LocalVoiceTranscript,
+          PrefetchHooks Function({bool messageId})
+        > {
+  $$LocalVoiceTranscriptsTableTableManager(
+    _$LocalDatabase db,
+    $LocalVoiceTranscriptsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalVoiceTranscriptsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$LocalVoiceTranscriptsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LocalVoiceTranscriptsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> messageId = const Value.absent(),
+                Value<String> transcript = const Value.absent(),
+                Value<String> modelId = const Value.absent(),
+                Value<String> modelVersion = const Value.absent(),
+                Value<String> audioSha256 = const Value.absent(),
+                Value<String> language = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalVoiceTranscriptsCompanion(
+                messageId: messageId,
+                transcript: transcript,
+                modelId: modelId,
+                modelVersion: modelVersion,
+                audioSha256: audioSha256,
+                language: language,
+                status: status,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String messageId,
+                Value<String> transcript = const Value.absent(),
+                Value<String> modelId = const Value.absent(),
+                Value<String> modelVersion = const Value.absent(),
+                Value<String> audioSha256 = const Value.absent(),
+                Value<String> language = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalVoiceTranscriptsCompanion.insert(
+                messageId: messageId,
+                transcript: transcript,
+                modelId: modelId,
+                modelVersion: modelVersion,
+                audioSha256: audioSha256,
+                language: language,
+                status: status,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalVoiceTranscriptsTable,
+                    LocalVoiceTranscript
+                  >(table),
+                  $$LocalVoiceTranscriptsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({messageId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (messageId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.messageId,
+                        referencedTable: $$LocalVoiceTranscriptsTableReferences
+                            ._messageIdTable(db),
+                        referencedColumn: $$LocalVoiceTranscriptsTableReferences
+                            ._messageIdTable(db)
+                            .messageId,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$LocalVoiceTranscriptsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$LocalDatabase,
+      $LocalVoiceTranscriptsTable,
+      LocalVoiceTranscript,
+      $$LocalVoiceTranscriptsTableFilterComposer,
+      $$LocalVoiceTranscriptsTableOrderingComposer,
+      $$LocalVoiceTranscriptsTableAnnotationComposer,
+      $$LocalVoiceTranscriptsTableCreateCompanionBuilder,
+      $$LocalVoiceTranscriptsTableUpdateCompanionBuilder,
+      (LocalVoiceTranscript, $$LocalVoiceTranscriptsTableReferences),
+      LocalVoiceTranscript,
+      PrefetchHooks Function({bool messageId})
+    >;
 
 class $LocalDatabaseManager {
   final _$LocalDatabase _db;
@@ -5143,4 +6182,6 @@ class $LocalDatabaseManager {
       $$PeerReceiptsTableTableManager(_db, _db.peerReceipts);
   $$SpacesTableTableManager get spaces =>
       $$SpacesTableTableManager(_db, _db.spaces);
+  $$LocalVoiceTranscriptsTableTableManager get localVoiceTranscripts =>
+      $$LocalVoiceTranscriptsTableTableManager(_db, _db.localVoiceTranscripts);
 }
