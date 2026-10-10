@@ -19,7 +19,11 @@ const builtinAlias = {
   ip16: 'iPhone 16',
   ip16plus: 'iPhone 16 Plus',
   ip16pro: 'iPhone 16 Pro',
-  ip16pm: 'iPhone 16 Pro Max'
+  ip16pm: 'iPhone 16 Pro Max',
+  ip17: 'iPhone 17',
+  ip17pro: 'iPhone 17 Pro',
+  ip17pm: 'iPhone 17 Pro Max',
+  ip17air: 'iPhone Air'
 }
 
 const rootDir = path.resolve(__dirname, '..')
