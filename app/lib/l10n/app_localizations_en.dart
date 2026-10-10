@@ -50,7 +50,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String upgradeRequiredBody(String min) {
-    return 'This version is no longer supported by the server (needs at least $min). Please update to continue.';
+    return 'Your app version is no longer supported (needs at least $min). Please update to continue.';
   }
 
   @override
@@ -60,9 +60,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get upgradeRequiredDownload => 'Download update';
-
-  @override
-  String get upgradeRequiredRecheck => 'Check again';
 
   @override
   String get upgradeRecommendedTitle => 'Update available';

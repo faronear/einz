@@ -13625,3 +13625,9 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   验证：server min_app_version.test.ts 6/6（+3 新用例）；app version_gate_test 14/14
   （+6 新用例，含"恰好等于必须下限→只提醒不拦"的边界）；npm test 全链绿、
   flutter analyze 干净。文档同步：PROTOCOL_MULTIVERSE.md §4.1、DEPLOYMENT.md 配置节。
+- 版本闸弹窗两处改进（老板 2026-10-10 真机测试反馈）：
+  ① 弹窗里的下载链接文本改为**可点击**（复用 LinkifiedText，蓝字+下划线，
+  点击 = 点「下载新版本」按钮，开外部浏览器；原先是 SelectableText 只能手抄）；
+  ② 删掉「重新检查」按钮（老板建议：实际只有运维改回配置时有意义，对终端用户是干扰项；
+  l10n 键 upgradeRequiredRecheck 一并删除，en/zh + gen-l10n）。
+  analyze + version_gate_test 14/14 全绿。

@@ -167,7 +167,7 @@ abstract class AppLocalizations {
   /// No description provided for @upgradeRequiredBody.
   ///
   /// In en, this message translates to:
-  /// **'This version is no longer supported by the server (needs at least {min}). Please update to continue.'**
+  /// **'Your app version is no longer supported (needs at least {min}). Please update to continue.'**
   String upgradeRequiredBody(String min);
 
   /// No description provided for @upgradeRequiredCurrent.
@@ -181,12 +181,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download update'**
   String get upgradeRequiredDownload;
-
-  /// No description provided for @upgradeRequiredRecheck.
-  ///
-  /// In en, this message translates to:
-  /// **'Check again'**
-  String get upgradeRequiredRecheck;
 
   /// No description provided for @upgradeRecommendedTitle.
   ///

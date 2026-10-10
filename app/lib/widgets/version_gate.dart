@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
+import 'linkified_text.dart';
 
 /// 版本闸（2026-10-04）：服务端在 `/health` 里声明 `min_app_version` 时，
 /// **低于它的客户端在首屏弹一个关不掉的升级窗口**——"服务端已经不支持你了"。
@@ -149,13 +148,6 @@ Future<void> checkVersionGate(
             currentVersion: current,
             minVersion: health.minAppVersion!,
             downloadUrl: health.appDownloadUrl,
-            // 唯一的逃生口不是"跳过"，而是**重新问一次服务器**：运维刚把配置改回来 /
-            // 刚推了新包，用户不必杀进程重启就能继续。
-            onRecheck: () {
-              Navigator.of(ctx).pop();
-              unawaited(checkVersionGate(context,
-                  server: server, probe: probe, appVersion: appVersion));
-            },
           )
         : _RecommendedUpgradeDialog(
             currentVersion: current,
@@ -181,14 +173,12 @@ class _RequiredUpgradeDialog extends StatelessWidget {
   const _RequiredUpgradeDialog({
     required this.currentVersion,
     required this.minVersion,
-    required this.onRecheck,
     this.downloadUrl,
   });
 
   final String currentVersion;
   final String minVersion;
   final String? downloadUrl;
-  final VoidCallback onRecheck;
 
   @override
   Widget build(BuildContext context) {
@@ -209,17 +199,13 @@ class _RequiredUpgradeDialog extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
             if (hasUrl) ...[
               const SizedBox(height: 10),
-              // 链接原样显示（可选中）：按钮点不开时还能手抄
-              SelectableText(url,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF2271F7))),
+              // 链接本身可点（= 点「下载新版本」按钮，开外部浏览器）；
+              // LinkifiedText 渲染蓝字+下划线，与全 app 链接样式一致
+              LinkifiedText(url, style: const TextStyle(fontSize: 12)),
             ],
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: onRecheck,
-            child: Text(l10n.upgradeRequiredRecheck),
-          ),
           if (hasUrl)
             FilledButton(
               onPressed: () => openAppDownloadUrl(context, downloadUrl),
@@ -264,8 +250,8 @@ class _RecommendedUpgradeDialog extends StatelessWidget {
               style: const TextStyle(fontSize: 12, color: Colors.grey)),
           if (hasUrl) ...[
             const SizedBox(height: 10),
-            SelectableText(url,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF2271F7))),
+            // 链接本身可点（= 点「下载新版本」按钮），同 _RequiredUpgradeDialog
+            LinkifiedText(url, style: const TextStyle(fontSize: 12)),
           ],
         ],
       ),

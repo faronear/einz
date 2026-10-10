@@ -35,18 +35,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupPageEnvelopeKeyHint(String mode) {
-    return '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境同伴获取。';
+    return '密保信封是私下交接的一段加密文字。请询问你的同伴获取。';
   }
 
   @override
   String get setupPageNeedPassphrase => '请设置共享口令';
 
   @override
-  String get upgradeRequiredTitle => '需要升级';
+  String get upgradeRequiredTitle => '必须升级';
 
   @override
   String upgradeRequiredBody(String min) {
-    return '这个版本已经不被服务器支持了（最低需要 $min）。升级后才能继续使用。';
+    return '您正在使用的版本已经过期（最低需要 $min）。升级后才能继续使用。';
   }
 
   @override
@@ -56,9 +56,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get upgradeRequiredDownload => '下载新版本';
-
-  @override
-  String get upgradeRequiredRecheck => '重新检查';
 
   @override
   String get upgradeRecommendedTitle => '有新版本';
