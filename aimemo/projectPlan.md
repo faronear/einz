@@ -48,6 +48,16 @@
   （凭口令取 Space Key）替代直接传 sealed 文件；配套考察加密 store
 - `[ ]` 文档债：`projectPlan` 之外的旧文档复核（`docs/DATABASE.md`/`PROTOCOL.md` 的
   Draft v0.1 头、`aimemo/upgradeToMultiverse.md` 是否仍与实际一致）
+- `[x]` **语音转写 Phase 1 MVP**（2026-10-09，feat/voice-transcript 分支 b856c75）：按
+  `aimemo/voiceTranscript.zhcn.md` 落地——`local_voice_transcripts` 表（schema v10，
+  随消息级联删除、不进密文/不同步/不入备份）；`VoiceTranscriptService` 后台 isolate 串行
+  跑 sherpa-onnx SenseVoice（isolate 只收纯值参数防捕获 drift 句柄；重试 2 次；模型未
+  就绪置 unavailable）；语音明文落盘后自动入队（`_autoStoreAttachments` 统一钩子）；气泡
+  下方转写行四态（done/pending/failed·stale·unavailable 可点入口，watch 单行刷新）。
+  验证：全量 analyze 零告警、迁移测试更新到 v10 通过、group/multi_space 测试全过。
+  `chat_page_menu_test` 语音用例**基线（cf2eb0a worktree）同点失败**（25s 断言，媒体
+  mock 既有问题）非回归。**待 Phase 0**：模型分发（不进 git）、真机 A/B（SenseVoice vs
+  Paraformer）、录音格式 m4a→16kHz WAV（§8，未做——转写行当前依赖 ASR 前解码）。
 - `[x]` **3 个 pty E2E 测试 rot 修复**（2026-10-09 完成）：根因=e2421d6 新增「秘境类型」
   问答 + 预置名机制删除 + 2026-10-04 purpose 收敛（invite=开新身份/attach=进已有身份、
   attach 不再问名字）+ 协议版本升 3。修复 4 个测试：presence/revoked/revoke_command/
