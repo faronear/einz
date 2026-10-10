@@ -185,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @upgradeCoolingBody.
   ///
   /// In en, this message translates to:
-  /// **'A newer version {latest} is available. Please update at your convenient time.'**
+  /// **'Your app version is old, the newest version {latest} is available for download. Please update at your convenient time.'**
   String upgradeCoolingBody(String latest);
 
   /// No description provided for @upgradeCoolingDownload.

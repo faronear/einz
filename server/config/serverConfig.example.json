@@ -2,7 +2,8 @@
   "maxSpaces": 0,
   "maxEntrancesPerSpace": 0,
   "maxMembersPerSpace": 0,
-  "minAppVersion": "",
-  "appDownloadUrl": "",
-  "dataStore": ""
+  "coldAppVersion": "xxxx.xxxx.xx",
+  "hotAppVersion": "xxxx.xxxx.xx",
+  "appDownloadUrl": "https://github.com/faronear/einz/releases/tag/latest",
+  "dataStore": "不能热加载，数据库只在server启动时打开"
 }

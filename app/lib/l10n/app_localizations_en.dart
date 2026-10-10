@@ -61,7 +61,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String upgradeCoolingBody(String latest) {
-    return 'A newer version $latest is available. Please update at your convenient time.';
+    return 'Your app version is old, the newest version $latest is available for download. Please update at your convenient time.';
   }
 
   @override

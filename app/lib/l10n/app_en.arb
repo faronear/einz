@@ -16,7 +16,7 @@
   "@upgradeFrozenBody": {"placeholders": {"min": {"type": "String"}, "current": {"type": "String"}}},
   "upgradeFrozenDownload": "Download update",
   "upgradeCoolingTitle": "Update available",
-  "upgradeCoolingBody": "A newer version {latest} is available. Please update at your convenient time.",
+  "upgradeCoolingBody": "Your app version is old, the newest version {latest} is available for download. Please update at your convenient time.",
   "@upgradeCoolingBody": {"placeholders": {"latest": {"type": "String"}}},
   "upgradeCoolingDownload": "Download update",
   "upgradeCoolingLater": "Later",

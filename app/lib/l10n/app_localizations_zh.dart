@@ -46,18 +46,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String upgradeFrozenBody(String min, String current) {
-    return '您正在使用的版本 $current 已经过期，最低需要 $min。升级后才能继续使用。';
+    return '您的应用版本 $current 已经过期，最低需要 $min。升级后才能继续使用。';
   }
 
   @override
   String get upgradeFrozenDownload => '下载新版本';
 
   @override
-  String get upgradeCoolingTitle => '有新版本';
+  String get upgradeCoolingTitle => '建议升级';
 
   @override
   String upgradeCoolingBody(String latest) {
-    return '已有新版本 $latest，建议您抽空升级。';
+    return '您的应用版本即将过期，目前可下载的最新版本为 $latest，建议您抽空升级。';
   }
 
   @override
