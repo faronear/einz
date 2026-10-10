@@ -13604,3 +13604,8 @@ c4f4f85 内容（含本修复）已重落为 `6cdb987`；coturn yml 与 aimemo �
 **接线（由我会做，等当前任务提交完成后）：** 把新提交 `rebase --onto
 origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只剩新改动），
 再补一个「撤回灰字占位」小提交 → 之后 push 是正常 fast-forward，无需 force。
+
+**接线完成（2026-10-10）：** `rebase --onto origin/main 5faff04` 落地为
+`ef65860 + 2731f3a`（worklog 一处冲突取并集）；`c89670f` 的灰字占位随后以
+`51fc12d` 再次移除。本地 main = origin/main + 3，push 为正常 fast-forward，
+无需 force。上节【接线说明】作废。
