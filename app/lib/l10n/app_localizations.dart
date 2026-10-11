@@ -1598,6 +1598,24 @@ abstract class AppLocalizations {
   /// **'Recall'**
   String get chatPageActionRecall;
 
+  /// No description provided for @chatPageRecallConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall this message?'**
+  String get chatPageRecallConfirmTitle;
+
+  /// No description provided for @chatPageRecallConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Once recalled, the recipient will never receive it. This cannot be undone.'**
+  String get chatPageRecallConfirmBody;
+
+  /// No description provided for @chatPageRecallConfirmOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall'**
+  String get chatPageRecallConfirmOk;
+
   /// No description provided for @chatPageRecallBlocked.
   ///
   /// In en, this message translates to:

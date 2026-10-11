@@ -843,6 +843,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionRecall => '撤回';
 
   @override
+  String get chatPageRecallConfirmTitle => '撤回这条消息？';
+
+  @override
+  String get chatPageRecallConfirmBody => '撤回后对方将永远收不到这条消息，且不可恢复。';
+
+  @override
+  String get chatPageRecallConfirmOk => '撤回';
+
+  @override
   String get chatPageRecallBlocked => '对方已接收，无法撤回';
 
   @override

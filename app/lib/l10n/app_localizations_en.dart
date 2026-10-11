@@ -915,6 +915,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionRecall => 'Recall';
 
   @override
+  String get chatPageRecallConfirmTitle => 'Recall this message?';
+
+  @override
+  String get chatPageRecallConfirmBody =>
+      'Once recalled, the recipient will never receive it. This cannot be undone.';
+
+  @override
+  String get chatPageRecallConfirmOk => 'Recall';
+
+  @override
   String get chatPageRecallBlocked => 'Already delivered, can\'t recall';
 
   @override

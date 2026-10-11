@@ -5234,19 +5234,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                   // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——
                   // 服务端按 delivered 高水位原子判定，客户端只做**粗筛**减少
-                  // 无效入口（最终判定的权威在服务端 409）
-                  if (_messageRecallable(m))
-                    _buildActionCard(
-                      icon: Icons.undo_outlined,
-                      label: l10n.chatPageActionRecall,
-                      onTap: () => Navigator.of(ctx).pop('recall'),
-                    ),
+                  // 无效入口（最终判定的权威在服务端 409）。放「删除」之后：
+                  // 撤回实质上比删除更重（删自己的还让别人收不到；2026-10-11）
                   _buildActionCard(
                     icon: Icons.delete_outline,
                     label: l10n.chatPageActionDelete,
                     destructive: true,
                     onTap: () => Navigator.of(ctx).pop('delete'),
                   ),
+                  if (_messageRecallable(m))
+                    _buildActionCard(
+                      icon: Icons.undo_outlined,
+                      label: l10n.chatPageActionRecall,
+                      destructive: true,
+                      onTap: () => Navigator.of(ctx).pop('recall'),
+                    ),
                 ]
               ]),
             ),
@@ -5280,6 +5282,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     const maxPerRow = 4;
     const spacing = 12.0;
     const maxCardWidth = 96.0;
+    // 网格容器的自然宽度=一行四卡。弹层比这宽时（如 macOS 满窗宽的底部
+    // 弹层，2026-10-11）卡片被 96 上限卡住、行尾一大片空白——整体限宽居中，
+    // 尾行也居中，与手机上填满一行的观感一致。
+    const gridMaxWidth = maxCardWidth * maxPerRow + spacing * (maxPerRow - 1);
+    Widget constrain(Widget child) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: gridMaxWidth),
+            child: child,
+          ),
+        );
     return LayoutBuilder(
       builder: (context, constraints) {
         final fourColumnWidth =
@@ -5291,24 +5303,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ];
         if (cards.length <= maxPerRow) {
           // 不超过 4 个：等距分布、卡片等高分栏
-          return IntrinsicHeight(
+          return constrain(IntrinsicHeight(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: items,
             ),
-          );
+          ));
         }
-        // 超过 4 个：每行 4 个一组、向左对齐摆放
+        // 超过 4 个：每行 4 个一组摆放；末行不满时也居中（与限宽后的整块
+        // 网格对齐，避免右侧空一大片）
         final rows = <Widget>[];
         for (var i = 0; i < items.length; i += maxPerRow) {
           final chunk = items.sublist(
             i,
             i + maxPerRow > items.length ? items.length : i + maxPerRow,
           );
+          final lastRow = i + maxPerRow >= items.length;
           rows.add(IntrinsicHeight(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisAlignment: lastRow && chunk.length < maxPerRow
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (var j = 0; j < chunk.length; j++) ...[
@@ -5319,7 +5335,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ));
         }
-        return Column(
+        return constrain(Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (var i = 0; i < rows.length; i++) ...[
@@ -5327,7 +5343,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               rows[i],
             ],
           ],
-        );
+        ));
       },
     );
   }
@@ -5546,6 +5562,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 409（对方已拉取）→ 提示不可撤；其余错误静默提示失败（不墓碑）。
   Future<void> _recallMessage(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
+    // 确认弹窗（2026-10-11）：撤回不可恢复且对方永远收不到，比删除更重，
+    // 不做二次确认容易误触
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
+        content: Text(l10n.chatPageRecallConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade400),
+            child: Text(l10n.chatPageRecallConfirmOk),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     try {
       await _repo.recallMessage(m.env.messageId);
     } on ApiException catch (e) {
