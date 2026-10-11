@@ -93,7 +93,9 @@ void main() {
         client
             .getUrl(Uri.parse('https://tls-fail.einz.test:${plain.port}/'))
             .then((r) => r.close()),
-        throwsA(isA<SocketException>()),
+        // 新版 Dart SDK 对纯 TCP 监听上的 TLS 握手抛 HandshakeException，
+        // 旧版抛 SocketException——两者都证明握手失败、证书未被绕过。
+        throwsA(anyOf(isA<SocketException>(), isA<HandshakeException>())),
       );
       expect(pinnedServerIps.containsKey('tls-fail.einz.test'), isFalse);
     });
