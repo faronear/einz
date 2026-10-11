@@ -5545,14 +5545,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
         content: Text(l10n.chatPageDeleteConfirmMessage),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(l10n.chatPageDeleteCancel),
           ),
-          // 确认按钮红字（2026-10-11 老板：与撤回确认弹窗一致）
-          TextButton(
+          // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
+          // 用实体样式，不再是纯文字）
+          FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red.shade400),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.white,
+            ),
             child: Text(l10n.chatPageDeleteConfirmOk),
           ),
         ],
@@ -5584,13 +5588,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
         content: Text(l10n.chatPageRecallConfirmBody),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(l10n.cancel),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red.shade400),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.white,
+            ),
             child: Text(l10n.chatPageRecallConfirmOk),
           ),
         ],

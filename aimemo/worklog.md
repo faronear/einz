@@ -13932,3 +13932,7 @@ TextButton（与撤回确认弹窗同款）。analyze 0 issue。
 记、不按单条消息——对方之后拉到更大 seq 会让撤回墓碑误显双勾；撤回=没
 送达，`_buildSendStatusIcon` 加 `deletedKind == 'recall'` 特判固定单勾。
 analyze 0 issue。
+
+**追记（同日，七）**：删除/撤回确认弹窗按钮从纯文字（TextButton）改实体
+样式——取消 → OutlinedButton、确认 → 红底白字 FilledButton，两弹窗同款。
+analyze 0 issue。
