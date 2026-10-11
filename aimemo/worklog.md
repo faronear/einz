@@ -13936,3 +13936,28 @@ analyze 0 issue。
 **追记（同日，七）**：删除/撤回确认弹窗按钮从纯文字（TextButton）改实体
 样式——取消 → OutlinedButton、确认 → 红底白字 FilledButton，两弹窗同款。
 analyze 0 issue。
+
+**追记（同日，八）：发行版「我的」灯常红的根因修复（老板报告）。**
+现象：发行版 macOS/iOS「我的」灯常红、About 显示已连接（REST 正常、消息
+能互发）、WS 握手从未到达服务器（生产 node 日志 30 分钟零 WS 记录，仅有
+的两条 400 是诊断 curl 走 HTTP/2 所致）；本地 dev（ws://localhost:3901）
+绿灯正常。通知条「离线 N 条待发送」与 About「已连接」矛盾 = 判据不同源
+（About 走 /health 探测，通知条走 WS/发送状态）。
+
+**根因**：`createPinnedHttpClient` 的 `connectionFactory`（c70f3c10 引入）
+对 `wss` scheme 失效——Dart 的 Uri 不认 wss 默认端口（`uri.port` 返回 **0**）
+且 `isScheme('https')` 对 wss 为 false → 走进明文 `Socket.startConnect(host, 0)`
+→ errno 49 恒失败。dev 的 `ws://localhost:3901` 端口显式非 0 所以绿灯；
+REST 是 https scheme 端口正常所以不受影响。**凡走 pinned client 的生产
+WS 全断**——与发行版时间线完全吻合。
+
+**修复**：connectionFactory 归一化端口（0 → 443/80 按 TLS 判定）与 TLS
+判定（isScheme('https') || isScheme('wss')）。临时探针脚本（shared/bin/
+ws_probe.dart，已删）验证：farinear.cn / bittic.cn 握手成功（假 token
+4401 关闭=预期）。dart analyze 0 issue；shared 83 测试全过。
+
+**连带发现（待老板处理）**：① `einz.tic.cc` 的 DNS A 记录**真的是
+127.0.0.1**——DoH（TLS 校验，不可注入）与系统解析一致，需查 tic.cc 的
+解析配置；② `einz.yuanjinx.com` 系统 DNS 被污染到 23.248.192.114（DoH
+正确 36.154.238.42），App 靠 DoH 钉扎自救，属 2026-10-11 容灾设计预期。
+③ 发行版要**重新打包**才能带上此修复（dev app 热重启已生效）。

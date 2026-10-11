@@ -117,19 +117,27 @@ HttpClient createPinnedHttpClient({Duration? connectionTimeout}) {
   final client = HttpClient();
   if (connectionTimeout != null) client.connectionTimeout = connectionTimeout;
   client.connectionFactory = (Uri uri, String? proxyHost, int? proxyPort) async {
+    // ws/wss 不是 Dart 认识默认端口的 scheme：Uri.port 会返回 **0**，
+    // isScheme('https') 对 wss 也是 false（2026-10-11 红灯排查实测：
+    // WsClient 经 pinned client 连 wss 时 "port = 0" errno 49）。这里把
+    // 端口与 TLS 判定一并归一化，四个 scheme 全覆盖。
+    final port = uri.port != 0
+        ? uri.port
+        : ((uri.isScheme('https') || uri.isScheme('wss')) ? 443 : 80);
+    final isTls = uri.isScheme('https') || uri.isScheme('wss');
     final pinnedIp = pinnedServerIps[uri.host];
     if (proxyHost != null || pinnedIp == null) {
       // 未钉扎（或出现代理——本工程不配置）：复刻 SDK 直连默认路径。
-      return uri.isScheme('https')
-          ? SecureSocket.startConnect(uri.host, uri.port)
-          : Socket.startConnect(uri.host, uri.port);
+      return isTls
+          ? SecureSocket.startConnect(uri.host, port)
+          : Socket.startConnect(uri.host, port);
     }
     final task = await Socket.startConnect(
-        InternetAddress(pinnedIp, type: InternetAddressType.IPv4), uri.port);
+        InternetAddress(pinnedIp, type: InternetAddressType.IPv4), port);
     final Future<Socket> socket = () async {
       try {
         final raw = await task.socket;
-        if (!uri.isScheme('https')) return raw;
+        if (!isTls) return raw;
         return await SecureSocket.secure(raw, host: uri.host);
       } on Object {
         // 钉扎 IP 连不上 / 证书对不上 → 清钉扎自愈，原始异常照常上抛
