@@ -13692,3 +13692,37 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   Xcode 27 + CocoaPods，iPhone 17 (iOS 27) 模拟器可跑 app。
 - macbook 与 iMac 多机分工：macbook 在 main（今天 4 个提交，未推送），iMac 在
   feat/voice-transcript；voice WIP 暂存 stash@{0}，合并时按 main 解 tooltip 冲突。
+
+## 2026-10-11（macbook · main）DNS 抢答注入排查 + DoH 兜底落地
+
+**排查结论（域名没有被劫持）：** 老板 ping `einz.yuanjinx.com` 拿到 `23.248.192.114`
+（RedLuff LLC，ARIN 美国段，443 直接 Connection refused）。Cloudflare 权威（DNSSEC 签名，
+TTL 300）+ Google/Cloudflare/AliDNS 公共 DNS 一致给出真 IP `36.154.238.42`（中国移动，
+即国内服务器）。连打 10 次 `dig @223.5.5.5`：4 次真、5 次假、1 次超时——**家庭宽带链路
+上的 UDP-53 抢答注入**（伪造应答 TTL 3600，抢先于真应答到达；mDNSResponder 中招后缓存
+1 小时）。腾讯 DoH（加密查询）返回干净真 IP。老板手机蜂窝（江苏）正常 → 注入只在老板
+家里那条宽带（路由器/移动网关）。**v2rayA 系误判**（当时先入为主）：已应老板确认卸载
+（launchctl bootout + 删 plist + brew uninstall --zap），但卸载后注入依旧存在，真因在
+链路上。安全面：假 IP 拿不出合法 LE 证书 → 只会"连不上"不会中间人，E2EE 无恙。
+
+**老板本机临时解法：** `/etc/hosts` 钉 `36.154.238.42 einz.yuanjinx.com`（待老板执行）。
+
+**DoH 兜底实现（老板拍板：DoH 自动解析，否掉硬编码 IP）：** 新增
+`shared/lib/src/protocol/dns_fallback.dart`（App/CLI/WS 三端共用）：
+- 探测失败 → DoH 重解析（doh.pub 优先、alidns 兜底，纯 dart:io 零新依赖）→ 真 IP
+  钉扎进进程级表（会话级，永不落盘）→ 重探一次；
+- `createPinnedHttpClient`：`connectionFactory` 直连钉扎 IP，https 经
+  `SecureSocket.secure(raw, host: 真域名)`——SNI/证书校验不变，无 onBadCertificate；
+- 自愈：钉扎 IP 连不上（搬迁后陈旧）→ 连接层清钉扎 + 原样上抛，下轮探测重 DoH；
+  每主机 60s 速率闸（防向导页 4s 重试循环打爆 DoH）；
+- 集成点：`api_client._client`（一行）、`ws_client`（`WebSocket.connect` 的
+  `customClient`，连接存活期不 close、stop 时收尾）、App `probeServer`（包
+  `probeWithDohFallback`，原体改名 `_probeDirect`）、TUI `_probeServer` 同法；
+- SDK 事实：`WebSocket.connect` 原生支持 `customClient`；`ConnectionTask.fromSocket`
+  需 Dart ≥3.13 → shared/cli pubspec `sdk` 升 `^3.13.0`。
+
+**测试：** 新 `shared/test/dns_fallback_test.dart`（解析/钉扎生效+Host 头保持真域名/
+TLS 失败清 pin/陈旧 pin 自愈/流程+60s 闸，共 15 例）；扩展 `ws_client_test`（钉扎经
+customClient 连通）与 `app/test/server_config_test.dart`（端到端 probeServer 兜底）。
+全绿：shared 82、cli 22、app 275（1 skip），三包 analyze 干净。文档
+SERVER_SETTINGS.md 新增 §4.1。**真机验证（被污染网络冷启动）待老板执行。**

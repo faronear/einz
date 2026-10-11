@@ -341,10 +341,24 @@ String _resolveAutoStore() {
 
 /// 启动探测（GET {server}/health，3s 超时，不重试）：
 /// 能连（HTTP 200）→ (true, 协议版本, 能力清单)；连接失败/超时 → (false, '', [])。
-/// Multiverse：/health 不再返回全局 member 表——member 名字改由空间成员信息提供，
-/// 消息前缀用本地 store 的名字（自己/对方由空间成员填充）。
-Future<(bool, String, List<String>)> _probeServer(String server) async {
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+/// 直连失败自动走 DoH 兜底（DNS 污染场景，见 dns_fallback.dart）；[dohResolver]
+/// 仅测试注入用。Multiverse：/health 不再返回全局 member 表——member 名字改由
+/// 空间成员信息提供，消息前缀用本地 store 的名字（自己/对方由空间成员填充）。
+Future<(bool, String, List<String>)> _probeServer(String server,
+    {DoHResolver? dohResolver}) {
+  return probeWithDohFallback(
+    server,
+    () => _probeDirect(server),
+    ok: (r) => r.$1,
+    dohResolver: dohResolver,
+  );
+}
+
+/// 直连探测（原 [_probeServer] 本体）。host 被钉扎时经 [createPinnedHttpClient]
+/// 直连 DoH 真 IP，TLS 仍按域名校验。
+Future<(bool, String, List<String>)> _probeDirect(String server) async {
+  final client =
+      createPinnedHttpClient(connectionTimeout: const Duration(seconds: 3));
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();

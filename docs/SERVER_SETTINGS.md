@@ -92,6 +92,25 @@ _kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com']
   指定的地址，不该被候选列表劫持。
 - 老 App 加一个备用域名后**自愈**，不需要用户更新，也不需要在 App 里做任何操作。
 
+### 4.1 DNS 污染兜底（DoH + IP 钉扎，2026-10-11）
+
+背景：部分网络（家庭路由器 / 运营商网关）对明文 UDP-53 查询做**抢答注入**——伪造应答
+（假 IP + TTL 3600）抢先到达，系统解析被污染约 1 小时，客户端连不上服务器（2026-10-11
+排查：`einz.yuanjinx.com` 在老板家庭宽带被注入 `23.248.192.114`；手机蜂窝正常）。
+
+机制（`shared/lib/src/protocol/dns_fallback.dart`，App / CLI / WS 三端共用）：
+
+- 探测（App `probeServer` / TUI `_probeServer`）直连失败 → 用 **DoH** 重新解析域名
+  （doh.pub 优先、dns.alidns.com 兜底，加密查询无法被链路注入）→ 拿到真 A 记录后
+  **钉扎**（pin）进进程级表 → 立即重探一次。
+- 钉扎后所有连接（REST / WS / 探测）经 `HttpClient.connectionFactory` 直连钉扎 IP，
+  **TLS 仍按真实域名校验**（SNI + 证书验证不变，全链路无 `onBadCertificate`）——假 IP
+  拿不出合法证书，只会握手失败，不会被中间人。
+- 自愈：钉扎 IP 连不上（服务器搬迁后陈旧）→ 连接层自动清钉扎，下一轮探测重新 DoH；
+  每主机 60s 内最多 DoH 一次（向导页 4s 重试循环不会打爆 DoH）。
+- 钉扎表会话级内存、**永不落盘**（与 §1 地址纪律一致）；IP 字面量 / localhost 不触发
+  DoH；健康网络零 DoH 流量（首次探测即成功直接返回）。
+
 ## 5. 开发工作流
 
 **手机 / 模拟器（debug）**

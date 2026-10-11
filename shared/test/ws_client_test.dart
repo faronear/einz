@@ -277,4 +277,24 @@ void main() {
     expect(statuses, contains(WsStatus.connected));
     await client.stop();
   });
+
+  test('IP 钉扎：假域名经 customClient 连到钉扎 IP（DNS 污染兜底）', () async {
+    final (server, base, _) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    // 把 URL 里的假域名钉到本地真实监听的 loopback
+    final fakeBase =
+        base.replaceFirst('127.0.0.1', 'fake.einz.test');
+    setServerPin('fake.einz.test', '127.0.0.1');
+    addTearDown(() => clearServerPin('fake.einz.test'));
+
+    final statuses = <WsStatus>[];
+    final client =
+        WsClient(server: fakeBase, token: 'tok', onStatus: statuses.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    expect(statuses, contains(WsStatus.connected),
+        reason: '钉扎生效时应经 customClient 连通假域名');
+    await client.stop();
+  });
 }

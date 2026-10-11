@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:einz_shared/einz_shared.dart'
+    show DoHResolver, createPinnedHttpClient, probeWithDohFallback;
 
 /// 服务器地址层（三层，见 docs/SERVER_SETTINGS.md）。
 ///
@@ -154,8 +156,23 @@ class ServerHealth {
 /// 旧 Server 明确升级提示，§8.1）。**另含版本闸两个边界值**（2026-10-04 起，
 /// 2026-10-10 温度三态）：coldAppVersion（冻结线）/ hotAppVersion（当前热版本），
 /// 客户端启动时据此判断 frozen / cooling / none（见 widgets/version_gate.dart）。
-Future<ServerHealth> probeServer(String server) async {
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+Future<ServerHealth> probeServer(
+  String server, {
+  DoHResolver? dohResolver, // 测试注入 fake；生产走真实 DoH（doh.pub → alidns）
+}) {
+  return probeWithDohFallback(
+    server,
+    () => _probeDirect(server),
+    ok: (h) => h.ok,
+    dohResolver: dohResolver,
+  );
+}
+
+/// 直连探测（原 [probeServer] 本体）。host 被钉扎时经 [createPinnedHttpClient]
+/// 直连 DoH 真 IP，TLS 仍按域名校验（DNS 污染兜底，见 dns_fallback.dart）。
+Future<ServerHealth> _probeDirect(String server) async {
+  final client =
+      createPinnedHttpClient(connectionTimeout: const Duration(seconds: 3));
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
