@@ -13726,3 +13726,19 @@ TLS 失败清 pin/陈旧 pin 自愈/流程+60s 闸，共 15 例）；扩展 `ws_
 customClient 连通）与 `app/test/server_config_test.dart`（端到端 probeServer 兜底）。
 全绿：shared 82、cli 22、app 275（1 skip），三包 analyze 干净。文档
 SERVER_SETTINGS.md 新增 §4.1。**真机验证（被污染网络冷启动）待老板执行。**
+
+## 2026-10-11（续）候选列表扩至四域名（用户无感连接主线）
+
+**老板定调：** 核心目标不是修本机网络，是**用户无感无痛连生产服务器**。新增两个备案
+域名 `einz.farinear.cn` / `einz.bittic.cn`（同一服务器 `36.154.238.42`），加入候选列表。
+
+**实测就绪后才动客户端：** 两域名 DNS 解析正确、服务器证书已签（LE，CN 各自匹配）、
+`/health` 返回 v2-multiverse 正常（同机同 uptime）——老板服务器端 Caddy 已配好。
+
+**改动：** App `kServerCandidates` 与 TUI `_kServerCandidates` 各加两行；SERVER_SETTINGS.md
+§4 样例同步。app/cli analyze + 测试全绿（server_config 守卫断言不受影响）。
+
+**分层防线（用户视角）：** ① 并发多域名探测——单域名被 DNS 注入 / 备案 / 注册商故障时
+自动落到其余入口；② DoH 兜底（上一条）——单域名解析路径污染时加密重解析；③ 都失效
+也只失败不中间人（TLS 按域名校验）。**未覆盖**：服务器挂 / IP 被封（需第二网络路径，
+将来再说）；存量旧包没有 ①②，需随下次发版更新。

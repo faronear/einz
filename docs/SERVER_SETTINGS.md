@@ -74,10 +74,13 @@ cwd 下有 localConfig.json 照样读（自建服务器场景）；没有就走�
 
 ```
 // App：app/lib/data/server_config.dart   ／   TUI：cli/bin/einz_tui.dart
-kServerCandidates  = [kPrimaryServer, 'https://einz.yuanjinx.com']
-_kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com']
-// 加备用域名 = 两边各加一行常量（+ 重新构建/发布）
-// 两个入口指向**同一台服务器**（一个全球、一个国内备案），身份相同、不需要清库。
+kServerCandidates  = [kPrimaryServer, 'https://einz.yuanjinx.com',
+                      'https://einz.farinear.cn', 'https://einz.bittic.cn']
+_kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com',
+                      'https://einz.farinear.cn', 'https://einz.bittic.cn']
+// 加备用域名 = 两边各加一行常量（+ 重新构建/发布）+ 服务器端 Caddy 站点/证书先行就绪
+// 四个入口指向**同一台服务器**（tic.cc 全球、其余国内备案），身份相同、不需要清库。
+// 多入口同时抗：单域名 DNS 注入（§4.1 DoH 兜底的姊妹防线）、备案/注册商故障。
 ```
 
 探测语义：候选**并发**探测，**谁先返回 200 就用谁**（不是"列表第一个优先"——顺序只

@@ -203,6 +203,8 @@ const String _kPrimaryServer = 'https://einz.tic.cc';
 const List<String> _kServerCandidates = [
   _kPrimaryServer, // 全球入口（无备案）
   'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
+  'https://einz.farinear.cn', // 中国备用入口 1
+  'https://einz.bittic.cn', // 中国备用入口 2
 ];
 
 /// 是否**打包好的产物**（`dart compile exe` 出来的 AOT 二进制，含 CI 编的那几份）。

@@ -50,9 +50,15 @@ const String kPrimaryServer = 'https://einz.tic.cc';
 /// 也无需在 App 里做任何操作。
 ///
 /// 新增备用域名 = 在这里加一行常量（+ 重新发包）。
+///
+/// 2026-10-11 起三域名同源（`36.154.238.42`）：单域名被 DNS 抢答注入（见
+/// dns_fallback.dart）/ 备案 / 注册商故障时，并发探测会自动落到其余入口，
+/// 用户无感。服务器端 TLS（Caddy）与解析需先行就绪。
 const List<String> kServerCandidates = [
   kPrimaryServer, // 全球入口（无备案）
   'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
+  'https://einz.farinear.cn', // 中国备用入口 1
+  'https://einz.bittic.cn', // 中国备用入口 2
 ];
 
 /// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
