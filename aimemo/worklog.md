@@ -13845,3 +13845,21 @@ app-apk-build / app-ios-build-raw / app-mac-build-raw / buildMacos.sh（dev+dist
 **追记**：`buildIos.sh` 的内联 TURN 块也抽取为 `scripts/turnDefineArgs.sh` 调用
 （数组语义保持：while read 填充 TURN_DEFINE_ARGS，stderr 提示原样透传）——单一
 实现，五条打包路径（ipa adhoc/appstore/raw、apk、macos dev/dist）同口径。
+
+## 2026-10-11 会话：修复「撤回」菜单项从不显示的 bug
+
+**现象（老板报告）：** 本地测试环境、最新代码，macOS 以「一往无前」发群组消息
+"nobody is online"（无人上线），长按刚发的消息没有「撤回」按钮。
+
+**排查：** 撤回功能（02def732，2026-10-10）本身完好——提交在 origin/main 与
+github/main，server/shared/repo 代码齐全。根因是**字符串值不匹配**：
+`message_repository.dart:858` 里 `sender` 取值为 `'me'`/`'peer'`，但
+`chat_page.dart` 撤回功能新增的 `_messageHasActions` / `_messageRecallable`
+两处都写成 `m.sender == 'mine'`——永远为 false，菜单项从不出现（双人/群组
+均如此）。当时测试全过是因为测试直接调 `_recallMessage` 与服务端接口，未
+覆盖菜单可见性。
+
+**修复：** 两处 `'mine'` → `'me'`。flutter analyze 0 issue；chat_page_menu
+相关测试 34 项全过。
+
+**验证：** iOS/macOS pid 文件在跑，已发 USR1 热重载。

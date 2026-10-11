@@ -5161,14 +5161,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   行，未送达的自己消息仍该能撤；其余操作对已删内容无意义）。
   bool _messageHasActions(HistoryMessage m) =>
       !m.deleted ||
-      (m.sender == 'mine' &&
+      (m.sender == 'me' &&
           m.env.serverSequence != null &&
           m.status != 'failed');
 
   /// 「撤回」可见条件（与 [_messageHasActions] 的墓碑分支同口径）：
   /// 自己消息、服务端已收下、对方尚未拉取（本地状态粗筛，权威判定在服务端）。
   bool _messageRecallable(HistoryMessage m) =>
-      m.sender == 'mine' &&
+      m.sender == 'me' &&
       m.env.serverSequence != null &&
       m.status != 'failed';
 
