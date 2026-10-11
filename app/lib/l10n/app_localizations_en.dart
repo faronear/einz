@@ -1154,6 +1154,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutServerDevNote => 'Development address for debugging only';
 
   @override
+  String get aboutStatusLabel => 'Connection';
+
+  @override
+  String get aboutStatusChecking => 'Checking…';
+
+  @override
+  String get aboutStatusConnected => 'Connected';
+
+  @override
+  String get aboutStatusUnreachable =>
+      'Cannot reach any server entrance (auto-retrying)';
+
+  @override
+  String aboutStatusEntranceNote(Object server) {
+    return 'Currently connected via: $server';
+  }
+
+  @override
   String get advancedMenuTitle => 'Advanced security';
 
   @override

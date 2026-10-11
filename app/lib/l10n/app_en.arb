@@ -598,6 +598,16 @@
   "aboutVersionLabel": "Version",
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address for debugging only",
+  "aboutStatusLabel": "Connection",
+  "aboutStatusChecking": "Checking…",
+  "aboutStatusConnected": "Connected",
+  "aboutStatusUnreachable": "Cannot reach any server entrance (auto-retrying)",
+  "aboutStatusEntranceNote": "Currently connected via: {server}",
+  "@aboutStatusEntranceNote": {
+    "placeholders": {
+      "server": {}
+    }
+  },
   "advancedMenuTitle": "Advanced security",
   "advancedDestroyEntrance": "Destroy this entrance",
   "advancedClearMessages": "Delete all messages",

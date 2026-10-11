@@ -13798,3 +13798,26 @@ realm 保持不变（不参与解析，改随机串无安全收益）。
 **待老板**：CF 里给 farinear.cn / bittic.cn 各加 `turn` A 记录 → 36.154.238.42
 （**灰云**）——**下版打包前必须就位**，否则新包中继全失效（DoH+系统解析都查无
 此名）。就位后喊我 dig 验证。
+
+## 2026-10-11（续 4）About 弹层如实显示连接状态（全不可达不再冒充兜底）
+
+**老板要求**：全部域名都连不上时，「关于秘境」必须明确显示这一点，而不是默默
+展示一个连不上的兜底名义地址（einz.tic.cc 之谜的 UI 侧修复）。
+
+**实现**（widgets/about_sheet.dart）：弹层新增「连接状态」行——并发探测
+kServerCandidates 全部候选（复用带 DoH 兜底的 probeServer，可注入 fake）：
+- 任一可达 → **已连接**（主色），名义地址 ≠ 实际入口时附注"当前实际入口：X"
+- 全部不可达 → **无法连接任何服务器入口（自动重试中）**（error 色）
+- 服务器地址行保持展示 effectiveServer 名义值（可复制排查用）
+
+**测试抓出真实 bug**：首版用 hasData 判定——全不可达时 future 正常完成但结果
+null（hasData=false），导致"无法连接"被永远显示成"检测中…"。改用
+connectionState 判定后修复。**这正是本次要修的那类静默错误，被测试当场复现。**
+
+**其他**：l10n 新增 5 键（zh/en + gen）；AboutSheet 加可选 probe 参数（入口
+show() 透传，三处调用点零改动）。app 全量 285 测试通过、analyze 干净。
+
+**TURN 配置（本机 gitignore 文件，无提交）**：老板拍板全 4 条——
+farinear/bittic/yuanjinx（新子域实测干净）/tic.cc（127.0.0.1 死入口，教义同
+kServerCandidates：留配置，将来搬海外改 DNS 即复活存量 App）。
+老板本机已临时撤销系统级 Ali DoH，保留金丝雀视角（Tailscale 开关 = 净化切换）。

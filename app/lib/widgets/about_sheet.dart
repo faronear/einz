@@ -16,17 +16,26 @@ typedef AboutInfo = ({String version, String buildNumber});
 /// （yymm.ddhh.mm，见 scripts/appVersion.js），不是 pubspec 里那个写死的 1.0.0。
 /// 服务器地址读 [effectiveServer]（启动时定好的进程全局量）——锁屏态与解锁后读的
 /// 是同一个变量，不可能不一致（地址不进锁包，见 `data/app_lock.dart`）。
+///
+/// **连接状态行（2026-10-11）**：[effectiveServer] 在全候选探测失败时会兜底成
+/// 主域名——那只是**名义地址**，不代表连得上。本弹层并发探测全部候选（复用带
+/// DoH 兜底的 [probeServer]），如实显示"已连接（实际入口）/ 无法连接任何服务器
+/// 入口"——老板要求：全域名不可达时**不许默默展示一个连不上的兜底地址**。
 class AboutSheet extends StatefulWidget {
-  const AboutSheet({super.key});
+  const AboutSheet({super.key, this.probe});
+
+  /// 探测函数（测试注入 fake；生产用 [probeServer]，自带 DoH 兜底）。
+  final Future<ServerHealth> Function(String server)? probe;
 
   /// 各处菜单/入口统一从这个静态方法打开（ showModalBottomSheet）。
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context,
+      {Future<ServerHealth> Function(String server)? probe}) {
     return showModalBottomSheet<void>(
       context: context,
       // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）：
       // 窗口缩小先保持弹层高度，压到上边沿才一起往下压。
       isScrollControlled: true,
-      builder: (_) => const AboutSheet(),
+      builder: (_) => AboutSheet(probe: probe),
     );
   }
 
@@ -37,9 +46,22 @@ class AboutSheet extends StatefulWidget {
 class _AboutSheetState extends State<AboutSheet> {
   late final Future<AboutInfo> _info = _load();
 
+  /// 并发探测全部候选入口：返回第一个可达的地址；null = 全部不可达。
+  late final Future<String?> _reachableEntrance = _probeEntrances();
+
   Future<AboutInfo> _load() async {
     final pkg = await PackageInfo.fromPlatform();
     return (version: pkg.version, buildNumber: pkg.buildNumber);
+  }
+
+  Future<String?> _probeEntrances() async {
+    final probe = widget.probe ?? probeServer;
+    final results = await Future.wait(kServerCandidates
+        .map((server) async => (server, await probe(server))));
+    for (final (server, health) in results) {
+      if (health.ok) return server;
+    }
+    return null;
   }
 
   @override
@@ -98,6 +120,39 @@ class _AboutSheetState extends State<AboutSheet> {
                         value: effectiveServer,
                         note: isDevServer ? l10n.aboutServerDevNote : null,
                       ),
+                      const SizedBox(height: 14),
+                      FutureBuilder<String?>(
+                        future: _reachableEntrance,
+                        builder: (context, snap) {
+                          // 判定用 connectionState 而非 hasData：全部不可达时
+                          // future 正常完成但结果是 null（hasData 为 false），
+                          // 若按 hasData 判定会把"无法连接"永远显示成"检测中"
+                          // （首版实现的真实 bug，测试抓出）。
+                          final String value;
+                          final Color? valueColor;
+                          String? note;
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            value = l10n.aboutStatusChecking;
+                            valueColor = null;
+                          } else if (snap.hasData && snap.data != null) {
+                            value = l10n.aboutStatusConnected;
+                            valueColor = Theme.of(context).colorScheme.primary;
+                            // 名义地址 ≠ 实际入口（候选切换/兜底）时如实标注
+                            if (snap.data != effectiveServer) {
+                              note = l10n.aboutStatusEntranceNote(snap.data!);
+                            }
+                          } else {
+                            value = l10n.aboutStatusUnreachable;
+                            valueColor = Theme.of(context).colorScheme.error;
+                          }
+                          return _InfoRow(
+                            label: l10n.aboutStatusLabel,
+                            value: value,
+                            valueColor: valueColor,
+                            note: note,
+                          );
+                        },
+                      ),
                     ],
                   );
                 },
@@ -112,13 +167,17 @@ class _AboutSheetState extends State<AboutSheet> {
 
 /// 一行「标签 + 值」，值可长按选中复制。
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value, this.note});
+  const _InfoRow(
+      {required this.label, required this.value, this.note, this.valueColor});
 
   final String label;
   final String value;
 
   /// 值下方的补充说明（小字、弱化色），null = 不展示。
   final String? note;
+
+  /// 值的颜色（连接状态语义色），null = 默认。
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +191,8 @@ class _InfoRow extends StatelessWidget {
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 4),
-        SelectableText(value, style: theme.textTheme.bodyLarge),
+        SelectableText(value,
+            style: theme.textTheme.bodyLarge?.copyWith(color: valueColor)),
         if (note != null) ...[
           const SizedBox(height: 4),
           Text(

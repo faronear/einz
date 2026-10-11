@@ -581,6 +581,16 @@
   "aboutVersionLabel": "版本号",
   "aboutServerLabel": "服务器地址",
   "aboutServerDevNote": "开发地址（非生产），仅用于开发调试",
+  "aboutStatusLabel": "连接状态",
+  "aboutStatusChecking": "检测中…",
+  "aboutStatusConnected": "已连接",
+  "aboutStatusUnreachable": "无法连接任何服务器入口（自动重试中）",
+  "aboutStatusEntranceNote": "当前实际入口：{server}",
+  "@aboutStatusEntranceNote": {
+    "placeholders": {
+      "server": {}
+    }
+  },
   "advancedMenuTitle": "高级安全",
   "advancedDestroyEntrance": "销毁本通道",
   "advancedClearMessages": "删除所有消息",

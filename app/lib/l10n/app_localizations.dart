@@ -2012,6 +2012,36 @@ abstract class AppLocalizations {
   /// **'Development address for debugging only'**
   String get aboutServerDevNote;
 
+  /// No description provided for @aboutStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get aboutStatusLabel;
+
+  /// No description provided for @aboutStatusChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get aboutStatusChecking;
+
+  /// No description provided for @aboutStatusConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get aboutStatusConnected;
+
+  /// No description provided for @aboutStatusUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot reach any server entrance (auto-retrying)'**
+  String get aboutStatusUnreachable;
+
+  /// No description provided for @aboutStatusEntranceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently connected via: {server}'**
+  String aboutStatusEntranceNote(Object server);
+
   /// No description provided for @advancedMenuTitle.
   ///
   /// In en, this message translates to:

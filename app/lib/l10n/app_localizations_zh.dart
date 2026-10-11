@@ -1076,6 +1076,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
 
   @override
+  String get aboutStatusLabel => '连接状态';
+
+  @override
+  String get aboutStatusChecking => '检测中…';
+
+  @override
+  String get aboutStatusConnected => '已连接';
+
+  @override
+  String get aboutStatusUnreachable => '无法连接任何服务器入口（自动重试中）';
+
+  @override
+  String aboutStatusEntranceNote(Object server) {
+    return '当前实际入口：$server';
+  }
+
+  @override
   String get advancedMenuTitle => '高级安全';
 
   @override
