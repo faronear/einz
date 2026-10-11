@@ -46,7 +46,7 @@
         "autoExecuteCommands": true,
         "commands": [
           "cd ~/einz",
-          "npm run app-apk-boot2run --mode=local"
+          "if [ $(hostname) = 'doombase.local' ]; then npm run app-apk-boot2run --mode=local; fi;"
         ]
       },
       {
@@ -54,8 +54,7 @@
         "autoExecuteCommands": true,
         "commands": [
           "cd ~/einz",
-          "npm run app-ios-boot",
-          "npm run app-ios-run-local"
+          "if [ $(hostname) = 'doombase.local' ]; then npm run app-ios-boot && npm run app-ios-run-local; fi;"
         ]
       },
       {
