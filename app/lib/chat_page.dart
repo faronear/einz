@@ -8053,95 +8053,92 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 onTap: () => _saveAttachment(m),
                                               ),
                                           ],
-                                          if (m.expiresAt != null) ...[
+                                          if (m.deleted) ...[
+                                            // 墓碑（2026-10-11）：按来路显示图标——
+                                            // 撤回→撤回图标、本机删除→删除图标
+                                            //（它们的沙漏+时长并未真正起作用，
+                                            // 与真焚毁的消息区分开）；焚毁到期→
+                                            // 沙漏（不带时长文字）。**不依赖是否
+                                            // 设过阅后即焚**——此前整块包在
+                                            // expiresAt 条件里，未设焚毁的撤回/
+                                            // 删除消息出不来图标（老板实测）。
+                                            // 纯显示不可点。前面多补 4（老板
+                                            // 2026-10-02）：活消息那路沙漏带
+                                            // 4 padding，墓碑裸排会窄一截
+                                            const SizedBox(width: 4),
+                                            if (m.deletedKind == 'recall' ||
+                                                m.deletedKind == 'delete')
+                                              Icon(
+                                                m.deletedKind == 'recall'
+                                                    ? Icons.undo_outlined
+                                                    : Icons.delete_outline,
+                                                size: 14,
+                                                color: _uiStyle == 'gradient'
+                                                    ? Colors.white70
+                                                    : Colors.grey,
+                                              )
+                                            else
+                                              // 焚毁到期墓碑只留沙漏（2026-10-11
+                                              // 老板：不显示具体时长了——沙漏
+                                              // 已经漏完，时长数字没有意义）
+                                              _BurnHourglass(
+                                                  burned: true, size: 14),
+                                          ] else if (m.expiresAt != null) ...[
                                             const SizedBox(width: 4),
                                             // 沙漏=阅后即焚倒计时（老板 2026-09-12，
-                                            // 替代原来的时钟图标，避免与发送中混淆）；
-                                            // 已焚毁/已删除 → 静态空沙漏（不再翻转）。
+                                            // 替代原来的时钟图标，避免与发送中混淆）。
                                             // 可点（老板 2026-10-02）：点击进档位设置
-                                            // 弹层（同长按菜单「阅后即焚」）——仅活消息；
-                                            // 墓碑无内容可操作，保持纯显示
-                                            if (!m.deleted)
-                                              Material(
-                                                color: Colors.transparent,
-                                                // 长条控件（沙漏+时长）用圆角矩形背景，
-                                                // 不跟快捷图标走圆形（老板 2026-10-02）
-                                                borderRadius: BorderRadius.circular(12),
-                                                clipBehavior: Clip.antiAlias,
-                                                child: Tooltip(
-                                                  // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
-                                                  // （老板 2026-10-08；此前只有这处没有）
-                                                  message: l10n.chatPageActionBurn,
-                                                  child: InkWell(
-                                                    mouseCursor: SystemMouseCursors.click,
-                                                    // 悬浮/点击背景同快捷动作/状态栏图标
-                                                    hoverColor:
-                                                        Colors.black.withValues(alpha: 0.05),
-                                                    highlightColor:
-                                                        Colors.black.withValues(alpha: 0.08),
-                                                    onTap: () => _setMessageBurn(m),
-                                                    child: SizedBox(
-                                                      // 与引用/拷贝/保存圆钮**同高**
-                                                      // （老板 2026-10-08：原来被文字撑高一截）
-                                                      height: _bubbleTimeRowControlHeight,
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.symmetric(
-                                                            horizontal: 4),
-                                                        child: Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            _BurnHourglass(
-                                                                burned:
-                                                                    m.deleted,
-                                                                size: 14),
-                                                            const SizedBox(
-                                                                width: 2),
-                                                            // 时钟标签：焚毁时刻 HH:MM（精确到分钟，老板 2026-10-09）
-                                                            Text(
-                                                                _burnTagLabel(m.expiresAt,
-                                                                        m.burnAfterSeconds,
-                                                                        manual: m.burnManual),
-                                                                style: TextStyle(
-                                                                    fontSize: 11,
-                                                                    color: _uiStyle == 'gradient'
-                                                                        ? Colors.white70
-                                                                        : Colors.grey)),
-                                                          ],
-                                                        ),
+                                            // 弹层（同长按菜单「阅后即焚」）
+                                            Material(
+                                              color: Colors.transparent,
+                                              // 长条控件（沙漏+时长）用圆角矩形背景，
+                                              // 不跟快捷图标走圆形（老板 2026-10-02）
+                                              borderRadius: BorderRadius.circular(12),
+                                              clipBehavior: Clip.antiAlias,
+                                              child: Tooltip(
+                                                // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
+                                                // （老板 2026-10-08；此前只有这处没有）
+                                                message: l10n.chatPageActionBurn,
+                                                child: InkWell(
+                                                  mouseCursor: SystemMouseCursors.click,
+                                                  // 悬浮/点击背景同快捷动作/状态栏图标
+                                                  hoverColor:
+                                                      Colors.black.withValues(alpha: 0.05),
+                                                  highlightColor:
+                                                      Colors.black.withValues(alpha: 0.08),
+                                                  onTap: () => _setMessageBurn(m),
+                                                  child: SizedBox(
+                                                    // 与引用/拷贝/保存圆钮**同高**
+                                                    // （老板 2026-10-08：原来被文字撑高一截）
+                                                    height: _bubbleTimeRowControlHeight,
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 4),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          _BurnHourglass(
+                                                              burned: false,
+                                                              size: 14),
+                                                          const SizedBox(
+                                                              width: 2),
+                                                          // 时钟标签：焚毁时刻 HH:MM（精确到分钟，老板 2026-10-09）
+                                                          Text(
+                                                              _burnTagLabel(m.expiresAt,
+                                                                      m.burnAfterSeconds,
+                                                                      manual: m.burnManual),
+                                                              style: TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: _uiStyle == 'gradient'
+                                                                      ? Colors.white70
+                                                                      : Colors.grey)),
+                                                        ],
                                                       ),
                                                     ),
                                                   ),
                                                 ),
-                                              )
-                                            else ...[
-                                              // 墓碑（2026-10-11）：按来路显示图标——
-                                              // 撤回→撤回图标、本机删除→删除图标
-                                              //（它们的沙漏+时长并未真正起作用，
-                                              // 与真焚毁的消息区分开）；焚毁到期→
-                                              // 沙漏+时长照旧。纯显示不可点。
-                                              // 前面多补 4（老板 2026-10-02）：
-                                              // 活消息那路沙漏带 4 padding，墓碑
-                                              // 裸排会窄一截
-                                              const SizedBox(width: 4),
-                                              if (m.deletedKind == 'recall' ||
-                                                  m.deletedKind == 'delete')
-                                                Icon(
-                                                  m.deletedKind == 'recall'
-                                                      ? Icons.undo_outlined
-                                                      : Icons.delete_outline,
-                                                  size: 14,
-                                                  color: _uiStyle == 'gradient'
-                                                      ? Colors.white70
-                                                      : Colors.grey,
-                                                )
-                                              else ...[
-                                                // 焚毁到期墓碑只留沙漏（2026-10-11
-                                                // 老板：不显示具体时长了——沙漏
-                                                // 已经漏完，时长数字没有意义）
-                                                _BurnHourglass(
-                                                    burned: m.deleted, size: 14),
-                                              ],
-                                            ],
+                                              ),
+                                            ),
                                           ],
                                         ],
                                       ),
