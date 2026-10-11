@@ -31,6 +31,7 @@ typedef HistoryMessage = ({
   int burnAfterSeconds,
   Map<String, dynamic>? quote,
   bool deleted,
+  String? deletedKind, // 墓碑来路：'recall'=撤回、'delete'=本机删除、NULL=焚毁到期
   bool burnManual,
   String status,
   Map<String, dynamic>? meta,
@@ -426,9 +427,14 @@ class MessageRepository {
   /// 删除本机一条消息（**本地墓碑**，Server 不参与）：只置 deletedAt 标记，
   /// 行与附件元数据保留——UI 隐藏内容但保留时间+焚毁记录，不打破历史流水
   /// （老板决策 2026-09-09，替代原来的彻底删行；重启后记录仍在、内容仍隐藏）。
-  Future<void> tombstoneMessage(String messageId) async {
+  /// [kind] 标记来路（'delete'=本机删除、'recall'=撤回；焚毁到期走
+  /// [tombstoneExpired] 不带 kind）——气泡时间行据此显示对应图标（2026-10-11）。
+  Future<void> tombstoneMessage(String messageId, {String kind = 'delete'}) async {
     await (db.update(db.localMessages)..where((m) => m.messageId.equals(messageId))).write(
-      LocalMessagesCompanion(deletedAt: Value(DateTime.now().millisecondsSinceEpoch)),
+      LocalMessagesCompanion(
+        deletedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        deletedKind: Value(kind),
+      ),
     );
   }
 
@@ -445,7 +451,7 @@ class MessageRepository {
     } on ApiException catch (e) {
       if (e.httpStatus != 404) rethrow;
     }
-    await tombstoneMessage(messageId);
+    await tombstoneMessage(messageId, kind: 'recall');
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
@@ -874,6 +880,7 @@ class MessageRepository {
             : (row.expiresAt == null ? 0 : max(1, row.expiresAt! - row.createdAt)),
         quote: quote,
         deleted: row.deletedAt != null,
+        deletedKind: row.deletedKind,
         burnManual: row.burnManual,
         status: row.status,
         meta: meta,

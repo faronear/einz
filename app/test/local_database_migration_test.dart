@@ -5,7 +5,7 @@
 // `ALTER TABLE ADD COLUMN space_id` 抛 "duplicate column name" → 迁移失败 → 启动门重试
 // 耗尽 → 界面停在"启动初始化失败"，且无出路（iMac 生产库撞到）。
 //
-// 本测试构造这种"版本戳落后"的库，断言迁移能一路升到 v9 且列改名正确。
+// 本测试构造这种"版本戳落后"的库，断言迁移能一路升到 v10 且列改名正确。
 
 import 'dart:io';
 
@@ -19,7 +19,7 @@ Future<bool> _has(LocalDatabase db, String table, String column) async {
 }
 
 void main() {
-  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v9 且列改名正确', () async {
+  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v10 且列改名正确', () async {
     final dir = Directory.systemTemp.createTempSync('einz-mig-');
     final path = '${dir.path}/einz.sqlite';
     final script = '''
@@ -46,7 +46,7 @@ PRAGMA user_version = 6;
 
     final uv = (await db.customSelect('PRAGMA user_version').getSingle())
         .read<int>('user_version');
-    expect(uv, 9, reason: '迁移后版本戳应升到 9');
+    expect(uv, 10, reason: '迁移后版本戳应升到 10');
 
     // v8 列改名已生效，旧列不残留。
     expect(await _has(db, 'spaces', 'member_id'), isTrue);
@@ -57,5 +57,7 @@ PRAGMA user_version = 6;
     expect(await _has(db, 'peer_receipts', 'person_id'), isFalse);
     expect(await _has(db, 'local_messages', 'sender_entrance_id'), isTrue);
     expect(await _has(db, 'local_messages', 'sender_device_id'), isFalse);
+    // v10：墓碑来路列（deleted_kind）已补上。
+    expect(await _has(db, 'local_messages', 'deleted_kind'), isTrue);
   });
 }

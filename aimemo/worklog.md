@@ -13879,3 +13879,27 @@ github/main，server/shared/repo 代码齐全。根因是**字符串值不匹配
 
 **验证：** analyze 0 issue；app flutter test 285 项全过；iOS/macOS 已发
 USR2 热重启。
+
+## 2026-10-11 会话（二）：菜单末行左对齐 + 墓碑按来路显示图标（老板要求）
+
+1. **末行从第一列排起**：撤回上一轮「末行居中」——整块网格仍限宽 420 居中
+   （老板认可），但超过 4 个时的末行改回向左对齐。
+2. **撤回墓碑去沙漏**：撤回/立刻删除的消息此前也显示「沙漏+时长」（若通道
+   设了阅后即焚），与真焚毁的消息无差别。改为本地库区分**墓碑来路**：
+   - `local_messages` 加 `deleted_kind` 列（schema v10，幂等迁移）：
+     `'recall'`=撤回、`'delete'`=本机立刻删除、NULL=焚毁到期（及 v10 前旧墓碑）；
+   - `tombstoneMessage` 带 `kind` 参数（删除默认 'delete'，`recallMessage`
+     传 'recall'）；`HistoryMessage` typedef / 行映射 / `_asDeleted` /
+     `_mergeRefreshed`（墓碑单调合并保留来路）/ `_setMessageBurn` 就地更新
+     record 全链路透传；
+   - 气泡时间行：撤回→撤回图标（undo）、立刻删除→删除图标（均 14 号灰），
+     焚毁到期保持沙漏+时长。
+3. **老板问答**：删除时间本地有记录（`deletedAt`，2026-09-09 墓碑方案起就有）。
+
+**踩坑**：build_runner 崩溃——pub 缓存里 windows_file_picker-1.3.0 缺
+pubspec.yaml（损坏），`rm -rf` 该目录 + `flutter pub get` 重取后恢复；
+build_runner 全量生成耗时 ~150s，`flutter test` 全量在_busy 机器上超过
+300s 前台上限，改后台跑。
+
+**验证：** analyze 0 issue；迁移测试更新为断言升到 v10 + deleted_kind 列
+存在；全量测试后台运行中（结果见下轮追记）。

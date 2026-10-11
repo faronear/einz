@@ -4444,6 +4444,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 attachment: x.attachment, expiresAt: expiresAt,
                 createdAt: x.createdAt, burnAfterSeconds: seconds,
                 quote: x.quote, deleted: x.deleted,
+                deletedKind: x.deletedKind,
                 // 长按手动设置（与 repo.setMessageBurn 落盘一致）；取消时无标签
                 burnManual: seconds > 0, status: x.status, meta: x.meta)
           else
@@ -4744,6 +4745,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       burnAfterSeconds: fresh.burnAfterSeconds,
       quote: fresh.quote,
       deleted: deleted,
+      // 墓碑单调：fresh 未删而 old 已删时，来路随 old（否则随 fresh）
+      deletedKind: fresh.deleted ? fresh.deletedKind : old.deletedKind,
       burnManual: fresh.burnManual,
       status: fresh.status,
       meta: fresh.meta,
@@ -5311,20 +5314,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ));
         }
-        // 超过 4 个：每行 4 个一组摆放；末行不满时也居中（与限宽后的整块
-        // 网格对齐，避免右侧空一大片）
+        // 超过 4 个：每行 4 个一组、向左对齐摆放（末行也从第一列排起，
+        // 老板 2026-10-11；整块网格仍限宽居中）
         final rows = <Widget>[];
         for (var i = 0; i < items.length; i += maxPerRow) {
           final chunk = items.sublist(
             i,
             i + maxPerRow > items.length ? items.length : i + maxPerRow,
           );
-          final lastRow = i + maxPerRow >= items.length;
           rows.add(IntrinsicHeight(
             child: Row(
-              mainAxisAlignment: lastRow && chunk.length < maxPerRow
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (var j = 0; j < chunk.length; j++) ...[
@@ -5508,7 +5508,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 记录副本：标记为已删除/已焚毁（墓碑，内容隐藏、时间+焚毁记录保留）。
-  HistoryMessage _asDeleted(HistoryMessage m) => (
+  /// [kind] 传墓碑来路（'delete'=本机删除、'recall'=撤回、缺省=焚毁到期）。
+  HistoryMessage _asDeleted(HistoryMessage m, {String? kind}) => (
         env: m.env,
         plaintext: m.plaintext,
         sender: m.sender,
@@ -5518,6 +5519,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         burnAfterSeconds: m.burnAfterSeconds,
         quote: m.quote,
         deleted: true,
+        deletedKind: kind,
         burnManual: m.burnManual,
         status: m.status,
         meta: m.meta,
@@ -5552,7 +5554,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() {
       _messages = [
         for (final x in _messages)
-          if (x.env.messageId == m.env.messageId) _asDeleted(x) else x,
+          if (x.env.messageId == m.env.messageId) _asDeleted(x, kind: 'delete') else x,
       ];
     });
   }
@@ -5602,7 +5604,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() {
       _messages = [
         for (final x in _messages)
-          if (x.env.messageId == m.env.messageId) _asDeleted(x) else x,
+          if (x.env.messageId == m.env.messageId) _asDeleted(x, kind: 'recall') else x,
       ];
     });
   }
@@ -8112,20 +8114,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 ),
                                               )
                                             else ...[
-                                              // 墓碑（已焚毁/已删除）：纯显示不可点。
-                                              // 前面多补 4（老板 2026-10-02）：活消息那路
-                                              // 沙漏带 4 padding，墓碑裸排会窄一截
+                                              // 墓碑（2026-10-11）：按来路显示图标——
+                                              // 撤回→撤回图标、本机删除→删除图标
+                                              //（它们的沙漏+时长并未真正起作用，
+                                              // 与真焚毁的消息区分开）；焚毁到期→
+                                              // 沙漏+时长照旧。纯显示不可点。
+                                              // 前面多补 4（老板 2026-10-02）：
+                                              // 活消息那路沙漏带 4 padding，墓碑
+                                              // 裸排会窄一截
                                               const SizedBox(width: 4),
-                                              _BurnHourglass(
-                                                  burned: m.deleted, size: 14),
-                                              const SizedBox(width: 2),
-                                              Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
-                                                      manual: m.burnManual),
-                                                  style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: _uiStyle == 'gradient'
-                                                          ? Colors.white70
-                                                          : Colors.grey)),
+                                              if (m.deletedKind == 'recall' ||
+                                                  m.deletedKind == 'delete')
+                                                Icon(
+                                                  m.deletedKind == 'recall'
+                                                      ? Icons.undo_outlined
+                                                      : Icons.delete_outline,
+                                                  size: 14,
+                                                  color: _uiStyle == 'gradient'
+                                                      ? Colors.white70
+                                                      : Colors.grey,
+                                                )
+                                              else ...[
+                                                _BurnHourglass(
+                                                    burned: m.deleted, size: 14),
+                                                const SizedBox(width: 2),
+                                                Text(_burnTagLabel(m.expiresAt,
+                                                        m.burnAfterSeconds,
+                                                        manual: m.burnManual),
+                                                    style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: _uiStyle == 'gradient'
+                                                            ? Colors.white70
+                                                            : Colors.grey)),
+                                              ],
                                             ],
                                           ],
                                         ],
