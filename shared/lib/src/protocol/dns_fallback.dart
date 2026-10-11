@@ -2,9 +2,10 @@
 /// UDP-53 查询做**抢答注入**——伪造应答（假 IP + TTL 3600）抢先于真实应答到达，
 /// 导致系统解析被污染约 1 小时，客户端连不上服务器。
 ///
-/// 兜底策略：连接探测失败 → 用加密 DoH（doh.pub → dns.alidns.com，响应经
-/// TLS 校验、无法被注入）重新解析 → 把真 IP **钉扎**（pin）进进程级表 →
-/// 后续所有连接经 [createPinnedHttpClient] 的 `connectionFactory` 直连该 IP。
+/// 兜底策略：连接探测失败 → 用加密 DoH（doh.pub → dns.alidns.com →
+/// cloudflare-dns.com，响应经 TLS 校验、无法被注入）重新解析 → 把真 IP
+/// **钉扎**（pin）进进程级表 → 后续所有连接经 [createPinnedHttpClient] 的
+/// `connectionFactory` 直连该 IP。
 ///
 /// 安全红线：
 /// - TLS 证书始终按**真实域名**校验（[SecureSocket.secure] 的 `host:` 参数
@@ -39,11 +40,12 @@ void resetDohFallbackState() {
 /// DoH 解析函数类型（测试可注入 fake）。
 typedef DoHResolver = Future<String?> Function(String host);
 
-/// DoH 解析：doh.pub 优先、alidns 兜底；各 4s 超时；只取 A 记录。
-/// 两个都失败 → null（调用方保留原始连接错误，行为与无兜底一致）。
+/// DoH 解析：doh.pub 优先、alidns 兜底、Cloudflare 收尾（海外用户在前两家
+/// 慢/不稳时有更好的选择；大陆 1.1.1.1 被墙，实际永远轮不到它，零代价）；
+/// 各 4s 超时；只取 A 记录。全失败 → null（调用方保留原始连接错误）。
 ///
-/// 解析 doh.pub / dns.alidns.com 本身仍走系统 DNS——这两个是头部大域，
-/// 实际上不会被抢答；且其应答经 HTTPS 证书校验，注入无法伪造。
+/// 解析 doh.pub / dns.alidns.com / cloudflare-dns.com 本身仍走系统 DNS——这些
+/// 头部大域实际不会被抢答；且其应答经 HTTPS 证书校验，注入无法伪造。
 Future<String?> dohResolveHost(String host) async {
   for (final endpoint in _kDohEndpoints) {
     try {
@@ -73,6 +75,7 @@ Future<String?> dohResolveHost(String host) async {
 const _kDohEndpoints = <String>[
   'https://doh.pub/dns-query',
   'https://dns.alidns.com/resolve',
+  'https://cloudflare-dns.com/dns-query', // 第三顺位：海外用户兜底（大陆被墙，仅前两家全挂时尝试）
 ];
 const _kDohTimeout = Duration(seconds: 4);
 

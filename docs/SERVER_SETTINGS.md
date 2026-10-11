@@ -104,8 +104,8 @@ _kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com',
 机制（`shared/lib/src/protocol/dns_fallback.dart`，App / CLI / WS 三端共用）：
 
 - 探测（App `probeServer` / TUI `_probeServer`）直连失败 → 用 **DoH** 重新解析域名
-  （doh.pub 优先、dns.alidns.com 兜底，加密查询无法被链路注入）→ 拿到真 A 记录后
-  **钉扎**（pin）进进程级表 → 立即重探一次。
+  （doh.pub 优先、dns.alidns.com 兜底、cloudflare-dns.com 收尾——海外用户兜底；
+  加密查询无法被链路注入）→ 拿到真 A 记录后**钉扎**（pin）进进程级表 → 立即重探一次。
 - 钉扎后所有连接（REST / WS / 探测）经 `HttpClient.connectionFactory` 直连钉扎 IP，
   **TLS 仍按真实域名校验**（SNI + 证书验证不变，全链路无 `onBadCertificate`）——假 IP
   拿不出合法证书，只会握手失败，不会被中间人。
