@@ -105,43 +105,14 @@ String _dropAttachmentType(String fileName) {
 /// 发送复用右侧发送键）。
 enum _InputMode { text, hint, recording, preview }
 
-/// 「通道列表」卡片间距 + 每行张数（与「切换我的秘境」弹层同口径：一行正好 3 张，
-/// 老板 2026-09-25；边长按可用宽度反算，桌面大窗口设上限）。
+/// 「通道列表」卡片间距（一卡占满整行后只剩纵向间距，老板 2026-10-11）。
 const double _entranceCardSpacing = 12;
-const int _entranceCardsPerRow = 3;
-
-/// 弹层**内容区**的最大宽度：modal bottom sheet 在 M3 下把内容限在 640，窗口再宽也不再长
-/// （实测 800 / 1600 宽的视口，内容区都是 640、居中）。
-const double _entranceSheetMaxWidth = 640;
 
 /// 气泡时间行里各小控件的**统一高度**（老板 2026-10-08）：引用/拷贝/保存的圆钮，
 /// 以及「沙漏+时长」胶囊——三者的背景高度必须一样（此前沙漏那块的文字把胶囊撑得
 /// 比圆钮高一截）。28 = 16 图标 + 上下各 6（2026-10-09 老板要求加大：原 20×20
 /// 热区远小于 44pt 最小触控标准，手机难点中；气泡约增高 8px）。
 const double _bubbleTimeRowControlHeight = 28;
-
-/// 弹层内容区左右的内边距（下面 Padding 的 16）。
-const double _entranceSheetHPadding = 16;
-
-/// 卡片边长上限 = **弹层最大宽度**下"一行 3 张"的边长：
-/// 640 − 左右各 16 = 608 可用，减去两条 12 的间距，再均分 3 份 = 194.67
-/// （`_entranceCardSizeFor` 向下取整到 194，右边最多余 2px）。
-///
-/// 老板 2026-09-26：桌面窗口拉宽到弹层不再增长之后，卡片也不能先停止增长——原来上限
-/// 硬写 160，宽窗口下三张卡只铺到 504，右边空一大截（弹层 640 里空 100+）。
-/// 手机上可用宽度够不到这个上限（< 3*160+2*12 = 504），不影响"一行正好 3 张"。
-/// 「切换我的秘境」弹层有一份同口径的 `_kCardMaxSize`（space_switcher.dart），改一处要改两处。
-const double _entranceCardMaxSize = (_entranceSheetMaxWidth -
-        _entranceSheetHPadding * 2 -
-        _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
-    _entranceCardsPerRow;
-
-double _entranceCardSizeFor(double availableWidth) {
-  final raw =
-      (availableWidth - _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
-          _entranceCardsPerRow;
-  return raw.floorToDouble().clamp(64.0, _entranceCardMaxSize).toDouble();
-}
 
 /// 「我的通道」弹层标题行右端「刷新」按钮的占位/按钮边长（标题居中靠它配平）。
 const double _entranceRefreshSize = 40;
@@ -3395,22 +3366,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
-                  // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
-                  // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
+                  // 通道卡片：**一卡占满整行**（老板 2026-10-11：不再一行 3 张）。
+                  // 卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/灰已撤销）+ 时间
+                  // （在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
                   // 右上角固定角标：本机=编辑图标（点击改名）、已撤销=阻止图标+整卡蒙版
                   // （老板 2026-10-02：当前通道改名改从本机卡片进，弹层不再放改名行）
                   // 通道多 + 窗口矮 → 随中间整块在外层 ScrollableCardArea 里滚动。
                   ScrollableCardArea(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final size = _entranceCardSizeFor(constraints.maxWidth);
-                        return Wrap(
-                          spacing: _entranceCardSpacing,
-                          runSpacing: _entranceCardSpacing,
-                          children: [
-                            for (final d in myRows)
-                              () {
+                    child: Wrap(
+                      runSpacing: _entranceCardSpacing,
+                      children: [
+                        for (final d in myRows)
+                          () {
                                 final name = (d['entrance_name'] as String? ?? '').trim();
                                 final entranceId = d['entrance_id'] as String? ?? '';
                                 final isLocal = d['_local'] == true;
@@ -3438,7 +3405,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
                                 final hasBadge = isLocal || revoked;
                                 return SizedBox(
-                                  width: size,
+                                  // 一卡占满整行（老板 2026-10-11）；高度仍由
+                                  // 内容（名称 + 状态行）自然撑出
+                                  width: double.infinity,
                                   child: Container(
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(12),
@@ -3574,9 +3543,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   ),
                                 );
                               }(),
-                          ],
-                        );
-                      },
+                      ],
                     ),
                   ),
                   if (loaded == null)

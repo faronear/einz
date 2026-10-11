@@ -14075,3 +14075,10 @@ true`（maxHeight=全屏）→ 整个弹层被顶到满屏。该 helper 为长�
 加 `heightFactor: 1`（高度包内容、只横向居中）。新增探针回归测试
 `attach_sheet_probe_test.dart`（真实 ChatPage 打开附件弹层，断言高度
 < 70% 屏高）。analyze 0 issue。
+
+**追记（同日，二十五）**：「我的通道」弹层通道卡片改**一卡占满整行**
+（老板 2026-10-11）：不再一行 3 张，卡片 `width: double.infinity`、高度
+仍由内容自然撑出；`Wrap` 去掉横向 spacing（只剩纵向 runSpacing），
+LayoutBuilder + 边长反算整段移除，连带清掉死常量
+`_entranceCardsPerRow`/`_entranceCardMaxSize`/`_entranceCardSizeFor`/
+`_entranceSheetMaxWidth`/`_entranceSheetHPadding`。analyze 0 issue。
