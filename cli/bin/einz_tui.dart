@@ -1279,6 +1279,11 @@ Future<void> main(List<String> args) async {
   if (Platform.environment['EINZ_UNITTEST'] == '1') return;
   await sodium();
 
+  // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。TUI 直接打一行可见警告
+  // （污染事件极少发生，偶尔打断一帧渲染值得换取确定性提示）。
+  onDnsPoisonDetected = (host, ip) =>
+      stderr.writeln('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip（已上报服务器）');
+
   var storePath = '';
   var server = '';
   var explicitStore = false; // 是否显式传 --store（自动发现 vs 手动指定）

@@ -133,13 +133,17 @@ void main() {
       expect(pinnedServerIps, isEmpty);
     });
 
-    test('直连失败 → DoH 给本地真 IP → 钉扎重试成功', () async {
+    test('直连失败 → DoH 给本地真 IP → 钉扎重试成功 + 污染钩子触发', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
       server.listen((req) async {
         req.response.statusCode = 200;
         await req.response.close();
       });
+
+      var hookCalls = <String>[];
+      onDnsPoisonDetected = (host, ip) => hookCalls.add('$host@$ip');
+      addTearDown(() => onDnsPoisonDetected = null);
 
       // attempt 走钉扎工厂：无 pin 时假域名解析失败 → false
       Future<bool> attempt() async {
@@ -167,6 +171,10 @@ void main() {
       expect(ok, isTrue);
       expect(pinnedServerIps['poisoned.einz.test'],
           InternetAddress.loopbackIPv4.address);
+      await Future<void>.delayed(Duration.zero); // 上报/钩子是 fire-and-forget
+      expect(hookCalls, [
+        'poisoned.einz.test@${InternetAddress.loopbackIPv4.address}'
+      ], reason: 'DoH 与系统解析分歧（= 污染）必须触发警报钩子');
     });
 
     test('DoH 失败（null）→ 返回原始失败结果，不钉扎', () async {

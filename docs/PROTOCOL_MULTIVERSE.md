@@ -160,6 +160,20 @@ GET /health
   前者是**产品级**闸（协议也许还能用，但某版本有缺陷/不可靠时，改配置即可把旧客户端
   挡在门外，不必改代码）。客户端实现见 `app/lib/widgets/version_gate.dart`。
 
+```text
+POST /network/dns-report        ← 2026-10-11，免认证（见下）
+  DNS 污染上报：客户端探测直连失败 → DoH 重解析成功（= 系统解析与加密解析分歧，
+  链路被抢答注入）时 fire-and-forget 上报一条；走 DoH 钉扎连接（此时唯一保证可达）。
+  请求：{ domain, doh_ip? }（domain=被污染的入口域名；doh_ip=DoH 解析出的真 IP）
+  响应：200 { ok: true }；入参形状不对 → 400 INVALID_REQUEST
+  **免认证理由**：污染发生在启动探测阶段，客户端尚未（也无法）完成认证。
+  滥用面：dnsReport 限速桶（默认 10 次/时/IP）+ 域名/IPV4 形状校验 + 只追加表
+  （30 天懒清理）。旧服务端（404 NOT_FOUND）客户端静默忽略，前后向兼容。
+GET /network/dns-report
+  聚合只读：{ reports: [{ day, domain, count }] }（按 UTC 日 + 域名计数，近 30 天；
+  **不含 IP**）。供运维看清"哪些网络在污染"，早于用户投诉。
+```
+
 POST /spaces
   创建 Space（首条通道自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,

@@ -32,6 +32,11 @@ import {
 } from './entrances.js'
 import { getSpace, registerPushToken, unregisterPushToken } from './push.js'
 import {
+  insertDnsReport,
+  summarizeDnsReports,
+  validateDnsReportBody
+} from './dnsReport.js'
+import {
   assertSpacePassphrase,
   deleteKeyEscrow,
   escrowForSpace,
@@ -158,7 +163,10 @@ server.on('upgrade', (req, socket, head) => {
  *   `POST /spaces/{id}/key-escrow` 的**口令取包分支**（加入方只有口令）、
  *   `GET /notify/verify`、`GET /notify/unsubscribe`（邮件里点开的链接，浏览器带不来
  *   Bearer；token 是随机不可猜的，能力也仅限翻转自己那一位标记——见
- *   notifier.consumeNotifyToken 的注释）。
+ *   notifier.consumeNotifyToken 的注释）、
+ *   `POST/GET /network/dns-report`（DNS 污染上报：污染发生在启动探测阶段，客户端
+ *   尚未也无法完成认证；滥用面由 dnsReport 限速桶 + 严格入参校验 + 只追加 30 天表
+ *   兜住——见 dnsReport.ts）。
  *   新增免鉴权端点必须在此处登记并说明理由。
  */
 async function route (req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -788,6 +796,20 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   // 空间
   if (method === 'GET' && path === '/space') {
     sendJson(res, 200, getSpace(bearerToken(req)))
+    return
+  }
+
+  // DNS 污染上报（免鉴权，理由见 dnsReport.ts 头注释；限速见 ratelimit dnsReport 桶）
+  if (method === 'POST' && path === '/network/dns-report') {
+    limitByIp(req, 'dnsReport')
+    const body = validateDnsReportBody(await readJsonBody(req))
+    insertDnsReport(body.domain, body.dohIp, req)
+    sendJson(res, 200, { ok: true })
+    return
+  }
+  if (method === 'GET' && path === '/network/dns-report') {
+    // 聚合只读（按天/域名计数，不含 IP）；谁都能看，但没什么可看的敏感面
+    sendJson(res, 200, { reports: summarizeDnsReports() })
     return
   }
 

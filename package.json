@@ -10,6 +10,7 @@
     "l10n": "echo Generating app_localizations_xx.dart from app_xx.arb; cd app && flutter gen-l10n",
     "pub-patches": "bash scripts/patchPubCache.sh",
     "server-mail-probe": "cd server && npm run mail:probe",
+    "dns-audit": "cd cli && dart run bin/dns_audit.dart",
     "server-run-dev": "echo CLEAN=$CLEAN; if [ \"$CLEAN\" = \"true\" ]; then echo Removing old data...; rm -fr server/data/*; fi; cd server && npm run dev",
     "server-run-docker-local": "echo CLEAN=$CLEAN; if [ \"$CLEAN\" = \"true\" ]; then echo Removing old data...; rm -fr serverDocker/data/*; fi; cd serverDocker; git pull; docker compose up -d --build server; docker compose logs -f server",
     "server-run-docker-remote-mirror": "cd serverDocker; sudo git pull; sudo env COMPOSE_PROGRESS=plain docker compose -f docker-compose.yml -f docker-compose.coturn.yml up -d --build --build-arg NPM_MIRROR=https://registry.npmmirror.com --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 server && docker compose logs -f server",

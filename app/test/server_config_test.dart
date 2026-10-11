@@ -21,14 +21,20 @@ void main() {
     test('直连失败 → DoH 解析到本地真 IP → 钉扎重探成功', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
+      var healthHits = 0;
       server.listen((req) async {
-        expect(req.uri.path, '/health');
-        req.response.headers.contentType = ContentType.json;
-        req.response.write(jsonEncode({
-          'protocol_version': '2',
-          'capabilities': ['spaces'],
-          'max_attachment_bytes': 4096,
-        }));
+        // /health 是探测；/network/dns-report 是客户端 fire-and-forget 的污染上报
+        //（比探测晚到，也走钉扎连接）——两者都应命中本地桩
+        if (req.uri.path == '/health') healthHits++;
+        req.response.statusCode = 200;
+        if (req.uri.path == '/health') {
+          req.response.headers.contentType = ContentType.json;
+          req.response.write(jsonEncode({
+            'protocol_version': '3',
+            'capabilities': ['spaces'],
+            'max_attachment_bytes': 4096,
+          }));
+        }
         await req.response.close();
       });
 
@@ -38,12 +44,15 @@ void main() {
       );
 
       expect(health.ok, isTrue);
-      expect(health.protocolVersion, '2');
+      expect(health.protocolVersion, '3');
       expect(health.maxAttachmentBytes, 4096);
       expect(pinnedServerIps['poisoned.einz.test'],
           InternetAddress.loopbackIPv4.address);
       // 顺带验证 probeServer 的唯一收口副作用仍生效
       expect(serverMaxAttachmentBytes, 4096);
+      // 污染上报也应经钉扎连接打到同一个桩（fire-and-forget，稍等它落地）
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(healthHits, 1, reason: '重探应恰好打一次 /health');
     });
 
     test('DoH 也失败 → 保留原始失败（不钉扎、不重试）', () async {

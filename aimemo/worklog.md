@@ -13742,3 +13742,33 @@ SERVER_SETTINGS.md 新增 §4.1。**真机验证（被污染网络冷启动）�
 自动落到其余入口；② DoH 兜底（上一条）——单域名解析路径污染时加密重解析；③ 都失效
 也只失败不中间人（TLS 按域名校验）。**未覆盖**：服务器挂 / IP 被封（需第二网络路径，
 将来再说）；存量旧包没有 ①②，需随下次发版更新。
+
+## 2026-10-11（续 2）污染可见化 + 上报聚合 + 巡检（前后端统一升级批次）
+
+**老板定调：** 核心目标是**用户无感无痛连生产服务器**；今天前后端统一升级，一次改完。
+
+**tic.cc 之惑（老板观察）：** 劫持测试时生产 App「关于秘境」显示连接 einz.tic.cc——
+真相是**全候选探测失败 → resolveServer 兜底回主域名 tic.cc → About 显示的是名义地址**，
+App 当时处于断连重试态（tic.cc 解析 127.0.0.1 干净无注入、443 拒连，实测确认）。
+显示语义（地址 ≠ 连接状态）列为待办，未在本次改。
+
+**实测金矿：** `npm run dns-audit` 首跑就抓到现行——einz.yuanjinx.com 此刻仍被注入
+（系统=23.248.192.114，DoH=36.154.238.42），**同网络的 farinear/bittic 两域名解析
+干净** → 注入是**针对域名**的，不是整条链路。多域名候选在这类网络单独即可救用户。
+
+**本批改动：**
+1. 服务端：新增 `server/src/dnsReport.ts` + 两个免认证端点
+   `POST /network/dns-report`（dnsReport 限速桶 10/时/IP，入参形状校验，入库
+   dns_reports 表 30 天懒清理）与 `GET`（按 UTC 日/域名聚合计数，**不含 IP**）。
+   免认证已在 app.ts 鉴权约定块登记理由；协议文档 PROTOCOL_MULTIVERSE.md §4.1 补充。
+   测试 `server/test/dnsReport.test.ts`（正常上报/缺版本头/入参校验/聚合/429），npm test 全绿。
+2. 客户端：dns_fallback 新增 `onDnsPoisonDetected` 钩子（DoH 与系统解析分歧即触发）
+   + `_reportPoison` fire-and-forget 上报（走钉扎连接、5s 超时、失败静默、旧服务端
+   404 静默忽略）。App debug 包 debugPrint 警报（assert 块内，正式包静默）；
+   TUI stderr 打可见警告。
+3. 巡检：`cli/bin/dns_audit.dart` + 根 `npm run dns-audit`——四域名系统 vs DoH 双通道
+   比对，分歧/无法判定退出码 1（可接 cron）。
+
+**验证：** server npm test 全链绿（含新 dnsReport 5 组断言）；shared 83 / cli 22 /
+app 275 全绿，三包 analyze 干净。**服务端上线：VPS git pull + docker 重建后，新包
+客户端的上报才开始入库；旧客户端/旧服务端组合完全兼容（404 静默）。**

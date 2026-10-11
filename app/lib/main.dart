@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:einz_shared/einz_shared.dart' show onDnsPoisonDetected;
 
 import 'brand_logo.dart';
 import 'chat_entry.dart';
@@ -30,6 +31,13 @@ Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
   WidgetsFlutterBinding.ensureInitialized();
+  // DNS 污染警报（debug 可见）：DoH 兜底触发 = 当前网络在被注入。
+  // 正式包走静默上报（dns_fallback 内 fire-and-forget），不需要打扰用户。
+  assert(() {
+    onDnsPoisonDetected = (host, ip) =>
+        debugPrint('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip');
+    return true;
+  }());
   // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
   effectiveServer = await resolveServer(parseServerArg(await readLaunchArgs()));
   runApp(const EinzApp());

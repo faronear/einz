@@ -17,8 +17,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'types.dart';
+
 /// 进程级 IP 钉扎表（host → IPv4）。唯一来源：TLS 校验过的 DoH 响应。
 final Map<String, String> pinnedServerIps = <String, String>{};
+
+/// DNS 污染事件钩子：DoH 解析与系统解析**分歧**（= 链路被注入）并成功拿到
+/// 真 IP 时触发。App/CLI 用它把"此刻这个网络在被污染"变成可见警报。
+/// 全局单槽（本工程单服务器，无需多订阅）；回调异常被吞，绝不影响主流程。
+void Function(String host, String pinnedIp)? onDnsPoisonDetected;
 
 void setServerPin(String host, String ip) => pinnedServerIps[host] = ip;
 void clearServerPin(String host) => pinnedServerIps.remove(host);
@@ -167,5 +174,37 @@ Future<T> probeWithDohFallback<T>(
   final ip = await (dohResolver ?? dohResolveHost)(host);
   if (ip == null) return first;
   setServerPin(host, ip);
+  _onPoisonDetected(server, host, ip);
   return attempt();
+}
+
+/// 污染事件落地：① 可见警报钩子；② 向被污染入口的服务端 fire-and-forget 上报
+/// 一条（走刚建立的钉扎连接，此时它是唯一保证可达的路径）。失败静默——
+/// 上报是尽力而为的遥测，绝不能反过来影响连接主流程。
+void _onPoisonDetected(String server, String host, String ip) {
+  try {
+    onDnsPoisonDetected?.call(host, ip);
+  } on Object {
+    // 钩子是纯观测，异常不追责
+  }
+  unawaited(_reportPoison(server, host, ip));
+}
+
+Future<void> _reportPoison(String server, String host, String ip) async {
+  HttpClient? client;
+  try {
+    client = createPinnedHttpClient(connectionTimeout: const Duration(seconds: 5));
+    final req = await client
+        .postUrl(Uri.parse('$server/network/dns-report'))
+        .timeout(const Duration(seconds: 5));
+    req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+    req.headers.set('X-Protocol-Version', kProtocolVersion);
+    req.write(jsonEncode(<String, String>{'domain': host, 'doh_ip': ip}));
+    final res = await req.close().timeout(const Duration(seconds: 5));
+    await res.drain<void>().timeout(const Duration(seconds: 5));
+  } on Object {
+    // 尽力而为：服务端还没升级（404）/网络仍不通/超时——都不追
+  } finally {
+    client?.close(force: true);
+  }
 }
