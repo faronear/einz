@@ -14016,3 +14016,9 @@ zh/en ARB 里混有老板未提交的文案改动（邀请提示 ×3、GroupName
 「群组名字→群组名称」、MembersHint 清空）——已用 `git apply --cached`
 按 hunk 只提交我的键删除，老板的 ARB 改动与再生成的 l10n 文件留在工作区
 （等老板自己提交）。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十七）**：群空间状态条**左侧胶囊改成一个大的**（老板
+2026-10-11）：编辑图标或群名 + 在线人数/总人数整体包进一个 StadiumBorder
+大胶囊（含 Tooltip「我的同伴」），点它打开「我的群组」弹层（与头像槽同
+动作，改名走弹层里的群名行）；原「单独可点的编辑图标/群名胶囊」去掉。
+analyze 0 issue；chat_page_menu 34 测试全过。

@@ -1824,52 +1824,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         : stripCount * kStatusMemberAvatarSize;
     final nameColMax = (maxWidth - slotWidth - gap).clamp(0.0, maxWidth);
 
-    // 第一行：有名字显示名字（点了改名）；没名字只显示编辑图标（点了起名）。
-    // 名字也做成**可点胶囊**：悬浮/按住变色，与状态条其他可点元素同口径
-    // （invite/通话图标/更多通道箭头）。
-    Widget nameLine = _groupName.isEmpty
-        ? Tooltip(
-            message: l10n.chatPageGroupNameEditTooltip,
-            child: Material(
-              color: Colors.transparent,
-              shape: const StadiumBorder(),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(mouseCursor: SystemMouseCursors.click,
-                onTap: _showGroupNameDialog,
-                hoverColor: Colors.black.withValues(alpha: 0.05),
-                highlightColor: Colors.black.withValues(alpha: 0.08),
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(Icons.edit,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-              ),
-            ),
-          )
-        : Material(
-            color: Colors.transparent,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(mouseCursor: SystemMouseCursors.click,
-              onTap: _showGroupNameDialog,
-              hoverColor: Colors.black.withValues(alpha: 0.05),
-              highlightColor: Colors.black.withValues(alpha: 0.08),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Text(_groupName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: nameStyle),
-              ),
-            ),
-          );
-    // 悬停提示「修改群名」——有名字时光看胶囊看不出来能点改名（老板 2026-10-10）
-    // 空名态上面已自带 Tooltip（灰字+图标一并提示）
-    nameLine = Tooltip(
-      message: l10n.chatPageGroupNameEditTooltip,
-      child: nameLine,
-    );
+    // 第一行内容：有名字显示名字；没名字只显示编辑图标（点了起名）。
+    // （2026-10-11 老板：群名/编辑图标与在线人数合并成**一个大胶囊**，
+    // 原「单独可点的名字/编辑图标胶囊」去掉——见下方 return 处的包裹。）
+    Widget nameContent = _groupName.isEmpty
+        ? Icon(Icons.edit,
+            size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant)
+        : Text(_groupName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: nameStyle);
 
     // 第二行：「在线人数」绿 + 「/总人数」灰（在线灯同色，一眼看出谁在）
     final Widget countLine = Text.rich(
@@ -1932,16 +1896,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       children: [
         avatarSlot,
         const SizedBox(width: gap),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: nameColMax),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              nameLine,
-              const SizedBox(height: 1),
-              countLine,
-            ],
+        // 大胶囊（2026-10-11 老板）：群名/编辑图标 + 在线人数整体可点，**点它
+        // 打开「我的群组」弹层**（与左侧头像槽同动作；改名走弹层里的群名行）
+        Tooltip(
+          message: l10n.chatPageMyGroupCompanionsTooltip,
+          child: Material(
+            color: Colors.transparent,
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(mouseCursor: SystemMouseCursors.click,
+              onTap: _showMembersSheet,
+              hoverColor: Colors.black.withValues(alpha: 0.05),
+              highlightColor: Colors.black.withValues(alpha: 0.08),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: nameColMax),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      nameContent,
+                      const SizedBox(height: 1),
+                      countLine,
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ],
