@@ -354,8 +354,6 @@
       }
     }
   },
-  "chatPageMenuMembers": "{mode, select, duo{我的同伴} other{我的群组}}",
-  "@chatPageMenuMembers": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersHint": "",
   "chatPageMembersTitle": "{mode, select, duo{我的同伴} other{我的群组}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},

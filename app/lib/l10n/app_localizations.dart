@@ -1328,12 +1328,6 @@ abstract class AppLocalizations {
   /// **'Invited to add a new entrance of “{target}”'**
   String wizardJoinReinviteHintNoName(String target);
 
-  /// No description provided for @chatPageMenuMembers.
-  ///
-  /// In en, this message translates to:
-  /// **'{mode, select, duo{My companion} other{My group}}'**
-  String chatPageMenuMembers(String mode);
-
   /// No description provided for @chatPageMembersHint.
   ///
   /// In en, this message translates to:

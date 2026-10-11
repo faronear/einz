@@ -692,15 +692,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String chatPageMenuMembers(String mode) {
-    String _temp0 = intl.Intl.selectLogic(mode, {
-      'duo': '我的同伴',
-      'other': '我的群组',
-    });
-    return '$_temp0';
-  }
-
-  @override
   String get chatPageMembersHint => '';
 
   @override

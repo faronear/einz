@@ -1855,8 +1855,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 人名 tooltip（`_stripAvatar`）。
     final Widget avatarSlot = others.isEmpty
         ? Tooltip(
-            // 与「我的群组」菜单项/弹层标题共享同一文案键（老板 2026-10-11）
-            message: l10n.chatPageMenuMembers('group'),
+            // 三个「我的群组/同伴」文案（菜单项/弹层标题/本 tooltip）共享
+            // 同一键（老板 2026-10-11）
+            message: l10n.chatPageMembersTitle('group'),
             child: SizedBox(
               width: kStatusMemberAvatarSize,
               height: kStatusMemberAvatarSize,
@@ -1876,10 +1877,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     // **一个大胶囊**（2026-10-11 老板）：多人头像条 + 群名/编辑图标 + 在线
     // 人数整体包进同一个 StadiumBorder 胶囊，悬浮/按住显色，点击打开
-    // 「我的群组」弹层（改名走弹层里的群名行）。tooltip 与「我的群组」共享
-    // 同一文案键（2026-10-11 老板）。
+    // 「我的群组」弹层（改名走弹层里的群名行）。tooltip 与菜单项/弹层标题
+    // 共享同一文案键（2026-10-11 老板）。
     return Tooltip(
-      message: l10n.chatPageMenuMembers('group'),
+      message: l10n.chatPageMembersTitle('group'),
       child: Material(
         color: Colors.transparent,
         shape: const StadiumBorder(),
@@ -7618,7 +7619,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'members',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMembers(_isGroup ? 'group' : 'duo'),
+                      Text(l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
                           style: captionStyle),
                       const Spacer(),
                       // 「我的同伴」右簇：图标按空间类型区分（老板 2026-10-06）——

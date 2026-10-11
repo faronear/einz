@@ -747,15 +747,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String chatPageMenuMembers(String mode) {
-    String _temp0 = intl.Intl.selectLogic(mode, {
-      'duo': 'My companion',
-      'other': 'My group',
-    });
-    return '$_temp0';
-  }
-
-  @override
   String get chatPageMembersHint => '';
 
   @override

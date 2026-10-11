@@ -14033,3 +14033,10 @@ analyze 0 issue；chat_page_menu 34 测试全过。
 「我的群组」菜单项/弹层标题**共享同一文案键** `chatPageMenuMembers('group')`
 （老板 2026-10-11），删除旧键 `chatPageMyGroupCompanionsTooltip`（我的群组
 同伴/My group companions）。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，二十）**：三处「我的群组/同伴」文案**合并为一个键**
+（老板 2026-10-11：tooltip 与弹层标题共享，三个都共享更好）——统一用
+`chatPageMembersTitle`（select duo{我的同伴}/other{我的群组}），删除
+`chatPageMenuMembers`；调用处=顶栏菜单项、成员弹层标题、状态条大胶囊
+tooltip（含空群占位头像）。members_reinvite 测试同步改用新键。analyze
+0 issue；chat_page_menu 34 + members_reinvite 全过。

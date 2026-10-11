@@ -359,8 +359,6 @@
       }
     }
   },
-  "chatPageMenuMembers": "{mode, select, duo{My companion} other{My group}}",
-  "@chatPageMenuMembers": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersHint": "",
   "chatPageMembersTitle": "{mode, select, duo{My companion} other{My group}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
