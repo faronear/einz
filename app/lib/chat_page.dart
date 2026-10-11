@@ -1849,68 +1849,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 头像位：有人加入 = 成员头像条；还没人加入 = **群组头像占位**（老板
     // 2026-10-09）——图标与菜单「我的同伴」行的 `groups_outlined` 同款，尺寸同
     // 成员头像（40），圆底用性别未知的中性灰（`_genderTint('')`，与「待加入」
-    // 卡片同源）。**两者都可点**，都开「我的同伴」弹层（老板追加）。
-    // **只包头像位**，不含右边的群名/人数：群名已可单独单击改名，人数/群名
-    // 就不该再落进"我的同伴"的可点区。
-    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
-    // 头像位与右方头像同高（40）上下顶满胶囊、**左缘贴边**（`_buildPeerStatus`
-    // 的群空间 `pad.left` 已是 0，不再需要早先"推离 10 再左移 10"的补偿——
-    // 那个 Transform 只挪绘制不挪布局槽，胶囊收窄到只包头像条后会把头像与
-    // 群名之间的**视觉**间距撑大 10px，老板 2026-10-09 实测）。
-    final Widget avatarSlot = Material(
-      color: Colors.transparent,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
-        onTap: _showMembersSheet,
-        hoverColor: Colors.black.withValues(alpha: 0.05),
-        highlightColor: Colors.black.withValues(alpha: 0.08),
-        child: others.isEmpty
-            ? Tooltip(
-                // 状态条 tooltip 全量补齐（老板 2026-10-10）：空群占位头像提示
-                // 点它开「我的同伴」弹层。已有成员时头像条里每个头像自带人名
-                // tooltip（`_stripAvatar`），整条不再套。
-                message: l10n.chatPageMyGroupCompanionsTooltip,
-                child: SizedBox(
-                  width: kStatusMemberAvatarSize,
-                  height: kStatusMemberAvatarSize,
-                  // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
-                  // Material 的墨水层上，InkWell 的悬浮/按住高亮才能盖在它上面——
-                  // 不透明 child 会把高亮整个挡住（老板 2026-10-09：占位头像也要
-                  // 有悬浮/点击背景效果，与状态条其他可点对象一致）。
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      color: _genderTint(''),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.groups_outlined, size: 22),
-                  ),
+    // 卡片同源）。**已并入下方的大胶囊**（2026-10-11：头像条 + 群名/人数是
+    // 同一个可点胶囊，整体打开「我的同伴」弹层——不再有独立的头像小胶囊）。
+    // 空群占位头像自带 tooltip「我的同伴」；已有成员时头像条里每个头像自带
+    // 人名 tooltip（`_stripAvatar`）。
+    final Widget avatarSlot = others.isEmpty
+        ? Tooltip(
+            message: l10n.chatPageMyGroupCompanionsTooltip,
+            child: SizedBox(
+              width: kStatusMemberAvatarSize,
+              height: kStatusMemberAvatarSize,
+              // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
+              // Material 的墨水层上，外层 InkWell 的悬浮/按住高亮才能盖在
+              // 它上面——不透明 child 会把高亮整个挡住（老板 2026-10-09）
+              child: Ink(
+                decoration: BoxDecoration(
+                  color: _genderTint(''),
+                  shape: BoxShape.circle,
                 ),
-              )
-            : _avatarStrip(others, avatarBudget),
-      ),
-    );
+                child: const Icon(Icons.groups_outlined, size: 22),
+              ),
+            ),
+          )
+        : _avatarStrip(others, avatarBudget);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        avatarSlot,
-        const SizedBox(width: gap),
-        // 大胶囊（2026-10-11 老板）：群名/编辑图标 + 在线人数整体可点，**点它
-        // 打开「我的群组」弹层**（与左侧头像槽同动作；改名走弹层里的群名行）
-        Tooltip(
-          message: l10n.chatPageMyGroupCompanionsTooltip,
-          child: Material(
-            color: Colors.transparent,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(mouseCursor: SystemMouseCursors.click,
-              onTap: _showMembersSheet,
-              hoverColor: Colors.black.withValues(alpha: 0.05),
-              highlightColor: Colors.black.withValues(alpha: 0.08),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: ConstrainedBox(
+    // **一个大胶囊**（2026-10-11 老板）：多人头像条 + 群名/编辑图标 + 在线
+    // 人数整体包进同一个 StadiumBorder 胶囊，悬浮/按住显色，点击打开
+    // 「我的群组」弹层（改名走弹层里的群名行）。
+    return Tooltip(
+      message: l10n.chatPageMyGroupCompanionsTooltip,
+      child: Material(
+        color: Colors.transparent,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(mouseCursor: SystemMouseCursors.click,
+          onTap: _showMembersSheet,
+          hoverColor: Colors.black.withValues(alpha: 0.05),
+          highlightColor: Colors.black.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                avatarSlot,
+                const SizedBox(width: gap),
+                ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: nameColMax),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1922,11 +1905,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
