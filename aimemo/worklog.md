@@ -13916,3 +13916,8 @@ build_runner 全量生成耗时 ~150s，`flutter test` 全量在_busy 机器上�
 把墓碑图标从焚毁条件里拆出——`if (m.deleted)` 一律显示（撤回/删除按
 deletedKind、焚毁到期空沙漏），活消息的沙漏+时长倒计时保留
 `else if (m.expiresAt != null)`。analyze 0 issue。
+
+**追记（同日，三）**：墓碑里焚毁沙漏颜色比删除/撤回图标深——沙漏组件
+（`_BurnHourglass`/`_HourglassFlip` 的 Icon 不带 color，继承 IconTheme），
+删除/撤回是显式灰。修复：墓碑分支的沙漏包 `IconTheme`（gradient→white70、
+其余→Colors.grey）与相邻图标同色。analyze 0 issue。

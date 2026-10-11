@@ -8080,9 +8080,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             else
                                               // 焚毁到期墓碑只留沙漏（2026-10-11
                                               // 老板：不显示具体时长了——沙漏
-                                              // 已经漏完，时长数字没有意义）
-                                              _BurnHourglass(
-                                                  burned: true, size: 14),
+                                              // 已经漏完，时长数字没有意义）。
+                                              // 颜色与相邻删除/撤回图标一致
+                                              //（沙漏本继承 IconTheme，偏深）
+                                              IconTheme(
+                                                data: IconThemeData(
+                                                  color: _uiStyle == 'gradient'
+                                                      ? Colors.white70
+                                                      : Colors.grey,
+                                                ),
+                                                child: _BurnHourglass(
+                                                    burned: true, size: 14),
+                                              ),
                                           ] else if (m.expiresAt != null) ...[
                                             const SizedBox(width: 4),
                                             // 沙漏=阅后即焚倒计时（老板 2026-09-12，
