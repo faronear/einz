@@ -700,7 +700,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageMembersHint => '如果有同伴不慎丢失了进入秘境的通道，点击“重新邀请”生成专属通道码以重新加入。';
+  String get chatPageMembersHint => '如果同伴不慎丢失了进入秘境的通道，可以重新邀请。';
 
   @override
   String chatPageMembersTitle(String mode) {
@@ -843,10 +843,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionRecall => '撤回';
 
   @override
-  String get chatPageRecallConfirmTitle => '撤回这条消息？';
+  String get chatPageRecallConfirmTitle => '撤回消息？';
 
   @override
-  String get chatPageRecallConfirmBody => '撤回后对方将永远收不到这条消息，且不可恢复。';
+  String get chatPageRecallConfirmBody => '一旦撤回，对方就不会收到这条消息。确定撤回这条消息吗？';
 
   @override
   String get chatPageRecallConfirmOk => '撤回';
@@ -878,11 +878,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionBurn => '阅后即焚';
 
   @override
-  String get chatPageDeleteConfirmTitle => '删除消息';
+  String get chatPageDeleteConfirmTitle => '删除消息？';
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      '删除后仅在本机消失，同伴不受影响，且无法恢复。确定删除这条消息吗？';
+      '删除仅在本机生效（你的和同伴的其他设备都不受影响），且无法恢复。确定删除这条消息吗？';
 
   @override
   String get chatPageDeleteCancel => '取消';

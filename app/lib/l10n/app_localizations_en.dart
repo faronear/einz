@@ -760,7 +760,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMembersHint =>
-      'If a companion loses all entrances into this space, tap “Re-invite” to generate a dedicated entrance token to rejoin this space.';
+      'If a companion loses all entrances into this space, tap “Re-invite”.';
 
   @override
   String chatPageMembersTitle(String mode) {
@@ -915,11 +915,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionRecall => 'Recall';
 
   @override
-  String get chatPageRecallConfirmTitle => 'Recall this message?';
+  String get chatPageRecallConfirmTitle => 'Recall message?';
 
   @override
   String get chatPageRecallConfirmBody =>
-      'Once recalled, the recipient will never receive it. This cannot be undone.';
+      'Once recalled, your companion will never receive it. This cannot be undone.';
 
   @override
   String get chatPageRecallConfirmOk => 'Recall';
@@ -951,11 +951,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionBurn => 'Burn after reading';
 
   @override
-  String get chatPageDeleteConfirmTitle => 'Delete message';
+  String get chatPageDeleteConfirmTitle => 'Delete message?';
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      'Removed only on this device; the others aren\'t affected, and it can\'t be undone. Delete?';
+      'Removed only on this device (the others aren\'t affected), and it can\'t be undone. Delete?';
 
   @override
   String get chatPageDeleteCancel => 'Cancel';

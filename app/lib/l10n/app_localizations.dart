@@ -1343,7 +1343,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersHint.
   ///
   /// In en, this message translates to:
-  /// **'If a companion loses all entrances into this space, tap “Re-invite” to generate a dedicated entrance token to rejoin this space.'**
+  /// **'If a companion loses all entrances into this space, tap “Re-invite”.'**
   String get chatPageMembersHint;
 
   /// No description provided for @chatPageMembersTitle.
@@ -1601,13 +1601,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRecallConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Recall this message?'**
+  /// **'Recall message?'**
   String get chatPageRecallConfirmTitle;
 
   /// No description provided for @chatPageRecallConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'Once recalled, the recipient will never receive it. This cannot be undone.'**
+  /// **'Once recalled, your companion will never receive it. This cannot be undone.'**
   String get chatPageRecallConfirmBody;
 
   /// No description provided for @chatPageRecallConfirmOk.
@@ -1667,13 +1667,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDeleteConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete message'**
+  /// **'Delete message?'**
   String get chatPageDeleteConfirmTitle;
 
   /// No description provided for @chatPageDeleteConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Removed only on this device; the others aren\'t affected, and it can\'t be undone. Delete?'**
+  /// **'Removed only on this device (the others aren\'t affected), and it can\'t be undone. Delete?'**
   String get chatPageDeleteConfirmMessage;
 
   /// No description provided for @chatPageDeleteCancel.
