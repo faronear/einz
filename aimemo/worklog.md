@@ -13927,3 +13927,8 @@ deletedKind、焚毁到期空沙漏），活消息的沙漏+时长倒计时保�
 
 **追记（同日，五）**：删除确认弹窗的确认按钮从 FilledButton 改为红字
 TextButton（与撤回确认弹窗同款）。analyze 0 issue。
+
+**追记（同日，六）**：撤回墓碑**永远显示单勾**（老板定）：回执按成员高水位
+记、不按单条消息——对方之后拉到更大 seq 会让撤回墓碑误显双勾；撤回=没
+送达，`_buildSendStatusIcon` 加 `deletedKind == 'recall'` 特判固定单勾。
+analyze 0 issue。

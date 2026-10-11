@@ -706,6 +706,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
+    // 撤回墓碑永远显示单勾（2026-10-11 老板）：服务端消息行已真删（对方永远
+    // 拉不到这一条），但回执是按成员高水位记的、不按单条消息——对方之后拉到
+    // 任何更大 seq 的消息都会越过它的 seq，按常规判定会误显双勾。撤回=没送达，
+    // 固定单勾才符合事实。
+    if (m.deletedKind == 'recall') {
+      return Tooltip(
+        message: l10n.chatPageMsgSent,
+        child: Icon(Icons.check, size: 12, color: subtle),
+      );
+    }
+
     // 对方已收到（delivered）/已读（read）→ 双勾。read 与 delivered 同图标：
     // 已读暂不展示（老板 2026-09-12）。
     final receipt = MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts);
