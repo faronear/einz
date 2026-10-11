@@ -14053,3 +14053,12 @@ InkWell 加测试 key `membersSheetGroupNameRow`（状态条上可能有同文�
 14px」规则）。顺手修了真 bug：大胶囊 Row 溢出 12px——maxWidth 预算没扣
 胶囊自身水平 Padding（左右各 6），已补 `capsulePad = 12`。analyze
 0 issue；group_status_bar 10/10 + 全量 app 285 测试全过。
+
+**追记（同日，二十二）**：duo 状态条同步大胶囊改版（老板 2026-10-11）——
+对方头像 + 名字/在线状态（或「待加入/Waiting」）合并为**同一个
+StadiumBorder 大胶囊**，整体可点开「My companion」弹层；胶囊 tooltip 与
+弹层标题、菜单项共享同一文案键 `chatPageMembersTitle('duo')`。胶囊内
+Padding(horizontal 6, vertical 2) 与 group 大胶囊同款（此前头像"三面贴壁"
+的 pad 约定由胶囊自身 Padding 接管）；「邀请加入」/「语音通话」仍在胶囊外
+（trailing 不变，peer_invite_link 测试不受影响）。analyze 0 issue；全量
+app 285 测试全过。

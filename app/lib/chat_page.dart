@@ -2091,50 +2091,75 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             alignment: Alignment.centerLeft,
             widthFactor: 1.0,
             child: _othersSummary(l10n))
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
-              // 点击统一开「My companion」弹层（老板 2026-10-10：与群空间头像条
-              // 全局一致——不再走头像全屏大图）。
-              _statusAvatar(
-                  bytes: _peerAvatarBytes,
-                  gender: _peerGender,
-                  saveName: _peerName,
-                  onTap: _showMembersSheet),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_peerName.isNotEmpty)
+        : Tooltip(
+            // 大胶囊 tooltip 与「My companion」弹层标题、菜单项共享同一文案键
+            // chatPageMembersTitle('duo')（老板 2026-10-11，与 group 空间同款）。
+            message: l10n.chatPageMembersTitle('duo'),
+            child: Material(
+              color: Colors.transparent,
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              // 整块可点：头像 + 名字/在线状态一体，点击打开「My companion」弹层
+              //（老板 2026-10-11：与 group 空间大胶囊同款交互）。
+              child: InkWell(
+                mouseCursor: SystemMouseCursors.click,
+                onTap: _showMembersSheet,
+                hoverColor: Colors.black.withValues(alpha: 0.05),
+                highlightColor: Colors.black.withValues(alpha: 0.08),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
+                      // 点击统一开「My companion」弹层（老板 2026-10-10：与群空间头像条
+                      // 全局一致——不再走头像全屏大图）。
+                      _statusAvatar(
+                          bytes: _peerAvatarBytes,
+                          gender: _peerGender,
+                          saveName: _peerName,
+                          onTap: _showMembersSheet),
+                      const SizedBox(width: 8),
                       Flexible(
-                        child: Text(_peerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主
-                            // ——名字是这一格的主信息，原来 13 与 11 几乎看不出主次
-                            // （老板 2026-09-26）
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w500)),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_peerName.isNotEmpty)
+                              Flexible(
+                                child: Text(_peerName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主
+                                    // ——名字是这一格的主信息，原来 13 与 11 几乎看不出主次
+                                    // （老板 2026-09-26）
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500)),
+                              ),
+                            const SizedBox(height: 1),
+                            // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
+                            // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间
+                            // 对未加入的人没有意义，摆个"上次离线时间"反而误导（2026-09-26）
+                            _statusLine(
+                              online: _peerOnline,
+                              offlineColor: Colors.red,
+                              sinceMs: _peerSinceMs,
+                              label: _peerJoined == false
+                                  ? l10n.memberPending
+                                  : null,
+                            ),
+                          ],
+                        ),
                       ),
-                    const SizedBox(height: 1),
-                    // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
-                    // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间
-                    // 对未加入的人没有意义，摆个"上次离线时间"反而误导（2026-09-26）
-                    _statusLine(
-                      online: _peerOnline,
-                      offlineColor: Colors.red,
-                      sinceMs: _peerSinceMs,
-                      label: _peerJoined == false ? l10n.memberPending : null,
-                    ),
-                  ],
+                      // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
+                      // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
+                    ],
+                  ),
                 ),
               ),
-              // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
-              // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
-            ],
+            ),
           );
 
     final Widget inviteLink = _peerJoined != false
