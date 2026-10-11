@@ -13969,3 +13969,12 @@ ws_probe.dart，已删）验证：farinear.cn / bittic.cn 握手成功（假 tok
 选的地址（实际是两次独立探测：启动=先到先得、About=列表顺序）。另确认
 tic.cc→127.0.0.1 是老板**有意**的防封禁设置（无备案不能指向国内服务器），
 已记忆。about_sheet 4 测试全过。
+
+**追记（同日，十）**：气泡时间行**状态小标**（催发小飞机/重发警告）样式与
+后面的快捷动作统一（老板 2026-10-11）：
+- 悬浮/点击加圆形背景遮罩（Material CircleBorder + InkWell，hover/highlight
+  色同 `_bubbleQuickAction`），热区高度同 `_bubbleTimeRowControlHeight`(28)；
+- 图标 11/12 → **16**（小飞机组件加 `size` 参数），与引用/拷贝/保存同档；
+- 渐变主题深蓝气泡上蓝色小飞机几乎不可见 → 渐变下改 white70（同快捷动作），
+  浅色主题保留超链接蓝；「加速中」期间仍用中性色。
+analyze 0 issue；chat_page_menu 34 测试全过。

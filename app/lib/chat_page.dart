@@ -688,19 +688,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     };
 
     if (m.status == 'failed') {
-      // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）
+      // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）。
+      // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
+      // 引用/拷贝/保存快捷动作同款风格，别像裸文字）
       return Tooltip(
         message: l10n.chatPageMsgFailed,
-        child: Clickable(
-          onTap: () => _tapRetryMessage(m, asResend: true),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(busyLabel ?? l10n.chatPageMsgFailedTap,
-                  style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
-              const SizedBox(width: 2),
-              Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
-            ],
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            hoverColor: Colors.black.withValues(alpha: 0.05),
+            highlightColor: Colors.black.withValues(alpha: 0.08),
+            onTap: () => _tapRetryMessage(m, asResend: true),
+            child: Container(
+              height: _bubbleTimeRowControlHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(busyLabel ?? l10n.chatPageMsgFailedTap,
+                      style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
+                  const SizedBox(width: 2),
+                  Icon(Icons.error_outline, size: 16, color: Colors.red.shade600),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -734,23 +749,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
 
     // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）。
-    // 小飞机用超链接蓝提示可点（老板 2026-09-18）；加速中改用中性色，避免"点了
-    // 还提示可点"的矛盾。
+    // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间行快捷动作同款）；
+    // 小飞机用超链接蓝提示可点——但渐变主题深蓝气泡上蓝飞机几乎看不见
+    // （2026-10-11 老板），改白系（同快捷动作的 white70）；「加速中」期间
+    // 仍用中性色，避免"点了还提示可点"的矛盾。
     return Tooltip(
       message: l10n.chatPageMsgSendingTap,
-      child: Clickable(
-        onTap: () => _tapRetryMessage(m, asResend: false),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (busyLabel != null) ...[
-              Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
-              const SizedBox(width: 2),
-            ],
-            _SendingPlane(
-              color: busyLabel != null ? subtle : const Color(0xFF2E7CF6),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          hoverColor: Colors.black.withValues(alpha: 0.05),
+          highlightColor: Colors.black.withValues(alpha: 0.08),
+          onTap: () => _tapRetryMessage(m, asResend: false),
+          child: Container(
+            height: _bubbleTimeRowControlHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (busyLabel != null) ...[
+                  Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
+                  const SizedBox(width: 2),
+                ],
+                _SendingPlane(
+                  size: 16,
+                  color: busyLabel != null
+                      ? subtle
+                      : (_uiStyle == 'gradient'
+                          ? Colors.white70
+                          : const Color(0xFF2E7CF6)),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -9647,9 +9682,12 @@ class _VideoPreviewState extends State<_VideoPreview> {
 /// 既尊重"减少动态效果"的系统偏好，也让 widget 测试里的 `pumpAndSettle` 不会
 /// 被这个常驻动画卡住（常驻动画会让 pumpAndSettle 一直等到超时）。
 class _SendingPlane extends StatefulWidget {
-  const _SendingPlane({this.color});
+  const _SendingPlane({this.color, this.size = 11});
 
   final Color? color;
+
+  /// 图标边长（2026-10-11 起气泡里传 16，与时间行快捷动作图标同档）。
+  final double size;
 
   @override
   State<_SendingPlane> createState() => _SendingPlaneState();
@@ -9670,7 +9708,7 @@ class _SendingPlaneState extends State<_SendingPlane>
 
   @override
   Widget build(BuildContext context) {
-    final icon = Icon(Icons.send, size: 11, color: widget.color);
+    final icon = Icon(Icons.send, size: widget.size, color: widget.color);
     if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return icon;
     return AnimatedBuilder(
       animation: _controller,
