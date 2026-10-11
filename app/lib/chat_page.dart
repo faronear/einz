@@ -2107,8 +2107,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 hoverColor: Colors.black.withValues(alpha: 0.05),
                 highlightColor: Colors.black.withValues(alpha: 0.08),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  // 只给右侧留白（头像↔名字间距）：头像沿用 duo 的「三面贴壁」
+                  // 约定（左/上/下贴住胶囊内壁，老板 2026-09-26）——与 group 大
+                  // 胶囊的 horizontal 6 不同（那边没有贴壁要求）。
+                  padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
