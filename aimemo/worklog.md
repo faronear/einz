@@ -14066,3 +14066,12 @@ app 285 测试全过。
 **追记（同日，二十三）**：duo 大胶囊头像恢复「三面贴壁」——胶囊内
 Padding 从 horizontal 6/vertical 2 改为只留右 6（老板 2026-10-11：duo
 沿用 2026-09-26 的贴壁约定，与 group 大胶囊不同）。analyze 0 issue。
+
+**追记（同日，二十四）**：修复附件弹层「顶天立地」回归——`413535d9`
+（桌面版网格限宽居中）给 `_buildActionCardGrid` 的 `constrain()` 用了不带
+`heightFactor` 的 `Center`：Align 系默认撑满约束，弹层 `isScrollControlled:
+true`（maxHeight=全屏）→ 整个弹层被顶到满屏。该 helper 为长按菜单与附件
+弹层共用（老板 clue：长按弹层操作按钮居中调整连带）。修复 = `Center`
+加 `heightFactor: 1`（高度包内容、只横向居中）。新增探针回归测试
+`attach_sheet_probe_test.dart`（真实 ChatPage 打开附件弹层，断言高度
+< 70% 屏高）。analyze 0 issue。

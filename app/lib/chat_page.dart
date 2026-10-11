@@ -5391,7 +5391,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 弹层，2026-10-11）卡片被 96 上限卡住、行尾一大片空白——整体限宽居中，
     // 尾行也居中，与手机上填满一行的观感一致。
     const gridMaxWidth = maxCardWidth * maxPerRow + spacing * (maxPerRow - 1);
+    // ⚠️ Center 必须带 heightFactor:1——Align 系默认**撑满约束**，弹层是
+    // isScrollControlled:true（maxHeight=全屏），不带会把整个弹层顶到顶天
+    // 立地（413535d9 引入的回归，老板 2026-10-11 实测）。heightFactor:1 =
+    // 高度包住内容、只做横向居中。
     Widget constrain(Widget child) => Center(
+          heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: gridMaxWidth),
             child: child,
