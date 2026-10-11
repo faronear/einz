@@ -3016,6 +3016,63 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 color: Theme.of(ctx).colorScheme.outline)),
                       ),
                     ),
+                  // 群空间：成员列表前放「群名称」标题行（老板 2026-10-11）：
+                  // **不用卡片**——白底上的标题文字（同弹层标题字号/字重），
+                  // 未设置 → 淡色占位词「群空间名称/Group space name」；
+                  // 编辑按钮紧跟文字右侧（不顶到最右）。点它打开改群名弹窗
+                  //（同状态条点群名）。
+                  if (_isGroup)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 14),
+                      child: Center(
+                        child: InkWell(
+                          mouseCursor: SystemMouseCursors.click,
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            // 先收起成员弹层；等它收完再弹改群名弹窗（同
+                            // 「重新邀请」的 route 交接处理，见其注释）
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showGroupNameDialog);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  // 占位词与改群名弹窗标题共用同一键（老板
+                                  // 2026-10-11：合并为一个文案「群组名称/
+                                  // Group name」，不另设占位词键）
+                                  _groupName.isEmpty
+                                      ? l10n.chatPageGroupNameTitle
+                                      : _groupName,
+                                  style: TextStyle(
+                                    // 占位词单独降档（老板 2026-10-11）：字号
+                                    // 小一档 + 更浅的 outline 色，别与真群名
+                                    // 的 22/w700 深色抢眼；有名字 → 群名
+                                    // 弹层里最显眼（22/w700）
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: _groupName.isEmpty ? 18 : 22,
+                                    height: 1.2,
+                                    color: _groupName.isEmpty
+                                        ? Theme.of(ctx).colorScheme.outline
+                                        : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.edit_outlined,
+                                    size: 18,
+                                    color: Theme.of(ctx)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   for (final e in others)
                     _membersCard(
                       memberId: e.key,

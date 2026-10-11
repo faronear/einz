@@ -887,7 +887,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send the dedicated entrance token below to “{name}” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
+  /// **'If “{name}” loses all entrances into this space, send the dedicated entrance token below to “{name}” to join again. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -1337,19 +1337,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuMembers.
   ///
   /// In en, this message translates to:
-  /// **'{mode, select, duo{My companion} other{My companions}}'**
+  /// **'{mode, select, duo{My companion} other{My group}}'**
   String chatPageMenuMembers(String mode);
 
   /// No description provided for @chatPageMembersHint.
   ///
   /// In en, this message translates to:
-  /// **'If a companion loses all entrances into this space, tap “Re-invite”.'**
+  /// **''**
   String get chatPageMembersHint;
 
   /// No description provided for @chatPageMembersTitle.
   ///
   /// In en, this message translates to:
-  /// **'{mode, select, duo{My companion} other{My companions}}'**
+  /// **'{mode, select, duo{My companion} other{My group}}'**
   String chatPageMembersTitle(String mode);
 
   /// No description provided for @chatPageMembersUnnamed.

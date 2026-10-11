@@ -208,7 +208,7 @@
   "chatPageInviteRegenerate": "Regenerate",
   "chatPageInviteDialogHintInvite": "Send the dedicated entrance token below to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
   "chatPageInviteDialogHintAttachSelf": "Use the dedicated entrance token below on my another device to connect to this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintReinvite": "Send the dedicated entrance token below to “{name}” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintReinvite": "If “{name}” loses all entrances into this space, send the dedicated entrance token below to “{name}” to join again. One-time use, valid for 24 hours.",
   "chatPageInviteDialogReinviteFallbackName": "them",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -360,10 +360,10 @@
       }
     }
   },
-  "chatPageMenuMembers": "{mode, select, duo{My companion} other{My companions}}",
+  "chatPageMenuMembers": "{mode, select, duo{My companion} other{My group}}",
   "@chatPageMenuMembers": {"placeholders": {"mode": {"type": "String"}}},
-  "chatPageMembersHint": "If a companion loses all entrances into this space, tap “Re-invite”.",
-  "chatPageMembersTitle": "{mode, select, duo{My companion} other{My companions}}",
+  "chatPageMembersHint": "",
+  "chatPageMembersTitle": "{mode, select, duo{My companion} other{My group}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvite": "Invite",

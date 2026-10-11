@@ -13978,3 +13978,41 @@ tic.cc→127.0.0.1 是老板**有意**的防封禁设置（无备案不能指向
 - 渐变主题深蓝气泡上蓝色小飞机几乎不可见 → 渐变下改 white70（同快捷动作），
   浅色主题保留超链接蓝；「加速中」期间仍用中性色。
 analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十一）**：「我的同伴」弹层群空间**列表前插入「群名称」卡**
+（老板 2026-10-11）：与同伴卡同款尺寸/底色（中性 tint、圆角 12、h12/v8），
+左侧 40×40 群图标圆形占位（同成员头像尺寸），中间现有群名或淡色占位词
+「群空间名称/Group space name」（ARB 新增 chatPageMembersGroupNameHint），
+右侧 edit_outlined 图标；**点整卡**打开改群名弹窗（`_showGroupNameDialog`，
+同状态条点群名；先收弹层再经 `_menuAction` 打开，同「重新邀请」的 route
+交接处理）。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十二）**：① 群名卡按老板要求调整：**去掉头像占位**，群名/
+占位词**整卡居中**（Stack 真居中，edit 图标 Positioned 绝对居右不挤占文字），
+垂直 padding 8→20 撑起卡片体量。② 群空间下菜单项与弹层标题「我的同伴」→
+**「我的群组」**（`chatPageMenuMembers`/`chatPageMembersTitle` 的 select
+分支 other 改「我的群组」/ "My group"；zh 两键补上 mode 占位符结构）。
+analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十三）**：群名展示再调整（老板 2026-10-11）：**不用卡片**——
+白底上的标题文字（同弹层标题字号 16/字重 600，未设置仍淡色占位词），编辑
+按钮紧跟文字右侧（Center + Row min，不顶到最右），InkWell 圆角 8 只罩
+文字+图标热区；点它仍打开改群名弹窗。analyze 0 issue；chat_page_menu
+34 测试全过。
+
+**追记（同日，十四）**：群名字体再放大（老板 2026-10-11：弹层里最显眼）：
+16/w600 → **22/w700**（height 1.2），超过弹层标题（16/w600）；占位词仍
+淡色。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十五）**：两处微调（老板 2026-10-11）：① 群名占位词单独
+降档——字号 18 + 更浅的 outline 色（真群名 22/w700 深色不变，保持弹层
+里最显眼）；② 群名行与下方同伴卡间距 bottom 4 → 14。analyze 0 issue；
+chat_page_menu 34 测试全过。
+
+**追记（同日，十六）**：群名占位词与改群名弹窗标题**合并为一个文案键**
+（老板 2026-10-11）：占位词直接用 `chatPageGroupNameTitle`（群组名称/
+Group name），删除专用键 `chatPageMembersGroupNameHint`。**提交注意**：
+zh/en ARB 里混有老板未提交的文案改动（邀请提示 ×3、GroupNameTitle
+「群组名字→群组名称」、MembersHint 清空）——已用 `git apply --cached`
+按 hunk 只提交我的键删除，老板的 ARB 改动与再生成的 l10n 文件留在工作区
+（等老板自己提交）。analyze 0 issue；chat_page_menu 34 测试全过。

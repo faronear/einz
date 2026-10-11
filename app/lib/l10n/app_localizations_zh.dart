@@ -431,15 +431,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      '把专属通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
+      '把以下的专属通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '使用专属通道码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
+      '使用以下的专属通道码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '把专属通道码发给“$name”，凭它重新加入本秘境。原有通道不受影响。24 小时内一次性有效。';
+    return '如果“$name”丢失了进入本秘境的所有通道，可凭以下的专属通道码重新加入本秘境。24 小时内一次性有效。';
   }
 
   @override
@@ -498,7 +498,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameNameLabel => '名字';
 
   @override
-  String get chatPageGroupNameTitle => '群组名字';
+  String get chatPageGroupNameTitle => '群组名称';
 
   @override
   String get chatPageGroupNameEditTooltip => '修改群名';
@@ -513,7 +513,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMyGroupCompanionsTooltip => '我的群组同伴';
 
   @override
-  String get chatPageGroupNameLabel => '名字';
+  String get chatPageGroupNameLabel => '名称';
 
   @override
   String get chatPageGenderLabel => '性别';
@@ -696,15 +696,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageMenuMembers(String mode) {
-    return '我的同伴';
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': '我的同伴',
+      'other': '我的群组',
+    });
+    return '$_temp0';
   }
 
   @override
-  String get chatPageMembersHint => '如果同伴不慎丢失了进入秘境的通道，可以重新邀请。';
+  String get chatPageMembersHint => '';
 
   @override
   String chatPageMembersTitle(String mode) {
-    return '我的同伴';
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': '我的同伴',
+      'other': '我的群组',
+    });
+    return '$_temp0';
   }
 
   @override

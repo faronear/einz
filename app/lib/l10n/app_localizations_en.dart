@@ -478,7 +478,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'Send the dedicated entrance token below to “$name” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
+    return 'If “$name” loses all entrances into this space, send the dedicated entrance token below to “$name” to join again. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -753,20 +753,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String chatPageMenuMembers(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
-      'other': 'My companions',
+      'other': 'My group',
     });
     return '$_temp0';
   }
 
   @override
-  String get chatPageMembersHint =>
-      'If a companion loses all entrances into this space, tap “Re-invite”.';
+  String get chatPageMembersHint => '';
 
   @override
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
-      'other': 'My companions',
+      'other': 'My group',
     });
     return '$_temp0';
   }
