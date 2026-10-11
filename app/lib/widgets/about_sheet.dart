@@ -54,9 +54,17 @@ class _AboutSheetState extends State<AboutSheet> {
     return (version: pkg.version, buildNumber: pkg.buildNumber);
   }
 
+  /// 探测可达入口：**优先 [effectiveServer]（正在用的那个）**——可达就显示它，
+  /// 与「服务器地址」一致；只有它不可达时才按候选顺序报备用可达入口
+  /// （2026-10-11 老板：避免「服务器地址 A、实际入口 B」让人误以为 App 连的
+  /// 不是自己选的地址；两个值不一致 = 正在用的真的连不上了，才是告警）。
+  /// null = 全部不可达。
   Future<String?> _probeEntrances() async {
     final probe = widget.probe ?? probeServer;
+    final effective = await probe(effectiveServer);
+    if (effective.ok) return effectiveServer;
     final results = await Future.wait(kServerCandidates
+        .where((server) => server != effectiveServer)
         .map((server) async => (server, await probe(server))));
     for (final (server, health) in results) {
       if (health.ok) return server;
