@@ -5238,18 +5238,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——
                   // 服务端按 delivered 高水位原子判定，客户端只做**粗筛**减少
                   // 无效入口（最终判定的权威在服务端 409）。放「删除」之后：
-                  // 撤回实质上比删除更重（删自己的还让别人收不到；2026-10-11）
+                  // 撤回实质上比删除更重（删自己的还让别人收不到；2026-10-11）。
+                  // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
                   _buildActionCard(
                     icon: Icons.delete_outline,
                     label: l10n.chatPageActionDelete,
-                    destructive: true,
                     onTap: () => Navigator.of(ctx).pop('delete'),
                   ),
                   if (_messageRecallable(m))
                     _buildActionCard(
                       icon: Icons.undo_outlined,
                       label: l10n.chatPageActionRecall,
-                      destructive: true,
                       onTap: () => Navigator.of(ctx).pop('recall'),
                     ),
                 ]

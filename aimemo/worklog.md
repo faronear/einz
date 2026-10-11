@@ -13921,3 +13921,6 @@ deletedKind、焚毁到期空沙漏），活消息的沙漏+时长倒计时保�
 （`_BurnHourglass`/`_HourglassFlip` 的 Icon 不带 color，继承 IconTheme），
 删除/撤回是显式灰。修复：墓碑分支的沙漏包 `IconTheme`（gradient→white70、
 其余→Colors.grey）与相邻图标同色。analyze 0 issue。
+
+**追记（同日，四）**：长按菜单里「立刻删除」「撤回」卡片去掉红色
+（`destructive`）——有确认弹窗把关，不必特殊显示。analyze 0 issue。
