@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import '../call_tones.dart';
@@ -9,6 +10,60 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'ws_realtime_service.dart';
+
+/// TURN 地址的 DoH 预解析结果缓存（host → ip，会话级）。
+/// 通话建立不频繁，命中缓存后零 DoH 流量；host→IP 变更（换服务器）在
+/// 下次冷启动后自然跟随——与主链路"地址不落盘"同一纪律。
+final Map<String, String> _turnResolvedIps = <String, String>{};
+
+/// 清空 TURN 解析缓存（仅供测试隔离）。
+@visibleForTesting
+void resetTurnResolution() => _turnResolvedIps.clear();
+
+/// 对单条 TURN 地址做 DNS 消毒：`turn:<host>:<port>` 中 host 若为域名，
+/// 一律走加密 DoH 解析成 IP（DNS 劫持免疫，见 shared dns_fallback.dart）；
+/// DoH 失败退系统解析，再失败保留原地址（与今天行为一致，优雅降级）。
+/// IP 字面量原样返回（零解析）。测试经 [dohResolver]/[systemLookup] 注入。
+Future<List<String>> resolveTurnUrls(
+  List<String> urls, {
+  DoHResolver? dohResolver,
+  Future<List<InternetAddress>> Function(String host)? systemLookup,
+}) async {
+  final resolved = <String>[];
+  for (final url in urls) {
+    final m = RegExp(r'^(turns?):([^:]+)(:(\d+))?$').firstMatch(url.trim());
+    if (m == null) {
+      resolved.add(url); // 未知形态不碰，交由 webrtc 自行处理
+      continue;
+    }
+    final scheme = m.group(1)!;
+    final host = m.group(2)!;
+    final port = m.group(4);
+    if (InternetAddress.tryParse(host) != null) {
+      resolved.add(url); // IP 字面量：零解析、零暴露
+      continue;
+    }
+    var ip = _turnResolvedIps[host];
+    ip ??= await (dohResolver ?? dohResolveHost)(host);
+    if (ip == null) {
+      try {
+        final addrs = await (systemLookup ?? (String h) => InternetAddress.lookup(h, type: InternetAddressType.IPv4))(
+                host)
+            .timeout(const Duration(seconds: 3));
+        ip = addrs.isEmpty ? null : addrs.first.address;
+      } on Object {
+        ip = null; // 系统解析也失败 → 保留原域名
+      }
+    }
+    if (ip == null) {
+      resolved.add(url);
+    } else {
+      _turnResolvedIps[host] = ip;
+      resolved.add('$scheme:$ip${port != null ? ':$port' : ''}');
+    }
+  }
+  return resolved;
+}
 
 /// ICE 服务器配置（voiceCall.zhcn.md §3）。
 ///
@@ -365,7 +420,8 @@ class VoiceCallService {
   /// 建连接。接通后**重设一次音频会话**——Phase A 真机实测：iOS 上不重设会出现
   /// 「connected 但没声音」，音频会话可能被别的 App 抢走。
   Future<RTCPeerConnection> _createPc() async {
-    final pc = await createPeerConnection(<String, dynamic>{'iceServers': _iceServers()});
+    final pc = await createPeerConnection(
+        <String, dynamic>{'iceServers': await _iceServers()});
     _pc = pc;
     pc.onIceCandidate = (candidate) {
       final id = state.value.callId;
@@ -453,7 +509,7 @@ class VoiceCallService {
     }
   }
 
-  List<Map<String, dynamic>> _iceServers() {
+  Future<List<Map<String, dynamic>>> _iceServers() async {
     final servers = <Map<String, dynamic>>[
       <String, dynamic>{'urls': kVoiceStunUrl},
     ];
@@ -461,8 +517,10 @@ class VoiceCallService {
     if (turn.isNotEmpty) {
       final urls = turn.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
       if (urls.isNotEmpty) {
+        // TURN 域名先经 DoH 消毒成 IP（DNS 劫持免疫，见 resolveTurnUrls 注释）
+        final cleanUrls = await resolveTurnUrls(urls);
         servers.add(<String, dynamic>{
-          'urls': urls,
+          'urls': cleanUrls,
           'username': kVoiceTurnUsername,
           'credential': kVoiceTurnCredential,
         });

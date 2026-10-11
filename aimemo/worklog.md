@@ -13772,3 +13772,29 @@ App 当时处于断连重试态（tic.cc 解析 127.0.0.1 干净无注入、443 
 **验证：** server npm test 全链绿（含新 dnsReport 5 组断言）；shared 83 / cli 22 /
 app 275 全绿，三包 analyze 干净。**服务端上线：VPS git pull + docker 重建后，新包
 客户端的上报才开始入库；旧客户端/旧服务端组合完全兼容（404 静默）。**
+
+## 2026-10-11（续 3）TURN 域名迁移 + DoH 预解析
+
+**背景**：coturn 的客户端地址 `turn:einz.yuanjinx.com:3478` 用的是被定点劫持的
+FQDN（relay 仅兜底场景触发，故未暴露）。老板拍板：换独立新域名 + 客户端 DoH
+预解析，为将来 coturn 拆分独立服务器铺路。
+
+**实测核账（ssh 只读）**：VPS coturn 一切正常——turnserver.conf 在
+/faronear/einz/serverDocker/coturn/（老板记成"没创建"系多机混淆）、容器 Up、
+凭证与 App 编译值一致、STUN Binding Request 外网探测 3478/UDP 应答正常。
+realm 保持不变（不参与解析，改随机串无安全收益）。
+
+**改动**：
+1. `app/lib/data/voice_call_service.dart`：新增 `resolveTurnUrls`——TURN 地址中
+   的域名一律 DoH 预解析成 IP（doh.pub→alidns→cloudflare 同套体系；失败退系统
+   解析，再失败保留原样优雅降级；IP 字面量零解析；会话级缓存 host→ip）；
+   `_iceServers` 转 async 并接入。
+2. `localConfig.turn.json`：`VOICE_TURN_URLS` 改为
+   `turn:turn.farinear.cn:3478,turn:turn.bittic.cn:3478`（双条目 ICE 择优）。
+3. 测试 `app/test/turn_resolve_test.dart` 6 例全绿（IP 透传/改写/系统回退/优雅
+   降级/未知形态透传/缓存命中）；flutter analyze 干净。
+4. voiceCall.zhcn.md 设计文档同步。
+
+**待老板**：CF 里给 farinear.cn / bittic.cn 各加 `turn` A 记录 → 36.154.238.42
+（**灰云**）——**下版打包前必须就位**，否则新包中继全失效（DoH+系统解析都查无
+此名）。就位后喊我 dig 验证。
