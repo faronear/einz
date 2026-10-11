@@ -14040,3 +14040,16 @@ analyze 0 issue；chat_page_menu 34 测试全过。
 `chatPageMenuMembers`；调用处=顶栏菜单项、成员弹层标题、状态条大胶囊
 tooltip（含空群占位头像）。members_reinvite 测试同步改用新键。analyze
 0 issue；chat_page_menu 34 + members_reinvite 全过。
+
+**追记（同日，二十一）**：修复 GitHub CI（run 38144759618）——昨晚大胶囊
+改版后 `group_status_bar_test.dart` 6 个用例仍走旧交互（点状态条编辑图标
+直接弹群名编辑框）而失败。修法：①chat_page 给「我的同伴」弹层的群名行
+InkWell 加测试 key `membersSheetGroupNameRow`（状态条上可能有同文案，需
+二义区分）；②测试加 `_openGroupNameDialog` helper（点胶囊→点弹层群名行
+→弹窗），并补 pump(400ms) 冲 `_menuAction` 的 300ms route 交接纯计时器
+（pumpAndSettle 停不到不排帧的 timer）；③「点人数/群名不开弹层」用例按
+新语义反转重写（大胶囊一体可点）；④间距用例按老板 2026-10-11 拍板改为
+断言胶囊内统一 8px（不再沿用 2026-10-09 的「与我的名字↔我的头像一致
+14px」规则）。顺手修了真 bug：大胶囊 Row 溢出 12px——maxWidth 预算没扣
+胶囊自身水平 Padding（左右各 6），已补 `capsulePad = 12`。analyze
+0 issue；group_status_bar 10/10 + 全量 app 285 测试全过。

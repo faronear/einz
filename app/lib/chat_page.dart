@@ -1762,8 +1762,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 是 0——头像条左缘贴边，见 `_buildPeerStatus` 的 pad 注释）——不扣的话
     // 内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
     const leadingPad = 10.0;
+    // 再扣掉大胶囊（2026-10-11）自己的水平 Padding（左右各 6 = 12）——不扣的
+    // 话 Row 内容会超出胶囊 12px（实测 RenderFlex overflow 12px）。
+    const capsulePad = 12.0;
     final maxWidth =
-        (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad;
+        (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad - capsulePad;
 
     // 12 号：比 duo 那行时刻（11）略大一档——这一格没有别的大字，11 会显得发飘
     final countStyle = TextStyle(
@@ -2994,6 +2997,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       padding: const EdgeInsets.only(top: 2, bottom: 14),
                       child: Center(
                         child: InkWell(
+                          // key 供测试定位群名行（状态条上可能有同文案，需区分）
+                          key: const ValueKey('membersSheetGroupNameRow'),
                           mouseCursor: SystemMouseCursors.click,
                           borderRadius: BorderRadius.circular(8),
                           onTap: () {
