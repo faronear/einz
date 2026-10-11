@@ -13821,3 +13821,23 @@ show() 透传，三处调用点零改动）。app 全量 285 测试通过、anal
 farinear/bittic/yuanjinx（新子域实测干净）/tic.cc（127.0.0.1 死入口，教义同
 kServerCandidates：留配置，将来搬海外改 DNS 即复活存量 App）。
 老板本机已临时撤销系统级 Ali DoH，保留金丝雀视角（Tailscale 开关 = 净化切换）。
+
+## 2026-10-11（续 5）release 打包脚本补齐 TURN 配置 + us2 TURN 上线核验
+
+**缺口（老板问"其他版本怎么引入"时查出）**：只有 `app/ios/buildIos.sh` 自动带
+`localConfig.turn.json`；`app-apk-build`（正式 APK）/ `app-ios-build-raw` /
+`app-mac-build-raw` / `app-mac-build-dist`（经 buildMacos.sh）全部没带 → 走这些
+脚本出的包**没有 TURN**，跨网严格 NAT 通话必挂。docs/TURN.md 只写了手工命令。
+
+**修复**：新增 `scripts/turnDefineArgs.sh`（stdout 只输出参数、提示走 stderr；
+存在才带、缺失警告不拦——与 buildIos.sh 同口径），接入四个脚本：
+app-apk-build / app-ios-build-raw / app-mac-build-raw / buildMacos.sh（dev+dist
+全渠道）。JSON 校验通过、helper 干跑验证（stdout 参数 / stderr 提示分离正确）。
+
+**us2（甲骨文）TURN 上线核验（老板操作 + 本机实测）**：
+- `turn.tic.cc` 曾被误设橙云 → STUN 探测无应答（CF 不转发 UDP，企业版 Spectrum
+  才有此能力）→ 老板切灰云后实测通过；
+- 灰云解析 `129.153.80.126`（甲骨文美国段），STUN Binding Request **应答正常**；
+  cn1（36.154.238.42）同步复测也正常——双 TURN 服务器就绪；
+- us2 conf：老板拷贝 cn1 的（user:密码不变=与客户端凭证一致，只改 realm +
+  external-ip）——标准做法。realm 两台可以不同（各自自报，客户端不感知）。
