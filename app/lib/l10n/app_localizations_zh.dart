@@ -57,7 +57,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String upgradeCoolingBody(String latest) {
-    return '您的应用版本即将过期，目前可下载的最新版本为 $latest，建议您抽空升级。';
+    return '您的应用版本即将过期，目前最新版本为 $latest，建议您抽空升级。';
   }
 
   @override
