@@ -13924,3 +13924,6 @@ deletedKind、焚毁到期空沙漏），活消息的沙漏+时长倒计时保�
 
 **追记（同日，四）**：长按菜单里「立刻删除」「撤回」卡片去掉红色
 （`destructive`）——有确认弹窗把关，不必特殊显示。analyze 0 issue。
+
+**追记（同日，五）**：删除确认弹窗的确认按钮从 FilledButton 改为红字
+TextButton（与撤回确认弹窗同款）。analyze 0 issue。

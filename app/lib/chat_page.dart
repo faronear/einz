@@ -5538,8 +5538,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(l10n.chatPageDeleteCancel),
           ),
-          FilledButton(
+          // 确认按钮红字（2026-10-11 老板：与撤回确认弹窗一致）
+          TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade400),
             child: Text(l10n.chatPageDeleteConfirmOk),
           ),
         ],
