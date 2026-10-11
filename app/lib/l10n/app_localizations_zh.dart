@@ -510,9 +510,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMyNameTooltip => '修改我的名字';
 
   @override
-  String get chatPageMyGroupCompanionsTooltip => '我的群组同伴';
-
-  @override
   String get chatPageGroupNameLabel => '名称';
 
   @override

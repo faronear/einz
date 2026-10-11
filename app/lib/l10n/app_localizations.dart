@@ -1016,12 +1016,6 @@ abstract class AppLocalizations {
   /// **'Change my name'**
   String get chatPageMyNameTooltip;
 
-  /// No description provided for @chatPageMyGroupCompanionsTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'My group companions'**
-  String get chatPageMyGroupCompanionsTooltip;
-
   /// No description provided for @chatPageGroupNameLabel.
   ///
   /// In en, this message translates to:

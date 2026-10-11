@@ -549,9 +549,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMyNameTooltip => 'Change my name';
 
   @override
-  String get chatPageMyGroupCompanionsTooltip => 'My group companions';
-
-  @override
   String get chatPageGroupNameLabel => 'Name';
 
   @override

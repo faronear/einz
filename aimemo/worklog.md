@@ -14028,3 +14028,8 @@ analyze 0 issue；chat_page_menu 34 测试全过。
 StadiumBorder 大胶囊**，悬浮/按住显色，点击打开「我的群组」弹层；头像槽
 的独立胶囊壳去掉（空群占位头像的 tooltip 保留，头像条内每人 tooltip 保留）。
 analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十九）**：状态条大胶囊（及空群占位头像）的 tooltip 改为与
+「我的群组」菜单项/弹层标题**共享同一文案键** `chatPageMenuMembers('group')`
+（老板 2026-10-11），删除旧键 `chatPageMyGroupCompanionsTooltip`（我的群组
+同伴/My group companions）。analyze 0 issue；chat_page_menu 34 测试全过。
