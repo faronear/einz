@@ -199,14 +199,11 @@ find "${APP_DIR}/build/ios" -name '*.sbak' -print -delete 2>/dev/null || true
 # 语音通话的 TURN 配置（可选）：`app/localConfig.turn.json` 存在就带上。
 # 它带 TURN 地址与凭据（gitignore 覆盖，不进仓库）；**没有它照样能打包**，
 # 只是产物跨网打不通（ICE 打不了洞）——所以缺文件时只提示，不拦。
+# 统一实现 scripts/turnDefineArgs.sh（与 apk/macos 打包脚本同口径，2026-10-11 抽取）。
 TURN_DEFINE_ARGS=()
-if [[ -f "${APP_DIR}/localConfig.turn.json" ]]; then
-  TURN_DEFINE_ARGS=(--dart-define-from-file=localConfig.turn.json)
-  echo "ℹ️  已带上 TURN 配置（localConfig.turn.json）"
-else
-  echo "ℹ️  没有 localConfig.turn.json → 本包**不带 TURN**，跨网通话会打不通。"
-  echo "   需要的话：cp localConfig.turn.json 的样例填好（见 docs/TURN.md）"
-fi
+while IFS= read -r arg; do
+  [[ -n "$arg" ]] && TURN_DEFINE_ARGS+=("$arg")
+done < <(bash "${SCRIPT_DIR}/../../scripts/turnDefineArgs.sh")
 
 echo "▶ 构建 ${CHANNEL} IPA（版本 ${APP_BUILD_NAME} / 构建号 ${APP_BUILD_NUMBER}，约 1–3 分钟）…"
 "${FLUTTER}" build ipa --release \

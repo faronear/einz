@@ -13841,3 +13841,7 @@ app-apk-build / app-ios-build-raw / app-mac-build-raw / buildMacos.sh（dev+dist
   cn1（36.154.238.42）同步复测也正常——双 TURN 服务器就绪；
 - us2 conf：老板拷贝 cn1 的（user:密码不变=与客户端凭证一致，只改 realm +
   external-ip）——标准做法。realm 两台可以不同（各自自报，客户端不感知）。
+
+**追记**：`buildIos.sh` 的内联 TURN 块也抽取为 `scripts/turnDefineArgs.sh` 调用
+（数组语义保持：while read 填充 TURN_DEFINE_ARGS，stderr 提示原样透传）——单一
+实现，五条打包路径（ipa adhoc/appstore/raw、apk、macos dev/dist）同口径。
