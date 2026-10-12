@@ -14127,3 +14127,9 @@ value 侧、与值同侧右对齐。⚠️ textAlign 只在文本框比文字宽
 aboutStatusUnreachable 文案改为"无法连接/Unreachable"（去掉"任何入口/
 自动重试中"）。测试同步反转为新语义（备用候选可达也显示无法连接）。
 about_sheet_status 4 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十二）**：气泡时间行最右（沙漏时长右边）加「...」图标
+（老板 2026-10-12）：单击 = 长按气泡打开消息菜单弹层（_showMessageActions）；
+复用 `_bubbleQuickAction`（圆形热区 28/图标 16/tooltip 菜单 chatPageMenuMore/
+同款 hover 色）；显示条件与气泡长按同口径 `_messageHasActions`（墓碑仅可
+撤回时给）。chat_page_menu + 引用 38 测试全过，analyze 0 issue。

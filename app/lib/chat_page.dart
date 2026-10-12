@@ -8251,6 +8251,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               ),
                                             ),
                                           ],
+                                          // 菜单「...」（老板 2026-10-12）：时间行
+                                          // 最右侧（沙漏时长右边），单击 = 长按气泡
+                                          // 打开消息菜单弹层；与气泡长按同条件
+                                          //（_messageHasActions：墓碑仅可撤回时给）。
+                                          if (_messageHasActions(m)) ...[
+                                            const SizedBox(width: 2),
+                                            _bubbleQuickAction(
+                                              m,
+                                              icon: Icons.more_horiz,
+                                              label: l10n.chatPageMenuMore,
+                                              onTap: () => _showMessageActions(m),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     ),
