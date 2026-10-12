@@ -14312,3 +14312,38 @@ shape: CircleBorder())` + 白 ✕，替换四处原裸 IconButton（消息图片
 ripple 与语义（仍是真按钮，不是贴图）。回归测试加第 4 例：断言 Dialog 里
 的关闭键 resolve 出 black54 背景 + CircleBorder（圆底真的画上、且是圆）。
 全量测试全过、analyze 0 issue。
+
+**（2026-10-12，五十一）**：桌面端 **Cmd/Ctrl+V 粘贴剪贴板内容直接发送**
+（老板 2026-10-12 要"微信那样把图片粘进输入框"，图片+文件一起做）。新增
+依赖 `pasteboard ^0.5.0`（Mixin 团队，Apache 2.0，2026-08 还在修 bug；
+备选 super_clipboard 要 Rust 工具链且自称 experimental，不选）——macOS/
+Windows/Linux **零配置**，Windows 的 generated_plugin_registrant 自动注册，
+无一行原生代码；iOS/macOS 的 Podfile.lock 已同步（pod install 跑过）。
+
+**实现**（chat_page.dart）：页面级 `CallbackShortcuts` 拦 Cmd+V（macOS
+meta / Win、Linux ctrl，SingleActivator 平台分支）→ `_pasteFromClipboard`
+三级分流，与微信口径一致（**同时有图和文时发图**）：① 图片 → 时间戳合成名
+`粘贴图片_MMdd_HHmmss.png` + 大小预检 + 走 `_sendAttachmentOptimistic`
+（与相册/拖放同一收口）；② 文件（访达拷的）→ `Pasteboard.files()` 复用
+拖放的 `_sendDroppedFiles`；③ 都没有 → 文本插输入框光标处。桌面门控
+`_clipboardPasteSupported`（与拖放同平台集、独立成门）。
+
+**焦点链实测（五种状态定方案，本项目的关键经验）**：页面级 Shortcuts 只有
+在**页面内有控件持焦**时才收到按键——① 输入框持焦 ✓；② 新开页面全页无焦点
+✗；③ 点消息列表（onTapOutside 失焦）✗；④ 给输入框加 autofocus 可修复 ②
+✓；⑤ 对话框打开时本层自然失活 ✓（焦点已移上层路由，无需护栏）。配套两个
+桌面小改：输入框 `autofocus: _clipboardPasteSupported`（桌面打开会话即聚焦，
+Discord 同款；移动端不抢焦点）、桌面端 onTapOutside 不再 unfocus（桌面无
+软键盘要收，失焦还会让粘贴失灵）。另核实过全局
+`HardwareKeyboard.addHandler` 路线不可行：KeyEventManager 文档明确"所有
+目的地都会收到事件、互不打断"，全局 handler 压不掉 TextField 的原生文字
+粘贴，会有双重动作。
+
+**测试**（chat_paste_test.dart 四例）：mock `pasteboard` + `flutter/platform`
+两个通道（项目已有 mock 先例）；图片发出 / 文件发出 / 文本只插入不发消息 /
+空剪贴板无动作。两个 FakeAsync 踩坑：① testWidgets 身体里**真实文件 I/O
+不会完成**（写临时文件必须包 `tester.runAsync`，否则整条挂死）；②
+`settleRealAsync` 首轮就因"没有转圈"退出，等不到文件分支的 length/
+readAsBytes 两步真实 I/O——需显式补 pump+runAsync 轮次。CI 在 ubuntu 上
+跑，测试按宿主平台选修饰键（mac meta / 其他 control），与生产分支一致。
+全量 296 测试全过、analyze 0 issue。

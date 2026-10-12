@@ -15,6 +15,7 @@ import 'widgets/linkified_text.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:pasteboard/pasteboard.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
@@ -73,6 +74,13 @@ bool get _hasCameraCapture =>
 /// 本平台是否能从系统拖文件进来（仅桌面）。移动端无此交互，且 desktop_drop 的
 /// Android 实现还是 preview，不挂上去更稳。
 bool get _fileDropSupported =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+/// 本平台是否支持「Cmd/Ctrl+V 粘贴剪贴板内容直接发送」（仅桌面）。
+/// 与 [_fileDropSupported] 同一个平台集，但是**独立的能力门**：粘贴走
+/// `pasteboard` 插件（macOS/Windows/Linux 零配置），移动端没有"拷图再粘贴
+/// 发送"的心智，且插件的 Android 侧要 FileProvider 配置，先不做。
+bool get _clipboardPasteSupported =>
     !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
 /// 拖入文件的类型归类（扩展名 → 附件类型）。桌面拖放与相册/文件对话框各入口
@@ -6581,6 +6589,74 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  // ---------- 桌面端剪贴板粘贴：Cmd/Ctrl+V 直接发送（老板 2026-10-12） ----------
+
+  /// 剪贴板图片的合成文件名。粘贴没有"原名"可言（截图/浏览器拷图都不带名），
+  /// 用时间戳保证连发多条不重名；扩展名跟字节格式走——`pasteboard` 在
+  /// macOS（NSPasteboard）与 Windows（DIB 转换）两端返回的都是 PNG。
+  /// 这名字会写进消息明文（`📎 <fileName>`，引用快照/对端保存都看它）。
+  String _pastedImageName() {
+    final t = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '粘贴图片_${two(t.month)}${two(t.day)}_${two(t.hour)}${two(t.minute)}${two(t.second)}.png';
+  }
+
+  /// Cmd/Ctrl+V 的落点：剪贴板内容直接进消息流（微信同款）。
+  /// 三级分流，与微信口径一致——**同时有图和文时发图**（图优先）：
+  /// ① 图片（截图 / 浏览器拷图）→ 走 [_sendAttachmentOptimistic] 发送，
+  ///    与相册、拖放同一收口（大小预检、失败提示全都继承）；
+  /// ② 文件（访达/资源管理器里拷的文件）→ 复用拖放入口的 [_sendDroppedFiles]；
+  /// ③ 都没有 → 纯文本，插入输入框光标处（见 [_insertPastedText]）。
+  ///
+  /// 为什么文本要自己插：快捷键一旦被页面级 CallbackShortcuts 匹配就会消费掉，
+  /// WidgetsApp 默认的文字粘贴不会跑，所以这一支得自己来（等价于原生粘贴：
+  /// 替换选中区、光标落到插入文本尾）。
+  Future<void> _pasteFromClipboard() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final bytes = await Pasteboard.image;
+      if (!mounted) return;
+      if (bytes != null) {
+        // 超限立刻失败（人话），与拖放/相册同口径（老板 2026-10-08）
+        if (!_withinAttachmentLimit(bytes.length)) return;
+        await _sendAttachmentOptimistic(
+            fileBytes: bytes, fileName: _pastedImageName(), type: 'image');
+        return;
+      }
+      final files = await Pasteboard.files();
+      if (!mounted) return;
+      if (files.isNotEmpty) {
+        await _sendDroppedFiles(files.map(XFile.new).toList());
+        return;
+      }
+      _insertPastedText(await Pasteboard.text ?? '');
+    } catch (e) {
+      if (!mounted) return;
+      _notice(context, _attachmentSendError(l10n, e));
+    }
+  }
+
+  /// 文本粘贴回退：把剪贴板文本插到输入框光标处（选中区替换）。
+  /// 焦点不在输入框时（焦点在消息列表/别处）先把焦点拉回来——否则插了字
+  /// 用户看不见光标，也不知道字去哪儿了。
+  void _insertPastedText(String text) {
+    if (text.isEmpty) return;
+    final controller = _input;
+    final sel = controller.selection;
+    // 从未聚焦过的输入框 selection 是 -1（无效值）：按"追加到末尾"处理
+    final hasSelection = sel.start >= 0 && sel.end >= 0;
+    final start =
+        hasSelection ? math.min(sel.start, sel.end) : controller.text.length;
+    final end =
+        hasSelection ? math.max(sel.start, sel.end) : controller.text.length;
+    final newText = controller.text.replaceRange(start, end, text);
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + text.length),
+    );
+    _inputFocusNode.requestFocus();
+  }
+
   // ---------- 视频：下载解密 → 临时文件 → video_player 播放 ----------
 
   /// 附件元数据缺失的媒体消息兜底 UI（2026-10-09）：明确的「附件不可用 ·
@@ -7421,7 +7497,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final page = Scaffold(
+    // 非 final：桌面端下面还要按需套 CallbackShortcuts（粘贴快捷键）/DropTarget
+    // （拖放），见方法末尾两处包裹
+    Widget page = Scaffold(
       // gradient 风格：body 延伸到 AppBar 之后，AppBar 透明浮在渐变上（同向导全屏
       // 渐变做法）；plain 风格保持原有布局（AppBar 浅粉底，body 从其下方开始）
       extendBodyBehindAppBar: _uiStyle == 'gradient',
@@ -8413,6 +8491,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               child: TextField(
                                 controller: _input,
                                 focusNode: _inputFocusNode,
+                                // 桌面端自动聚焦（老板 2026-10-12 粘贴功能配套）：
+                                // Cmd/Ctrl+V 走焦点链分发——新开聊天页若输入框无
+                                // 焦点，页面级 CallbackShortcuts 收不到按键，粘贴
+                                // 会"没反应"（实测五种焦点状态定的方案）。桌面聊天
+                                // 客户端打开会话即聚焦输入框也是惯例（Discord 同款）；
+                                // 移动端不抢焦点（会弹软键盘）。
+                                autofocus: _clipboardPasteSupported,
                                 // 多行输入框：文字到达宽度后自动折行，输入框随之增高，
                                 // 最多 8 行；超过 8 行不再增高，转为内部纵向滚动
                                 // （老板要求 2026-09-13：原先单行 + 横向滚动体验差）。
@@ -8444,8 +8529,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 // 发送后键盘常驻遮挡消息流；点按输入框以外的任意处
                                 // （消息列表/空白/其他控件）收起键盘（老板要求 2026-09-12）。
                                 // 移动端默认不动 focus，需显式 unfocus。
-                                onTapOutside: (_) =>
-                                    FocusManager.instance.primaryFocus?.unfocus(),
+                                // **桌面端不收起**：桌面没有软键盘要收，且失焦后
+                                // Cmd/Ctrl+V 粘贴快捷键（焦点链上的 CallbackShortcuts）
+                                // 就收不到按键了——点消息列表不该让粘贴失灵
+                                // （老板 2026-10-12 粘贴功能配套）。
+                                onTapOutside: (_) {
+                                  if (!_clipboardPasteSupported) {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                  }
+                                },
                               ),
                             ),
                             if (_inputMode != _InputMode.text)
@@ -8500,6 +8593,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 桌面端：整页套一个投递区，从访达/资源管理器拖文件进来即发送；移动端不挂
     // （无此交互，且 desktop_drop 的 Android 实现是 preview，不挂更稳）。
     if (!_fileDropSupported) return page;
+    // 桌面端：Cmd/Ctrl+V 粘贴剪贴板内容直接发送（微信同款，老板 2026-10-12）。
+    // CallbackShortcuts 内部就是一层 canRequestFocus:false + skipTraversal 的
+    // Focus——不抢焦点、不进 Tab 遍历，只在页面内任意控件（含输入框）持焦时
+    // 沿焦点链收到按键。匹配即消费：文字分支由 _pasteFromClipboard 自己插，
+    // WidgetsApp 默认粘贴不会跑。**对话框/弹层打开时本层自然失活**——焦点已
+    // 移到上层路由，不是本 Shortcuts 的后代（实测）。
+    if (_clipboardPasteSupported) {
+      page = CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          SingleActivator(
+            LogicalKeyboardKey.keyV,
+            control: !Platform.isMacOS, // Win/Linux 用 Ctrl
+            meta: Platform.isMacOS, // macOS 用 Cmd
+          ): () => unawaited(_pasteFromClipboard()),
+        },
+        child: page,
+      );
+    }
     return DropTarget(
       onDragEntered: (_) => setState(() => _fileDragHover = true),
       onDragExited: (_) => setState(() => _fileDragHover = false),

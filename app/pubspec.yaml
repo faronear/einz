@@ -53,6 +53,7 @@ dependencies:
   video_player: ^2.14.0
   file_picker: ^12.1.2
   desktop_drop: ^0.8.4 # 桌面端从访达/资源管理器拖文件进窗口直接发送（仅桌面生效；移动端无事件）
+  pasteboard: ^0.5.0 # 桌面端读系统剪贴板图片/文件（Cmd/Ctrl+V 粘贴发送，老板 2026-10-12；macOS/Windows/Linux 零配置，Apache 2.0）
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.4.0
