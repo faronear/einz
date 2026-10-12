@@ -7406,41 +7406,53 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 模型下载（§11，模型 ~228MB 不进 git）：进度对话框（百分比+MB），可取消。
-  /// 返回 true=模型就绪；false=用户取消或下载失败（失败已 notice 说明）。
-  Future<bool> _downloadVoiceModel() async {
+  /// 模型准备（§11，模型 ~228MB 随包分发）：进度对话框（百分比+MB），可取消。
+  /// 正常发布构建 = 从包内资产拷进应用目录；dev 构建没跑 fetchVoiceModel.sh
+  /// 时 ensureInstalled 自动回落下载，同一对话框不感知差异。
+  /// 返回 true=模型就绪；false=用户取消或准备失败（失败已 notice 说明）。
+  Future<bool> _prepareVoiceModel() async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final l10n = AppLocalizations.of(context)!;
     var cancelled = false;
-    var received = await VoiceTranscriptModel.downloadedBytes();
-    if (!mounted) return false;
+    var received = 0;
     final total = VoiceTranscriptModel.totalBytes;
+    // ⚠️ 任务必须**只在 builder 首次执行时启动一次**：进度回调 setState 会让
+    // StatefulBuilder 的 builder 整体重跑——启动语句若直接写在 builder 里，
+    // 每次重建都会再起一个 ensureInstalled（239MB 拷贝/下载并发炸开：进度
+    // 瞬间 100% 后彻底卡死，多个 pop(true) 重入 Navigator 触发红屏断言
+    // `!_debugLocked`，并发 ByteData 内存暴涨把 macOS 顶成黑屏）。
+    // 2026-10-12 真机实测踩坑（Android 红屏 + macOS 黑屏），改动前先读这段。
+    var started = false;
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
-        void progress(int rec, int tot) {
-          if (!ctx.mounted) return;
-          setState(() => received = rec);
+        if (!started) {
+          started = true;
+          // 进度对话框打开即开跑；失败把错误顶到 SnackBar 并关窗
+          unawaited(() async {
+            try {
+              await VoiceTranscriptModel.ensureInstalled(
+                onProgress: (rec, _) {
+                  if (ctx.mounted) setState(() => received = rec);
+                },
+                cancelled: () => cancelled,
+              );
+              if (ctx.mounted) Navigator.of(ctx).pop(true);
+            } catch (e) {
+              if (ctx.mounted) Navigator.of(ctx).pop(false);
+              // 用户主动取消（_Cancelled）不是失败：不弹错误，否则会露出
+              // "Instance of '_Cancelled'" 这种内部异常名
+              if (!cancelled) {
+                messenger?.showSnackBar(SnackBar(
+                    content: Text(l10n.voiceTranscriptPrepareFailed('$e'))));
+              }
+            }
+          }());
         }
-
-        // 进度对话框打开即开跑；失败把错误顶到 SnackBar 并关窗
-        unawaited(() async {
-          try {
-            await VoiceTranscriptModel.ensureDownloaded(
-              onProgress: progress,
-              cancelled: () => cancelled,
-            );
-            if (ctx.mounted) Navigator.of(ctx).pop(true);
-          } catch (e) {
-            if (ctx.mounted) Navigator.of(ctx).pop(false);
-            messenger?.showSnackBar(SnackBar(
-                content: Text(l10n.voiceTranscriptDownloadFailed('$e'))));
-          }
-        }());
         final pct = total == 0 ? 0 : (received * 100 / total).clamp(0, 100);
         return AlertDialog(
-          title: Text(l10n.voiceTranscriptDownloading),
+          title: Text(l10n.voiceTranscriptPreparing),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -7468,7 +7480,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 手动/重转入口（§10）：旧 m4a 明确提示不支持转写（别"点了没反应"）；
-  /// 模型未就绪先下载（进度对话框可取消，§11 模型不进 git）；就绪后清旧行
+  /// 模型未就绪先准备（进度对话框可取消，§11 模型随包分发）；就绪后清旧行
   /// 重新入队。失败静默——转写是纯增强功能，行留在原状态下次还能点。
   Future<void> _retryVoiceTranscript(HistoryMessage m) async {
     if (m.attachment == null) return;
@@ -7481,7 +7493,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     try {
       if (!await VoiceTranscriptModel.isReady()) {
-        final ok = await _downloadVoiceModel();
+        final ok = await _prepareVoiceModel();
         if (!ok || !mounted) return;
       }
       final t = _transcriber ??= VoiceTranscriptService(_voiceDb);

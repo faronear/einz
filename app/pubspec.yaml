@@ -103,6 +103,11 @@ flutter:
   assets:
     - assets/logo.png
     - assets/spinnerLogo.png
+    # 语音转写模型（sense-voice-small int8 ~239MB + tokens.txt）：二进制不进
+    # git，构建前由 scripts/fetchVoiceModel.sh 拉取到此目录（幂等）；运行时
+    # 首次转写从资产拷到应用目录，见 VoiceTranscriptModel.ensureInstalled。
+    # 目录里的 .gitkeep 保证新克隆也有目录（否则此处构建直接失败）。
+    - assets/voice_model/
 
 # sqlite3 原生库：用 sqlite3 包默认的捆绑预编译库（构建时从 GitHub releases
 # 下载并打入 APK）。曾配置 source: system 依赖系统 SQLite，但 Android 系统

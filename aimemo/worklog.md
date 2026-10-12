@@ -14243,3 +14243,45 @@ _enqueueVoiceTranscripts / 模型下载重试）与 main 新 UI（气泡「...�
 Recall 单勾限制、双勾进度）经 grep 抽查俱在。flutter pub get 后 lock 零
 漂移（镜像未污染）；app 与 shared 两侧 flutter/dart analyze 均 0 issue。
 转写入口与 main 新菜单的交互 UI 待老板真机自测。
+
+**（2026-10-12，四十二）**：语音转写模型分发从「首次使用下载」改回「**打包进
+产物**」（老板 2026-10-12 拍板，回到 §5 预留方案）。落地：①
+`scripts/fetchVoiceModel.sh`——构建前把 model.int8.onnx(239MB)+tokens.txt
+拉进 `app/assets/voice_model/`，幂等（sha256 过就秒过）、双源 + 3 轮重试、
+连接 20s 快失 / <10KB/s·60s 僵死 abort（国内网络实测：huggingface.co 直连
+必超时，hf-mirror 夜间偏慢，第一版脚本 14 分钟双源皆败后加了这些）；基线
+与 `voice_transcript_model.dart` 的 `_files` 同一份。② pubspec 声明资产目录；
+.gitignore 忽略目录**内容**并 `!.gitkeep`（git 否定规则救不回已排除目录里的
+文件——踩过；gitkeep 保证新克隆不缺目录，否则 pubspec 声明资产直接构建失败）。
+③ `VoiceTranscriptModel.ensureInstalled` 三级解析：已装过（含 10-10 以来
+下载过模型的设备，零迁移）→ 直接用；包内有资产 → 首次转写前拷进
+ApplicationSupport（1MB 分块进度 + 可取消 + 取消清残file + 大小校验）；
+包里没有（dev 没跑 fetch）→ 回落原下载链路。删掉 `downloadedBytes()`（进度
+基线统一 0，顺带消掉旧代码续传基线与拷贝绝对字节混用会跳变的隐患）。④
+chat_page `_downloadVoiceModel`→`_prepareVoiceModel`，l10n 两键换名
+（Downloading→Preparing / DownloadFailed→PrepareFailed）。⑤ 三个构建入口
+（buildIos/buildMacos/npm app-apk-build）先跑 fetch，**失败中断打包**——不
+静默出没有转写功能的包。flutter analyze 0 issue。
+
+**（2026-10-12，四十三）**：修真机红/黑屏 bug（老板 2026-10-12 实测：flutter
+run 后点转写，进度框瞬间 100% 后卡死，Android 红屏断言 navigator.dart
+`!_debugLocked`、macOS 黑屏）。根因：`_prepareVoiceModel` 把
+`unawaited(ensureInstalled…)` 直接写在 StatefulBuilder 的 **builder 里**——
+进度回调 setState 使 builder 整体重跑，每次重建都再起一个 ensureInstalled：
+239MB 拷贝/下载并发炸开（进度瞬间 100% 即多路并发灌的），多个 pop(true)
+重入 Navigator 触发 `_debugLocked` 断言（红屏），并发 ByteData 内存暴涨把
+macOS 顶黑。同型模式全库仅此一处（其余 StatefulBuilder 都在按钮回调里起
+任务）。修法：`started` 旗标保证任务只在 builder 首次执行时启动一次，注释
+写死原因防后人"清理"掉。附带确认：此修复是纯 Dart，**热重启即生效**（不动
+资产/原生）；旧的下载路径同型同险，本次一并修复。**两个后续实证**：① 拷贝落盘增 sha256
+校验（大小对内容烂只有哈希抓得到，防磁盘错误/写一半被 kill）。② 关于
+「并发写花文件」的推测**被实测推翻**：老板 macOS 上那份并发写出来的
+model.int8.onnx，sha256 与期望值完全一致——多路拷贝写的是同一资产的
+**相同字节、相同偏移**，交错写是幂等的，文件必然完好，无需手动删目录。
+（这也反证他的测试跑的已是新代码：239MB 在一分钟内落盘 = 包内资产
+拷贝，hf-mirror 下载要 8–14 分钟。）③ 路径构成备注（老板按文档路径
+没找到目录）：macOS 上 path_provider_foundation 会给 ApplicationSupport
+**拼上 bundle id**（源码确认，iOS 不拼、Android=filesDir），故模型目录
+实为 `<容器>/Library/Application Support/cc.tic.einz/voice_transcript/`；
+_rootDir 不加 applyDevDataDir 是刻意的——模型是派生缓存，dev/生产共用
+一份比分存两份好（DB/附件才是要隔离的数据）。

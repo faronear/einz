@@ -136,3 +136,10 @@ __pycache__/
 Caddyfile
 
 turnserver.*.conf
+# --- 语音转写模型（sense-voice-small int8 ~239MB，二进制不进 git）---
+# 模型由 scripts/fetchVoiceModel.sh 在构建前拉取，随 App 打包分发；
+# 忽略目录**内容**而非目录本身（git 否定规则救不回已排除目录里的文件），
+# 保住 .gitkeep——否则新克隆缺目录，pubspec 声明资产会直接构建失败
+# （"unable to find directory entry"）。
+app/assets/voice_model/*
+!app/assets/voice_model/.gitkeep

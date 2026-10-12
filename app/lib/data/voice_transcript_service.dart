@@ -22,8 +22,9 @@ class VoiceTranscriptService {
   final LocalDatabase _db;
 
   /// 模型目录（含 model.int8.onnx + tokens.txt）。
-  /// null = 走 [VoiceTranscriptModel.installedDir]（首次点转写时由 ChatPage
-  /// 下载，见 §11——模型不进 git）。显式传入仅供测试注入。
+  /// null = 走 [VoiceTranscriptModel.installedDir]（未就绪 → 行置
+  /// unavailable，用户点手动入口时由 ChatPage 调 ensureInstalled 就地
+  /// 安装——包内资产拷贝优先、下载兜底，见 §11）。显式传入仅供测试注入。
   final String? modelDir;
 
   /// 当前模型版本标识（进 `model_version` 列，判定 stale 的开关）。

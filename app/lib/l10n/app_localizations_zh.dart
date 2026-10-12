@@ -1004,11 +1004,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptLegacyAudio => '旧版语音（m4a）不支持转写，新录的语音才能转';
 
   @override
-  String get voiceTranscriptDownloading => '正在下载转写模型';
+  String get voiceTranscriptPreparing => '正在准备转写模型…';
 
   @override
-  String voiceTranscriptDownloadFailed(String error) {
-    return '转写模型下载失败：$error';
+  String voiceTranscriptPrepareFailed(String error) {
+    return '转写模型准备失败：$error';
   }
 
   @override

@@ -534,9 +534,9 @@
   "voiceTranscriptStale": "Re-transcribe available",
   "voiceTranscriptManual": "Tap to transcribe",
   "voiceTranscriptLegacyAudio": "Legacy voice messages (m4a) can't be transcribed — only new recordings can",
-  "voiceTranscriptDownloading": "Downloading transcription model",
-  "voiceTranscriptDownloadFailed": "Model download failed: {error}",
-  "@voiceTranscriptDownloadFailed": {
+  "voiceTranscriptPreparing": "Preparing transcription model…",
+  "voiceTranscriptPrepareFailed": "Failed to prepare transcription model: {error}",
+  "@voiceTranscriptPrepareFailed": {
     "placeholders": {
       "error": {
         "type": "String"
