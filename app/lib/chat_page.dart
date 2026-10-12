@@ -6876,10 +6876,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
+  /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 点任何位置关闭，与头像全屏一致）。
   /// useSafeArea:false + 直角 shape：背景铺满整屏，不留圆角和上下安全区空隙。
   /// 背景 = kBrandGradient（老板 2026-09-15：全屏查看用首屏同款渐变，更有品牌感）。
   /// 底部「保存」按钮（老板 2026-10-08）：移动端存相册 / 桌面弹保存对话框。
+  /// 轻触关闭（老板 2026-10-12）：点击屏幕任何地方都返回聊天页，不必非找右上角 ✕；
+  /// 与 _showAvatarFullscreen 同一套 Clickable 包裹——缩放/拖动仍归 InteractiveViewer，
+  /// 只有"轻触"（ pointer 未移动即抬起）才关，双指放大后误触不会关掉大图。
   Future<void> _showFullImage(HistoryMessage m, Uint8List bytes) async {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
@@ -6896,8 +6899,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: InteractiveViewer(
-                        child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+                      child: Clickable(
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: InteractiveViewer(
+                          child: Center(
+                              child: Image.memory(bytes, fit: BoxFit.contain)),
+                        ),
                       ),
                     ),
                     Positioned(
@@ -9468,6 +9475,8 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   /// 背景 = kBrandGradient，与图片全屏一致（老板 2026-09-15）。
   /// 底部「保存」按钮（老板 2026-10-08）：仅在调用方给了 [onSaveImage] 时出现
   /// （别人的头像可下载；状态条头像条不开全屏、也没给回调）。
+  /// 轻触关闭（老板 2026-10-12）：点屏幕任何地方返回聊天页（Image.memory 的
+  /// hitTestSelf 恒真，整块 fill 区域都接得住轻触），与图片/视频全屏一致。
   Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
@@ -9485,7 +9494,12 @@ class _MessageAvatarState extends State<_MessageAvatar> {
                 decoration: const BoxDecoration(gradient: kBrandGradient),
                 child: Stack(
                   children: [
-                    Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
+                    Positioned.fill(
+                      child: Clickable(
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: Image.memory(bytes, fit: BoxFit.contain),
+                      ),
+                    ),
                     Positioned(
                       top: 8,
                       right: 8,
@@ -9697,6 +9711,9 @@ class _VideoPreviewState extends State<_VideoPreview> {
     );
   }
 
+  /// 全屏播放（品牌渐变底 + 铺满整屏 + 点任何位置关闭）。
+  /// 轻触关闭（老板 2026-10-12）与图片/头像全屏一致：点画面或四周压边都返回
+  /// 聊天页；右上角 ✕ 保留作显式出口。
   Future<void> _playFullscreen(VideoPlayerController c) async {
     await c.seekTo(Duration.zero);
     await c.play();
@@ -9718,10 +9735,17 @@ class _VideoPreviewState extends State<_VideoPreview> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio: c.value.aspectRatio,
-                          child: VideoPlayer(c),
+                      child: Clickable(
+                        // opaque：视频在 AspectRatio 里不遮满屏幕，四周渐变压边
+                        // 也要接得住轻触（deferToChild 会漏掉这些区域）——
+                        // 老板 2026-10-12：点任何地方关闭全屏
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: c.value.aspectRatio,
+                            child: VideoPlayer(c),
+                          ),
                         ),
                       ),
                     ),

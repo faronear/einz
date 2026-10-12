@@ -14281,3 +14281,21 @@ entrance_name / join_token_target / member_name）的 `freePort()` 是纯随机
 CI 负载下偶发必触发。修法与项目内另一版可靠实现（audit/smoke/receipts
 等已用）对齐：`listen(0)` 让系统分配真实空闲端口，调用点改 `await`。
 4 文件 × import + 函数体 + 调用点，tsc 通过、4 个测试全绿。
+
+**（2026-10-12，四十九）**：全屏查看（图片 / 头像 / 视频）统一支持「点屏幕
+任何地方关闭」（老板 2026-10-12：以前必须点右上角 ✕ 才能返回聊天页）。
+三处改动都在内容层外包 `Clickable(onTap: pop)`——与 2026-09-26 起
+`_showAvatarFullscreen`（状态条头像大图，commit 9a056c47）同一套模式，
+四处行为自此一致：`_showFullImage`（消息图片）、
+`_MessageAvatarState._showFullscreen`（消息列表头像大图）、
+`_VideoPreviewState._playFullscreen`（视频全屏）。关键点：①
+InteractiveViewer 只管双指缩放/拖动，只有"轻触"（未移动即抬起）才关，
+放大后误触不关；② 视频那处传 `behavior: HitTestBehavior.opaque`——视频在
+AspectRatio 里不遮满屏幕，四周渐变压边也要接得住轻触；③ 右上角 ✕ 保留作
+显式出口，底部「保存」按钮在 Stack 上层不受影响。新增回归测试
+`chat_fullscreen_tap_close_test.dart`（3 例：压边轻触关、大图本体轻触关、
+拖动不误关 + ✕ 仍可关）。**踩坑（测试环境专有）**：
+`withImmersiveFullscreen` 里的 `SystemChrome.setEnabledSystemUIMode` 走
+flutter/platform 通道，widget 测试无引擎、调用永不回调 → `await` 挂住、
+`showDialog` 永远不执行（全屏压根打不开）；测试里 mock 该通道统一回 null
+解决（真机不受影响，通道有系统回）。全量 291 测试全过、analyze 0 issue。
