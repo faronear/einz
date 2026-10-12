@@ -14100,3 +14100,10 @@ group_status_bar 10 测试全过，analyze 0 issue。
 `_statusAvatar`，改为在胶囊里直接画 Ink 头像（照片 `Ink.image` + ClipOval、
 无图性别 tint + Ink，与群占位头像同款），点击/悬浮都归外层 InkWell，
 外层悬浮高亮能盖在头像上。analyze 0 issue。
+
+**（2026-10-12，二十九）**：修复 `npm run app-ios-boot` 的 TDZ 崩溃——
+`scripts/emuResolveIos.js` 里 `versionOf`（const 箭头函数）声明在 113 行，
+但 `if (!input)` 分支在模块顶层就执行 sort、比较器立刻调用它 →
+`ReferenceError: Cannot access 'versionOf' before initialization`。修复 =
+把 `versionOf`/`runtimeKeyFor` 挪到所有使用之前（json 解析之后）。
+`node scripts/emuResolveIos.js` 验证通过（exit=0）。

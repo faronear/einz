@@ -81,6 +81,16 @@ const json = JSON.parse(
   execSync('xcrun simctl list devices available -j').toString()
 )
 
+// 辅助函数放在**所有使用之前**：下面 `if (!input)` 分支在模块顶层就跑
+// sort，比较器立刻调用 versionOf——const 声明若在使用之后会触发 TDZ
+// （ReferenceError: Cannot access 'versionOf' before initialization，
+// 2026-10-12 老板实测）。
+const runtimeKeyFor = want => `iOS-${want.replace(/\./g, '-')}`
+const versionOf = runtimeKey => {
+  const matched = runtimeKey.match(/iOS-(\d+)(?:-(\d+))?/)
+  return matched ? [Number(matched[1]), Number(matched[2] || 0)] : [0, 0]
+}
+
 // 空规格（裸 npm run app-ios-boot）：有 Booted 直接用它；否则挑可用的
 // iPhone 里系统版本最高的那台——任何机器上都能裸跑，不再钉死某机型。
 if (!input) {
@@ -107,12 +117,6 @@ if (!input) {
   })
   console.log(iPhones[0].udid)
   process.exit(0)
-}
-
-const runtimeKeyFor = want => `iOS-${want.replace(/\./g, '-')}`
-const versionOf = runtimeKey => {
-  const matched = runtimeKey.match(/iOS-(\d+)(?:-(\d+))?/)
-  return matched ? [Number(matched[1]), Number(matched[2] || 0)] : [0, 0]
 }
 
 const matched = []
