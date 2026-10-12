@@ -597,6 +597,7 @@
   "aboutPageTitle": "About Einz",
   "aboutIntro": "Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.",
   "aboutVersionLabel": "Version",
+  "aboutDownloadLabel": "Download",
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address for debugging only",
   "aboutStatusLabel": "Connection",

@@ -53,4 +53,22 @@ void main() {
     await tester.pump();
     expect(find.text('检测中…'), findsOneWidget);
   });
+
+  testWidgets('版本号下有下载入口：releases 链接原样展示且排在版本号下方',
+      (tester) async {
+    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+    // 绑 l10n 键不绑字面（文案常改）
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutDownloadLabel), findsOneWidget);
+    // URL 原样展示：打不开浏览器时用户能手抄（同 version_gate 口径）
+    expect(find.text('https://github.com/faronear/einz/releases/tag/latest'),
+        findsOneWidget);
+    // 「在版本号下」：下载行整体比版本号行更靠下
+    expect(
+      tester.getTopLeft(find.text(l10n.aboutDownloadLabel)).dy,
+      greaterThan(tester.getTopLeft(find.text(l10n.aboutVersionLabel)).dy),
+      reason: '下载入口应排在版本号下一行',
+    );
+  });
 }

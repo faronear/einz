@@ -1079,6 +1079,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutVersionLabel => '版本号';
 
   @override
+  String get aboutDownloadLabel => '下载';
+
+  @override
   String get aboutServerLabel => '服务器地址';
 
   @override

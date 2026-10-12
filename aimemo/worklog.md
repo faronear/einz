@@ -14226,3 +14226,14 @@ app/pubspec.lock 曾被整文件替换成 voice 分支版本（含 sherpa_onnx�
 （无并发）testAll 四栈全过、汇总「全部通过 ✅」；此前失败的两项分别隔离复现/修复验证：
 entrance_list_sheet 修复后 6 用例全过；receipts 修复前隔离两连过（证明是负载
 敏感的竞态）、修复后通过；smoke 修复后通过。
+
+**（2026-10-12，四十四）**：About 弹层版本号下新增「下载」一行（老板
+2026-10-12）：标签 下载/Download（新 l10n 键 aboutDownloadLabel），值 =
+GitHub releases latest 页 URL（与服务端 appDownloadUrl 同址），整行可点 →
+openAppDownloadUrl 外部浏览器打开（打不开静默、URL 留底可手抄，同
+version_gate 口径）。实现：_InfoRow 加可选 onTap——入口行的值渲染成 app
+统一链接样式（品牌蓝 #2271F7 + 下划线，同 LinkifiedText），文字本身挂
+TapGestureRecognizer、外层 Clickable 包整行（老板口径：整块可点）；普通行
+仍是 SelectableText 不变。about_sheet_status_test 加一例（绑 l10n 键、
+URL 原样、下载行 dy 大于版本号行）；about + chat_page_menu + version_gate
+三文件 53 测试全过，全量 analyze 0 issue。

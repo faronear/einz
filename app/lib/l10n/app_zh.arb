@@ -582,6 +582,7 @@
   "aboutPageTitle": "关于秘境",
   "aboutIntro": "秘境是端到端加密的私密聊天和共享空间，没有任何第三方（包括秘境自身）能够偷看内容，严格保障隐私安全。",
   "aboutVersionLabel": "版本号",
+  "aboutDownloadLabel": "下载",
   "aboutServerLabel": "服务器地址",
   "aboutServerDevNote": "开发地址，仅供测试",
   "aboutStatusLabel": "连接状态",

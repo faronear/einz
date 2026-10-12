@@ -1,9 +1,21 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../brand_logo.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
+import 'clickable.dart';
+import 'version_gate.dart';
+
+/// 下载入口（老板 2026-10-12）：GitHub releases 的 latest 页（与服务端
+/// `appDownloadUrl` 同一地址）。`latest` 是 GitHub 的固定别名， releases 置顶
+/// 即指向它——不跟具体版本号，永不过期。
+const String _kReleasesUrl =
+    'https://github.com/faronear/einz/releases/tag/latest';
+
+/// 链接色：品牌深蓝 #2271F7（与 LinkifiedText / 「邀请加入」链接同源）。
+const Color _kLinkColor = Color(0xFF2271F7);
 
 /// 「关于」弹层要展示的版本信息（版本号 + 构建号）。
 typedef AboutInfo = ({String version, String buildNumber});
@@ -112,6 +124,16 @@ class _AboutSheetState extends State<AboutSheet> {
                             : '${info.version} (${info.buildNumber})',
                       ),
                       const SizedBox(height: 14),
+                      // 下载入口（版本号下一项，老板 2026-10-12）：整行可点 →
+                      // 外部浏览器打开 releases 页；打不开（无浏览器/地址非法）
+                      // 静默——URL 原样展示在行里，用户能手抄（同 version_gate
+                      // 的 openAppDownloadUrl 口径）
+                      _InfoRow(
+                        label: l10n.aboutDownloadLabel,
+                        value: _kReleasesUrl,
+                        onTap: () => openAppDownloadUrl(context, _kReleasesUrl),
+                      ),
+                      const SizedBox(height: 14),
                       // 服务器地址可长按选中复制（排查连不上时最常问的就是这个）。
                       // 非出厂域名（--server / 编译期覆盖）时标注，避免把开发包当正式包。
                       _InfoRow(
@@ -160,9 +182,17 @@ class _AboutSheetState extends State<AboutSheet> {
 
 /// 一行「标签左 --- 值右」（老板 2026-10-12：标签与值放同一行，不再上下两行），
 /// 值可长按选中复制；补充说明仍在下方独占一行。
+///
+/// [onTap] 非空 = 这一行是入口（如「下载」）：整块可点（老板口径：别让用户去点
+/// 中某个小控件），值渲染成 app 统一链接样式（蓝字 #2271F7 + 下划线）且文字
+/// 本身也可点——点哪都是同一个动作。
 class _InfoRow extends StatelessWidget {
   const _InfoRow(
-      {required this.label, required this.value, this.note, this.valueColor});
+      {required this.label,
+      required this.value,
+      this.note,
+      this.valueColor,
+      this.onTap});
 
   final String label;
   final String value;
@@ -173,10 +203,13 @@ class _InfoRow extends StatelessWidget {
   /// 值的颜色（连接状态语义色），null = 默认。
   final Color? valueColor;
 
+  /// 行点击动作，null = 普通展示行（值可选中复制）。
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
+    final row = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // baseline 对齐：标签小字（labelMedium）与值大字（bodyLarge）字基线一致
@@ -191,10 +224,31 @@ class _InfoRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: SelectableText(value,
-                  textAlign: TextAlign.right,
-                  style:
-                      theme.textTheme.bodyLarge?.copyWith(color: valueColor)),
+              child: onTap == null
+                  // 普通行：值可长按选中复制（排查连不上时最常问的就是服务器地址）
+                  ? SelectableText(value,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodyLarge
+                          ?.copyWith(color: valueColor))
+                  // 入口行：链接样式 + 文字本身可点（与整行 Clickable 同一动作）
+                  : Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: value,
+                            style: (theme.textTheme.bodyLarge ??
+                                    const TextStyle())
+                                .copyWith(
+                              color: _kLinkColor,
+                              decoration: TextDecoration.underline,
+                              decorationColor: _kLinkColor,
+                            ),
+                            recognizer: TapGestureRecognizer()..onTap = onTap,
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
             ),
           ],
         ),
@@ -216,5 +270,7 @@ class _InfoRow extends StatelessWidget {
         ],
       ],
     );
+    // 入口行整块可点（含标签与留白）；普通行不包，少一层无关手势
+    return onTap == null ? row : Clickable(onTap: onTap, child: row);
   }
 }

@@ -1149,6 +1149,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutVersionLabel => 'Version';
 
   @override
+  String get aboutDownloadLabel => 'Download';
+
+  @override
   String get aboutServerLabel => 'Server';
 
   @override

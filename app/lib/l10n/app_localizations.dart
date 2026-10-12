@@ -2012,6 +2012,12 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get aboutVersionLabel;
 
+  /// No description provided for @aboutDownloadLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get aboutDownloadLabel;
+
   /// No description provided for @aboutServerLabel.
   ///
   /// In en, this message translates to:
