@@ -698,7 +698,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': '我的同伴',
-      'other': '我的群组',
+      'group': '我的群组',
+      'other': '我的秘境',
     });
     return '$_temp0';
   }

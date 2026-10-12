@@ -14082,3 +14082,10 @@ true`（maxHeight=全屏）→ 整个弹层被顶到满屏。该 helper 为长�
 LayoutBuilder + 边长反算整段移除，连带清掉死常量
 `_entranceCardsPerRow`/`_entranceCardMaxSize`/`_entranceCardSizeFor`/
 `_entranceSheetMaxWidth`/`_entranceSheetHPadding`。analyze 0 issue。
+
+**（2026-10-12，二十六）**：`chatPageMembersTitle` 的 select 补显式
+`group{My group}` 分支（老板提议）——此前 `other{My group}` 在兼任 group
+分支，语义不直白；ICU select 强制要求 `other` 存在不能删，故写成
+duo+group+other 三键（other 留作强制兜底，文案同 group，行为不变）。
+重新 gen-l10n；members_reinvite + group_status_bar 11 测试全过，
+analyze 0 issue。

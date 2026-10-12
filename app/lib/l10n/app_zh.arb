@@ -355,7 +355,7 @@
     }
   },
   "chatPageMembersHint": "",
-  "chatPageMembersTitle": "{mode, select, duo{我的同伴} other{我的群组}}",
+  "chatPageMembersTitle": "{mode, select, duo{我的同伴} group{我的群组} other{我的秘境}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersUnnamed": "未命名",
   "chatPageMembersInvite": "邀请",
@@ -630,7 +630,7 @@
   "resetEntrancePinLabel": "锁屏码",
   "resetEntrancePinHint": "请输入本机锁屏码",
   "resetEntranceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道",
-  "spaceListHint": "点击其他秘境即可切换",
+  "spaceListHint": "点击其他卡片切换当前秘境",
   "spaceListTitle": "我的秘境",
   "spaceListEmpty": "还没有加入任何秘境",
   "spaceListAdd": "添加另一个秘境",

@@ -360,7 +360,7 @@
     }
   },
   "chatPageMembersHint": "",
-  "chatPageMembersTitle": "{mode, select, duo{My companion} other{My group}}",
+  "chatPageMembersTitle": "{mode, select, duo{My companion} group{My group} other{My space}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvite": "Invite",
