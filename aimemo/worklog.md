@@ -14189,3 +14189,11 @@ image: DecorationImage(cover))`，与占位分支同口径（chat_page.dart）�
 hardEdge 裁掉；space_switcher.dart）。随后老板看了效果定稿 **-8**（再外推一点、
 和头像拉开距离）。analyze 0 issue；space_switcher_avatar +
 multi_space_pages 12 测试全过。
+
+**（2026-10-12，四十）**：单空间顶栏「我的秘境」也带多空间图标并可点开切换弹层
+（老板 2026-10-12，推翻 2026-09-24 的"单空间不给切换暗示"——图标是"空间弹层"
+的入口，不是"有多个空间"的暗示）。`_brandTitle` 去掉 `if (_multiSpace)` 分支：
+图标与 Tooltip/InkWell 对任何空间数都生效；`_multiSpace` getter 随之无引用删除。
+测试同步反转：`chat_page_menu` 里"单空间不给箭头/不可点"用例改为断言图标出现 +
+品牌名可点（logo 可点开「关于」不变），另一测试的过时注释更正。analyze 0 issue；
+chat_page_menu + multi_space_pages + space_switcher_avatar 46 测试全过。
