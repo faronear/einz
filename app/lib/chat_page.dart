@@ -1644,12 +1644,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 底部「保存」（移动端入相册、桌面弹保存对话框）。先关大图再
                     // 保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面会看不见。
@@ -6911,12 +6906,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       top: 8,
                       right: 8,
                       // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
                     // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。
@@ -9390,6 +9380,28 @@ class _StatusAvatarState extends State<_StatusAvatar> {
   }
 }
 
+/// 全屏查看（图片 / 视频 / 头像大图）右上角的关闭键（老板 2026-10-12）：
+/// 白 ✕ + 黑 54% 半透明圆底。内容铺满全屏时若图片偏白，纯白 ✕ 会融进背景
+/// 看不见；半透明深灰圆底压在任何底色上都能衬出白叉——用半透明而非实心灰，
+/// 是会随底色自适应：深色内容上不显脏、浅色内容上够压得住。48 直径正好是
+/// Material 最小触控区域，不比原来的裸 IconButton 多占地方。
+/// 四间全屏查看（消息图片 / 视频 / 消息头像 / 状态条头像）共用这一只。
+class _FullscreenCloseButton extends StatelessWidget {
+  const _FullscreenCloseButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.black54,
+        shape: const CircleBorder(),
+      ),
+      icon: const Icon(Icons.close, color: Colors.white),
+      onPressed: () => Navigator.of(context).pop(),
+    );
+  }
+}
+
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar(
       {this.memberId,
@@ -9503,12 +9515,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见
                     if (onSave != null)
@@ -9752,12 +9759,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
                     // 先关全屏再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。

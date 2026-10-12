@@ -1,7 +1,8 @@
 // 回归测试（老板要求 2026-10-12）：图片全屏后，点击屏幕**任何地方**都应返回
-// 聊天页，而不是必须点右上角的关闭 ✕。同时守住两条边界：
+// 聊天页，而不是必须点右上角的关闭 ✕。同时守住三条边界：
 // ① 双指缩放/拖动（pan）不能误触关闭——只有"轻触"才关；
-// ② 右上角 ✕ 仍负责显式关闭（不被轻触层抢走）。
+// ② 右上角 ✕ 仍负责显式关闭（不被轻触层抢走）；
+// ③ ✕ 带黑 54% 圆底——内容偏白时纯白叉会融进背景，圆底保证任何底色都醒目。
 
 import 'dart:convert';
 
@@ -178,6 +179,27 @@ void main() {
     await tester.tap(_dialogCloseButton());
     await tester.pumpAndSettle();
     expect(find.byType(Dialog), findsNothing, reason: '✕ 仍负责显式关闭');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('图片全屏：关闭键是白叉+深灰圆底（浅色图片上也醒目）',
+      (WidgetTester tester) async {
+    await pumpWithImage(tester);
+    await openFullscreen(tester);
+
+    // 老板 2026-10-12：内容偏白时纯白 ✕ 会融进背景——圆底必须真的画上，
+    // 且是圆形（不是方块/椭圆）
+    final circledClose = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byWidgetPredicate((w) {
+        if (w is! IconButton) return false;
+        final states = const <WidgetState>{};
+        return w.style?.backgroundColor?.resolve(states) == Colors.black54 &&
+            w.style?.shape?.resolve(states) is CircleBorder;
+      }),
+    );
+    expect(circledClose, findsOneWidget,
+        reason: '关闭键应为白叉 + 黑 54% 圆形底（任何底色都衬得出）');
     expect(tester.takeException(), isNull);
   });
 }

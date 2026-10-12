@@ -14299,3 +14299,16 @@ AspectRatio 里不遮满屏幕，四周渐变压边也要接得住轻触；③ �
 flutter/platform 通道，widget 测试无引擎、调用永不回调 → `await` 挂住、
 `showDialog` 永远不执行（全屏压根打不开）；测试里 mock 该通道统一回 null
 解决（真机不受影响，通道有系统回）。全量 291 测试全过、analyze 0 issue。
+
+**（2026-10-12，五十）**：全屏查看的关闭键加**深灰半透明圆底**（老板
+2026-10-12：内容铺满全屏时若图片偏白，纯白 ✕ 会融进背景看不见；不限定方案，
+"有更好的可直接执行"）。落地：抽出共用的 `_FullscreenCloseButton`
+（chat_page.dart）——`IconButton.styleFrom(backgroundColor: Colors.black54,
+shape: CircleBorder())` + 白 ✕，替换四处原裸 IconButton（消息图片
+`_showFullImage`、视频 `_playFullscreen`、消息头像 `_showFullscreen`、
+状态条头像 `_showAvatarFullscreen`），行为/尺寸不变。选型理由：**半透明**
+（黑 54%）而非实心灰——圆底会随底色自适应，深色内容上不显脏、浅色内容上
+够压得住；48 直径正好是 Material 最小触控区域，不比原来多占地方；保留
+ripple 与语义（仍是真按钮，不是贴图）。回归测试加第 4 例：断言 Dialog 里
+的关闭键 resolve 出 black54 背景 + CircleBorder（圆底真的画上、且是圆）。
+全量测试全过、analyze 0 issue。
