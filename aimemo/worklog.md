@@ -14379,3 +14379,29 @@ WS 证明可达，不套"宕机"指数退避），窗口从 60s+ 缩到 ≤5s；
 WS 态分两种：灯绿 → 新键 `chatPageSyncingLocalOnly`「同步中… 暂时无法收发，
 仅可查看本地消息」（老板原话），真离线时保留原「离线 · …」（那时"离线"
 是准的）。中英 arb 各加一 key，gen-l10n + analyze 0 issue。
+
+**（2026-10-12，五十四）**：新建 `feat/linux`——Linux GUI 支持（老板 2026-10-12：
+要在他的 Debian 13.3 上跑）。**依赖审计结论**（按各包自己 pubspec 的 platforms
+声明，非 lock——lock 按平台过滤不可靠）：19 个直接依赖 14 个支持 Linux
+（secure_storage=libsecret、record、audioplayers、webrtc、file_picker、
+image_picker、url_launcher、desktop_drop、path_provider、device_info、
+package_info、wakelock + 纯 Dart 族）；sqlite3 3.5.2 的 native-asset hook
+**自带 Linux 编译**（还专处了与系统 SQLite 的符号冲突，产物内嵌 libsqlite3，
+运行期不用装）。5 个无 Linux 实现：video_player（最新 2.14.1 仍只有
+android/ios/macos/web）、mobile_scanner、open_filex、video_thumbnail、gal。
+**代码改动**：① gal 无需动（canSaveToGallery 早已仅移动端）；②
+video_thumbnail 无需动（_buildVideoThumb 的 FutureBuilder 早有失败兜底，
+注释原话「平台无取帧能力」）；③ video_player：_VideoPreview 在 Linux 跳过
+初始化 + 改渲染「此设备不支持播放视频，点按保存到本地」占位（新 l10n 键
+chatPageVideoUnsupportedPlatform，整块可点→_saveAttachment 桌面保存对话框）；
+④ open_filex：_downloadFile 两处「直接打开」短路加 !Platform.isLinux，
+Linux 落下载→Documents→提示路径的既有出口；⑤ mobile_scanner：join token
+页扫码 suffixIcon 在 Linux 隐藏。**CI**：buildMultiPlatform.yml 加 linux-gui
+job（ubuntu-latest + GTK/libsecret 构建依赖 → flutter build linux --release
+→ bundle 打 tar.gz 附运行说明 → artifact + 传 latest Release）；该文件头部
+「Linux GUI 未发布」的注释同步更新。**测试**：widget_test 的扫码断言按平台
+分流（Linux 下 findsNothing——否则 CI 的 ubuntu 上必红）；chat_quote_video
+不受影响（缩略图走 mock 通道）。analyze 0 issue；widget_test +
+chat_quote_video 11 测试全过。**注意**：分支推不上 CI 自动触发（CI 只认
+main/tag），用 workflow_dispatch 选 linux 手动出包；产物 glibc 线 = runner
+的 2.39，Debian 13.3（2.41）满足。

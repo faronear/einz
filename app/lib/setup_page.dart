@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'widgets/menu_metrics.dart';
 import 'dart:convert';
-import 'dart:io' show exit;
+import 'dart:io' show exit, Platform;
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -1676,12 +1676,15 @@ class _SetupPageState extends State<SetupPage> {
                 : null,
             border: const OutlineInputBorder(),
             // 扫码填入邀请链接/token（扫中后自动填入并自动下一步验证）；
-            // 已验证后禁止再扫（否则会覆盖已验证的 token）
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: l10n.setupPageScanInvite,
-              onPressed: _joinTokenVerified ? null : _scanInviteQr,
-            ),
+            // 已验证后禁止再扫（否则会覆盖已验证的 token）。
+            // Linux 没有 mobile_scanner 实现（相机扫码不支持）：不摆入口
+            suffixIcon: Platform.isLinux
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    tooltip: l10n.setupPageScanInvite,
+                    onPressed: _joinTokenVerified ? null : _scanInviteQr,
+                  ),
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
