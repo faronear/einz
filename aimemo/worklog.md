@@ -14237,3 +14237,16 @@ TapGestureRecognizer、外层 Clickable 包整行（老板口径：整块可点�
 仍是 SelectableText 不变。about_sheet_status_test 加一例（绑 l10n 键、
 URL 原样、下载行 dy 大于版本号行）；about + chat_page_menu + version_gate
 三文件 53 测试全过，全量 analyze 0 issue。
+
+**（2026-10-12，四十五）**：新建 `www/`——面向用户的介绍站（老板 2026-10-12，
+仿 productX/pex/pex-web-md/info.agidin.com 的结构与文案风格，上传 file.tic.cc
+后由 Seafile 发布库渲染成站）。Seafile 发布库约定：首页=根目录 home.md、
+左侧导航=根目录 index.md（多级无序列表，无则退化成目录树）、md 内联渲染、
+相对路径链接。站点：home.md/README.md（同文，语言选择）、index.md（中英
+分区导航）、_zhcn/_enus 目录页、about/what_is_einz、howto/get_started、
+news、rules/privacy_policy 四组内容（全部中英双语）、images/logo.png（拷自
+app/assets）。内容只写主线已上线事实：二人/群秘境（群 2026-10-03）、E2EE、
+本地优先、阅后即焚、单双勾、我的通道（09-25）、界面语言（08-30）、下载走
+GitHub releases；纪念日/共同回忆/私人笔记等未实现项不写。隐私政策如实说明
+服务器存密文+元数据、不存明文/PIN/口令/密钥。发布前用脚本全量校验相对链接
+（修掉一处少上一级的 `../`）。
