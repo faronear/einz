@@ -14250,3 +14250,15 @@ app/assets）。内容只写主线已上线事实：二人/群秘境（群 2026-
 GitHub releases；纪念日/共同回忆/私人笔记等未实现项不写。隐私政策如实说明
 服务器存密文+元数据、不存明文/PIN/口令/密钥。发布前用脚本全量校验相对链接
 （修掉一处少上一级的 `../`）。
+
+**（2026-10-12，四十六）**：www 站点补齐 `images/theme/`（老板 2026-10-12：
+按 info.agidin.com 约定放 logo 与 favicon，发布渲染自动拾取）。三件产物：
+favicon.png（sips 由 app/assets/logo.png 缩放到 256）、favicon.ico（纯 Python
+包 PNG 的 256 单帧，`file` 验证合法）、logoslogan.png（秘境 Einz 横版文字
+标志——logo 圆角块 + PingFangSC 双行文字，Swift/AppKit 脚本绘制，600×150
+逻辑画布 2x 光栅化出 1200×300 RGBA 透明底）。生成脚本随目录提交
+（logoslogan.swift，对标参照站的 .psd 源文件角色，素材路径相对脚本解析，
+换机可跑）。踩坑记录：NSBezierPath.addClip 的裁剪区**持续生效**，画 logo
+不包 save/restoreGraphicsState 会把右侧文字整块裁掉。另修 .gitignore：`*.sw*`（本想挡 vim 交换文件）把
+logoslogan.swift 静默漏掉，补 `!www/images/theme/*.swift` 例外（与 macOS
+Runner 源码同因）。
