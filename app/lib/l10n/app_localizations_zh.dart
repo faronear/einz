@@ -472,7 +472,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAvatar => '我的头像';
 
   @override
-  String get chatPageAvatarUploaded => '✅ 头像已更新';
+  String get chatPageAvatarUploaded => '✅ 我的头像已更新';
 
   @override
   String get chatPageAvatarTooLarge => '图片过大（最大 2MB）';

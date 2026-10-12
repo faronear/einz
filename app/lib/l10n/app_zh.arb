@@ -229,7 +229,7 @@
   "chatPageTitleBrand": "我的秘境",
   "chatPageMenuChangePassphrase": "修改共享口令",
   "chatPageMenuAvatar": "我的头像",
-  "chatPageAvatarUploaded": "✅ 头像已更新",
+  "chatPageAvatarUploaded": "✅ 我的头像已更新",
   "chatPageAvatarTooLarge": "图片过大（最大 2MB）",
   "chatPageAvatarFailed": "头像上传失败: {error}",
   "@chatPageAvatarFailed": {

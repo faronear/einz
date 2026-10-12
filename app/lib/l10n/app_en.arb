@@ -232,7 +232,7 @@
   "chatPageTitleBrand": "My Einz",
   "chatPageMenuChangePassphrase": "Change shared passphrase",
   "chatPageMenuAvatar": "My avatar",
-  "chatPageAvatarUploaded": "✅ Avatar updated",
+  "chatPageAvatarUploaded": "✅ My avatar updated",
   "chatPageAvatarTooLarge": "Image too large (max 2MB)",
   "chatPageAvatarFailed": "Avatar upload failed: {error}",
   "@chatPageAvatarFailed": {

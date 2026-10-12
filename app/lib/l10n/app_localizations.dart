@@ -947,7 +947,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAvatarUploaded.
   ///
   /// In en, this message translates to:
-  /// **'✅ Avatar updated'**
+  /// **'✅ My avatar updated'**
   String get chatPageAvatarUploaded;
 
   /// No description provided for @chatPageAvatarTooLarge.

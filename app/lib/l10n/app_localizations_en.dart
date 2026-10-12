@@ -511,7 +511,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAvatar => 'My avatar';
 
   @override
-  String get chatPageAvatarUploaded => '✅ Avatar updated';
+  String get chatPageAvatarUploaded => '✅ My avatar updated';
 
   @override
   String get chatPageAvatarTooLarge => 'Image too large (max 2MB)';
