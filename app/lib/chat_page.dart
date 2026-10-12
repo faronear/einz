@@ -5247,15 +5247,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // ---------- 长按消息操作：引用 / 删除（2 人世界不做转发） ----------
 
   /// 长按消息弹出操作菜单：引用 / 删除。
-  /// 长按菜单是否有内容可给（决定气泡长按是否响应）：
+  /// 长按菜单是否有内容可给（决定气泡长按与「...」是否响应）：
   /// - 未墓碑：常规菜单（引用/拷贝/保存/撤回/焚毁/删除）总有项；
-  /// - 墓碑：仅当**可撤回**时给菜单（老板 2026-10-10：本地墓碑不影响服务端
-  ///   行，未送达的自己消息仍该能撤；其余操作对已删内容无意义）。
+  /// - 墓碑：仅当**本机删除或焚毁到期、且仍是单勾**（sent、无对方回执）的
+  ///   自己消息才给——菜单里唯一可用的操作是撤回（老板 2026-10-12：已送达/
+  ///   已读的、或本来已撤回的墓碑，Recall 都不可能成功，不提供入口）。
   bool _messageHasActions(HistoryMessage m) =>
       !m.deleted ||
       (m.sender == 'me' &&
+          m.deletedKind != 'recall' &&
           m.env.serverSequence != null &&
-          m.status != 'failed');
+          m.status == 'sent' &&
+          MessageRepository.receiptOf(
+                  m.env.serverSequence, _peerReceipts) ==
+              null);
 
   /// 「撤回」可见条件（与 [_messageHasActions] 的墓碑分支同口径）：
   /// 自己消息、服务端已收下、对方尚未拉取（本地状态粗筛，权威判定在服务端）。

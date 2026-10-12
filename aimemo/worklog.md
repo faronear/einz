@@ -14133,3 +14133,12 @@ about_sheet_status 4 测试全过，analyze 0 issue。
 复用 `_bubbleQuickAction`（圆形热区 28/图标 16/tooltip 菜单 chatPageMenuMore/
 同款 hover 色）；显示条件与气泡长按同口径 `_messageHasActions`（墓碑仅可
 撤回时给）。chat_page_menu + 引用 38 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十三）**：墓碑消息的「...」收紧显示条件（老板
+2026-10-12）：仅**本机删除或焚毁到期、且仍是单勾**（status == 'sent'、无
+对方回执）的自己消息才给菜单（唯一操作 Recall）；已送达/已读（回执双勾或
+delivered/read 状态）、已撤回（deletedKind == 'recall'）的墓碑不再提供
+「...」/长按——Recall 都不可能成功。`_messageHasActions` 墓碑分支加
+deletedKind != 'recall' + status == 'sent' + receiptOf == null 三条件。
+chat_send_status + chat_page_menu + message_repository 71 测试全过，
+analyze 0 issue。
