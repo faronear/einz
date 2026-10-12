@@ -450,6 +450,16 @@
   "chatPageDeleteConfirmMessage": "删除仅在本机生效（你的和同伴的其他设备都不受影响），且无法恢复。确定删除这条消息吗？",
   "chatPageDeleteCancel": "取消",
   "chatPageDeleteConfirmOk": "删除",
+  "chatPagePasteSendImageTitle": "发送这张图片？",
+  "chatPagePasteSendFilesTitle": "{count, plural, one {发送这个文件？} other {发送这 {count} 个文件？}}",
+  "@chatPagePasteSendFilesTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteEmpty": "剪贴板是空的",
   "chatPageSendFailed": "发送失败: {error}",
   "@chatPageSendFailed": {
     "placeholders": {
@@ -507,6 +517,7 @@
   },
   "chatPageAttachEmoji": "表情符",
   "chatPageEmojiKeyboard": "键盘",
+  "chatPageAttachPaste": "粘贴",
   "chatPageAttachPhoto": "拍照",
   "chatPageAttachGalleryImage": "相册图片",
   "chatPageAttachVideoCamera": "拍视频",

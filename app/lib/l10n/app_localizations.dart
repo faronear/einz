@@ -1682,6 +1682,24 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get chatPageDeleteConfirmOk;
 
+  /// No description provided for @chatPagePasteSendImageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this image?'**
+  String get chatPagePasteSendImageTitle;
+
+  /// No description provided for @chatPagePasteSendFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Send this file?} other {Send these {count} files?}}'**
+  String chatPagePasteSendFilesTitle(int count);
+
+  /// No description provided for @chatPagePasteEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard is empty'**
+  String get chatPagePasteEmpty;
+
   /// No description provided for @chatPageSendFailed.
   ///
   /// In en, this message translates to:
@@ -1813,6 +1831,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keyboard'**
   String get chatPageEmojiKeyboard;
+
+  /// No description provided for @chatPageAttachPaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get chatPageAttachPaste;
 
   /// No description provided for @chatPageAttachPhoto.
   ///

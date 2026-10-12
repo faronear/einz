@@ -59,7 +59,7 @@ import 'widgets/clickable.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
-enum _AttachmentKind { emoji, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
+enum _AttachmentKind { emoji, paste, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
 
 /// 本平台是否具备**相机采集**能力（拍照/拍摄）。
 ///
@@ -76,11 +76,28 @@ bool get _hasCameraCapture =>
 bool get _fileDropSupported =>
     !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
-/// 本平台是否支持「Cmd/Ctrl+V 粘贴剪贴板内容直接发送」（仅桌面）。
-/// 与 [_fileDropSupported] 同一个平台集，但是**独立的能力门**：粘贴走
-/// `pasteboard` 插件（macOS/Windows/Linux 零配置），移动端没有"拷图再粘贴
-/// 发送"的心智，且插件的 Android 侧要 FileProvider 配置，先不做。
+/// 本平台是否支持「剪贴板粘贴」能力（附件面板的「粘贴」入口 + 读取逻辑）。
+/// **全平台**（老板 2026-10-12：桌面端经附件面板同样可用，移动端经同一入口）：
+/// 走 `pasteboard` 插件——iOS/macOS 零配置，Android 只读剪贴板也不需要
+/// FileProvider（那只在 writeImage 时才用，我们从不写剪贴板）。
 bool get _clipboardPasteSupported =>
+    !kIsWeb &&
+    (Platform.isAndroid ||
+        Platform.isIOS ||
+        Platform.isMacOS ||
+        Platform.isWindows ||
+        Platform.isLinux);
+
+/// 桌面端专属：Cmd/Ctrl+V 快捷键 + 配套的输入框 autofocus / onTapOutside
+/// 行为调整（焦点链实测定的，见 build 里 CallbackShortcuts 注释）。
+/// 移动端没有键盘快捷键这一说，入口走附件面板。
+bool get _pasteShortcutSupported =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+/// 剪贴板**文件**分支仅桌面：插件在 Android 返回的是 content:// URI
+/// （dart:io 读不了，要 content resolver——v1 不碰原生），iOS 侧恒返回空；
+/// 桌面两端（macOS 路径 / Windows 临时文件中转）都是可直接读的路径。
+bool get _pasteboardFilesSupported =>
     !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
 /// 拖入文件的类型归类（扩展名 → 附件类型）。桌面拖放与相册/文件对话框各入口
@@ -6379,6 +6396,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: _buildActionCardGrid([
+            // 粘贴放最前（老板 2026-10-12）：剪贴板里的东西已经"在手边"，
+            // 是从别的 App 拷图/拷文件过来的最短路径；桌面移动端都走这个入口
+            // （桌面另有 Cmd/Ctrl+V 快捷键，见 build 里的 CallbackShortcuts）。
+            // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
+            if (_clipboardPasteSupported)
+              _buildActionCard(
+                icon: Icons.content_paste,
+                label: l10n.chatPageAttachPaste,
+                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
+              ),
             // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
             if (_hasCameraCapture) ...[
               _buildActionCard(
@@ -6451,6 +6478,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       switch (kind) {
         case _AttachmentKind.emoji:
           return; // 已在 _showAttachmentSheet 中分流（展开表情面板），不走上传
+        case _AttachmentKind.paste:
+          // 粘贴：读剪贴板 → 图/文件走确认弹窗 → 发送；文本插入输入框。
+          // 自己的 try/catch 在 _pasteFromClipboard 里（错误提示同口径）
+          await _pasteFromClipboard();
+          return;
         case _AttachmentKind.photo:
           image = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
           if (image == null) return;
@@ -6603,26 +6635,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  // ---------- 桌面端剪贴板粘贴：Cmd/Ctrl+V 直接发送（老板 2026-10-12） ----------
+  // ---------- 剪贴板粘贴：附件面板入口 + 桌面 Cmd/Ctrl+V（老板 2026-10-12） ----------
 
   /// 剪贴板图片的合成文件名。粘贴没有"原名"可言（截图/浏览器拷图都不带名），
   /// 用时间戳保证连发多条不重名；扩展名跟字节格式走——`pasteboard` 在
-  /// macOS（NSPasteboard）与 Windows（DIB 转换）两端返回的都是 PNG。
-  /// 这名字会写进消息明文（`📎 <fileName>`，引用快照/对端保存都看它）。
+  /// macOS（NSPasteboard）、Windows（DIB 转换）、iOS（UIPasteboard）三端
+  /// 返回的都是 PNG。这名字会写进消息明文（`📎 <fileName>`，引用快照/对端保存都看它）。
   String _pastedImageName() {
     final t = DateTime.now();
     String two(int v) => v.toString().padLeft(2, '0');
     return '粘贴图片_${two(t.month)}${two(t.day)}_${two(t.hour)}${two(t.minute)}${two(t.second)}.png';
   }
 
-  /// Cmd/Ctrl+V 的落点：剪贴板内容直接进消息流（微信同款）。
-  /// 三级分流，与微信口径一致——**同时有图和文时发图**（图优先）：
-  /// ① 图片（截图 / 浏览器拷图）→ 走 [_sendAttachmentOptimistic] 发送，
-  ///    与相册、拖放同一收口（大小预检、失败提示全都继承）；
-  /// ② 文件（访达/资源管理器里拷的文件）→ 复用拖放入口的 [_sendDroppedFiles]；
-  /// ③ 都没有 → 纯文本，插入输入框光标处（见 [_insertPastedText]）。
+  /// 粘贴的落点：读剪贴板 → 分流（与微信口径一致——**同时有图和文时发图**）：
+  /// ① 图片（截图 / 浏览器拷图）→ **确认弹窗** → 走 [_sendAttachmentOptimistic]
+  ///    发送（与相册、拖放同一收口：大小预检、失败提示全都继承）；
+  /// ② 文件（访达/资源管理器里拷的，仅桌面，见 [_pasteboardFilesSupported]）
+  ///    → **确认弹窗** → 复用拖放入口的 [_sendDroppedFiles]；
+  /// ③ 都没有 → 纯文本，插入输入框光标处（见 [_insertPastedText]）；
+  /// ④ 全空 → 提示「剪贴板是空的」（附件面板点了没反馈会很懵）。
   ///
-  /// 为什么文本要自己插：快捷键一旦被页面级 CallbackShortcuts 匹配就会消费掉，
+  /// 为什么发送前要确认（老板 2026-10-12）：剪贴板内容不可见——可能是几分钟前
+  /// 拷的旧图/旧文件，而 E2EE 消息对方可能已收到、撤不回。图片/文件弹窗给一次
+  /// **带预览**的确认；纯文本只是插进输入框（随时可改），不弹。
+  ///
+  /// 为什么文本要自己插：桌面快捷键一旦被页面级 CallbackShortcuts 匹配就会消费掉，
   /// WidgetsApp 默认的文字粘贴不会跑，所以这一支得自己来（等价于原生粘贴：
   /// 替换选中区、光标落到插入文本尾）。
   Future<void> _pasteFromClipboard() async {
@@ -6631,23 +6668,86 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final bytes = await Pasteboard.image;
       if (!mounted) return;
       if (bytes != null) {
-        // 超限立刻失败（人话），与拖放/相册同口径（老板 2026-10-08）
+        // 超限预检放确认前：都看预览了才被告知超大，不如先拦（老板 2026-10-08 同思路）
         if (!_withinAttachmentLimit(bytes.length)) return;
+        final ok = await _confirmPasteSend(_PastePayload.image(bytes));
+        if (!ok || !mounted) return;
         await _sendAttachmentOptimistic(
             fileBytes: bytes, fileName: _pastedImageName(), type: 'image');
         return;
       }
-      final files = await Pasteboard.files();
+      if (_pasteboardFilesSupported) {
+        final files = await Pasteboard.files();
+        if (!mounted) return;
+        if (files.isNotEmpty) {
+          final xfiles = files.map(XFile.new).toList();
+          // 逐个的大小预检在 _sendDroppedFiles 里（要先读盘才知道，同拖放口径）
+          final ok = await _confirmPasteSend(_PastePayload.files(xfiles));
+          if (!ok || !mounted) return;
+          await _sendDroppedFiles(xfiles);
+          return;
+        }
+      }
+      final text = await Pasteboard.text ?? '';
       if (!mounted) return;
-      if (files.isNotEmpty) {
-        await _sendDroppedFiles(files.map(XFile.new).toList());
+      if (text.isEmpty) {
+        _notice(context, l10n.chatPagePasteEmpty);
         return;
       }
-      _insertPastedText(await Pasteboard.text ?? '');
+      _insertPastedText(text);
     } catch (e) {
       if (!mounted) return;
       _notice(context, _attachmentSendError(l10n, e));
     }
+  }
+
+  /// 粘贴发送前的确认弹窗（老板 2026-10-12）：图片给预览、文件给名单，
+  /// 按钮 取消/发送。点遮罩或系统返回 = 取消（不能默认发送）。
+  /// 返回 true = 用户确认发送。
+  Future<bool> _confirmPasteSend(_PastePayload payload) async {
+    final l10n = AppLocalizations.of(context)!;
+    final bytes = payload.bytes;
+    final files = payload.files;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(bytes != null
+            ? l10n.chatPagePasteSendImageTitle
+            : l10n.chatPagePasteSendFilesTitle(files!.length)),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
+          child: bytes != null
+              ? Image.memory(bytes, fit: BoxFit.contain)
+              // 名单用 SingleChildScrollView + Column(min)：对话框要算内容
+              // 固有宽度，ListView(shrinkWrap) 会抛 intrinsic dimensions 异常
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final f in files!)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.insert_drive_file),
+                          title: Text(f.name,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.send),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   /// 文本粘贴回退：把剪贴板文本插到输入框光标处（选中区替换）。
@@ -8511,7 +8611,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 // 会"没反应"（实测五种焦点状态定的方案）。桌面聊天
                                 // 客户端打开会话即聚焦输入框也是惯例（Discord 同款）；
                                 // 移动端不抢焦点（会弹软键盘）。
-                                autofocus: _clipboardPasteSupported,
+                                autofocus: _pasteShortcutSupported,
                                 // 多行输入框：文字到达宽度后自动折行，输入框随之增高，
                                 // 最多 8 行；超过 8 行不再增高，转为内部纵向滚动
                                 // （老板要求 2026-09-13：原先单行 + 横向滚动体验差）。
@@ -8548,7 +8648,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 // 就收不到按键了——点消息列表不该让粘贴失灵
                                 // （老板 2026-10-12 粘贴功能配套）。
                                 onTapOutside: (_) {
-                                  if (!_clipboardPasteSupported) {
+                                  if (!_pasteShortcutSupported) {
                                     FocusManager.instance.primaryFocus
                                         ?.unfocus();
                                   }
@@ -8607,13 +8707,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 桌面端：整页套一个投递区，从访达/资源管理器拖文件进来即发送；移动端不挂
     // （无此交互，且 desktop_drop 的 Android 实现是 preview，不挂更稳）。
     if (!_fileDropSupported) return page;
-    // 桌面端：Cmd/Ctrl+V 粘贴剪贴板内容直接发送（微信同款，老板 2026-10-12）。
+    // 桌面端：Cmd/Ctrl+V 粘贴快捷通道（与附件面板「粘贴」入口同汇到
+    // _pasteFromClipboard；移动端没有键盘这一说，只走面板入口）。
     // CallbackShortcuts 内部就是一层 canRequestFocus:false + skipTraversal 的
     // Focus——不抢焦点、不进 Tab 遍历，只在页面内任意控件（含输入框）持焦时
     // 沿焦点链收到按键。匹配即消费：文字分支由 _pasteFromClipboard 自己插，
     // WidgetsApp 默认粘贴不会跑。**对话框/弹层打开时本层自然失活**——焦点已
     // 移到上层路由，不是本 Shortcuts 的后代（实测）。
-    if (_clipboardPasteSupported) {
+    if (_pasteShortcutSupported) {
       page = CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           SingleActivator(
@@ -9525,6 +9626,16 @@ class _FullscreenCloseButton extends StatelessWidget {
       onPressed: () => Navigator.of(context).pop(),
     );
   }
+}
+
+/// 粘贴待确认的内容（老板 2026-10-12 确认弹窗的载荷）：图片（字节）或文件
+/// （路径列表）二选一——两者都空不可能出现（那走文本分支，不弹窗）。
+class _PastePayload {
+  const _PastePayload.image(this.bytes) : files = null;
+  const _PastePayload.files(this.files) : bytes = null;
+
+  final Uint8List? bytes;
+  final List<XFile>? files;
 }
 
 class _MessageAvatar extends StatefulWidget {

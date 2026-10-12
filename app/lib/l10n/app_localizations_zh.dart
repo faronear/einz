@@ -891,6 +891,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDeleteConfirmOk => '删除';
 
   @override
+  String get chatPagePasteSendImageTitle => '发送这张图片？';
+
+  @override
+  String chatPagePasteSendFilesTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '发送这 $count 个文件？',
+      one: '发送这个文件？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatPagePasteEmpty => '剪贴板是空的';
+
+  @override
   String chatPageSendFailed(String error) {
     return '发送失败: $error';
   }
@@ -966,6 +983,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEmojiKeyboard => '键盘';
+
+  @override
+  String get chatPageAttachPaste => '粘贴';
 
   @override
   String get chatPageAttachPhoto => '拍照';

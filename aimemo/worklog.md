@@ -14379,3 +14379,22 @@ WS 证明可达，不套"宕机"指数退避），窗口从 60s+ 缩到 ≤5s；
 WS 态分两种：灯绿 → 新键 `chatPageSyncingLocalOnly`「同步中… 暂时无法收发，
 仅可查看本地消息」（老板原话），真离线时保留原「离线 · …」（那时"离线"
 是准的）。中英 arb 各加一 key，gen-l10n + analyze 0 issue。
+
+**（2026-10-12，五十二）**：粘贴功能补全——**附件面板加「粘贴」入口**（桌面
+移动端都走它，桌面另有 Cmd/Ctrl+V）+ **移动端支持** + **发送前确认弹窗**
+（老板 2026-10-12：剪贴板内容不可见，可能是几分钟前的旧图，E2EE 发错撤不回）。
+- 平台门一分为三：`_clipboardPasteSupported`（全平台：面板入口+读取逻辑）、
+  `_pasteShortcutSupported`（桌面：快捷键/autofocus/onTapOutside）、
+  `_pasteboardFilesSupported`（仅桌面：Android 插件返回 content:// URI，
+  dart:io 读不了；iOS 的 files() 恒返回空、自动落到文本分支）。
+- **不需要 Android FileProvider**：插件只在 writeImage 时才用 provider，
+  我们只读剪贴板（查过 0.5.0 的 Kotlin 源码确认）。
+- 确认弹窗 `_confirmPasteSend`：图片给预览、文件给名单（SingleChildScrollView
+  + Column(min)——ListView(shrinkWrap) 在 AlertDialog 固有宽度计算里会抛
+  intrinsic dimensions 异常，踩过），取消/发送；点遮罩=取消。**纯文本不弹**
+  （只是插入输入框，随时可改）。全空 → 提示「剪贴板是空的」。
+- 面板入口排网格第一位（剪贴板内容"在手边"是最短路径）；桌面端同样显示。
+- l10n 四新键（chatPageAttachPaste / PasteSendImageTitle /
+  PasteSendFilesTitle 复数形态 / PasteEmpty），按钮复用通用 cancel/send。
+- 测试扩到六例（chat_paste_test.dart）：图片确认后发 / 文件确认后发 /
+  取消不发 / 文本不弹窗 / 空提示 / 面板入口同链路。

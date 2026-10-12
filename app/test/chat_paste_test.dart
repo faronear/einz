@@ -1,11 +1,12 @@
-// 回归测试（老板要求 2026-10-12）：桌面端 Cmd/Ctrl+V 把剪贴板内容直接发进
-// 聊天——微信同款。四态：
-//   ① 剪贴板是图片（截图/浏览器拷图）→ 发图片消息；
-//   ② 是文件（访达/资源管理器里拷的）→ 发文件消息（复用拖放链路）；
-//   ③ 只有文本 → 插进输入框、不发消息；
-//   ④ 全空 → 无动作、不崩。
-// 另外隐式覆盖两个配套点：桌面端输入框 autofocus（不点输入框直接按粘贴键，
-// 新开页面无焦点也能触发）与页面级 CallbackShortcuts 的挂载。
+// 回归测试（老板要求 2026-10-12）：剪贴板粘贴发送——桌面 Cmd/Ctrl+V 与附件
+// 面板「粘贴」入口同汇到一条链路。六态：
+//   ① 剪贴板是图片 → 确认弹窗（问句+预览+取消/发送）→ 发送图片消息；
+//   ② 是文件（访达拷的）→ 确认弹窗列名单 → 发送文件消息（复用拖放链路）；
+//   ③ 弹窗点取消 → 不发送；
+//   ④ 只有文本 → 插进输入框、不发消息、不弹窗；
+//   ⑤ 全空 → 提示「剪贴板是空的」；
+//   ⑥ 附件面板有「粘贴」入口，点了走同一条确认链路。
+// 另隐式覆盖：桌面端输入框 autofocus（不点输入框直接按粘贴键）。
 
 import 'dart:convert';
 import 'dart:io';
@@ -158,19 +159,36 @@ void main() {
     await tester.sendKeyUpEvent(mod);
   }
 
-  testWidgets('剪贴板是图片 → Cmd/Ctrl+V 直接发出图片消息',
-      (WidgetTester tester) async {
+  /// 确认弹窗里的「发送」按钮（限定在 AlertDialog 作用域内，别点到别处的发送）
+  Finder dialogSendButton() => find.descendant(
+      of: find.byType(AlertDialog), matching: find.text('发送'));
+
+  /// 确认弹窗里的「取消」按钮
+  Finder dialogCancelButton() => find.descendant(
+      of: find.byType(AlertDialog), matching: find.text('取消'));
+
+  testWidgets('剪贴板是图片 → 确认弹窗预览 → 发送', (WidgetTester tester) async {
     await pumpChat(tester);
     _clipImage = _tinyPng;
     // 不点输入框：桌面端 autofocus 应已把焦点放在输入框（老板的实际用法）
     await pressPaste(tester);
+    await tester.pumpAndSettle();
+
+    // 发送前必须弹确认（老板 2026-10-12）：标题问句 + 取消/发送两个按钮
+    expect(find.text('发送这张图片？'), findsOneWidget,
+        reason: '图片发送前应弹确认');
+    expect(dialogSendButton(), findsOneWidget);
+    expect(dialogCancelButton(), findsOneWidget);
+
+    await tester.tap(dialogSendButton());
     await settleRealAsync(tester); // 真实加密 + 假 api 发送是异步
 
-    expect(_bubbleImage(), findsOneWidget, reason: '粘贴的图片应已成消息');
+    expect(find.byType(AlertDialog), findsNothing, reason: '确认后弹窗应关闭');
+    expect(_bubbleImage(), findsOneWidget, reason: '确认后图片应已成消息');
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('剪贴板是文件（访达拷的）→ 直接发出文件消息',
+  testWidgets('剪贴板是文件 → 确认弹窗列名单 → 发送',
       (WidgetTester tester) async {
     await pumpChat(tester);
     final tmp = File('${Directory.systemTemp.path}/einz_paste_test_file.txt');
@@ -182,6 +200,15 @@ void main() {
     _clipFiles = [tmp.path];
 
     await pressPaste(tester);
+    await tester.pumpAndSettle();
+
+    // 文件弹窗列名字（复数标题：1 个走单数形态）
+    expect(find.text('发送这个文件？'), findsOneWidget,
+        reason: '文件发送前应弹确认');
+    expect(find.text('einz_paste_test_file.txt'), findsOneWidget,
+        reason: '弹窗应列出待发送的文件名');
+
+    await tester.tap(dialogSendButton());
     // 文件分支要读两次真实文件（XFile.length + readAsBytes），FakeAsync 区里
     // 必须显式给真实事件循环让路（与 settleRealAsync 同原理——但它首轮就会因
     // "没有转圈"退出，等不到这两步 I/O，消息会一直挂在半路）
@@ -193,11 +220,26 @@ void main() {
     await settleRealAsync(tester);
 
     expect(find.text('einz_paste_test_file.txt'), findsOneWidget,
-        reason: '粘贴的文件应已成消息（文件卡显示原名）');
+        reason: '确认后文件应已成消息（弹窗已关，这里匹配的是文件卡）');
+    expect(_bubbleImage(), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('剪贴板只有文本 → 插进输入框，不发消息',
+  testWidgets('确认弹窗点取消 → 不发送', (WidgetTester tester) async {
+    await pumpChat(tester);
+    _clipImage = _tinyPng;
+
+    await pressPaste(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(dialogCancelButton());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing, reason: '取消后弹窗应关闭');
+    expect(_bubbleImage(), findsNothing, reason: '取消不应发出任何消息');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('剪贴板只有文本 → 插进输入框，不发消息、不弹窗',
       (WidgetTester tester) async {
     await pumpChat(tester);
     _clipText = '粘贴过来的文字';
@@ -207,18 +249,45 @@ void main() {
 
     expect(find.text('粘贴过来的文字'), findsOneWidget,
         reason: '文本应插入输入框');
+    expect(find.byType(AlertDialog), findsNothing,
+        reason: '纯文本只是入框（可改），不弹确认');
     expect(_bubbleImage(), findsNothing, reason: '纯文本不应发出消息');
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('剪贴板全空 → 无动作、不崩', (WidgetTester tester) async {
+  testWidgets('剪贴板全空 → 提示「剪贴板是空的」，不崩',
+      (WidgetTester tester) async {
     await pumpChat(tester);
 
     await pressPaste(tester);
     await tester.pumpAndSettle();
 
     expect(_bubbleImage(), findsNothing);
-    expect(find.text('粘贴过来的文字'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('附件面板有「粘贴」入口，点了走同一条确认链路',
+      (WidgetTester tester) async {
+    await pumpChat(tester);
+    _clipImage = _tinyPng;
+
+    // 开附件面板（输入栏左侧 + 号）
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    await tester.pumpAndSettle();
+    expect(find.text('粘贴'), findsOneWidget, reason: '附件面板应有粘贴入口');
+    expect(find.text('相册图片'), findsOneWidget,
+        reason: '原有入口不受影响（面板网格照常）');
+
+    // 点入口 → 面板收起 → 同一套读剪贴板 + 确认弹窗
+    await tester.tap(find.text('粘贴'));
+    await tester.pumpAndSettle();
+    expect(find.text('发送这张图片？'), findsOneWidget,
+        reason: '面板入口与快捷键同汇到 _pasteFromClipboard');
+
+    await tester.tap(dialogCancelButton());
+    await tester.pumpAndSettle();
+    expect(_bubbleImage(), findsNothing, reason: '取消则不发送');
     expect(tester.takeException(), isNull);
   });
 }

@@ -465,6 +465,16 @@
   "chatPageDeleteConfirmMessage": "Removed only on this device (the others aren't affected), and it can't be undone. Delete?",
   "chatPageDeleteCancel": "Cancel",
   "chatPageDeleteConfirmOk": "Delete",
+  "chatPagePasteSendImageTitle": "Send this image?",
+  "chatPagePasteSendFilesTitle": "{count, plural, one {Send this file?} other {Send these {count} files?}}",
+  "@chatPagePasteSendFilesTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteEmpty": "Clipboard is empty",
   "chatPageSendFailed": "Send failed: {error}",
   "@chatPageSendFailed": {
     "placeholders": {
@@ -522,6 +532,7 @@
   },
   "chatPageAttachEmoji": "Emoji",
   "chatPageEmojiKeyboard": "Keyboard",
+  "chatPageAttachPaste": "Paste",
   "chatPageAttachPhoto": "Take photo",
   "chatPageAttachGalleryImage": "Gallery image",
   "chatPageAttachVideoCamera": "Record video",

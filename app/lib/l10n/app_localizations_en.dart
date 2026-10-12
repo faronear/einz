@@ -955,6 +955,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageDeleteConfirmOk => 'Delete';
 
   @override
+  String get chatPagePasteSendImageTitle => 'Send this image?';
+
+  @override
+  String chatPagePasteSendFilesTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count files?',
+      one: 'Send this file?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatPagePasteEmpty => 'Clipboard is empty';
+
+  @override
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }
@@ -1033,6 +1050,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEmojiKeyboard => 'Keyboard';
+
+  @override
+  String get chatPageAttachPaste => 'Paste';
 
   @override
   String get chatPageAttachPhoto => 'Take photo';
