@@ -601,13 +601,7 @@
   "aboutStatusLabel": "Connection",
   "aboutStatusChecking": "Checking…",
   "aboutStatusConnected": "Connected",
-  "aboutStatusUnreachable": "Cannot reach any server entrance (auto-retrying)",
-  "aboutStatusEntranceNote": "Currently connected via: {server}",
-  "@aboutStatusEntranceNote": {
-    "placeholders": {
-      "server": {}
-    }
-  },
+  "aboutStatusUnreachable": "Unreachable",
   "advancedMenuTitle": "Advanced security",
   "advancedDestroyEntrance": "Destroy this entrance",
   "advancedClearMessages": "Delete all messages",

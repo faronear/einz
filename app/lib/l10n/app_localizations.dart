@@ -2039,14 +2039,8 @@ abstract class AppLocalizations {
   /// No description provided for @aboutStatusUnreachable.
   ///
   /// In en, this message translates to:
-  /// **'Cannot reach any server entrance (auto-retrying)'**
+  /// **'Unreachable'**
   String get aboutStatusUnreachable;
-
-  /// No description provided for @aboutStatusEntranceNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Currently connected via: {server}'**
-  String aboutStatusEntranceNote(Object server);
 
   /// No description provided for @advancedMenuTitle.
   ///

@@ -1161,13 +1161,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutStatusConnected => 'Connected';
 
   @override
-  String get aboutStatusUnreachable =>
-      'Cannot reach any server entrance (auto-retrying)';
-
-  @override
-  String aboutStatusEntranceNote(Object server) {
-    return 'Currently connected via: $server';
-  }
+  String get aboutStatusUnreachable => 'Unreachable';
 
   @override
   String get advancedMenuTitle => 'Advanced security';

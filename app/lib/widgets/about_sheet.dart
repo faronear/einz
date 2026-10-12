@@ -17,10 +17,11 @@ typedef AboutInfo = ({String version, String buildNumber});
 /// 服务器地址读 [effectiveServer]（启动时定好的进程全局量）——锁屏态与解锁后读的
 /// 是同一个变量，不可能不一致（地址不进锁包，见 `data/app_lock.dart`）。
 ///
-/// **连接状态行（2026-10-11）**：[effectiveServer] 在全候选探测失败时会兜底成
-/// 主域名——那只是**名义地址**，不代表连得上。本弹层并发探测全部候选（复用带
-/// DoH 兜底的 [probeServer]），如实显示"已连接（实际入口）/ 无法连接任何服务器
-/// 入口"——老板要求：全域名不可达时**不许默默展示一个连不上的兜底地址**。
+/// **连接状态行（2026-10-11；2026-10-12 改口径）**：只探测**启动时定下的活
+/// 地址** [effectiveServer]（复用带 DoH 兜底的 [probeServer]）——可达显示
+/// "已连接"，不可达如实显示"无法连接"。**不再尝试其他候选**：候选切换/兜底
+/// 是启动探测的事，About 是状态展示不是连接管理器（老板 2026-10-12：开发
+/// 环境连 localhost 断开时，跑去显示连上了线上域名没有意义）。
 class AboutSheet extends StatefulWidget {
   const AboutSheet({super.key, this.probe});
 
@@ -46,30 +47,20 @@ class AboutSheet extends StatefulWidget {
 class _AboutSheetState extends State<AboutSheet> {
   late final Future<AboutInfo> _info = _load();
 
-  /// 并发探测全部候选入口：返回第一个可达的地址；null = 全部不可达。
-  late final Future<String?> _reachableEntrance = _probeEntrances();
+  /// 只探测**启动时定下的活地址** [effectiveServer]（2026-10-12 老板决策）：
+  /// About 是状态展示，不是连接管理器——重新去连其他候选没有意义（候选切换/
+  /// 兜底是启动探测的事，App 的实际连接也一直走 effectiveServer）。断开就如实
+  /// 显示断开，不尝试其他地址。true = 可达。
+  late final Future<bool> _reachable = _probeEffective();
 
   Future<AboutInfo> _load() async {
     final pkg = await PackageInfo.fromPlatform();
     return (version: pkg.version, buildNumber: pkg.buildNumber);
   }
 
-  /// 探测可达入口：**优先 [effectiveServer]（正在用的那个）**——可达就显示它，
-  /// 与「服务器地址」一致；只有它不可达时才按候选顺序报备用可达入口
-  /// （2026-10-11 老板：避免「服务器地址 A、实际入口 B」让人误以为 App 连的
-  /// 不是自己选的地址；两个值不一致 = 正在用的真的连不上了，才是告警）。
-  /// null = 全部不可达。
-  Future<String?> _probeEntrances() async {
+  Future<bool> _probeEffective() async {
     final probe = widget.probe ?? probeServer;
-    final effective = await probe(effectiveServer);
-    if (effective.ok) return effectiveServer;
-    final results = await Future.wait(kServerCandidates
-        .where((server) => server != effectiveServer)
-        .map((server) async => (server, await probe(server))));
-    for (final (server, health) in results) {
-      if (health.ok) return server;
-    }
-    return null;
+    return (await probe(effectiveServer)).ok;
   }
 
   @override
@@ -129,26 +120,21 @@ class _AboutSheetState extends State<AboutSheet> {
                         note: isDevServer ? l10n.aboutServerDevNote : null,
                       ),
                       const SizedBox(height: 14),
-                      FutureBuilder<String?>(
-                        future: _reachableEntrance,
+                      FutureBuilder<bool>(
+                        future: _reachable,
                         builder: (context, snap) {
-                          // 判定用 connectionState 而非 hasData：全部不可达时
-                          // future 正常完成但结果是 null（hasData 为 false），
-                          // 若按 hasData 判定会把"无法连接"永远显示成"检测中"
+                          // 判定用 connectionState 而非 hasData：探测结果是
+                          // bool，全部路径都有数据；不可达是 false——若按
+                          // hasData 判定会把"无法连接"显示成"检测中"
                           // （首版实现的真实 bug，测试抓出）。
                           final String value;
                           final Color? valueColor;
-                          String? note;
                           if (snap.connectionState == ConnectionState.waiting) {
                             value = l10n.aboutStatusChecking;
                             valueColor = null;
-                          } else if (snap.hasData && snap.data != null) {
+                          } else if (snap.data == true) {
                             value = l10n.aboutStatusConnected;
                             valueColor = Theme.of(context).colorScheme.primary;
-                            // 名义地址 ≠ 实际入口（候选切换/兜底）时如实标注
-                            if (snap.data != effectiveServer) {
-                              note = l10n.aboutStatusEntranceNote(snap.data!);
-                            }
                           } else {
                             value = l10n.aboutStatusUnreachable;
                             valueColor = Theme.of(context).colorScheme.error;
@@ -157,7 +143,6 @@ class _AboutSheetState extends State<AboutSheet> {
                             label: l10n.aboutStatusLabel,
                             value: value,
                             valueColor: valueColor,
-                            note: note,
                           );
                         },
                       ),

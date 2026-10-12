@@ -1091,12 +1091,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutStatusConnected => '已连接';
 
   @override
-  String get aboutStatusUnreachable => '无法连接任何服务器入口（自动重试中）';
-
-  @override
-  String aboutStatusEntranceNote(Object server) {
-    return '当前实际入口：$server';
-  }
+  String get aboutStatusUnreachable => '无法连接';
 
   @override
   String get advancedMenuTitle => '高级安全';

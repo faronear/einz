@@ -1,6 +1,7 @@
-// AboutSheet 连接状态行测试（2026-10-11）：
-// 全候选可达 → 已连接；仅兜底外的候选可达 → 标注实际入口；全不可达 → 明确显示
-// "无法连接任何服务器入口"（不许默默展示连不上的兜底地址）。
+// AboutSheet 连接状态行测试（2026-10-11；2026-10-12 改口径）：
+// 只探测**启动时定下的活地址**（effectiveServer）——可达 → 已连接；不可达 →
+// 如实显示"无法连接"，**不尝试其他候选**（候选切换/兜底是启动探测的事，老板
+// 2026-10-12：开发环境连 localhost 断开时，跑去显示连上了线上域名没有意义）。
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,26 +22,27 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('全部候选可达（首个即主域名）→ 已连接，无实际入口附注', (tester) async {
+  testWidgets('启动定下的活地址可达 → 已连接', (tester) async {
     await _pump(tester, (server) async =>
         server == 'https://einz.tic.cc' ? const ServerHealth(ok: true) : const ServerHealth());
     await tester.pumpAndSettle();
     expect(find.text('已连接'), findsOneWidget);
-    expect(find.textContaining('当前实际入口'), findsNothing);
   });
 
-  testWidgets('仅备用候选可达 → 已连接 + 如实标注实际入口', (tester) async {
+  testWidgets('启动地址不可达（其他候选可达）→ 仍显示无法连接，不尝试其他候选',
+      (tester) async {
+    // 老板 2026-10-12：About 只认启动时定下的活地址；别的候选可达也不改口。
     await _pump(tester, (server) async =>
         server.contains('yuanjinx') ? const ServerHealth(ok: true) : const ServerHealth());
     await tester.pumpAndSettle();
-    expect(find.text('已连接'), findsOneWidget);
-    expect(find.textContaining('当前实际入口'), findsOneWidget);
+    expect(find.text('无法连接'), findsOneWidget);
+    expect(find.text('已连接'), findsNothing);
   });
 
-  testWidgets('全部候选不可达 → 明确显示无法连接（不冒充已连接）', (tester) async {
+  testWidgets('全部不可达 → 明确显示无法连接（不冒充已连接）', (tester) async {
     await _pump(tester, (server) async => const ServerHealth());
     await tester.pumpAndSettle();
-    expect(find.text('无法连接任何服务器入口（自动重试中）'), findsOneWidget);
+    expect(find.text('无法连接'), findsOneWidget);
     expect(find.text('已连接'), findsNothing);
     // 兜底名义地址仍然如实展示（语义由连接状态行说明）
     expect(find.text(effectiveServer), findsOneWidget);

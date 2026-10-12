@@ -14117,3 +14117,13 @@ value 侧、与值同侧右对齐。⚠️ textAlign 只在文本框比文字宽
 仍靠左，须先 `SizedBox(width: double.infinity)` 撑满整行再 textAlign 右
 （老板热重启后实测抓出）。长值换行时每行仍右对齐、label 恒在左；长按复制
 保留。about_sheet_status 4 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十一）**：About 连接状态改口径（老板 2026-10-12）：只探测
+**启动时定下的活地址** effectiveServer——可达→已连接，断开→如实显示
+"无法连接"，**不再尝试其他候选**（About 是状态展示不是连接管理器，候选
+切换/兜底是启动探测的事；开发环境连 localhost 断开时跑去显示连上线上域名
+没有意义）。实现：`_probeEntrances`→`_probeEffective`（Future<bool>），删
+"当前实际入口"附注；l10n 键 aboutStatusEntranceNote 删除、
+aboutStatusUnreachable 文案改为"无法连接/Unreachable"（去掉"任何入口/
+自动重试中"）。测试同步反转为新语义（备用候选可达也显示无法连接）。
+about_sheet_status 4 测试全过，analyze 0 issue。
