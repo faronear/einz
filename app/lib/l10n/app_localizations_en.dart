@@ -958,6 +958,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePasteSendImageTitle => 'Send this image?';
 
   @override
+  String chatPagePasteSendVideoTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count videos?',
+      one: 'Send this video?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendAudioTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count audio files?',
+      one: 'Send this audio?',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String chatPagePasteSendFilesTitle(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

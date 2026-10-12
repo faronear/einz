@@ -451,6 +451,22 @@
   "chatPageDeleteCancel": "取消",
   "chatPageDeleteConfirmOk": "删除",
   "chatPagePasteSendImageTitle": "发送这张图片？",
+  "chatPagePasteSendVideoTitle": "{count, plural, one {发送这个视频？} other {发送这 {count} 个视频？}}",
+  "@chatPagePasteSendVideoTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteSendAudioTitle": "{count, plural, one {发送这个音频？} other {发送这 {count} 个音频？}}",
+  "@chatPagePasteSendAudioTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "chatPagePasteSendFilesTitle": "{count, plural, one {发送这个文件？} other {发送这 {count} 个文件？}}",
   "@chatPagePasteSendFilesTitle": {
     "placeholders": {

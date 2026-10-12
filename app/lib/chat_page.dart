@@ -125,6 +125,19 @@ String _dropAttachmentType(String fileName) {
   return 'file';
 }
 
+/// 剪贴板给的"文件路径"是否是**本地真实存在的普通文件**（老板 2026-10-12）：
+/// 浏览器拷图有时会连带一个 http URL，插件取 `url.path` 得到个不存在的本地
+/// 路径（如 `/images/foo.png`）——那种必须落空，让粘贴回落到图片数据分支，
+/// 否则 statSync 抛错、用户看到"发送失败"。
+bool _isLocalReadableFile(String path) {
+  if (path.isEmpty) return false;
+  try {
+    return FileStat.statSync(path).type == FileSystemEntityType.file;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
 /// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
 /// 发送复用右侧发送键）。
@@ -6648,12 +6661,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 粘贴的落点：读剪贴板 → 分流（与微信口径一致——**同时有图和文时发图**）：
-  /// ① 图片（截图 / 浏览器拷图）→ **确认弹窗** → 走 [_sendAttachmentOptimistic]
-  ///    发送（与相册、拖放同一收口：大小预检、失败提示全都继承）；
-  /// ② 文件（访达/资源管理器里拷的，仅桌面，见 [_pasteboardFilesSupported]）
-  ///    → **确认弹窗** → 复用拖放入口的 [_sendDroppedFiles]；
+  /// ① **文件路径优先**（访达/资源管理器里拷的文件，仅桌面，见
+  ///    [_pasteboardFilesSupported]）→ 按扩展名归类后走 [_sendPastedFiles]；
+  /// ② 没有真实本地文件 → 图片**字节**（截图 / 图片 App 拷贝 / 浏览器拷图）
+  ///    → **确认弹窗**（缩略图）→ 走 [_sendAttachmentOptimistic] 发送；
   /// ③ 都没有 → 纯文本，插入输入框光标处（见 [_insertPastedText]）；
   /// ④ 全空 → 提示「剪贴板是空的」（附件面板点了没反馈会很懵）。
+  ///
+  /// **为什么文件优先于图片字节**（老板 2026-10-12 实测 + 机制）：macOS 在
+  /// Finder 里拷文件时，剪贴板里的"图片数据"是**文件类型图标**（系统合成的
+  /// 缩略图，pdf/mp4 等同理），不是文件内容——先读 image 分支会把图标当成
+  /// 图发出去（弹窗显示图标、发出去也是一张图标）。文件路径才是真内容，
+  /// 所以先判 files；校验过本地真实存在（浏览器拷图有时会带一个 http 派
+  /// 生的假路径，自然落空）才走文件分支。
   ///
   /// 为什么发送前要确认（老板 2026-10-12）：剪贴板内容不可见——可能是几分钟前
   /// 拷的旧图/旧文件，而 E2EE 消息对方可能已收到、撤不回。图片/文件弹窗给一次
@@ -6665,6 +6685,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _pasteFromClipboard() async {
     final l10n = AppLocalizations.of(context)!;
     try {
+      final localFiles = _pasteboardFilesSupported
+          ? (await Pasteboard.files()).where(_isLocalReadableFile).toList()
+          : const <String>[];
+      if (!mounted) return;
+      if (localFiles.isNotEmpty) {
+        await _sendPastedFiles(localFiles.map(XFile.new).toList());
+        return;
+      }
       final bytes = await Pasteboard.image;
       if (!mounted) return;
       if (bytes != null) {
@@ -6676,18 +6704,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             fileBytes: bytes, fileName: _pastedImageName(), type: 'image');
         return;
       }
-      if (_pasteboardFilesSupported) {
-        final files = await Pasteboard.files();
-        if (!mounted) return;
-        if (files.isNotEmpty) {
-          final xfiles = files.map(XFile.new).toList();
-          // 逐个的大小预检在 _sendDroppedFiles 里（要先读盘才知道，同拖放口径）
-          final ok = await _confirmPasteSend(_PastePayload.files(xfiles));
-          if (!ok || !mounted) return;
-          await _sendDroppedFiles(xfiles);
-          return;
-        }
-      }
       final text = await Pasteboard.text ?? '';
       if (!mounted) return;
       if (text.isEmpty) {
@@ -6695,6 +6711,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return;
       }
       _insertPastedText(text);
+    } catch (e) {
+      if (!mounted) return;
+      _notice(context, _attachmentSendError(l10n, e));
+    }
+  }
+
+  /// 剪贴板里的**文件**（Finder/资源管理器里拷的）按扩展名归类后走确认弹窗：
+  /// - 单张图片 → 读真实字节、弹窗给**缩略图**、按图片消息发（用真名，不是
+  ///   合成名——它本来就是有名字的文件；老板 2026-10-12：拷 png 粘贴就该
+  ///   跟图片 App 里拷贝一样看到图、发出去也是图）；
+  /// - 其余（多图/视频/音频/混合/其他文件）→ 按 [kind] 问的名单弹窗
+  ///   （标题和图标按类型走），发送仍走 [_sendDroppedFiles]——它逐文件按
+  ///   扩展名分型，视频发视频、音频发音频（带时长探测）、图片发图片。
+  Future<void> _sendPastedFiles(List<XFile> xfiles) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final kinds = xfiles.map((f) => _dropAttachmentType(f.name)).toSet();
+      if (kinds.length == 1 && kinds.first == 'image' && xfiles.length == 1) {
+        final bytes = await xfiles.first.readAsBytes();
+        if (!mounted) return;
+        if (!_withinAttachmentLimit(bytes.length)) return;
+        final ok = await _confirmPasteSend(_PastePayload.image(bytes));
+        if (!ok || !mounted) return;
+        await _sendAttachmentOptimistic(
+            fileBytes: bytes, fileName: xfiles.first.name, type: 'image');
+        return;
+      }
+      // 同类媒体按那个类型问（视频/音频），混合或非媒体按"文件"问
+      final kind = kinds.length == 1 ? kinds.first : 'file';
+      final ok = await _confirmPasteSend(_PastePayload.files(xfiles, kind));
+      if (!ok || !mounted) return;
+      // 逐个的大小预检在 _sendDroppedFiles 里（要先读盘才知道，同拖放口径）
+      await _sendDroppedFiles(xfiles);
     } catch (e) {
       if (!mounted) return;
       _notice(context, _attachmentSendError(l10n, e));
@@ -6711,9 +6760,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(bytes != null
-            ? l10n.chatPagePasteSendImageTitle
-            : l10n.chatPagePasteSendFilesTitle(files!.length)),
+        // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
+        // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"
+        title: Text(switch (payload.kind) {
+          'image' => l10n.chatPagePasteSendImageTitle,
+          'video' => l10n.chatPagePasteSendVideoTitle(files!.length),
+          'audio' => l10n.chatPagePasteSendAudioTitle(files!.length),
+          _ => l10n.chatPagePasteSendFilesTitle(files!.length),
+        }),
         content: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
           child: bytes != null
@@ -6727,7 +6781,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       for (final f in files!)
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.insert_drive_file),
+                          // 图标也按类型：视频/音频不该挂个通用文件图标
+                          leading: Icon(switch (payload.kind) {
+                            'video' => Icons.movie,
+                            'audio' => Icons.music_note,
+                            _ => Icons.insert_drive_file,
+                          }),
                           title: Text(f.name,
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
@@ -9628,14 +9687,20 @@ class _FullscreenCloseButton extends StatelessWidget {
   }
 }
 
-/// 粘贴待确认的内容（老板 2026-10-12 确认弹窗的载荷）：图片（字节）或文件
-/// （路径列表）二选一——两者都空不可能出现（那走文本分支，不弹窗）。
+/// 粘贴待确认的内容（老板 2026-10-12 确认弹窗的载荷）：
+/// - 图片：clipboard 里的图片**字节**（截图 / 图片 App 拷贝），弹窗给缩略图；
+/// - 文件：访达/资源管理器里拷的**文件路径**，按扩展名归类到
+///   [kind]（image/video/audio/file），弹窗按类型问、图标按类型给。
+/// 两者都空不可能出现（那走文本分支，不弹窗）。
 class _PastePayload {
-  const _PastePayload.image(this.bytes) : files = null;
-  const _PastePayload.files(this.files) : bytes = null;
+  const _PastePayload.image(this.bytes)
+      : files = null,
+        kind = 'image';
+  const _PastePayload.files(this.files, this.kind) : bytes = null;
 
   final Uint8List? bytes;
   final List<XFile>? files;
+  final String kind;
 }
 
 class _MessageAvatar extends StatefulWidget {

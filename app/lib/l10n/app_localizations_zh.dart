@@ -894,6 +894,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePasteSendImageTitle => '发送这张图片？';
 
   @override
+  String chatPagePasteSendVideoTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '发送这 $count 个视频？',
+      one: '发送这个视频？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendAudioTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '发送这 $count 个音频？',
+      one: '发送这个音频？',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String chatPagePasteSendFilesTitle(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

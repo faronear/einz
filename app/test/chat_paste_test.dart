@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,11 @@ import 'package:einz_shared/einz_shared.dart';
 /// 2x2 PNG（红）——足够小又能被 Flutter 解码。
 final Uint8List _tinyPng = base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==');
+
+/// 2x2 PNG（蓝）——Finder 拷贝场景里冒充"系统文件类型图标"的字节（与真实
+/// 文件内容必须是不同的字节，才能断言弹窗用的是文件内容而不是图标）。
+final Uint8List _tinyPngBlue = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAD0lEQVR4nGNgYPgPRmAKABf2A/1+6zfzAAAAAElFTkSuQmCC');
 
 /// 消息流里的图片气泡（180 见方、cover 裁剪）。
 Finder _bubbleImage() =>
@@ -222,6 +228,102 @@ void main() {
     expect(find.text('einz_paste_test_file.txt'), findsOneWidget,
         reason: '确认后文件应已成消息（弹窗已关，这里匹配的是文件卡）');
     expect(_bubbleImage(), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Finder 里拷的 png → 按图片发（弹窗缩略图是文件内容，不是系统图标）',
+      (WidgetTester tester) async {
+    await pumpChat(tester);
+    final tmp = File('${Directory.systemTemp.path}/finder_copy.png');
+    // runAsync：testWidgets 身体跑在 FakeAsync 区里，真实文件 I/O 不会完成
+    await tester.runAsync(() => tmp.writeAsBytes(_tinyPng));
+    addTearDown(() => tmp.deleteSync());
+    // macOS 拷文件时剪贴板里的"图片数据"是**文件类型图标**（蓝），文件路径
+    // （红）才是真内容——老板 2026-10-12 实测：老逻辑把图标当图发了
+    _clipImage = _tinyPngBlue;
+    _clipFiles = [tmp.path];
+
+    await pressPaste(tester);
+    // 单图分支先 readAsBytes（真实文件 I/O）才弹窗——FakeAsync 区要
+    // runAsync 让路，否则对话框永远开不出来
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+    }
+    await tester.pumpAndSettle();
+
+    // 弹窗缩略图必须是文件真实内容（红），不能是系统图标（蓝）
+    final realContentPreview = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byWidgetPredicate((w) =>
+          w is Image &&
+          w.image is MemoryImage &&
+          listEquals((w.image as MemoryImage).bytes, _tinyPng)));
+    expect(realContentPreview, findsOneWidget,
+        reason: '弹窗缩略图应是文件真实内容，而非系统文件类型图标');
+    expect(find.text('发送这张图片？'), findsOneWidget,
+        reason: '图片文件按图片问，不该按文件问');
+
+    await tester.tap(dialogSendButton());
+    // 字节已在手里（单图分支直接发，不再读盘），微任务链路 settleRealAsync 就够
+    await settleRealAsync(tester);
+
+    expect(_bubbleImage(), findsOneWidget,
+        reason: '确认后应作为图片消息发出（不是文件卡）');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Finder 里拷的 mp4 → 按视频问、按视频发',
+      (WidgetTester tester) async {
+    await pumpChat(tester);
+    final tmp = File('${Directory.systemTemp.path}/finder_copy.mp4');
+    await tester.runAsync(() => tmp.writeAsBytes(
+        Uint8List.fromList(List.filled(128, 7)))); // 假 mp4：渲染会进失败态
+    addTearDown(() => tmp.deleteSync());
+    _clipImage = _tinyPngBlue; // 同样：系统图标 ≠ 内容
+    _clipFiles = [tmp.path];
+
+    await pressPaste(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('发送这个视频？'), findsOneWidget,
+        reason: '视频文件按视频问，不该按文件问');
+    expect(find.byIcon(Icons.movie), findsWidgets,
+        reason: '名单行挂视频图标，不是通用文件图标');
+
+    await tester.tap(dialogSendButton());
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+    }
+    await settleRealAsync(tester);
+
+    // 视频消息：_VideoPreview 三种状态都带 videoPreview key（假 mp4 进失败态）
+    expect(find.byKey(const ValueKey('videoPreview')), findsOneWidget,
+        reason: '确认后应作为视频消息发出（不是文件卡）');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('浏览器拷图（files 里带不存在的 http 派生路径）→ 仍走图片数据分支',
+      (WidgetTester tester) async {
+    await pumpChat(tester);
+    // 浏览器拷图有时会连带一个 http URL，插件取 url.path 得到不存在的本地
+    // 路径——必须落空，让粘贴回落到图片字节（老板 2026-10-12 边界）
+    _clipImage = _tinyPng;
+    _clipFiles = ['/images/from_browser.png'];
+
+    await pressPaste(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('发送这张图片？'), findsOneWidget,
+        reason: '假文件路径应被过滤，回落图片数据分支');
+    expect(find.byType(AlertDialog), findsOneWidget);
+
+    await tester.tap(dialogCancelButton());
+    await tester.pumpAndSettle();
+    expect(_bubbleImage(), findsNothing, reason: '取消则不发送');
     expect(tester.takeException(), isNull);
   });
 

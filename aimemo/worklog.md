@@ -14398,3 +14398,24 @@ WS 态分两种：灯绿 → 新键 `chatPageSyncingLocalOnly`「同步中… �
   PasteSendFilesTitle 复数形态 / PasteEmpty），按钮复用通用 cancel/send。
 - 测试扩到六例（chat_paste_test.dart）：图片确认后发 / 文件确认后发 /
   取消不发 / 文本不弹窗 / 空提示 / 面板入口同链路。
+
+**（2026-10-12，五十三）**：修 Finder 拷文件粘贴的**图标当图发** bug（老板
+macOS 实测 + 自己定位了机制）。根因：macOS 在 Finder 里拷文件时，剪贴板里的
+"图片数据"是**文件类型图标**（系统合成缩略图，mp4/pdf 同理），不是文件内容；
+老逻辑先读 `Pasteboard.image`，把图标当图发了——弹窗显示图标、发出去也是一张
+图标图。而"在图片 App 里拷贝"是纯图片字节（无文件路径），一切正常。
+- 修复：`_pasteFromClipboard` 改**文件路径优先**——先 `Pasteboard.files()`，
+  经 `_isLocalReadableFile` 校验本地真实存在才走文件分支；没有真实文件才读
+  图片字节。该校验同时兜住浏览器拷图（插件会把 http URL 的 `url.path` 当成
+  文件路径返回，如 `/images/x.png`，不存在 → 落空 → 回落图片分支，不会误报
+  "发送失败"）。Windows 侧同理（Explorer 拷文件也可能带图标位图）。
+- 新增 `_sendPastedFiles`：单张图片 → 读**真实字节**走缩略图弹窗、按图片
+  消息发（用真名）；多图/视频/音频/混合 → 按扩展名归类的名单弹窗 + 仍走
+  `_sendDroppedFiles`（它逐文件分型：视频发视频、音频探时长、图片发图片）。
+- 确认弹窗分类感知：`_PastePayload` 加 `kind`，标题与行图标按
+  image/video/audio/file 走（新增两个复数标题键）。拷 mp4 不再问"发送这个
+  文件？"而是"发送这个视频？"。
+- 测试加到九例，新增 Finder 拷 png（断言弹窗缩略图是文件内容而非图标字节，
+  listEquals 比字节）、Finder 拷 mp4（视频弹窗 + 视频消息）、浏览器拷图
+  （假路径回落图片分支）。单图分支先 readAsBytes 再弹窗，测试里要 runAsync
+  给真实 I/O 让路（第三个 FakeAsync 踩点）。

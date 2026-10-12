@@ -1688,6 +1688,18 @@ abstract class AppLocalizations {
   /// **'Send this image?'**
   String get chatPagePasteSendImageTitle;
 
+  /// No description provided for @chatPagePasteSendVideoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Send this video?} other {Send these {count} videos?}}'**
+  String chatPagePasteSendVideoTitle(int count);
+
+  /// No description provided for @chatPagePasteSendAudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Send this audio?} other {Send these {count} audio files?}}'**
+  String chatPagePasteSendAudioTitle(int count);
+
   /// No description provided for @chatPagePasteSendFilesTitle.
   ///
   /// In en, this message translates to:

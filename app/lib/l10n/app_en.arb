@@ -466,6 +466,22 @@
   "chatPageDeleteCancel": "Cancel",
   "chatPageDeleteConfirmOk": "Delete",
   "chatPagePasteSendImageTitle": "Send this image?",
+  "chatPagePasteSendVideoTitle": "{count, plural, one {Send this video?} other {Send these {count} videos?}}",
+  "@chatPagePasteSendVideoTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteSendAudioTitle": "{count, plural, one {Send this audio?} other {Send these {count} audio files?}}",
+  "@chatPagePasteSendAudioTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "chatPagePasteSendFilesTitle": "{count, plural, one {Send this file?} other {Send these {count} files?}}",
   "@chatPagePasteSendFilesTitle": {
     "placeholders": {
