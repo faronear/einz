@@ -2116,23 +2116,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 大胶囊（2026-10-12 老板）是**一个整体**，悬浮/点击都归
                       // 外层 InkWell——头像用 Ink 画在 Material 墨水层上（与群
                       // 占位头像同款），外层悬浮高亮才能盖在头像上面。
+                      // ⚠️ 照片**不能用** `Ink.image + ClipOval`：Ink 画在 Material
+                      // 墨水层画布上，不经过 widget 树里的 ClipOval——照片会糊成
+                      // 方块（老板 2026-10-12 实测）。要圆就让 Ink 自己的
+                      // decoration 是圆的（与下面无图分支同一口径）。
                       SizedBox(
                         width: kStatusAvatarSize,
                         height: kStatusAvatarSize,
-                        child: ClipOval(
-                          child: _peerAvatarBytes != null
-                              ? Ink.image(
-                                  image: MemoryImage(_peerAvatarBytes!),
-                                  fit: BoxFit.cover,
-                                )
-                              : Ink(
-                                  decoration: BoxDecoration(
-                                    color: _genderTint(_peerGender),
-                                    shape: BoxShape.circle,
+                        child: _peerAvatarBytes != null
+                            ? Ink(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: DecorationImage(
+                                    image: MemoryImage(_peerAvatarBytes!),
+                                    fit: BoxFit.cover,
                                   ),
-                                  child: const Icon(Icons.person, size: 22),
                                 ),
-                        ),
+                              )
+                            : Ink(
+                                decoration: BoxDecoration(
+                                  color: _genderTint(_peerGender),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.person, size: 22),
+                              ),
                       ),
                       const SizedBox(width: 8),
                       Flexible(

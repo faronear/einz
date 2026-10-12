@@ -14177,3 +14177,15 @@ analyze 0 issue。
 ——内容已被拿走，不提供无效入口；duo 同理=对方已拉取）。`_messageRecallable`
 加 deliveredCountOf == 0 条件；墓碑本就不给菜单（_messageHasActions =
 !m.deleted）。chat_page_menu 34 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十九）**：两处 UI 修复。① **duo 状态条对方照片头像不圆**——
+根因：`Ink.image + ClipOval` 组合里 Ink 画在 Material 墨水层画布上，**不经过
+widget 树的 ClipOval**，照片贴成方块（无图占位分支恰好是 `Ink` 圆 decoration
+所以一直正常）。修法：照片分支改用 `Ink` + `BoxDecoration(shape: circle,
+image: DecorationImage(cover))`，与占位分支同口径（chat_page.dart）。② **空间
+切换弹层当前卡片**——去掉左上角 `check_circle` 圆勾（群组卡片成员头像会顶到
+角上被压住；选中态靠底色/前景渐变 + 浮起阴影已够），未读角标负偏移
+`right/top: -5` 贴住甚至压出卡片右上圆角（Stack 开 `Clip.none`，否则被默认
+hardEdge 裁掉；space_switcher.dart）。随后老板看了效果定稿 **-8**（再外推一点、
+和头像拉开距离）。analyze 0 issue；space_switcher_avatar +
+multi_space_pages 12 测试全过。
