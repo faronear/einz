@@ -497,10 +497,12 @@ async function main (): Promise<void> {
       ws.on('message', data => {
         const frame = JSON.parse(data.toString())
         if (frame.type === 'hello') {
-          void devB.postMessage(
+          // 不 void：同 receipts 测试——漂浮 promise 在 done() 之后 reject
+          // （server 被 finally 掐断）会崩掉 node 进程，挂 catch 兜住
+          devB.postMessage(
             port,
             devB.encryptMessage('msg-0002', 'reply from b', spaceId)
-          )
+          ).catch(fail)
         } else if (frame.type === 'message.new') {
           assert.equal(
             frame.payload.message.message_id,

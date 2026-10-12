@@ -249,7 +249,11 @@ async function main (): Promise<void> {
       ws.on('message', data => {
         const frame = JSON.parse(data.toString())
         if (frame.type === 'hello') {
-          void bob.postReceipt(port, { read_upto_seq: 2 })
+          // 不 void：漂浮 promise 若在 done() 之后才 reject（WS 广播先于
+          // HTTP 响应到达 → finally 杀 server 掐断在途请求），无人接的
+          // rejection 会直接把 node 进程崩掉（2026-10-12 实测）。挂 catch
+          // 后：真失败 → 测试失败；done 之后迟归 → 无害空转
+          bob.postReceipt(port, { read_upto_seq: 2 }).catch(fail)
         } else if (frame.type === 'receipt.updated') {
           assert.equal(frame.payload.member_id, bob.memberId, 'payload.member_id 应为 Bob')
           assert.equal(frame.payload.read_upto_seq, 2, 'payload.read_upto_seq 应为 2')

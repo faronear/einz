@@ -14209,3 +14209,20 @@ app.ts 的请求/响应行与 ws.ts 的 connect / call / disconnect 三处共 4 
 （老板 2026-10-12）：`reqTimestamp()` 全部走 getUTC*，输出
 `2026-10-12T03:24:23Z`（ISO 风格 + `Z` 后缀，跨时区/跨机器日志可比可排序）。
 冒烟确认格式；tsc 干净。
+
+**（2026-10-12，四十三）**：修 main 上 `npm run testAll` 两项失败。① **app
+widget 测试**（entrance_list_sheet_test）——88bf7e51（10-11 晚）把「我的通道」
+弹层卡片改成一卡占满整行，但漏改测试：仍在按旧「一行 3 张」几何断言（iPhone.dx
+< iPad.dx、卡宽 194）。一卡一行后两卡 dx 恒等 → 实测 105.0 == 105.0 挂掉。
+修法：排序断言改比 dy（本机卡在首行），卡宽改 608（M3 弹层内容限宽 640 −
+左右各 16），注释同步。② **server npm test**（receipts.test.ts）——WS hello
+处理器里 `void bob.postReceipt(...)` 是漂浮 promise：WS 广播先于 HTTP 响应
+到达 → done() 先返回 → finally 杀 server 掐断在途请求 → rejection 无人接 →
+Node 22 直接崩（"fetch failed / other side closed"）。smoke.test.ts:500 同型
+同险。两处都挂 `.catch(fail)`：真失败→测试失败，done 后迟归→无害。另记一笔：
+app/pubspec.lock 曾被整文件替换成 voice 分支版本（含 sherpa_onnx；pubspec.yaml
+未动）——疑 Seafile 跨机同步把 voice 工作区状态带进来，testAll 的 lock 守卫
+只比对自身跑前跑后故未拦下；已还原，提交前 git status 复核过。修复后单独重跑
+（无并发）testAll 四栈全过、汇总「全部通过 ✅」；此前失败的两项分别隔离复现/修复验证：
+entrance_list_sheet 修复后 6 用例全过；receipts 修复前隔离两连过（证明是负载
+敏感的竞态）、修复后通过；smoke 修复后通过。
