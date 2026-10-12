@@ -519,9 +519,9 @@
   "voiceTranscriptStale": "可重新转写",
   "voiceTranscriptManual": "点按转写文字",
   "voiceTranscriptLegacyAudio": "旧版语音（m4a）不支持转写，新录的语音才能转",
-  "voiceTranscriptDownloading": "正在下载转写模型",
-  "voiceTranscriptDownloadFailed": "转写模型下载失败：{error}",
-  "@voiceTranscriptDownloadFailed": {
+  "voiceTranscriptPreparing": "正在准备转写模型…",
+  "voiceTranscriptPrepareFailed": "转写模型准备失败：{error}",
+  "@voiceTranscriptPrepareFailed": {
     "placeholders": {
       "error": {
         "type": "String"

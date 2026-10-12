@@ -1071,11 +1071,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can';
 
   @override
-  String get voiceTranscriptDownloading => 'Downloading transcription model';
+  String get voiceTranscriptPreparing => 'Preparing transcription model…';
 
   @override
-  String voiceTranscriptDownloadFailed(String error) {
-    return 'Model download failed: $error';
+  String voiceTranscriptPrepareFailed(String error) {
+    return 'Failed to prepare transcription model: $error';
   }
 
   @override

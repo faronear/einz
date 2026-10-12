@@ -168,27 +168,41 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 
 ---
 
-## 11. 模型分发（2026-10-10 已定：首次使用时下载）
+## 11. 模型分发（2026-10-12 改回：打包进产物，首次转写就地解包）
 
 | 方式 | 优点 | 代价 |
 | ---- | ---- | ---- |
-| **打包进产物**（build 时脚本下载，**不进 git**） | 装好即离线可用、无下载逻辑 | 产物 +79~230 MB |
+| **打包进产物**（build 时脚本拉取，**不进 git**） | 装好即离线可用、无下载逻辑 | 产物 +239 MB |
 | **首次使用时下载** | 产物小 | 需处理下载/进度/失败/存储 |
 
-**结论**：模型二进制**不进 git、不打包进产物**；首次点「手动转写」时由
-`VoiceTranscriptModel.ensureDownloaded` 下载到
-`<ApplicationSupport>/voice_transcript/<kModelVersion>/`，此后 `installedDir` 直接命中本地（离线可用）。
+**结论（2026-10-12 老板拍板，改回打包）**：模型二进制**不进 git**，由
+`scripts/fetchVoiceModel.sh` 在**构建前**拉取到 `app/assets/voice_model/`
+（幂等：已就绪秒过；双源 + 3 轮重试；sha256 校验），随 App 打包分发。
+运行时**首次转写前**由 `VoiceTranscriptModel.ensureInstalled` 装到
+`<ApplicationSupport>/voice_transcript/<kModelVersion>/`——已装过（含 10-10
+~10-12 期间下载过模型的设备）直接复用，**零迁移**。
 
-实现要点（`app/lib/data/voice_transcript_model.dart`）：
+分发链路（`app/lib/data/voice_transcript_model.dart`）：
 
-- 双源：hf-mirror.com 优先（大陆可达），失败回落 huggingface.co；
-- 断点续传：`.part` 临时文件按已收字节 Range 续传（仅对**同一主机**有效——换源前清 `.part` 重下）；
-- 完整性：大小 + sha256 边下边算（不把 239MB 读进内存），基线见 `_files`
-  （model.int8.onnx 239233841B / tokens.txt 315894B，sha256 为 2026-10-10 基线）；
+- **三级解析** `ensureInstalled`：① `installedDir` 命中 → 直接用；
+  ② 包内有资产（`rootBundle.load('assets/voice_model/…')`，缺失时 manifest
+  快速失败不会真读 239MB）→ 拷进应用目录（model.onnx 分 1MB 块写：平滑
+  进度 + 可取消 + 取消清残file；只校验大小——资产由 App 签名保护完整性）；
+  ③ 包里没有（dev 构建没跑 fetch 脚本）→ **回落 `ensureDownloaded` 下载兜底**，
+  dev 机不断网也能自愈。
+- 下载兜底双源：hf-mirror.com 优先（大陆可达），失败回落 huggingface.co；
+- 下载断点续传：`.part` 临时文件按已收字节 Range 续传（仅对**同一主机**有效——换源前清 `.part` 重下）；
+- 下载完整性：大小 + sha256 边下边算（不把 239MB 读进内存），基线见 `_files`
+  （model.int8.onnx 239233841B / tokens.txt 315894B，sha256 为 2026-10-10 基线；
+  **与 fetchVoiceModel.sh 基线同一份，改模型两处一起改**）；
 - 原子性：全部文件就绪后才写 `.ok` 标记，不完整目录视为未安装；
-- 版本演进：换模型 = 新 `kModelVersion` 目录 + 重新下载，永不覆盖旧目录；转写表
-  `modelVersion` 列同步更新（stale 判定自动生效）。
+- 版本演进：换模型 = 新 `kModelVersion` 目录 + 重新拉取/重转，永不覆盖旧目录；
+  转写表 `modelVersion` 列同步更新（stale 判定自动生效）。
 - 与 A/B 两模型都留出**替换余地**（模型文件 + 配置可换）。
+- 构建入口挂钩：`app/ios/buildIos.sh` / `app/macos/buildMacos.sh` / npm
+  `app-apk-build` 都先跑 fetchVoiceModel.sh（幂等）；**拉取失败中断打包**——
+  不静默出没有转写功能的包。`.gitkeep` 保证新克隆也有资产目录（否则 pubspec
+  声明资产直接构建失败）。
 
 ---
 
@@ -211,7 +225,7 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 - [x] 气泡下方渲染 + 转写中/失败态 + 手动入口
 - [x] 级联删除（配合阅后即焚/删除）
 - [x] 多语言文案
-- [x] 模型分发落地（§11 首次使用下载，2026-10-10）
+- [x] 模型分发落地（§11，2026-10-10 首次使用下载；**2026-10-12 改回打包进产物** + 首次转写就地解包 + 下载兜底）
 
 ### Phase 2 — 打磨（按需）
 

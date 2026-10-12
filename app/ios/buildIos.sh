@@ -205,6 +205,13 @@ while IFS= read -r arg; do
   [[ -n "$arg" ]] && TURN_DEFINE_ARGS+=("$arg")
 done < <(bash "${SCRIPT_DIR}/../../scripts/turnDefineArgs.sh")
 
+# 语音转写模型（~239MB，随包分发）：幂等拉取到 app/assets/voice_model/
+# （aimemo/voiceTranscript.zhcn.md §11）。已就绪秒过；拉取失败宁可中断
+# 打包，也不静默出一个没有转写功能的包（dev 用 flutter run 不受影响，
+# 运行时自动回落下载兜底）。
+echo "▶ 拉取语音转写模型（幂等，已就绪则秒过）…"
+bash "${REPO_ROOT}/scripts/fetchVoiceModel.sh"
+
 echo "▶ 构建 ${CHANNEL} IPA（版本 ${APP_BUILD_NAME} / 构建号 ${APP_BUILD_NUMBER}，约 1–3 分钟）…"
 "${FLUTTER}" build ipa --release \
   --build-name="${APP_BUILD_NAME}" \
