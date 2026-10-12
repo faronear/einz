@@ -490,6 +490,7 @@ jobs:
   # ⚠️ glibc 兼容线 = runner 的 2.39：比它老的发行版（Ubuntu 22.04 等）跑不了
   # （TUI 同款问题，见 linux-cli 注释）；Debian 13 / Fedora 41+ 无妨。
   # 运行期系统依赖：libgtk-3（桌面自带）、libsecret-1（密钥存储）、
+  # gstreamer（audioplayers_linux 的音频链路：libgstreamer + plugins-base）、
   # libsodium（E2EE 走 FFI dlopen，**必须装**）——详见包内 README。
   linux-gui:
     needs: [test]
@@ -501,11 +502,12 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: 装 GTK/libsecret 等构建依赖
+      - name: 装 GTK/libsecret/gstreamer 等构建依赖
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libsecret-1-dev
+            libgtk-3-dev liblzma-dev libsecret-1-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get
@@ -521,9 +523,12 @@ jobs:
           cat > _release.gitomit/einz/README-linux-gui.txt <<'TXT'
           einz（Linux x64 GUI）
 
-          运行前置（缺 libsodium 起不来——E2EE 走 FFI 动态加载）：
-            Debian/Ubuntu: sudo apt install libsodium23 libsecret-1-0 libgtk-3-0
-            RHEL/Fedora:   sudo dnf install libsodium libsecret gtk3
+          运行前置（缺 libsodium / gstreamer 起不来或语音没声音）：
+            Debian/Ubuntu: sudo apt install libsodium23 libsecret-1-0 libgtk-3-0 \
+              gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+          音频输出（按声音系统装，Debian 13 默认 PipeWire）：
+            PipeWire:    gstreamer1.0-pipewire
+            PulseAudio:  gstreamer1.0-pulseaudio
           注：libsqlite3 已由构建内嵌（native assets），无需单独装；
               glibc 需 ≥ 2.39（构建线），Debian 13 / Fedora 41+ 满足。
 

@@ -14415,3 +14415,13 @@ main/tag），用 workflow_dispatch 选 linux 手动出包；产物 glibc 线 = 
 generated_*）全部入库，无本机产物。教训：本地能 `ls` 到目录 ≠ 目录在 git
 里——平台目录是否 tracked 要看 `git ls-files`（上次 voice_model 239MB 也是
 同类坑，方向相反）。
+
+**（2026-10-12，五十六）**：feat/linux CI 第二败——
+`audioplayers_linux` CMake 要 gstreamer-1.0 / gstreamer-app-1.0 /
+gstreamer-audio-1.0（pkg-config），构建机没装。已把全部 *_linux 插件的
+CMakeLists 依赖扫齐（其余无额外构建依赖），apt 清单补
+libgstreamer1.0-dev + libgstreamer-plugins-base1.0-dev（app/audio 的
+.pc 都在后者）；运行说明同步补 gstreamer plugins-base/good + 按声音
+系统选 pipewire/pulseaudio。另确认 VSCode 里 linux 目录显灰只是
+gitignore 缓存未刷新（git check-ignore 已放行、10 文件已跟踪），
+Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代码问题。
