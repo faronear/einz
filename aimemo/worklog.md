@@ -14405,3 +14405,13 @@ job（ubuntu-latest + GTK/libsecret 构建依赖 → flutter build linux --relea
 chat_quote_video 11 测试全过。**注意**：分支推不上 CI 自动触发（CI 只认
 main/tag），用 workflow_dispatch 选 linux 手动出包；产物 glibc 线 = runner
 的 2.39，Debian 13.3（2.41）满足。
+
+**（2026-10-12，五十五）**：feat/linux 首跑 CI 即败——
+`No Linux desktop project configured`。根因：`app/.gitignore` 有一条
+`/linux/`（历史策略「linux/web 暂不需要，继续忽略」），**app/linux 脚手架
+从未入 git**，CI checkout 出来没有该目录，`flutter build linux` 直接拒。
+解禁：删掉该条（保留 /web/）、注释同步更新；app/linux 的内层 .gitignore
+本来就有（排除 flutter/ephemeral），10 个脚手架文件（CMakeLists/runner/
+generated_*）全部入库，无本机产物。教训：本地能 `ls` 到目录 ≠ 目录在 git
+里——平台目录是否 tracked 要看 `git ls-files`（上次 voice_model 239MB 也是
+同类坑，方向相反）。

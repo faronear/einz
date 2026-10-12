@@ -53,9 +53,8 @@ app.*.map.json
 # 签名密钥（禁止提交）
 /android/key.properties
 
-# 平台工程文件跟踪策略：macos/windows 桌面端构建依赖其工程文件，必须跟踪；
-# 各自目录内有 .gitignore 精确排除本地产物。linux/web 暂不需要，继续忽略。
-/linux/
+# 平台工程文件跟踪策略：macos/windows/linux 桌面端构建依赖其工程文件，必须跟踪；
+# 各自目录内有 .gitignore 精确排除本地产物（ephemeral 等）。web 暂不需要，继续忽略。
 /web/
 
 # Widget Preview related
