@@ -2089,14 +2089,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
-                      // 点击统一开「My companion」弹层（老板 2026-10-10：与群空间头像条
-                      // 全局一致——不再走头像全屏大图）。
-                      _statusAvatar(
-                          bytes: _peerAvatarBytes,
-                          gender: _peerGender,
-                          saveName: _peerName,
-                          onTap: _showMembersSheet),
+                      // 头像放**最左**（老板 2026-09-26 新设计）。**不用**
+                      // `_statusAvatar`（它自带 MouseRegion 悬浮变色/点击）：
+                      // 大胶囊（2026-10-12 老板）是**一个整体**，悬浮/点击都归
+                      // 外层 InkWell——头像用 Ink 画在 Material 墨水层上（与群
+                      // 占位头像同款），外层悬浮高亮才能盖在头像上面。
+                      SizedBox(
+                        width: kStatusAvatarSize,
+                        height: kStatusAvatarSize,
+                        child: ClipOval(
+                          child: _peerAvatarBytes != null
+                              ? Ink.image(
+                                  image: MemoryImage(_peerAvatarBytes!),
+                                  fit: BoxFit.cover,
+                                )
+                              : Ink(
+                                  decoration: BoxDecoration(
+                                    color: _genderTint(_peerGender),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.person, size: 22),
+                                ),
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Column(

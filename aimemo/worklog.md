@@ -14094,3 +14094,9 @@ analyze 0 issue。
 Padding 从 horizontal 6/vertical 2 改为只留右 6（老板 2026-10-12，与 duo
 的 fromLTRB(0,0,6,0) 同款）；宽度预算 capsulePad 12→6（左 0 后减半）。
 group_status_bar 10 测试全过，analyze 0 issue。
+
+**（2026-10-12，二十八）**：duo 大胶囊头像去掉自己的悬浮变色（老板
+2026-10-12：胶囊是一个整体）——不再用带 MouseRegion/Clickable 的
+`_statusAvatar`，改为在胶囊里直接画 Ink 头像（照片 `Ink.image` + ClipOval、
+无图性别 tint + Ink，与群占位头像同款），点击/悬浮都归外层 InkWell，
+外层悬浮高亮能盖在头像上。analyze 0 issue。
