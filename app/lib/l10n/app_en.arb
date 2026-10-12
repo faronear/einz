@@ -455,7 +455,7 @@
   "chatPageRecallConfirmOk": "Recall",
   "chatPageRecallBlocked": "Already delivered, can't recall",
   "chatPageRecallFailed": "Recall failed, try again later",
-  "chatPageDeletedMessage": "(This message was deleted)",
+  "chatPageDeletedMessage": "(This message is no longer available)",
   "chatPageActionQuote": "Quote",
   "chatPageActionSave": "Save",
   "chatPageAttachmentSaved": "Saved.",

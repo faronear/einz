@@ -922,7 +922,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRecallFailed => 'Recall failed, try again later';
 
   @override
-  String get chatPageDeletedMessage => '(This message was deleted)';
+  String get chatPageDeletedMessage => '(This message is no longer available)';
 
   @override
   String get chatPageActionQuote => 'Quote';

@@ -1625,7 +1625,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDeletedMessage.
   ///
   /// In en, this message translates to:
-  /// **'(This message was deleted)'**
+  /// **'(This message is no longer available)'**
   String get chatPageDeletedMessage;
 
   /// No description provided for @chatPageActionQuote.

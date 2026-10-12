@@ -858,7 +858,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRecallFailed => '撤回失败，请稍后重试';
 
   @override
-  String get chatPageDeletedMessage => '（该消息已删除）';
+  String get chatPageDeletedMessage => '（该消息已不存在）';
 
   @override
   String get chatPageActionQuote => '引用';
@@ -1082,7 +1082,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerLabel => '服务器地址';
 
   @override
-  String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
+  String get aboutServerDevNote => '开发地址，仅供测试';
 
   @override
   String get aboutStatusLabel => '连接状态';
@@ -1154,7 +1154,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
 
   @override
-  String get spaceListHint => '点击其他秘境即可切换';
+  String get spaceListHint => '点击卡片切换当前秘境';
 
   @override
   String get spaceListTitle => '我的秘境';

@@ -14166,3 +14166,8 @@ chat_page_menu 34 测试全过，analyze 0 issue。
 撤回墓碑固定单勾、failed 红警不变。补 3 接收方不同水位 + 已读蕴含送达 +
 边界共 7 断言的单测。message_repository + chat_send_status 38 测试全过，
 analyze 0 issue。
+
+**（2026-10-12，三十七）**：老板文案修改入库——zh：aboutServerDevNote
+"开发地址（非生产），仅用于开发调试"→"开发地址，仅供测试"、spaceListHint
+"点击其他秘境即可切换"→"点击卡片切换当前秘境"；en：chatPageDeletedMessage
+"(This message was deleted)"→"(This message is no longer available)"。
