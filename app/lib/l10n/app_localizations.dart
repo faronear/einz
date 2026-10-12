@@ -1736,6 +1736,12 @@ abstract class AppLocalizations {
   /// **'Offline · local messages only, cannot send or receive'**
   String get chatPageOfflineLocalOnly;
 
+  /// No description provided for @chatPageSyncingLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing… send/receive temporarily unavailable · local messages only'**
+  String get chatPageSyncingLocalOnly;
+
   /// No description provided for @chatPageMsgResending.
   ///
   /// In en, this message translates to:

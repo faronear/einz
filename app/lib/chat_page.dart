@@ -565,7 +565,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 三档优先级：
   /// - 服务器不认本通道（库被重置）→ 淡红：明确"数据没被清除"，用户可继续读本地消息；
   /// - 有 pending 消息 + 连接异常 → 淡琥珀（原有：解释"小飞机停了很久"）；
-  /// - 仅连续同步失败（无 pending）→ 淡琥珀「离线 · 仅可查看本地消息」。
+  /// - 仅连续同步失败（无 pending）→ 淡琥珀：措辞按 WS 态分两种（老板 2026-10-12：
+  ///   绿灯时再喊"离线·无法收发"自相矛盾——WS 连着说明实时链路是通的，只是 HTTP
+  ///   同步这一轮没成）：WS 在线 →「同步中… 暂时无法收发，仅可查看本地消息」；
+  ///   WS 不在线 →「离线 · 仅可查看本地消息，无法收发」（那时"离线"是准的）。
   /// 判定用 `_consecutiveSyncFailures > 0` 而不是 `!_ws.connected`，避免普通重连闪条。
   Widget _buildOfflineHint() {
     final l10n = AppLocalizations.of(context)!;
@@ -586,8 +589,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
     if (_consecutiveSyncFailures == 0) return const SizedBox.shrink();
+    final wsOnline = _ws?.connected.value ?? false;
     return _hintBanner(
-      l10n.chatPageOfflineLocalOnly,
+      wsOnline
+          ? l10n.chatPageSyncingLocalOnly
+          : l10n.chatPageOfflineLocalOnly,
       bg: const Color(0xFFFFF3E0),
       fg: const Color(0xFF8A5300),
     );
@@ -5066,7 +5072,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 实际轮询周期 = 基准 × 2^(连续失败次数)，上限 60s。
   /// 目的：离线期间把"每 3s 一轮、每轮最多 30s"的请求风暴收敛为"每分钟一次"。
+  ///
+  /// **WS 在线 + 同步失败例外**（老板 2026-10-12：绿灯与"离线"条同框 60s+）：
+  /// WS 还连着 = 网络与服务端已被证明可达，失败几乎总是会话续期一类的应用层
+  /// 问题，下一轮往往就成功——不该套用"服务端宕机"的指数退避。固定 5s 快速
+  /// 重试：窗口期从 60s+ 缩到 ≤5s，又比 3s 略松，给续期往返留余量。
   Duration get _tickerInterval {
+    if (_consecutiveSyncFailures > 0 && _ws?.connected.value == true) {
+      return const Duration(seconds: 5);
+    }
     if (_consecutiveSyncFailures == 0) return _baseTickerInterval;
     final growth = 1 << _consecutiveSyncFailures.clamp(0, 5);
     final seconds = _baseTickerInterval.inSeconds * growth;

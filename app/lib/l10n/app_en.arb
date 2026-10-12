@@ -488,6 +488,7 @@
   },
   "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
   "chatPageOfflineLocalOnly": "Offline · local messages only, cannot send or receive",
+  "chatPageSyncingLocalOnly": "Syncing… send/receive temporarily unavailable · local messages only",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",

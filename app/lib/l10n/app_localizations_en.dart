@@ -988,6 +988,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Offline · local messages only, cannot send or receive';
 
   @override
+  String get chatPageSyncingLocalOnly =>
+      'Syncing… send/receive temporarily unavailable · local messages only';
+
+  @override
   String get chatPageMsgResending => 'Resending…';
 
   @override

@@ -923,6 +923,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageOfflineLocalOnly => '离线 · 仅可查看本地消息，无法收发';
 
   @override
+  String get chatPageSyncingLocalOnly => '同步中… 暂时无法收发，仅可查看本地消息';
+
+  @override
   String get chatPageMsgResending => '重发中…';
 
   @override
