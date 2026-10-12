@@ -7626,9 +7626,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _notice(context, l10n.chatPageAttachmentMetaMissing);
       return;
     }
-    // 留存副本还在 → 直接交给系统应用打开
+    // 留存副本还在 → 直接交给系统应用打开。
+    // Linux 没有 open_filex 实现：跳过「直接打开」，落到下方的下载→保存→
+    // 提示路径流程（文件落 Documents，用户自己打开）
     final stored = await _storedFile(m);
-    if (stored != null) {
+    if (stored != null && !Platform.isLinux) {
       await _openFileWith(stored.path);
       return;
     }
@@ -7638,7 +7640,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         keyVersion: att['key_version'] as int,
         nonce: base64Decode(att['nonce'] as String),
       );
-      if (_storeAttachments) {
+      // 留存落盘成功 → 交给系统应用打开；Linux 无 open_filex：落到下方的
+      // Documents 保存 + 提示路径（与 secured 模式同一条出口）
+      if (_storeAttachments && !Platform.isLinux) {
         final file = await AttachmentStore.ensure(
             widget.spaceId, m.env.messageId, _attachmentExtOf(m), () async => bytes);
         if (file != null) {
@@ -9928,7 +9932,9 @@ class _VideoPreviewState extends State<_VideoPreview> {
   @override
   void initState() {
     super.initState();
-    _init();
+    // Linux 没有 video_player 实现（连最新 2.14.1 也只有 android/ios/macos/
+    // web）：初始化必失败，跳过——build 里走「保存到本地」占位
+    if (!Platform.isLinux) _init();
   }
 
   Future<void> _init() async {
@@ -9962,6 +9968,40 @@ class _VideoPreviewState extends State<_VideoPreview> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // Linux（无 video_player 实现）：不摆播放器，给「保存到本地」入口——
+    // 字节已解密到手（_buildVideo 的 FutureBuilder 传进来的），保存走桌面
+    // 保存对话框（_saveAttachment → FilePicker.saveFile）。与失败态同尺寸，
+    // 但不可重试（重试无意义）——文案说清「不支持播放」而非「加载失败」
+    if (Platform.isLinux) {
+      return Clickable(
+        key: const ValueKey('videoPreview'),
+        onTap: widget.onDownload == null ? null : () => widget.onDownload!(),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 180,
+          height: 100,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.movie_outlined, size: 26),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(l10n.chatPageVideoUnsupportedPlatform,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final c = _controller;
     // 初始化失败：给可点重试的明确错误态，而不是一个没有内容的空白框
     // （三种状态都带同一个 key：测试按 key 定位视频气泡，不受具体控件类型影响）

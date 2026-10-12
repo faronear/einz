@@ -14427,3 +14427,49 @@ macOS 实测 + 自己定位了机制）。根因：macOS 在 Finder 里拷文件
 才能开面板（大剪贴板图几十 ms）。老板拍简：**总显示，点了空的由提示兜底**
 （`chatPagePasteEmpty` 已有）。入口显隐/顺序加回归断言（粘贴位置必须在表情符
 之后——同行比 x、换行比 y）。
+
+**（2026-10-12，五十四）**：新建 `feat/linux`——Linux GUI 支持（老板 2026-10-12：
+要在他的 Debian 13.3 上跑）。**依赖审计结论**（按各包自己 pubspec 的 platforms
+声明，非 lock——lock 按平台过滤不可靠）：19 个直接依赖 14 个支持 Linux
+（secure_storage=libsecret、record、audioplayers、webrtc、file_picker、
+image_picker、url_launcher、desktop_drop、path_provider、device_info、
+package_info、wakelock + 纯 Dart 族）；sqlite3 3.5.2 的 native-asset hook
+**自带 Linux 编译**（还专处了与系统 SQLite 的符号冲突，产物内嵌 libsqlite3，
+运行期不用装）。5 个无 Linux 实现：video_player（最新 2.14.1 仍只有
+android/ios/macos/web）、mobile_scanner、open_filex、video_thumbnail、gal。
+**代码改动**：① gal 无需动（canSaveToGallery 早已仅移动端）；②
+video_thumbnail 无需动（_buildVideoThumb 的 FutureBuilder 早有失败兜底，
+注释原话「平台无取帧能力」）；③ video_player：_VideoPreview 在 Linux 跳过
+初始化 + 改渲染「此设备不支持播放视频，点按保存到本地」占位（新 l10n 键
+chatPageVideoUnsupportedPlatform，整块可点→_saveAttachment 桌面保存对话框）；
+④ open_filex：_downloadFile 两处「直接打开」短路加 !Platform.isLinux，
+Linux 落下载→Documents→提示路径的既有出口；⑤ mobile_scanner：join token
+页扫码 suffixIcon 在 Linux 隐藏。**CI**：buildMultiPlatform.yml 加 linux-gui
+job（ubuntu-latest + GTK/libsecret 构建依赖 → flutter build linux --release
+→ bundle 打 tar.gz 附运行说明 → artifact + 传 latest Release）；该文件头部
+「Linux GUI 未发布」的注释同步更新。**测试**：widget_test 的扫码断言按平台
+分流（Linux 下 findsNothing——否则 CI 的 ubuntu 上必红）；chat_quote_video
+不受影响（缩略图走 mock 通道）。analyze 0 issue；widget_test +
+chat_quote_video 11 测试全过。**注意**：分支推不上 CI 自动触发（CI 只认
+main/tag），用 workflow_dispatch 选 linux 手动出包；产物 glibc 线 = runner
+的 2.39，Debian 13.3（2.41）满足。
+
+**（2026-10-12，五十五）**：feat/linux 首跑 CI 即败——
+`No Linux desktop project configured`。根因：`app/.gitignore` 有一条
+`/linux/`（历史策略「linux/web 暂不需要，继续忽略」），**app/linux 脚手架
+从未入 git**，CI checkout 出来没有该目录，`flutter build linux` 直接拒。
+解禁：删掉该条（保留 /web/）、注释同步更新；app/linux 的内层 .gitignore
+本来就有（排除 flutter/ephemeral），10 个脚手架文件（CMakeLists/runner/
+generated_*）全部入库，无本机产物。教训：本地能 `ls` 到目录 ≠ 目录在 git
+里——平台目录是否 tracked 要看 `git ls-files`（上次 voice_model 239MB 也是
+同类坑，方向相反）。
+
+**（2026-10-12，五十六）**：feat/linux CI 第二败——
+`audioplayers_linux` CMake 要 gstreamer-1.0 / gstreamer-app-1.0 /
+gstreamer-audio-1.0（pkg-config），构建机没装。已把全部 *_linux 插件的
+CMakeLists 依赖扫齐（其余无额外构建依赖），apt 清单补
+libgstreamer1.0-dev + libgstreamer-plugins-base1.0-dev（app/audio 的
+.pc 都在后者）；运行说明同步补 gstreamer plugins-base/good + 按声音
+系统选 pipewire/pulseaudio。另确认 VSCode 里 linux 目录显灰只是
+gitignore 缓存未刷新（git check-ignore 已放行、10 文件已跟踪），
+Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代码问题。

@@ -1,9 +1,8 @@
 # Einz 多平台构建（GitHub Actions）
 #
-# 覆盖 Android / iOS / macOS / Windows 四个目标，另在 Windows / macOS 上顺带出
-# TUI（einz-tui-windows / einz-tui-macos-*），Linux 只出 TUI（einz-tui-linux-x64，
-# 见 linux-cli job；Linux GUI 未发布：video_player / mobile_scanner / open_filex /
-# video_thumbnail 无 Linux 实现，需要先做平台分支）。触发方式（老板 2026-09-21 定）：
+# 覆盖 Android / iOS / macOS / Windows / Linux 五个目标，另在 Windows / macOS /
+# Linux 上顺带出 TUI（einz-tui-windows / einz-tui-macos-* / einz-tui-linux-x64，
+# 见各 *-cli job）。触发方式（老板 2026-09-21 定）：
 #   - push main：自动跑全平台（纯文档改动被 paths-ignore 挡掉，不烧额度）
 #   - workflow_dispatch：手动选择单个平台
 #   - push tag v*：全平台（路径过滤对 tag 不生效，发版一律全跑）
@@ -481,6 +480,77 @@ jobs:
         with:
           name: einz-tui-linux-x64
           path: einz-tui-linux-x64.tar.gz
+
+  # Linux 桌面 GUI（einz-app-linux-x64.tar.gz，2026-10-12 加）：
+  # 平台分支已补齐（feat/linux：video_player / mobile_scanner / open_filex /
+  # video_thumbnail 无 Linux 实现，chat_page/setup_page 里已按 Platform.isLinux
+  # 分流——视频给「保存到本地」占位、扫码入口隐藏、文件走下载+提示路径）。
+  # 产物 = build/linux/x64/release/bundle 整个目录（自带 libflutter_linux_gtk.so
+  # 与 native assets 编出的 libsqlite3），tar 包里附运行说明。
+  # ⚠️ glibc 兼容线 = runner 的 2.39：比它老的发行版（Ubuntu 22.04 等）跑不了
+  # （TUI 同款问题，见 linux-cli 注释）；Debian 13 / Fedora 41+ 无妨。
+  # 运行期系统依赖：libgtk-3（桌面自带）、libsecret-1（密钥存储）、
+  # gstreamer（audioplayers_linux 的音频链路：libgstreamer + plugins-base）、
+  # libsodium（E2EE 走 FFI dlopen，**必须装**）——详见包内 README。
+  linux-gui:
+    needs: [test]
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 装 GTK/libsecret/gstreamer 等构建依赖
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libsecret-1-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Build Linux GUI
+        working-directory: app
+        run: |
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build linux --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+      - name: 打包（tar.gz + 运行说明）
+        run: |
+          mkdir -p _release.gitomit/einz
+          cp -r app/build/linux/x64/release/bundle/. _release.gitomit/einz/
+          cat > _release.gitomit/einz/README-linux-gui.txt <<'TXT'
+          einz（Linux x64 GUI）
+
+          运行前置（缺 libsodium / gstreamer 起不来或语音没声音）：
+            Debian/Ubuntu: sudo apt install libsodium23 libsecret-1-0 libgtk-3-0 \
+              gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+          音频输出（按声音系统装，Debian 13 默认 PipeWire）：
+            PipeWire:    gstreamer1.0-pipewire
+            PulseAudio:  gstreamer1.0-pulseaudio
+          注：libsqlite3 已由构建内嵌（native assets），无需单独装；
+              glibc 需 ≥ 2.39（构建线），Debian 13 / Fedora 41+ 满足。
+
+          运行：
+            chmod +x einz
+            ./einz
+
+          开发切换服务器（正式包不需要）：./einz --server http://localhost:3000
+          TXT
+          tar -czf einz-app-linux-x64.tar.gz -C _release.gitomit einz
+          ls -lh einz-app-linux-x64.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-linux-x64
+          path: einz-app-linux-x64.tar.gz
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: einz-app-linux-x64.tar.gz
 
   ios:
     needs: [test]

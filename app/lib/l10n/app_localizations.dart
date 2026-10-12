@@ -1940,6 +1940,12 @@ abstract class AppLocalizations {
   /// **'Video failed to load — tap to retry'**
   String get chatPageVideoLoadFailed;
 
+  /// No description provided for @chatPageVideoUnsupportedPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'This device can\'t play video — tap to save it'**
+  String get chatPageVideoUnsupportedPlatform;
+
   /// No description provided for @chatPageFileOpenFailed.
   ///
   /// In en, this message translates to:

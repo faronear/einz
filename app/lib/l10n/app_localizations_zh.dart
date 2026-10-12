@@ -1059,6 +1059,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageVideoLoadFailed => '视频加载失败，点击重试';
 
   @override
+  String get chatPageVideoUnsupportedPlatform => '此设备不支持播放视频，点按保存到本地';
+
+  @override
   String chatPageFileOpenFailed(String error) {
     return '打开文件失败: $error';
   }
