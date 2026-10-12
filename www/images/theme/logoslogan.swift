@@ -50,7 +50,7 @@ let line1Top: CGFloat = 24
 line1.draw(in: NSRect(x: 160, y: line1Top, width: l1.width + 6, height: l1.height + 6))
 
 // ── 第二行：标语（灰小字）────────────────────────────────────────────
-let line2 = NSAttributedString(string: "端到端加密的二人私密空间", attributes: [
+let line2 = NSAttributedString(string: "端到端加密的私密空间", attributes: [
   .font: font("PingFangSC-Regular", 20),
   .foregroundColor: gray,
 ])

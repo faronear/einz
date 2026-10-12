@@ -14262,3 +14262,11 @@ favicon.png（sips 由 app/assets/logo.png 缩放到 256）、favicon.ico（纯 
 不包 save/restoreGraphicsState 会把右侧文字整块裁掉。另修 .gitignore：`*.sw*`（本想挡 vim 交换文件）把
 logoslogan.swift 静默漏掉，补 `!www/images/theme/*.swift` 例外（与 macOS
 Runner 源码同因）。
+
+**（2026-10-12，四十七）**：www 站点文案从「二人专属」改为「二人 + 群组」
+双形态（老板 2026-10-12：已不局限于二人秘境）。改动：about 两页「它适合
+谁」不再把群组排除在外（两个人→小圈子：两个人、挚友、家人）；中文简介
+「属于两个人，或一小群」→「属于两个人，也属于一小群」；logoslogan 标语
+「端到端加密的二人私密空间」→「端到端加密的私密空间」（脚本同步改并重新
+出图）。howto 的「二人/群秘境」类型选择与 news 2026-10-03 的历史条目保持
+原样（前者是向导事实、后者是历史记录）。

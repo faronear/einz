@@ -36,7 +36,7 @@ No ads, no subscriptions, no feeds, no "people you may know". Not on any app sto
 
 ## Who it's for
 
-For two people who take "private" seriously: partners, best friends, family. Not for crowds chasing noise.
+For small circles who take "private" seriously: the two of you, best friends, family. Not for crowds chasing noise.
 
 ---
 
