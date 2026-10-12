@@ -14171,3 +14171,9 @@ analyze 0 issue。
 "开发地址（非生产），仅用于开发调试"→"开发地址，仅供测试"、spaceListHint
 "点击其他秘境即可切换"→"点击卡片切换当前秘境"；en：chatPageDeletedMessage
 "(This message was deleted)"→"(This message is no longer available)"。
+
+**（2026-10-12，三十八）**：菜单里 Recall 只给**纯粹单勾**（k=0，还没有
+任何人收到）的消息（老板 2026-10-12：群空间里只要有人收到，撤回就会失败
+——内容已被拿走，不提供无效入口；duo 同理=对方已拉取）。`_messageRecallable`
+加 deliveredCountOf == 0 条件；墓碑本就不给菜单（_messageHasActions =
+!m.deleted）。chat_page_menu 34 测试全过，analyze 0 issue。

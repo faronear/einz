@@ -5277,12 +5277,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _messageHasActions(HistoryMessage m) => !m.deleted;
 
   /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
-  /// [_messageHasActions]）：自己消息、服务端已收下（本地状态粗筛，权威
-  /// 判定在服务端）。
+  /// [_messageHasActions]）：自己消息、服务端已收下、且**纯粹单勾**——还没
+  /// 有任何人收到（k=0；老板 2026-10-12：群空间里只要有人收到，撤回就会
+  /// 失败——内容已被拿走；duo 同理 = 对方已拉取。本地粗筛，权威判定在
+  /// 服务端 409）。
   bool _messageRecallable(HistoryMessage m) =>
       m.sender == 'me' &&
       m.env.serverSequence != null &&
-      m.status != 'failed';
+      m.status != 'failed' &&
+      MessageRepository.deliveredCountOf(
+              m.env.serverSequence, _peerReceipts) ==
+          0;
 
   Future<void> _showMessageActions(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
