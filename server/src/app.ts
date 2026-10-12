@@ -5,6 +5,7 @@ import {
 } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { loadConfig } from './config.js'
+import { logReq } from './reqLog.js'
 import { startConfigWatcher } from './configFile.js'
 import { getDb, openDb } from './db.js'
 import {
@@ -110,11 +111,9 @@ const server = createServer(async (req, res) => {
   // 请求/响应日志（pm2 log 式）：方法、路径、状态码、耗时；响应体不入日志（避免泄露密文）
   res.on('finish', () => {
     if (LOG_REQUESTS) {
-      console.log(
-        `[req] ${req.method ?? '-'} ${req.url ?? '-'} ${res.statusCode} ${
-          Date.now() - start
-        }ms`
-      )
+      logReq(`${req.method ?? '-'} ${req.url ?? '-'} ${res.statusCode} ${
+        Date.now() - start
+      }ms`)
     }
   })
   try {

@@ -6,6 +6,7 @@ import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 import { PROTOCOL_VERSION } from "./protocolVersion.js";
 import { getSpaceMode } from "./spaces.js";
 import { checkRateLimit } from "./ratelimit.js";
+import { logReq } from "./reqLog.js";
 
 interface Conn {
   ws: WebSocket;
@@ -241,7 +242,7 @@ export function attachWs(wss: WebSocketServer): void {
       .run(now, entranceId);
     logConnection({ entranceId, spaceId, event: "connect", atMs: now, meta });
     broadcastPeerStatus(entranceId, "peer.online");
-    console.log(`[req] WS /ws connect entrance=${entranceId} space=${spaceId} total=${conns.size}`);
+    logReq(`WS /ws connect entrance=${entranceId} space=${spaceId} total=${conns.size}`);
 
     ws.send(JSON.stringify({ id: 1, type: "hello", payload: { entrance_id: entranceId, space_id: spaceId } }));
 
@@ -283,7 +284,7 @@ export function attachWs(wss: WebSocketServer): void {
           // 只记"通话级"事件（invite/accept/reject/hangup），不记 offer/answer/ice：
           // 后三者一通电话几十条，会把日志刷满。排障用：确认本版服务端是否真的在转发。
           if (frame.type !== "call.offer" && frame.type !== "call.answer" && frame.type !== "call.ice") {
-            console.log(`[req] WS ${frame.type} entrance=${entranceId} call=${callId}`);
+            logReq(`WS ${frame.type} entrance=${entranceId} call=${callId}`);
           }
         }
       } catch {
@@ -317,7 +318,7 @@ export function attachWs(wss: WebSocketServer): void {
         closeReason: reason?.toString("utf8") ?? null,
         meta: conn.meta,
       });
-      console.log(`[req] WS /ws disconnect entrance=${entranceId} total=${conns.size}`);
+      logReq(`WS /ws disconnect entrance=${entranceId} total=${conns.size}`);
     });
   });
 

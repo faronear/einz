@@ -14197,3 +14197,10 @@ multi_space_pages 12 测试全过。
 测试同步反转：`chat_page_menu` 里"单空间不给箭头/不可点"用例改为断言图标出现 +
 品牌名可点（logo 可点开「关于」不变），另一测试的过时注释更正。analyze 0 issue；
 chat_page_menu + multi_space_pages + space_switcher_avatar 46 测试全过。
+
+**（2026-10-12，四十一）**：服务端 `[req]` 控制台日志每条加时间戳（老板要求）。
+新增 `server/src/reqLog.ts`：`reqTimestamp()`（`2026-10-12 11:23:40` 本地时间，
+pm2 日志跨天滚动所以日期一起给）+ `logReq(message)` 统一打 `[时间戳] [req] 正文`；
+app.ts 的请求/响应行与 ws.ts 的 connect / call / disconnect 三处共 4 个调用点
+全部改走它。`tsc` 干净、`npm test` 5 套件全绿；本地 PORT=3901 冒烟确认
+`[2026-10-12 11:23:40] [req] GET /health 200 6ms` 格式正确。
