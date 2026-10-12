@@ -6409,16 +6409,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: _buildActionCardGrid([
-            // 粘贴放最前（老板 2026-10-12）：剪贴板里的东西已经"在手边"，
-            // 是从别的 App 拷图/拷文件过来的最短路径；桌面移动端都走这个入口
-            // （桌面另有 Cmd/Ctrl+V 快捷键，见 build 里的 CallbackShortcuts）。
-            // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
-            if (_clipboardPasteSupported)
-              _buildActionCard(
-                icon: Icons.content_paste,
-                label: l10n.chatPageAttachPaste,
-                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
-              ),
             // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
             if (_hasCameraCapture) ...[
               _buildActionCard(
@@ -6460,6 +6450,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               label: l10n.chatPageAttachEmoji,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
             ),
+            // 「粘贴」排表情符之后——整个网格的末尾（老板 2026-10-12 指定）。
+            // **总显示、不做剪贴板预检**：iOS 上 App 读剪贴板会弹系统"已粘贴"
+            // 横幅，每开一次面板弹一次没人受得了；空了就空了，点了由
+            // _pasteFromClipboard 提示「剪贴板是空的」兜底（老板拍简：接受这个
+            // 代价，换实现简单 + iOS 不被横幅骚扰）。放末尾也不挤常用入口。
+            // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
+            if (_clipboardPasteSupported)
+              _buildActionCard(
+                icon: Icons.content_paste,
+                label: l10n.chatPageAttachPaste,
+                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
+              ),
           ]),
         ),
       ),

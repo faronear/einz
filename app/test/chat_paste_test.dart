@@ -1,11 +1,15 @@
 // 回归测试（老板要求 2026-10-12）：剪贴板粘贴发送——桌面 Cmd/Ctrl+V 与附件
-// 面板「粘贴」入口同汇到一条链路。六态：
+// 面板「粘贴」入口（排表情符之后、总显示不预检）同汇到一条链路。十态：
 //   ① 剪贴板是图片 → 确认弹窗（问句+预览+取消/发送）→ 发送图片消息；
 //   ② 是文件（访达拷的）→ 确认弹窗列名单 → 发送文件消息（复用拖放链路）；
-//   ③ 弹窗点取消 → 不发送；
+//   ③ 确认弹窗点取消 → 不发送；
 //   ④ 只有文本 → 插进输入框、不发消息、不弹窗；
 //   ⑤ 全空 → 提示「剪贴板是空的」；
-//   ⑥ 附件面板有「粘贴」入口，点了走同一条确认链路。
+//   ⑥ 附件面板入口顺序（表情符之后）+ 空剪贴板也常显；
+//   ⑦ 附件面板点入口 → 同一条确认链路；
+//   ⑧ Finder 拷的 png → 按图片发（弹窗缩略图是文件内容，不是系统图标）；
+//   ⑨ Finder 拷的 mp4 → 按视频问、按视频发；
+//   ⑩ 浏览器拷图（files 里带不存在的 http 派生路径）→ 仍走图片数据分支。
 // 另隐式覆盖：桌面端输入框 autofocus（不点输入框直接按粘贴键）。
 
 import 'dart:convert';
@@ -369,7 +373,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('附件面板有「粘贴」入口，点了走同一条确认链路',
+  testWidgets('附件面板「粘贴」入口排表情符之后（空剪贴板也常显）',
+      (WidgetTester tester) async {
+    await pumpChat(tester);
+    // 空剪贴板：不做预检、入口照常显示（老板 2026-10-12 拍简：iOS 读剪贴板
+    // 会弹系统横幅，预检不可行；点了空的由提示兜底）
+    _clipImage = null;
+    _clipFiles = const [];
+    _clipText = null;
+
+    // 开附件面板（输入栏左侧 + 号）
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    await tester.pumpAndSettle();
+    expect(find.text('粘贴'), findsOneWidget,
+        reason: '空剪贴板也应显示粘贴入口（不预检）');
+    expect(find.text('表情符'), findsOneWidget, reason: '表情符入口照常');
+
+    // 顺序：粘贴必须在表情符之后（老板 2026-10-12 指定排末尾）。同一行比 x，
+    // 换了行比 y——两者都满足"更靠后"
+    final paste = tester.getTopLeft(find.text('粘贴'));
+    final emoji = tester.getTopLeft(find.text('表情符'));
+    expect(paste.dy > emoji.dy || (paste.dy == emoji.dy && paste.dx > emoji.dx),
+        isTrue,
+        reason: '粘贴应排在表情符之后（paste=$paste, emoji=$emoji）');
+
+    // 点入口 → 面板收起 → 空剪贴板 → 提示（不发消息、不崩）
+    await tester.tap(find.text('粘贴'));
+    await tester.pumpAndSettle();
+    expect(find.text('发送这张图片？'), findsNothing,
+        reason: '空剪贴板不走确认弹窗');
+    expect(_bubbleImage(), findsNothing, reason: '空剪贴板不发消息');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('附件面板点「粘贴」→ 同一条确认链路',
       (WidgetTester tester) async {
     await pumpChat(tester);
     _clipImage = _tinyPng;
