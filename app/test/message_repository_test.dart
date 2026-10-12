@@ -693,6 +693,41 @@ void main() {
     expect(MessageRepository.receiptOf(1, const []), isNull, reason: '没有任何回执行 → null');
   });
 
+  test('回执：deliveredCountOf 数出已送达人数（单勾+k 设计，老板 2026-10-12）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    // 3 名接收方，水位各异：b 最快（read5/delivered10）、c 中（read3/delivered7）、
+    // d 是"已读但 delivered 水位没跟上"的形态（read6/delivered0）——已读必已送达，
+    // 计数要把它算进去。
+    api.receiptRows = [
+      ReceiptRow(
+          memberId: 'member-b', deliveredUptoSeq: 10, readUptoSeq: 5, updatedAt: 111),
+      ReceiptRow(
+          memberId: 'member-c', deliveredUptoSeq: 7, readUptoSeq: 3, updatedAt: 112),
+      ReceiptRow(
+          memberId: 'member-d', deliveredUptoSeq: 0, readUptoSeq: 6, updatedAt: 113),
+    ];
+    await repo.sync();
+    final rows = await repo.peerReceipts();
+    expect(rows.length, 3);
+
+    // 三人都收到 seq=5（b/c 按 delivered，d 按已读 6 蕴含送达）
+    expect(MessageRepository.deliveredCountOf(5, rows), 3,
+        reason: 'b(10≥5) c(7≥5) d(read 6≥5) → 3');
+    // c 的边界：=delivered 算收到
+    expect(MessageRepository.deliveredCountOf(7, rows), 2,
+        reason: 'b(10≥7) c(=7) d(read 6<7) → 2');
+    // 只剩 b
+    expect(MessageRepository.deliveredCountOf(10, rows), 1,
+        reason: '边界：=delivered → b 收到');
+    // 超出所有人水位
+    expect(MessageRepository.deliveredCountOf(11, rows), 0);
+    // 未同步的消息
+    expect(MessageRepository.deliveredCountOf(null, rows), 0);
+    // 没有任何回执行
+    expect(MessageRepository.deliveredCountOf(1, const []), 0);
+  });
+
   test('回执：我自己那一行不参与推导（否则我发出的消息永远停在单勾）', () async {
     final api = FakeApi();
     api.spaceEntrances = [

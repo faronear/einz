@@ -703,13 +703,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 对方已收到（delivered）/已读（read）→ 双勾。read 与 delivered 同图标：
-    // 已读暂不展示（老板 2026-09-12）。
-    final receipt = MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts);
-    if (receipt != null) {
+    // 送达进度（老板 2026-10-12 定稿）：k=0 → 单勾；k≥1 → 「k 双勾」（数字在
+    // 双勾**前面**、不加号——放在后面会跟时间数字混淆，老板同日调优）。
+    // **群组永远不出现裸双勾**——群随时扩张，"全员送达"不是终态：新人进群
+    // 后总数变大，显示自动退回"旧k 双勾"，不发生图标降级。duo 只有一名
+    // 接收方（k=1 即全体），保持经典裸双勾。k 来自 _peerReceipts 逐成员
+    // 水位（内存常驻，随回执轮询刷新，无额外网络开销）。
+    final deliveredCount =
+        MessageRepository.deliveredCountOf(m.env.serverSequence, _peerReceipts);
+    if (deliveredCount > 0) {
+      final allReceived = MessageRepository.receiptOf(
+              m.env.serverSequence, _peerReceipts) !=
+          null;
       return Tooltip(
-        message: l10n.chatPageMsgDelivered,
-        child: Icon(Icons.done_all, size: 12, color: subtle),
+        message: allReceived
+            ? l10n.chatPageMsgDelivered
+            : l10n.chatPageMsgSent,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // duo（peers=1）全员送达 → 裸双勾；群 → 永远带人数（含全员时），
+            // 数字与双勾间留 1 空隙（老板 2026-10-12 定：试过 2/3 后回到 1）
+            if (!allReceived || _peerReceipts.length > 1) ...[
+              Text('$deliveredCount',
+                  style: TextStyle(fontSize: 11, color: subtle)),
+              const SizedBox(width: 1),
+            ],
+            Icon(Icons.done_all, size: 12, color: subtle),
+          ],
+        ),
       );
     }
     if (m.status == 'sent' || m.status == 'delivered' || m.status == 'read') {

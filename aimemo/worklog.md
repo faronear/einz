@@ -14154,3 +14154,15 @@ chat_page_menu 44 测试全过，analyze 0 issue。
 （"菜单"/"Menu"，汉堡菜单在用，不能改）换成新键 chatPageMsgMoreActions
 （"更多操作"/"More actions"，老板 2026-10-12）。gen-l10n 重新生成；
 chat_page_menu 34 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十六）**：群消息送达进度"双勾+k"（老板 2026-10-12 设计
+定稿）：MessageRepository 加纯函数 `deliveredCountOf(seq, peers)`
+（deliveredUptoSeq≥seq 或 readUptoSeq≥seq，已读蕴含送达，口径同 receiptOf
+排除我自己——水位表内存常驻随回执轮询刷新，无需新机制）。渲染
+`_buildSendStatusIcon`：k=0 → 单勾；k≥1 → **「k 双勾」**（数字在勾前、
+无加号、间 1px——先后试过"+k"后缀/紧贴/2px/3px，老板逐版定稿）；
+**群组永远不出现裸双勾**（群随时扩张"全员送达"不是终态，新人进群自动退
+回"旧k 双勾"无图标降级）；duo 单接收方 k=1 即全体，保持经典裸双勾。
+撤回墓碑固定单勾、failed 红警不变。补 3 接收方不同水位 + 已读蕴含送达 +
+边界共 7 断言的单测。message_repository + chat_send_status 38 测试全过，
+analyze 0 issue。

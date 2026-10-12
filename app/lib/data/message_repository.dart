@@ -604,6 +604,19 @@ class MessageRepository {
     return null;
   }
 
+  /// 自己某条消息**已送达的人数**（老板 2026-10-12 的"双勾+k"设计）：[peers]
+  /// 里 `deliveredUptoSeq ≥ seq` 或 `readUptoSeq ≥ seq`（已读必已送达）的人数。
+  /// 纯函数便于单测；[peers] 口径同 [receiptOf]——**必须只含接收方**（排除我
+  /// 自己那一行，见 [peerReceipts]），否则我的水位会被算进"已送达人数"。
+  /// 渲染规则见 ChatPage.\_buildSendStatusIcon：k=0 → 单勾；k≥1 → 双勾+k
+  /// （群组随时扩张，"全员送达"不是终态，裸双勾只属于 duo 单接收方）。
+  static int deliveredCountOf(int? seq, List<PeerReceipt> peers) {
+    if (seq == null) return 0;
+    return peers
+        .where((p) => p.deliveredUptoSeq >= seq || p.readUptoSeq >= seq)
+        .length;
+  }
+
   /// 补发 pending 队列（成功后置 sent 并推进锚点）。
   Future<int> _flushPending() async {
     final t = token;
