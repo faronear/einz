@@ -14347,3 +14347,20 @@ Discord 同款；移动端不抢焦点）、桌面端 onTapOutside 不再 unfocu
 readAsBytes 两步真实 I/O——需显式补 pump+runAsync 轮次。CI 在 ubuntu 上
 跑，测试按宿主平台选修饰键（mac meta / 其他 control），与生产分支一致。
 全量 296 测试全过、analyze 0 issue。
+
+**（2026-10-12，五十二）**：修发布版 macOS app 点录音报「麦克风权限被
+拒绝」（老板 2026-10-12：测试版正常、GitHub releases 下载版必现）。
+根因：`app/macos/Runner/Info.plist` **从来没有** `NSMicrophoneUsageDescription`
+（git 历史 -S 确认从未加过；iOS 的 plist 四项声明齐全，macOS 漏了）。
+macOS 缺用途声明时系统**不弹**麦克风授权框，`AVCaptureDevice.requestAccess`
+（record 插件 `hasPermission()` 默认 request:true 会触发）直接回 false →
+app 自己的 toast。开发版能用是因为其 TCC 记录早已 authorized（旧版授权/
+手动开过）；发布版 Developer ID 签名（TeamID CQ6733CTMV）在 TCC 里是
+另一个身份，首次录音时想弹框也弹不出来（没声明），永远停在未授权。
+修法：Info.plist 补 `NSMicrophoneUsageDescription`（文案与 iOS 端一字不差：
+"Einz 需要使用麦克风录制语音消息、进行语音通话，并加密发送给对方。"）。
+相机不用加——桌面端无相机采集入口（`_hasCameraCapture` 仅 Android/iOS，
+见 chat_page.dart 2026-09-20 记录）。
+**发布版需重新走 CI 构建 + 重新下载**才生效；新构建首点录音会正常弹系统
+授权框。临时绕过（不想等重新构建）：系统设置→隐私与安全性→麦克风，
+若列表里已有"einz"直接打开开关即可（手动授权不需要用途声明）。
