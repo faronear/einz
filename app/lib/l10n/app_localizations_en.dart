@@ -531,6 +531,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMore => 'Menu';
 
   @override
+  String get chatPageMsgMoreActions => 'More actions';
+
+  @override
   String get chatPageRenameNameTitle => 'My identity';
 
   @override

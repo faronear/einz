@@ -8258,7 +8258,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             _bubbleQuickAction(
                                               m,
                                               icon: Icons.more_horiz,
-                                              label: l10n.chatPageMenuMore,
+                                              // 「更多操作」：区别于汉堡菜单的
+                                              // chatPageMenuMore（"菜单"），这个
+                                              // 指消息操作菜单（老板 2026-10-12）
+                                              label: l10n.chatPageMsgMoreActions,
                                               onTap: () => _showMessageActions(m),
                                             ),
                                           ],

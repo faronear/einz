@@ -980,6 +980,12 @@ abstract class AppLocalizations {
   /// **'Menu'**
   String get chatPageMenuMore;
 
+  /// No description provided for @chatPageMsgMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get chatPageMsgMoreActions;
+
   /// No description provided for @chatPageRenameNameTitle.
   ///
   /// In en, this message translates to:

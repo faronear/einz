@@ -245,6 +245,7 @@
   "chatPageNameUnset": "Unset",
   "chatPageMenuExit": "Quit app",
   "chatPageMenuMore": "Menu",
+  "chatPageMsgMoreActions": "More actions",
   "chatPageRenameNameTitle": "My identity",
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",

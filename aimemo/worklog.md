@@ -14149,3 +14149,8 @@ analyze 0 issue。
 `_messageHasActions` 收敛回 `!m.deleted`，墓碑不提供任何菜单入口。
 _messageRecallable 仅剩未墓碑语义（注释同步）。chat_send_status +
 chat_page_menu 44 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十五）**：气泡「...」的 tooltip 从 chatPageMenuMore
+（"菜单"/"Menu"，汉堡菜单在用，不能改）换成新键 chatPageMsgMoreActions
+（"更多操作"/"More actions"，老板 2026-10-12）。gen-l10n 重新生成；
+chat_page_menu 34 测试全过，analyze 0 issue。
