@@ -14089,3 +14089,8 @@ LayoutBuilder + 边长反算整段移除，连带清掉死常量
 duo+group+other 三键（other 留作强制兜底，文案同 group，行为不变）。
 重新 gen-l10n；members_reinvite + group_status_bar 11 测试全过，
 analyze 0 issue。
+
+**（2026-10-12，二十七）**：group 大胶囊头像同步「三面贴壁」——胶囊内
+Padding 从 horizontal 6/vertical 2 改为只留右 6（老板 2026-10-12，与 duo
+的 fromLTRB(0,0,6,0) 同款）；宽度预算 capsulePad 12→6（左 0 后减半）。
+group_status_bar 10 测试全过，analyze 0 issue。
