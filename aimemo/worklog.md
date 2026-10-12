@@ -14142,3 +14142,10 @@ delivered/read 状态）、已撤回（deletedKind == 'recall'）的墓碑不再
 deletedKind != 'recall' + status == 'sent' + receiptOf == null 三条件。
 chat_send_status + chat_page_menu + message_repository 71 测试全过，
 analyze 0 issue。
+
+**（2026-10-12，三十四）**：墓碑消息**一律不给**「...」/长按菜单（老板
+2026-10-12 复杂度收敛）：上一条试过"仅单勾+本机删除/焚毁"细筛，但群空间
+里"一部分成员已收到"时撤回必然失败，单勾粗筛在群语义下不可靠——干脆
+`_messageHasActions` 收敛回 `!m.deleted`，墓碑不提供任何菜单入口。
+_messageRecallable 仅剩未墓碑语义（注释同步）。chat_send_status +
+chat_page_menu 44 测试全过，analyze 0 issue。

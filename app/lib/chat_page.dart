@@ -5249,21 +5249,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 长按消息弹出操作菜单：引用 / 删除。
   /// 长按菜单是否有内容可给（决定气泡长按与「...」是否响应）：
   /// - 未墓碑：常规菜单（引用/拷贝/保存/撤回/焚毁/删除）总有项；
-  /// - 墓碑：仅当**本机删除或焚毁到期、且仍是单勾**（sent、无对方回执）的
-  ///   自己消息才给——菜单里唯一可用的操作是撤回（老板 2026-10-12：已送达/
-  ///   已读的、或本来已撤回的墓碑，Recall 都不可能成功，不提供入口）。
-  bool _messageHasActions(HistoryMessage m) =>
-      !m.deleted ||
-      (m.sender == 'me' &&
-          m.deletedKind != 'recall' &&
-          m.env.serverSequence != null &&
-          m.status == 'sent' &&
-          MessageRepository.receiptOf(
-                  m.env.serverSequence, _peerReceipts) ==
-              null);
+  /// - **墓碑一律不给**（老板 2026-10-12：曾试过"仅单勾+本机删除/焚毁"的细
+  ///   筛，但群空间里"一部分成员已收到"时撤回必然失败，单勾粗筛在群语义下
+  ///   已不可靠——复杂度失控，干脆墓碑不提供任何菜单入口）。
+  bool _messageHasActions(HistoryMessage m) => !m.deleted;
 
-  /// 「撤回」可见条件（与 [_messageHasActions] 的墓碑分支同口径）：
-  /// 自己消息、服务端已收下、对方尚未拉取（本地状态粗筛，权威判定在服务端）。
+  /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
+  /// [_messageHasActions]）：自己消息、服务端已收下（本地状态粗筛，权威
+  /// 判定在服务端）。
   bool _messageRecallable(HistoryMessage m) =>
       m.sender == 'me' &&
       m.env.serverSequence != null &&
