@@ -15,6 +15,7 @@
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
+import { createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -23,8 +24,16 @@ import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 const ROOT = join(import.meta.dirname, '..')
 
-function freePort (): number {
-  return 41000 + Math.floor(Math.random() * 20000)
+/** listen(0) 让系统分配真实空闲端口——纯随机猜号会撞上别的进程（尤其临时端口
+ *  范围）导致 EADDRINUSE、server 静默退出、waitReady 干等超时（2026-10-12 CI 实测）。 */
+function freePort (): Promise<number> {
+  return new Promise(resolve => {
+    const srv = createServer()
+    srv.listen(0, () => {
+      const port = (srv.address() as AddressInfo).port
+      srv.close(() => resolve(port))
+    })
+  })
 }
 
 async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
@@ -47,7 +56,7 @@ async function withServer (
   const dir = mkdtempSync(join(tmpdir(), 'einz-minapp-'))
   const configPath = join(dir, 'serverConfig.json')
   writeFileSync(configPath, JSON.stringify(config))
-  const port = freePort()
+  const port = await freePort()
   const proc: ChildProcess = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
     env: {
       ...process.env,

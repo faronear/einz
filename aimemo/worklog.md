@@ -14270,3 +14270,14 @@ Runner 源码同因）。
 「端到端加密的二人私密空间」→「端到端加密的私密空间」（脚本同步改并重新
 出图）。howto 的「二人/群秘境」类型选择与 news 2026-10-03 的历史条目保持
 原样（前者是向导事实、后者是历史记录）。
+
+**（2026-10-12，四十八）**：修 CI 偶发失败（本地 testAll 全绿但 GitHub CI
+挂）——server/test/cold_app_version.test.ts 第 6 项 `waitReady` 超时
+（`server not ready`）。根因：4 个测试文件（cold_app_version /
+entrance_name / join_token_target / member_name）的 `freePort()` 是纯随机
+猜号（40000–62000 区间），恰好落在 Linux 临时端口范围（32768–60999）内，
+撞上别的进程或同进程 fetch 源端口 → server 启动即 EADDRINUSE 退出
+（`stdio: 'ignore'` 吞掉报错）→ waitReady 干等 10s 超时。本地不触发、
+CI 负载下偶发必触发。修法与项目内另一版可靠实现（audit/smoke/receipts
+等已用）对齐：`listen(0)` 让系统分配真实空闲端口，调用点改 `await`。
+4 文件 × import + 函数体 + 调用点，tsc 通过、4 个测试全绿。
