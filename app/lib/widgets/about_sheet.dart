@@ -173,7 +173,8 @@ class _AboutSheetState extends State<AboutSheet> {
   }
 }
 
-/// 一行「标签 + 值」，值可长按选中复制。
+/// 一行「标签左 --- 值右」（老板 2026-10-12：标签与值放同一行，不再上下两行），
+/// 值可长按选中复制；补充说明仍在下方独占一行。
 class _InfoRow extends StatelessWidget {
   const _InfoRow(
       {required this.label, required this.value, this.note, this.valueColor});
@@ -193,20 +194,39 @@ class _InfoRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: theme.textTheme.labelMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        // baseline 对齐：标签小字（labelMedium）与值大字（bodyLarge）字基线一致
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SelectableText(value,
+                  textAlign: TextAlign.right,
+                  style:
+                      theme.textTheme.bodyLarge?.copyWith(color: valueColor)),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        SelectableText(value,
-            style: theme.textTheme.bodyLarge?.copyWith(color: valueColor)),
         if (note != null) ...[
           const SizedBox(height: 4),
-          Text(
-            note!,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          // note 也属于 value 侧（如开发地址标注）：与值同侧**右对齐**。
+          // ⚠️ 必须先撑满整行（SizedBox width infinity）——Column 的
+          // crossAxisAlignment.start 会把 Text 收缩到文字自然宽，框=字宽时
+          // textAlign 不起作用（老板 2026-10-12 实测：热重启后 note 仍靠左）。
+          SizedBox(
+            width: double.infinity,
+            child: Text(
+              note!,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ),
         ],
       ],

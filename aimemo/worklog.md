@@ -14107,3 +14107,13 @@ group_status_bar 10 测试全过，analyze 0 issue。
 `ReferenceError: Cannot access 'versionOf' before initialization`。修复 =
 把 `versionOf`/`runtimeKeyFor` 挪到所有使用之前（json 解析之后）。
 `node scripts/emuResolveIos.js` 验证通过（exit=0）。
+
+**（2026-10-12，三十）**：About 弹层信息行改「标签左 --- 值右」同一行
+（老板 2026-10-12）：版本号/服务器地址/连接状态三行不再上下两行——
+`_InfoRow` 改 Row（label 小字在左 + 12 间距 + Expanded 里 SelectableText
+textAlign 右对齐，baseline 对齐）；note（开发地址标注等补充说明）也属于
+value 侧、与值同侧右对齐。⚠️ textAlign 只在文本框比文字宽时起作用：Column
+的 crossAxisAlignment.start 会把 Text 收缩到自然宽（框=字宽）→ 对齐无效
+仍靠左，须先 `SizedBox(width: double.infinity)` 撑满整行再 textAlign 右
+（老板热重启后实测抓出）。长值换行时每行仍右对齐、label 恒在左；长按复制
+保留。about_sheet_status 4 测试全过，analyze 0 issue。
