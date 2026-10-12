@@ -135,6 +135,26 @@ Finder _countFinder(String plain) =>
 Finder get _dialogField => find.descendant(
     of: find.byType(AlertDialog), matching: find.byType(TextField));
 
+/// 状态条大胶囊（2026-10-11）：点任何位置都开「我的同伴」弹层，改群名走
+/// **弹层里的群名行**（点它先收弹层再弹改群名弹窗）。测试统一从这条路径打开弹窗。
+Future<void> _openGroupNameDialog(WidgetTester tester) async {
+  await tester.tap(
+      find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('membersSheetGroupNameRow')));
+  await tester.pumpAndSettle();
+  // 群名行 onTap = 收弹层 + `_menuAction`（Future.delayed(300ms) 的 route 交接）；
+  // 纯计时器不排帧，pumpAndSettle 停不到它，需手动把时钟推过 300ms
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pumpAndSettle();
+}
+
+/// 关闭「我的同伴」弹层（点最上层的 ModalBarrier 消散；页面里有两个 barrier）。
+Future<void> _closeMembersSheet(WidgetTester tester) async {
+  await tester.tap(find.byType(ModalBarrier).last, warnIfMissed: false);
+  await tester.pumpAndSettle();
+}
+
 /// 状态条里的头像数（含**我自己**那一个——它在右侧）。
 int _statusAvatars(WidgetTester tester) => tester
     .widgetList(find.descendant(of: _statusBar, matching: find.byType(CircleAvatar)))
@@ -269,19 +289,11 @@ void main() {
     expect(find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)),
         findsOneWidget,
         reason: '没有群名时第一行应显示编辑图标');
-    expect(
-        find.descendant(
-            of: _statusBar,
-            matching: find.text(_zh.chatPageGroupNameEmptyHint)),
-        findsOneWidget,
-        reason: '没有群名时编辑图标前应有灰字「设置群名」占位（老板 2026-10-09）');
     expect(find.descendant(of: _statusBar, matching: find.text('Crew')),
         findsNothing);
 
-    // ② 点编辑图标 → 打开群组名字编辑弹窗
-    await tester.tap(
-        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
-    await tester.pumpAndSettle();
+    // ② 点编辑图标（大胶囊一体可点）→「我的同伴」弹层 → 点群名行 → 编辑弹窗
+    await _openGroupNameDialog(tester);
     expect(find.text(_zh.chatPageGroupNameTitle), findsOneWidget);
 
     // ③ 输入并保存 → 第一行显示名字，编辑图标消失
@@ -298,8 +310,13 @@ void main() {
     final profile = await AppLockService(db).loadProfile(spaceId: 'space-demo');
     expect(profile['groupName'], 'Crew');
 
-    // ⑤ 点名字可再次编辑；清空保存 → 回到"没有名字"（编辑图标回来）
+    // ⑤ 点名字可再次编辑（大胶囊 → 成员弹层 → 群名行）；清空保存 → 回到
+    // "没有名字"（编辑图标回来）
     await tester.tap(find.descendant(of: _statusBar, matching: find.text('Crew')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('membersSheetGroupNameRow')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400)); // route 交接延迟（同 helper）
     await tester.pumpAndSettle();
     await tester.enterText(_dialogField, '');
     await tester.tap(find.text(_zh.chatPageRenamingSubmit));
@@ -319,9 +336,7 @@ void main() {
     addTearDown(db.close);
     await _pump(tester, db, 3);
 
-    await tester.tap(
-        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
-    await tester.pumpAndSettle();
+    await _openGroupNameDialog(tester);
     await tester.enterText(_dialogField, 'Crew');
     await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
@@ -342,9 +357,7 @@ void main() {
     addTearDown(db.close);
     await _pump(tester, db, 3);
 
-    await tester.tap(
-        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
-    await tester.pumpAndSettle();
+    await _openGroupNameDialog(tester);
 
     // ① 人名白名单外的字符（空格）→ 拦下，弹窗不开
     await tester.enterText(_dialogField, 'Mr Lukas');
@@ -371,36 +384,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
   });
 
-  testWidgets('「我的同伴」胶囊只包头像条：点人数/群名不开成员弹层',
+  testWidgets('「我的同伴」大胶囊一体可点：点人数/群名/头像都开成员弹层',
       (WidgetTester tester) async {
-    // 老板 2026-10-09：群名已可单独单击改名，人数/群名不该再落进"我的同伴"可点区。
+    // 老板 2026-10-11：头像条+群名+在线人数合并为**一个大胶囊**，整体可点开
+    // 「我的同伴」弹层；改群名走弹层里的群名行（见上一个用例）。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await _pump(tester, db, 3);
     final membersSheet = find.text(_zh.chatPageMembersTitle('group'));
 
     // 先起个群名，第一行才有名字可点
-    await tester.tap(
-        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
-    await tester.pumpAndSettle();
+    await _openGroupNameDialog(tester);
     await tester.enterText(_dialogField, 'Crew');
     await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
 
-    // ① 点人数（第二行「2/3」）→ 不开成员弹层
+    // ① 点人数（第二行「2/3」）→ 开成员弹层
     await tester.tap(
         find.descendant(of: _statusBar, matching: _countFinder('2/3')));
     await tester.pumpAndSettle();
-    expect(membersSheet, findsNothing, reason: '人数不属于「我的同伴」可点区');
+    expect(membersSheet, findsOneWidget, reason: '人数也属于大胶囊可点区');
+    await _closeMembersSheet(tester);
 
-    // ② 点群名 → 开的是**群名编辑**弹窗，不是成员弹层
+    // ② 点群名 → 同样开成员弹层（改群名入口在弹层里的群名行）
     await tester.tap(find.descendant(of: _statusBar, matching: find.text('Crew')));
     await tester.pumpAndSettle();
+    expect(membersSheet, findsOneWidget, reason: '群名也属于大胶囊可点区');
     expect(find.text(_zh.chatPageGroupNameTitle), findsOneWidget,
-        reason: '点群名应开改名弹窗');
-    expect(membersSheet, findsNothing, reason: '群名可点区属于「改名」而非成员弹层');
-    await tester.tap(find.text(_zh.cancel));
-    await tester.pumpAndSettle();
+        reason: '弹层里的群名行：没名字时显示占位词，有名字显示群名本身');
+    await _closeMembersSheet(tester);
 
     // ③ 点头像条 → 开「我的同伴」
     await tester.tap(find.descendant(
@@ -450,16 +462,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
   });
 
-  testWidgets('头像条↔群名的间距 = 我的名字↔我的头像的间距（老板 2026-10-09）',
+  testWidgets('头像条↔群名的间距 = 大胶囊内统一的 8px（老板 2026-10-11）',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await _pump(tester, db, 3);
 
     // 先起个群名，第一行才有名字可量
-    await tester.tap(
-        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
-    await tester.pumpAndSettle();
+    await _openGroupNameDialog(tester);
     await tester.enterText(_dialogField, 'Crew');
     await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
@@ -468,15 +478,11 @@ void main() {
     final stripRight = tester.getRect(avatars.at(2)).right; // 头像条最右那个
     final groupNameLeft = tester.getRect(
         find.descendant(of: _statusBar, matching: find.text('Crew'))).left;
-    final myNameRight = tester.getRect(
-        find.descendant(of: _statusBar, matching: find.text('Lukas'))).right;
-    final myAvatarLeft = tester.getRect(avatars.last).left; // 我自己的头像（最右）
-
     final gapGroup = groupNameLeft - stripRight;
-    final gapMine = myAvatarLeft - myNameRight;
-    expect(gapGroup, closeTo(gapMine, 2),
-        reason: '头像条↔群名的视觉间距应与"我的名字↔我的头像"一致'
-            '（实测 gapGroup=$gapGroup gapMine=$gapMine）');
+    // 2026-10-11 大胶囊：内部间距统一 8px（老板 2026-10-11 拍板：不再沿用
+    // 2026-10-09 的「与我的名字↔我的头像一致（14px）」规则）
+    expect(gapGroup, closeTo(8, 2),
+        reason: '头像条↔群名的视觉间距应为 8px（实测 gapGroup=$gapGroup）');
     // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
     await tester.pump(const Duration(milliseconds: 450));
   });
@@ -526,9 +532,7 @@ void main() {
     await _pump(tester, db, 3);
 
     const longName = '群群群群群群群群群群群群群群群群群群群群群群群群群群群群群群群群';
-    await tester.tap(
-        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
-    await tester.pumpAndSettle();
+    await _openGroupNameDialog(tester);
     await tester.enterText(_dialogField, longName);
     await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();

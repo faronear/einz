@@ -11,6 +11,7 @@ export 'src/crypto/passphrase_policy.dart';
 export 'src/policy/entrance_name_policy.dart';
 export 'src/policy/member_name_policy.dart';
 export 'src/protocol/api_client.dart';
+export 'src/protocol/dns_fallback.dart';
 export 'src/protocol/entrance_status.dart';
 export 'src/protocol/message_payload.dart';
 export 'src/protocol/types.dart';

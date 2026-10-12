@@ -65,6 +65,14 @@ TURN 兜底          →  国内服务器                   ← 关键：跨境 
 - 国内机跑 TURN 的备案问题：纯 UDP、不提供网页访问，按经验一般不触发，但机房政策不一。
   → 客户端 TURN 地址写成**可配置项（支持 `IP:port`，不强制域名）**，被卡就换 IP 直连。先试，不提前纠结。
 
+**2026-10-11 演进（DNS 劫持事件后）：** TURN 地址用**独立新域名**
+`turn.farinear.cn` / `turn.bittic.cn`（双条目，ICE 择优；不再用 einz.yuanjinx.com——
+该 FQDN 被 DNS 抢答注入定点，见 docs/DNS_HIJACK_EVIDENCE.md）。客户端在构建
+ICE 配置时对 TURN 域名做 **DoH 预解析**（`resolveTurnUrls`，DoH 失败退系统解析，
+再失败保留原样；会话级缓存），换服务器 IP 时改 DNS 即自愈，无需重打包。
+realm 与凭证不受影响（realm 不参与解析）。实证：STUN Binding Request 外网探测
+3478/UDP 应答正常。
+
 ---
 
 ## 4. 分阶段计划

@@ -203,6 +203,8 @@ const String _kPrimaryServer = 'https://einz.tic.cc';
 const List<String> _kServerCandidates = [
   _kPrimaryServer, // 全球入口（无备案）
   'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
+  'https://einz.farinear.cn', // 中国备用入口 1
+  'https://einz.bittic.cn', // 中国备用入口 2
 ];
 
 /// 是否**打包好的产物**（`dart compile exe` 出来的 AOT 二进制，含 CI 编的那几份）。
@@ -341,10 +343,24 @@ String _resolveAutoStore() {
 
 /// 启动探测（GET {server}/health，3s 超时，不重试）：
 /// 能连（HTTP 200）→ (true, 协议版本, 能力清单)；连接失败/超时 → (false, '', [])。
-/// Multiverse：/health 不再返回全局 member 表——member 名字改由空间成员信息提供，
-/// 消息前缀用本地 store 的名字（自己/对方由空间成员填充）。
-Future<(bool, String, List<String>)> _probeServer(String server) async {
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+/// 直连失败自动走 DoH 兜底（DNS 污染场景，见 dns_fallback.dart）；[dohResolver]
+/// 仅测试注入用。Multiverse：/health 不再返回全局 member 表——member 名字改由
+/// 空间成员信息提供，消息前缀用本地 store 的名字（自己/对方由空间成员填充）。
+Future<(bool, String, List<String>)> _probeServer(String server,
+    {DoHResolver? dohResolver}) {
+  return probeWithDohFallback(
+    server,
+    () => _probeDirect(server),
+    ok: (r) => r.$1,
+    dohResolver: dohResolver,
+  );
+}
+
+/// 直连探测（原 [_probeServer] 本体）。host 被钉扎时经 [createPinnedHttpClient]
+/// 直连 DoH 真 IP，TLS 仍按域名校验。
+Future<(bool, String, List<String>)> _probeDirect(String server) async {
+  final client =
+      createPinnedHttpClient(connectionTimeout: const Duration(seconds: 3));
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
@@ -1262,6 +1278,11 @@ Future<void> main(List<String> args) async {
   // 纯函数用）。保持一行、无副作用，便于测试 import 本文件
   if (Platform.environment['EINZ_UNITTEST'] == '1') return;
   await sodium();
+
+  // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。TUI 直接打一行可见警告
+  // （污染事件极少发生，偶尔打断一帧渲染值得换取确定性提示）。
+  onDnsPoisonDetected = (host, ip) =>
+      stderr.writeln('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip（已上报服务器）');
 
   var storePath = '';
   var server = '';

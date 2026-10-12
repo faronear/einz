@@ -19,7 +19,7 @@ Future<bool> _has(LocalDatabase db, String table, String column) async {
 }
 
 void main() {
-  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v9 且列改名正确', () async {
+  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v10 且列改名正确', () async {
     final dir = Directory.systemTemp.createTempSync('einz-mig-');
     final path = '${dir.path}/einz.sqlite';
     final script = '''
@@ -60,5 +60,7 @@ PRAGMA user_version = 6;
     expect(await _has(db, 'peer_receipts', 'person_id'), isFalse);
     expect(await _has(db, 'local_messages', 'sender_entrance_id'), isTrue);
     expect(await _has(db, 'local_messages', 'sender_device_id'), isFalse);
+    // v10：墓碑来路列（deleted_kind）已补上。
+    expect(await _has(db, 'local_messages', 'deleted_kind'), isTrue);
   });
 }

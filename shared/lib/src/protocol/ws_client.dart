@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../crypto/message_crypto.dart';
+import 'dns_fallback.dart';
 import 'types.dart';
 
 /// WS 事件帧类型（PROTOCOL.md §8）。
@@ -238,6 +239,8 @@ class WsClient {
     _reconnectTimer?.cancel();
     await _ws?.close();
     _ws = null;
+    _pinnedClient?.close(force: true);
+    _pinnedClient = null;
     _setStatus(WsStatus.stopped);
   }
 
@@ -246,6 +249,13 @@ class WsClient {
     onStatus?.call(s);
   }
 
+  /// 钉扎版 HttpClient（DNS 污染兜底，见 dns_fallback.dart）。
+  ///
+  /// `customClient` 的语义：close() 会连带拆掉其上的活跃连接，所以连接存活期
+  /// 绝不 close——只在 [stop] 收尾。重连复用同一个 client（connectionFactory
+  /// 每次建连都重读 pin 表，陈旧钉扎的清除/自愈不受影响）。
+  HttpClient? _pinnedClient;
+
   void _connect() {
     if (_stopped) return;
     _setStatus(_attempt == 0 ? WsStatus.connecting : WsStatus.reconnecting);
@@ -253,9 +263,12 @@ class WsClient {
     // 凭证走握手头，**不放 URL query**（2026-09-15 评审 H4）：URL 会进反代
     // access log / 代理缓存 / 浏览器历史，session token 不该落在这些地方。
     final uri = Uri.parse('$wsUrl/ws?pv=$kProtocolVersion');
+    _pinnedClient ??=
+        createPinnedHttpClient(connectionTimeout: const Duration(seconds: 10));
     WebSocket.connect(
       uri.toString(),
       headers: {'Authorization': 'Bearer $_token'},
+      customClient: _pinnedClient,
     ).then((ws) {
       if (_stopped) {
         ws.close();

@@ -4,7 +4,8 @@ import {
   type ServerResponse
 } from 'node:http'
 import { WebSocketServer } from 'ws'
-import { loadConfig, type ServerConfig } from './config.js'
+import { loadConfig } from './config.js'
+import { startConfigWatcher } from './configFile.js'
 import { getDb, openDb } from './db.js'
 import {
   cleanupExpired,
@@ -12,7 +13,7 @@ import {
   createChallenge,
   verifyChallenge
 } from './auth.js'
-import { postMessage, syncMessages } from './messages.js'
+import { postMessage, recallMessage, syncMessages } from './messages.js'
 import { getReceipts, postReceipts, unreadCount } from './receipts.js'
 import {
   attachmentMetaByMessage,
@@ -30,6 +31,11 @@ import {
   updateMemberName
 } from './entrances.js'
 import { getSpace, registerPushToken, unregisterPushToken } from './push.js'
+import {
+  insertDnsReport,
+  summarizeDnsReports,
+  validateDnsReportBody
+} from './dnsReport.js'
 import {
   assertSpacePassphrase,
   deleteKeyEscrow,
@@ -76,11 +82,15 @@ const SERVER_VERSION = '1.0.0'
 // 协议版本（PROTOCOL.md §1）：REST 头 X-Protocol-Version / WS 握手 ?pv=。
 // 单一来源见 ./protocolVersion.ts（与 ws.ts 共用，别再各写一份）。
 openDb() // 先开库（所有路由依赖 db 就绪）
-const cfg: ServerConfig = loadConfig()
+// 后台监听 serverConfig.json：变更时自动重读 → 产品参数（maxSpaces / 上限 /
+// 版本闸）**改配置不用重启**（2026-10-10，见 configFile.ts 的 startConfigWatcher）。
+// dataStore（DB 路径）除外——它只在 openDb() 时消费，改了要重启。
+startConfigWatcher()
 // 免认证的 POST /spaces 会一直开着（新空间创建者没有任何凭证可用），所以
 // maxSpaces 是"公网开放注册"的唯一总闸：0 = 不限 → 任何人都能无限建空间
-// （2026-09-15 评审 H2）。这里只提醒，改配置由老板决定。
-if (cfg.max_spaces === 0) {
+// （2026-09-15 评审 H2）。这里只提醒，改配置由老板决定（启动时提醒一次；
+// 之后热改配置不再重复提醒）。
+if (loadConfig().max_spaces === 0) {
   console.warn('[einz] maxSpaces=0（不限）')
 }
 
@@ -153,7 +163,10 @@ server.on('upgrade', (req, socket, head) => {
  *   `POST /spaces/{id}/key-escrow` 的**口令取包分支**（加入方只有口令）、
  *   `GET /notify/verify`、`GET /notify/unsubscribe`（邮件里点开的链接，浏览器带不来
  *   Bearer；token 是随机不可猜的，能力也仅限翻转自己那一位标记——见
- *   notifier.consumeNotifyToken 的注释）。
+ *   notifier.consumeNotifyToken 的注释）、
+ *   `POST/GET /network/dns-report`（DNS 污染上报：污染发生在启动探测阶段，客户端
+ *   尚未也无法完成认证；滥用面由 dnsReport 限速桶 + 严格入参校验 + 只追加 30 天表
+ *   兜住——见 dnsReport.ts）。
  *   新增免鉴权端点必须在此处登记并说明理由。
  */
 async function route (req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -174,6 +187,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 只报告服务健康、协议版本与能力：**不返回消息总量 / 在线连接数 / 成员元数据**
     // （2026-09-15 评审：免鉴权公网端点吐业务量属元数据泄露；Multiverse 下更要避免
     // 跨空间泄漏，空间状态由受保护 API 获取，见 PROTOCOL_MULTIVERSE.md §4.1）
+    // 每请求取新配置（startConfigWatcher 热加载后 /health 实时反映文件内容）
+    const cfg = loadConfig()
     sendJson(res, 200, {
       status: 'ok',
       protocol_version: cfg.protocol_version,
@@ -184,12 +199,17 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       // （如 1GB 视频）时即时给一句人话，而不是把内存读满再吃 413（2026-10-08）。
       // 纯静态配置值，非密、无元数据风险（与 capabilities 同级）。
       max_attachment_bytes: MAX_ATTACHMENT_BYTES,
-      // 客户端启动时的**强制升级闸**（2026-10-04）：低于 min_app_version 的客户端
-      // 会在首屏弹不可关闭的升级窗口。只在服务端配了才下发（没配就不出现这个键，
-      // 老客户端对未知键天然无感）。两个字段都非密、无元数据风险。
-      ...(cfg.min_app_version == null
+      // 客户端启动时的**冻结闸**（2026-10-04，原"强制升级闸"）：低于 cold_app_version
+      // （frozen，不可用）的客户端会在首屏弹不可关闭的升级窗口。只在服务端配了才下发
+      // （没配就不出现这个键，老客户端对未知键天然无感）。两个字段都非密、无元数据风险。
+      ...(cfg.cold_app_version == null
         ? {}
-        : { min_app_version: cfg.min_app_version }),
+        : { cold_app_version: cfg.cold_app_version }),
+      // **冷却中的版本**（2026-10-10）：低于 hot_app_version（但 ≥ cold_app_version）
+      // 的客户端弹**可关闭**的升级提醒。同 cold_app_version：只在配了才下发。
+      ...(cfg.hot_app_version == null
+        ? {}
+        : { hot_app_version: cfg.hot_app_version }),
       ...(cfg.app_download_url == null
         ? {}
         : { app_download_url: cfg.app_download_url })
@@ -422,6 +442,24 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
         server_sequence: result.server_sequence,
         type: envelope.type ?? null
       },
+      meta: metaOf(req)
+    })
+    sendJson(res, 200, result)
+    return
+  }
+  // 撤回：删除「已发出、对方尚未拉取」的消息（服务端原子校验 delivered 水位）
+  if (method === 'POST' && path === '/messages/recall') {
+    const body = await readJsonBody(req)
+    const token = bearerToken(req)
+    const sess = requireSession(token)
+    const messageId = String((body as Record<string, unknown>)?.message_id ?? '')
+    const result = recallMessage(token, messageId)
+    // 审计：撤回证据（只记元数据，不碰密文）
+    logActivity({
+      entranceId: sess.entrance_id,
+      spaceId: sess.space_id,
+      kind: 'message.recall',
+      detail: { message_id: result.message_id, server_sequence: result.server_sequence },
       meta: metaOf(req)
     })
     sendJson(res, 200, result)
@@ -758,6 +796,20 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   // 空间
   if (method === 'GET' && path === '/space') {
     sendJson(res, 200, getSpace(bearerToken(req)))
+    return
+  }
+
+  // DNS 污染上报（免鉴权，理由见 dnsReport.ts 头注释；限速见 ratelimit dnsReport 桶）
+  if (method === 'POST' && path === '/network/dns-report') {
+    limitByIp(req, 'dnsReport')
+    const body = validateDnsReportBody(await readJsonBody(req))
+    insertDnsReport(body.domain, body.dohIp, req)
+    sendJson(res, 200, { ok: true })
+    return
+  }
+  if (method === 'GET' && path === '/network/dns-report') {
+    // 聚合只读（按天/域名计数，不含 IP）；谁都能看，但没什么可看的敏感面
+    sendJson(res, 200, { reports: summarizeDnsReports() })
     return
   }
 

@@ -107,43 +107,14 @@ String _dropAttachmentType(String fileName) {
 /// 发送复用右侧发送键）。
 enum _InputMode { text, hint, recording, preview }
 
-/// 「通道列表」卡片间距 + 每行张数（与「切换我的秘境」弹层同口径：一行正好 3 张，
-/// 老板 2026-09-25；边长按可用宽度反算，桌面大窗口设上限）。
+/// 「通道列表」卡片间距（一卡占满整行后只剩纵向间距，老板 2026-10-11）。
 const double _entranceCardSpacing = 12;
-const int _entranceCardsPerRow = 3;
-
-/// 弹层**内容区**的最大宽度：modal bottom sheet 在 M3 下把内容限在 640，窗口再宽也不再长
-/// （实测 800 / 1600 宽的视口，内容区都是 640、居中）。
-const double _entranceSheetMaxWidth = 640;
 
 /// 气泡时间行里各小控件的**统一高度**（老板 2026-10-08）：引用/拷贝/保存的圆钮，
 /// 以及「沙漏+时长」胶囊——三者的背景高度必须一样（此前沙漏那块的文字把胶囊撑得
 /// 比圆钮高一截）。28 = 16 图标 + 上下各 6（2026-10-09 老板要求加大：原 20×20
 /// 热区远小于 44pt 最小触控标准，手机难点中；气泡约增高 8px）。
 const double _bubbleTimeRowControlHeight = 28;
-
-/// 弹层内容区左右的内边距（下面 Padding 的 16）。
-const double _entranceSheetHPadding = 16;
-
-/// 卡片边长上限 = **弹层最大宽度**下"一行 3 张"的边长：
-/// 640 − 左右各 16 = 608 可用，减去两条 12 的间距，再均分 3 份 = 194.67
-/// （`_entranceCardSizeFor` 向下取整到 194，右边最多余 2px）。
-///
-/// 老板 2026-09-26：桌面窗口拉宽到弹层不再增长之后，卡片也不能先停止增长——原来上限
-/// 硬写 160，宽窗口下三张卡只铺到 504，右边空一大截（弹层 640 里空 100+）。
-/// 手机上可用宽度够不到这个上限（< 3*160+2*12 = 504），不影响"一行正好 3 张"。
-/// 「切换我的秘境」弹层有一份同口径的 `_kCardMaxSize`（space_switcher.dart），改一处要改两处。
-const double _entranceCardMaxSize = (_entranceSheetMaxWidth -
-        _entranceSheetHPadding * 2 -
-        _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
-    _entranceCardsPerRow;
-
-double _entranceCardSizeFor(double availableWidth) {
-  final raw =
-      (availableWidth - _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
-          _entranceCardsPerRow;
-  return raw.floorToDouble().clamp(64.0, _entranceCardMaxSize).toDouble();
-}
 
 /// 「我的通道」弹层标题行右端「刷新」按钮的占位/按钮边长（标题居中靠它配平）。
 const double _entranceRefreshSize = 40;
@@ -293,6 +264,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 每条消息的自愈尝试计数：网络失败 +1；404 直接置满（确定结论，别再问）。
   final Map<String, int> _healAttempts = {};
 
+  /// 服务端**确认**无附件（自愈补拉 404）的消息 id：孤儿消息（超大附件被拒/
+  /// 发送失败）重试永远无效，UI 据此去掉「点按重试」邀请（老板 2026-10-10）。
+  /// 内存 Set 即可——重启后自愈首轮再 404 会重新标上。
+  final Set<String> _healConfirmedMissing = {};
+
   /// 自愈重入保护：ticker 每 3s 一次 unawaited，单条补拉慢（弱网）时会叠轮。
   bool _healInFlight = false;
 
@@ -319,8 +295,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (await _repo.healAttachmentMeta(m)) {
             fixed = true; // 补到了；计数清零不再动它
           } else {
-            // 404：服务端确认没有 → 立即放弃这条（置满计数），继续修其它
+            // 404：服务端确认没有 → 立即放弃这条（置满计数），继续修其它；
+            // 同时打上「确认缺失」标（UI 去掉「点按重试」邀请）
             _healAttempts[m.env.messageId] = _kHealAttachmentMaxRetries;
+            _healConfirmedMissing.add(m.env.messageId);
+            if (mounted) setState(() {});
           }
         } on Exception {
           // 网络/认证抖动：计数+1，留给下轮（到上限自然放弃）
@@ -685,31 +664,79 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     };
 
     if (m.status == 'failed') {
-      // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）
+      // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）。
+      // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
+      // 引用/拷贝/保存快捷动作同款风格，别像裸文字）
       return Tooltip(
         message: l10n.chatPageMsgFailed,
-        child: Clickable(
-          onTap: () => _tapRetryMessage(m, asResend: true),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(busyLabel ?? l10n.chatPageMsgFailedTap,
-                  style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
-              const SizedBox(width: 2),
-              Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
-            ],
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            hoverColor: Colors.black.withValues(alpha: 0.05),
+            highlightColor: Colors.black.withValues(alpha: 0.08),
+            onTap: () => _tapRetryMessage(m, asResend: true),
+            child: Container(
+              height: _bubbleTimeRowControlHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(busyLabel ?? l10n.chatPageMsgFailedTap,
+                      style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
+                  const SizedBox(width: 2),
+                  Icon(Icons.error_outline, size: 16, color: Colors.red.shade600),
+                ],
+              ),
+            ),
           ),
         ),
       );
     }
 
-    // 对方已收到（delivered）/已读（read）→ 双勾。read 与 delivered 同图标：
-    // 已读暂不展示（老板 2026-09-12）。
-    final receipt = MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts);
-    if (receipt != null) {
+    // 撤回墓碑永远显示单勾（2026-10-11 老板）：服务端消息行已真删（对方永远
+    // 拉不到这一条），但回执是按成员高水位记的、不按单条消息——对方之后拉到
+    // 任何更大 seq 的消息都会越过它的 seq，按常规判定会误显双勾。撤回=没送达，
+    // 固定单勾才符合事实。
+    if (m.deletedKind == 'recall') {
       return Tooltip(
-        message: l10n.chatPageMsgDelivered,
-        child: Icon(Icons.done_all, size: 12, color: subtle),
+        message: l10n.chatPageMsgSent,
+        child: Icon(Icons.check, size: 12, color: subtle),
+      );
+    }
+
+    // 送达进度（老板 2026-10-12 定稿）：k=0 → 单勾；k≥1 → 「k 双勾」（数字在
+    // 双勾**前面**、不加号——放在后面会跟时间数字混淆，老板同日调优）。
+    // **群组永远不出现裸双勾**——群随时扩张，"全员送达"不是终态：新人进群
+    // 后总数变大，显示自动退回"旧k 双勾"，不发生图标降级。duo 只有一名
+    // 接收方（k=1 即全体），保持经典裸双勾。k 来自 _peerReceipts 逐成员
+    // 水位（内存常驻，随回执轮询刷新，无额外网络开销）。
+    final deliveredCount =
+        MessageRepository.deliveredCountOf(m.env.serverSequence, _peerReceipts);
+    if (deliveredCount > 0) {
+      final allReceived = MessageRepository.receiptOf(
+              m.env.serverSequence, _peerReceipts) !=
+          null;
+      return Tooltip(
+        message: allReceived
+            ? l10n.chatPageMsgDelivered
+            : l10n.chatPageMsgSent,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // duo（peers=1）全员送达 → 裸双勾；群 → 永远带人数（含全员时），
+            // 数字与双勾间留 1 空隙（老板 2026-10-12 定：试过 2/3 后回到 1）
+            if (!allReceived || _peerReceipts.length > 1) ...[
+              Text('$deliveredCount',
+                  style: TextStyle(fontSize: 11, color: subtle)),
+              const SizedBox(width: 1),
+            ],
+            Icon(Icons.done_all, size: 12, color: subtle),
+          ],
+        ),
       );
     }
     if (m.status == 'sent' || m.status == 'delivered' || m.status == 'read') {
@@ -720,23 +747,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
 
     // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）。
-    // 小飞机用超链接蓝提示可点（老板 2026-09-18）；加速中改用中性色，避免"点了
-    // 还提示可点"的矛盾。
+    // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间行快捷动作同款）；
+    // 小飞机用超链接蓝提示可点——但渐变主题深蓝气泡上蓝飞机几乎看不见
+    // （2026-10-11 老板），改白系（同快捷动作的 white70）；「加速中」期间
+    // 仍用中性色，避免"点了还提示可点"的矛盾。
     return Tooltip(
       message: l10n.chatPageMsgSendingTap,
-      child: Clickable(
-        onTap: () => _tapRetryMessage(m, asResend: false),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (busyLabel != null) ...[
-              Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
-              const SizedBox(width: 2),
-            ],
-            _SendingPlane(
-              color: busyLabel != null ? subtle : const Color(0xFF2E7CF6),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          hoverColor: Colors.black.withValues(alpha: 0.05),
+          highlightColor: Colors.black.withValues(alpha: 0.08),
+          onTap: () => _tapRetryMessage(m, asResend: false),
+          child: Container(
+            height: _bubbleTimeRowControlHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (busyLabel != null) ...[
+                  Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
+                  const SizedBox(width: 2),
+                ],
+                _SendingPlane(
+                  size: 16,
+                  color: busyLabel != null
+                      ? subtle
+                      : (_uiStyle == 'gradient'
+                          ? Colors.white70
+                          : const Color(0xFF2E7CF6)),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1455,18 +1502,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   
 
-  /// 是否有 2 个及以上空间（决定要不要给「切换秘境」入口）。
-  ///
-  /// 取自内存里已解锁的 [VaultSession]（不触安全存储、不需要 PIN）；取不到时
-  /// （如测试直接构造 ChatPage）按单空间处理——最保守：单空间往往就是想和一个人用，
-  /// 别暗示这里能切（老板 2026-09-24 定）。
-  bool get _multiSpace => (VaultSession.current?.spaces.length ?? 0) > 1;
 
   /// 顶栏的「品牌名（+ 多空间图标）」这一块。
   ///
-  /// 多空间时整块可点 → 打开「切换我的秘境」弹层，图标放在标题文字右侧
-  /// （老板 2026-09-28：原先是独立 IconButton，自带的 8px 内边距把箭头推得很远，
-  /// 不像和标题是一体的）。单空间时不画图标、也不可点（别暗示这里能切）。
+  /// **任何空间数都画图标、都可点** → 打开「切换我的秘境」弹层（老板
+  /// 2026-10-12：单空间也加，与多空间一致——图标是"空间弹层"的入口，
+  /// 不是"有多个空间"的暗示，推翻 2026-09-24 的"单空间不可点"）。
+  /// 图标放在标题文字右侧（老板 2026-09-28：原先是独立 IconButton，
+  /// 自带的 8px 内边距把箭头推得很远，不像和标题是一体的）。
   Widget _brandTitle() {
     final l10n = AppLocalizations.of(context)!;
     final titleRow = Padding(
@@ -1481,19 +1524,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 overflow: TextOverflow.ellipsis),
           ),
           // 颜色继承 AppBar 的 IconTheme（AppBar 给整个 toolbar 套了 IconTheme.merge）
-          if (_multiSpace) ...[
-            // 6px：旧小箭头（arrow_drop_down）字形小、图标框自带留白，视觉间隙
-            // 差不多是这个数；换成 dynamic_feed 后字形几乎满框，2px 会紧贴标题
-            // （老板 2026-10-09：不好看，留回小箭头时的间距）。
-            const SizedBox(width: 6),
-            // 与汉堡菜单「切换我的秘境」行同款图标（dynamic_feed 多窗口叠加，
-            // 表达"多个空间"，老板 2026-09-28 定稿）
-            const Icon(Icons.dynamic_feed, size: 20),
-          ],
+          // 6px：旧小箭头（arrow_drop_down）字形小、图标框自带留白，视觉间隙
+          // 差不多是这个数；换成 dynamic_feed 后字形几乎满框，2px 会紧贴标题
+          // （老板 2026-10-09：不好看，留回小箭头时的间距）。
+          const SizedBox(width: 6),
+          // 与汉堡菜单「切换我的秘境」行同款图标（dynamic_feed 多窗口叠加，
+          // 老板 2026-09-28 定稿）
+          const Icon(Icons.dynamic_feed, size: 20),
         ],
       ),
     );
-    if (!_multiSpace) return titleRow;
     return Tooltip(
       message: l10n.spaceListSwitch,
       child: InkWell(mouseCursor: SystemMouseCursors.click,
@@ -1693,7 +1733,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// 布局：`[头像位] [ 名字列 ]`，名字列两行——
   /// - 第一行 = **群组名字**（样式同「我的状态胶囊」的名字行：15 号 w500）；
-  ///   空名字时显示灰字「设置群名」+ 编辑图标（点击进 [\_showGroupNameDialog] 起名）；
+  ///   空名字时只显示一个**编辑图标**（点击进 [\_showGroupNameDialog] 起名）；
   /// - 第二行 = **「在线人数/总人数」**，「在线人数」用**绿色**（同在线灯），
   ///   「/总人数」保持原灰。两个数都不含我自己（`_othersOnline` / `_othersTotal`）。
   ///
@@ -1713,8 +1753,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 是 0——头像条左缘贴边，见 `_buildPeerStatus` 的 pad 注释）——不扣的话
     // 内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
     const leadingPad = 10.0;
+    // 再扣掉大胶囊自己的水平 Padding（老板 2026-10-12 起只留**右 6**：头像
+    // 三面贴壁、左 0）——不扣的话 Row 内容会超出胶囊（实测 RenderFlex
+    // overflow；此前左右各 6 = 12，头像贴壁后减半）。
+    const capsulePad = 6.0;
     final maxWidth =
-        (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad;
+        (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad - capsulePad;
 
     // 12 号：比 duo 那行时刻（11）略大一档——这一格没有别的大字，11 会显得发飘
     final countStyle = TextStyle(
@@ -1745,20 +1789,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
 
     const gap = 8.0;
-    // 编辑图标占位宽（4 间距 + 18 图标）；没有名字时它跟在灰字提示后面
+    // 编辑图标占位宽（左右各 2 内边距 + 18 图标）；没有名字时第一行只摆它——
+    // 曾试过在图标前加灰字「群名」占位，老板体验后撤掉：有的群就是不想要名字，
+    // 常驻占位文案反而是干扰（2026-10-09）。
     const editIconWidth = 22.0;
-    // 「设置群名」灰字占位（老板 2026-10-09）：没名字时光一个图标看不出能点/
-    // 是干什么的，灰字把动作说出来。英文用 "Set group name"（比 "Set name"
-    // 明确——这里改的是群名，不是我的名字）。
-    final hintStyle = TextStyle(
-      fontSize: 15,
-      fontWeight: FontWeight.w400,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
     final countWidth = measure(countLabel, countStyle);
-    final nameWidth = _groupName.isEmpty
-        ? measure(l10n.chatPageGroupNameEmptyHint, hintStyle) + editIconWidth
-        : measure(_groupName, nameStyle);
+    final nameWidth =
+        _groupName.isEmpty ? editIconWidth : measure(_groupName, nameStyle);
 
     // 量出来的名字宽**只用来给头像分预算**（名字是信息、优先，剩下的给头像），
     // **不再拿来钉死名字列宽**——TextPainter 量出的宽与真实渲染可能有出入（字体
@@ -1782,48 +1819,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         : stripCount * kStatusMemberAvatarSize;
     final nameColMax = (maxWidth - slotWidth - gap).clamp(0.0, maxWidth);
 
-    // 第一行：有名字显示名字（点了改名）；没名字显示灰字「设置群名」+ 编辑
-    // 图标（点了起名）——灰字把动作说出来，光一个图标看不出能干什么（老板
-    // 2026-10-09）。名字也做成**可点胶囊**：悬浮/按住变色，与状态条其他可点
-    // 元素同口径（invite/通话图标/更多通道箭头）。
-    final Widget nameLine = _groupName.isEmpty
-        ? Material(
-            color: Colors.transparent,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(mouseCursor: SystemMouseCursors.click,
-              onTap: _showGroupNameDialog,
-              hoverColor: Colors.black.withValues(alpha: 0.05),
-              highlightColor: Colors.black.withValues(alpha: 0.08),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(l10n.chatPageGroupNameEmptyHint, style: hintStyle),
-                  const SizedBox(width: 4),
-                  Icon(Icons.edit,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ]),
-              ),
-            ),
-          )
-        : Material(
-            color: Colors.transparent,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(mouseCursor: SystemMouseCursors.click,
-              onTap: _showGroupNameDialog,
-              hoverColor: Colors.black.withValues(alpha: 0.05),
-              highlightColor: Colors.black.withValues(alpha: 0.08),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Text(_groupName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: nameStyle),
-              ),
-            ),
-          );
+    // 第一行内容：有名字显示名字；没名字只显示编辑图标（点了起名）。
+    // （2026-10-11 老板：群名/编辑图标与在线人数合并成**一个大胶囊**，
+    // 原「单独可点的名字/编辑图标胶囊」去掉——见下方 return 处的包裹。）
+    Widget nameContent = _groupName.isEmpty
+        ? Icon(Icons.edit,
+            size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant)
+        : Text(_groupName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: nameStyle);
 
     // 第二行：「在线人数」绿 + 「/总人数」灰（在线灯同色，一眼看出谁在）
     final Widget countLine = Text.rich(
@@ -1839,60 +1844,73 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 头像位：有人加入 = 成员头像条；还没人加入 = **群组头像占位**（老板
     // 2026-10-09）——图标与菜单「我的同伴」行的 `groups_outlined` 同款，尺寸同
     // 成员头像（40），圆底用性别未知的中性灰（`_genderTint('')`，与「待加入」
-    // 卡片同源）。**两者都可点**，都开「我的同伴」弹层（老板追加）。
-    // **只包头像位**，不含右边的群名/人数：群名已可单独单击改名，人数/群名
-    // 就不该再落进"我的同伴"的可点区。
-    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
-    // 头像位与右方头像同高（40）上下顶满胶囊、**左缘贴边**（`_buildPeerStatus`
-    // 的群空间 `pad.left` 已是 0，不再需要早先"推离 10 再左移 10"的补偿——
-    // 那个 Transform 只挪绘制不挪布局槽，胶囊收窄到只包头像条后会把头像与
-    // 群名之间的**视觉**间距撑大 10px，老板 2026-10-09 实测）。
-    final Widget avatarSlot = Material(
-      color: Colors.transparent,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
-        onTap: _showMembersSheet,
-        hoverColor: Colors.black.withValues(alpha: 0.05),
-        highlightColor: Colors.black.withValues(alpha: 0.08),
-        child: others.isEmpty
-            ? SizedBox(
-                width: kStatusMemberAvatarSize,
-                height: kStatusMemberAvatarSize,
-                // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
-                // Material 的墨水层上，InkWell 的悬浮/按住高亮才能盖在它上面——
-                // 不透明 child 会把高亮整个挡住（老板 2026-10-09：占位头像也要
-                // 有悬浮/点击背景效果，与状态条其他可点对象一致）。
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: _genderTint(''),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.groups_outlined, size: 22),
+    // 卡片同源）。**已并入下方的大胶囊**（2026-10-11：头像条 + 群名/人数是
+    // 同一个可点胶囊，整体打开「我的同伴」弹层——不再有独立的头像小胶囊）。
+    // 空群占位头像自带 tooltip「我的同伴」；已有成员时头像条里每个头像自带
+    // 人名 tooltip（`_stripAvatar`）。
+    final Widget avatarSlot = others.isEmpty
+        ? Tooltip(
+            // 三个「我的群组/同伴」文案（菜单项/弹层标题/本 tooltip）共享
+            // 同一键（老板 2026-10-11）
+            message: l10n.chatPageMembersTitle('group'),
+            child: SizedBox(
+              width: kStatusMemberAvatarSize,
+              height: kStatusMemberAvatarSize,
+              // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
+              // Material 的墨水层上，外层 InkWell 的悬浮/按住高亮才能盖在
+              // 它上面——不透明 child 会把高亮整个挡住（老板 2026-10-09）
+              child: Ink(
+                decoration: BoxDecoration(
+                  color: _genderTint(''),
+                  shape: BoxShape.circle,
                 ),
-              )
-            : _avatarStrip(others, avatarBudget),
-      ),
-    );
+                child: const Icon(Icons.groups_outlined, size: 22),
+              ),
+            ),
+          )
+        : _avatarStrip(others, avatarBudget);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        avatarSlot,
-        const SizedBox(width: gap),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: nameColMax),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              nameLine,
-              const SizedBox(height: 1),
-              countLine,
-            ],
+    // **一个大胶囊**（2026-10-11 老板）：多人头像条 + 群名/编辑图标 + 在线
+    // 人数整体包进同一个 StadiumBorder 胶囊，悬浮/按住显色，点击打开
+    // 「我的群组」弹层（改名走弹层里的群名行）。tooltip 与菜单项/弹层标题
+    // 共享同一文案键（2026-10-11 老板）。
+    return Tooltip(
+      message: l10n.chatPageMembersTitle('group'),
+      child: Material(
+        color: Colors.transparent,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(mouseCursor: SystemMouseCursors.click,
+          onTap: _showMembersSheet,
+          hoverColor: Colors.black.withValues(alpha: 0.05),
+          highlightColor: Colors.black.withValues(alpha: 0.08),
+          child: Padding(
+            // 只给右侧留白（头像条↔群名侧）：头像沿用「三面贴壁」约定（左/上/
+            // 下贴住胶囊内壁，老板 2026-10-12）——与 duo 大胶囊同款（duo 的
+            // fromLTRB(0,0,6,0)）。
+            padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                avatarSlot,
+                const SizedBox(width: gap),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: nameColMax),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      nameContent,
+                      const SizedBox(height: 1),
+                      countLine,
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -2068,47 +2086,99 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             alignment: Alignment.centerLeft,
             widthFactor: 1.0,
             child: _othersSummary(l10n))
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
-              _statusAvatar(
-                  bytes: _peerAvatarBytes,
-                  gender: _peerGender,
-                  saveName: _peerName),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_peerName.isNotEmpty)
-                      Flexible(
-                        child: Text(_peerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主
-                            // ——名字是这一格的主信息，原来 13 与 11 几乎看不出主次
-                            // （老板 2026-09-26）
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w500)),
+        : Tooltip(
+            // 大胶囊 tooltip 与「My companion」弹层标题、菜单项共享同一文案键
+            // chatPageMembersTitle('duo')（老板 2026-10-11，与 group 空间同款）。
+            message: l10n.chatPageMembersTitle('duo'),
+            child: Material(
+              color: Colors.transparent,
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              // 整块可点：头像 + 名字/在线状态一体，点击打开「My companion」弹层
+              //（老板 2026-10-11：与 group 空间大胶囊同款交互）。
+              child: InkWell(
+                mouseCursor: SystemMouseCursors.click,
+                onTap: _showMembersSheet,
+                hoverColor: Colors.black.withValues(alpha: 0.05),
+                highlightColor: Colors.black.withValues(alpha: 0.08),
+                child: Padding(
+                  // 只给右侧留白（头像↔名字间距）：头像沿用 duo 的「三面贴壁」
+                  // 约定（左/上/下贴住胶囊内壁，老板 2026-09-26）——与 group 大
+                  // 胶囊的 horizontal 6 不同（那边没有贴壁要求）。
+                  padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 头像放**最左**（老板 2026-09-26 新设计）。**不用**
+                      // `_statusAvatar`（它自带 MouseRegion 悬浮变色/点击）：
+                      // 大胶囊（2026-10-12 老板）是**一个整体**，悬浮/点击都归
+                      // 外层 InkWell——头像用 Ink 画在 Material 墨水层上（与群
+                      // 占位头像同款），外层悬浮高亮才能盖在头像上面。
+                      // ⚠️ 照片**不能用** `Ink.image + ClipOval`：Ink 画在 Material
+                      // 墨水层画布上，不经过 widget 树里的 ClipOval——照片会糊成
+                      // 方块（老板 2026-10-12 实测）。要圆就让 Ink 自己的
+                      // decoration 是圆的（与下面无图分支同一口径）。
+                      SizedBox(
+                        width: kStatusAvatarSize,
+                        height: kStatusAvatarSize,
+                        child: _peerAvatarBytes != null
+                            ? Ink(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: DecorationImage(
+                                    image: MemoryImage(_peerAvatarBytes!),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              )
+                            : Ink(
+                                decoration: BoxDecoration(
+                                  color: _genderTint(_peerGender),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.person, size: 22),
+                              ),
                       ),
-                    const SizedBox(height: 1),
-                    // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
-                    // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间
-                    // 对未加入的人没有意义，摆个"上次离线时间"反而误导（2026-09-26）
-                    _statusLine(
-                      online: _peerOnline,
-                      offlineColor: Colors.red,
-                      sinceMs: _peerSinceMs,
-                      label: _peerJoined == false ? l10n.memberPending : null,
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_peerName.isNotEmpty)
+                              Flexible(
+                                child: Text(_peerName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主
+                                    // ——名字是这一格的主信息，原来 13 与 11 几乎看不出主次
+                                    // （老板 2026-09-26）
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500)),
+                              ),
+                            const SizedBox(height: 1),
+                            // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
+                            // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间
+                            // 对未加入的人没有意义，摆个"上次离线时间"反而误导（2026-09-26）
+                            _statusLine(
+                              online: _peerOnline,
+                              offlineColor: Colors.red,
+                              sinceMs: _peerSinceMs,
+                              label: _peerJoined == false
+                                  ? l10n.memberPending
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
+                      // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
+                    ],
+                  ),
                 ),
               ),
-              // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
-              // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
-            ],
+            ),
           );
 
     final Widget inviteLink = _peerJoined != false
@@ -2961,6 +3031,65 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 color: Theme.of(ctx).colorScheme.outline)),
                       ),
                     ),
+                  // 群空间：成员列表前放「群名称」标题行（老板 2026-10-11）：
+                  // **不用卡片**——白底上的标题文字（同弹层标题字号/字重），
+                  // 未设置 → 淡色占位词「群空间名称/Group space name」；
+                  // 编辑按钮紧跟文字右侧（不顶到最右）。点它打开改群名弹窗
+                  //（同状态条点群名）。
+                  if (_isGroup)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 14),
+                      child: Center(
+                        child: InkWell(
+                          // key 供测试定位群名行（状态条上可能有同文案，需区分）
+                          key: const ValueKey('membersSheetGroupNameRow'),
+                          mouseCursor: SystemMouseCursors.click,
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            // 先收起成员弹层；等它收完再弹改群名弹窗（同
+                            // 「重新邀请」的 route 交接处理，见其注释）
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showGroupNameDialog);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  // 占位词与改群名弹窗标题共用同一键（老板
+                                  // 2026-10-11：合并为一个文案「群组名称/
+                                  // Group name」，不另设占位词键）
+                                  _groupName.isEmpty
+                                      ? l10n.chatPageGroupNameTitle
+                                      : _groupName,
+                                  style: TextStyle(
+                                    // 占位词单独降档（老板 2026-10-11）：字号
+                                    // 小一档 + 更浅的 outline 色，别与真群名
+                                    // 的 22/w700 深色抢眼；有名字 → 群名
+                                    // 弹层里最显眼（22/w700）
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: _groupName.isEmpty ? 18 : 22,
+                                    height: 1.2,
+                                    color: _groupName.isEmpty
+                                        ? Theme.of(ctx).colorScheme.outline
+                                        : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.edit_outlined,
+                                    size: 18,
+                                    color: Theme.of(ctx)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   for (final e in others)
                     _membersCard(
                       memberId: e.key,
@@ -3283,22 +3412,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
-                  // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
-                  // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
+                  // 通道卡片：**一卡占满整行**（老板 2026-10-11：不再一行 3 张）。
+                  // 卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/灰已撤销）+ 时间
+                  // （在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
                   // 右上角固定角标：本机=编辑图标（点击改名）、已撤销=阻止图标+整卡蒙版
                   // （老板 2026-10-02：当前通道改名改从本机卡片进，弹层不再放改名行）
                   // 通道多 + 窗口矮 → 随中间整块在外层 ScrollableCardArea 里滚动。
                   ScrollableCardArea(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final size = _entranceCardSizeFor(constraints.maxWidth);
-                        return Wrap(
-                          spacing: _entranceCardSpacing,
-                          runSpacing: _entranceCardSpacing,
-                          children: [
-                            for (final d in myRows)
-                              () {
+                    child: Wrap(
+                      runSpacing: _entranceCardSpacing,
+                      children: [
+                        for (final d in myRows)
+                          () {
                                 final name = (d['entrance_name'] as String? ?? '').trim();
                                 final entranceId = d['entrance_id'] as String? ?? '';
                                 final isLocal = d['_local'] == true;
@@ -3326,7 +3451,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
                                 final hasBadge = isLocal || revoked;
                                 return SizedBox(
-                                  width: size,
+                                  // 一卡占满整行（老板 2026-10-11）；高度仍由
+                                  // 内容（名称 + 状态行）自然撑出
+                                  width: double.infinity,
                                   child: Container(
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(12),
@@ -3462,9 +3589,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   ),
                                 );
                               }(),
-                          ],
-                        );
-                      },
+                      ],
                     ),
                   ),
                   if (loaded == null)
@@ -4435,6 +4560,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 attachment: x.attachment, expiresAt: expiresAt,
                 createdAt: x.createdAt, burnAfterSeconds: seconds,
                 quote: x.quote, deleted: x.deleted,
+                deletedKind: x.deletedKind,
                 // 长按手动设置（与 repo.setMessageBurn 落盘一致）；取消时无标签
                 burnManual: seconds > 0, status: x.status, meta: x.meta)
           else
@@ -4735,6 +4861,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       burnAfterSeconds: fresh.burnAfterSeconds,
       quote: fresh.quote,
       deleted: deleted,
+      // 墓碑单调：fresh 未删而 old 已删时，来路随 old（否则随 fresh）
+      deletedKind: fresh.deleted ? fresh.deletedKind : old.deletedKind,
       burnManual: fresh.burnManual,
       status: fresh.status,
       meta: fresh.meta,
@@ -5146,6 +5274,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // ---------- 长按消息操作：引用 / 删除（2 人世界不做转发） ----------
 
   /// 长按消息弹出操作菜单：引用 / 删除。
+  /// 长按菜单是否有内容可给（决定气泡长按与「...」是否响应）：
+  /// - 未墓碑：常规菜单（引用/拷贝/保存/撤回/焚毁/删除）总有项；
+  /// - **墓碑一律不给**（老板 2026-10-12：曾试过"仅单勾+本机删除/焚毁"的细
+  ///   筛，但群空间里"一部分成员已收到"时撤回必然失败，单勾粗筛在群语义下
+  ///   已不可靠——复杂度失控，干脆墓碑不提供任何菜单入口）。
+  bool _messageHasActions(HistoryMessage m) => !m.deleted;
+
+  /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
+  /// [_messageHasActions]）：自己消息、服务端已收下、且**纯粹单勾**——还没
+  /// 有任何人收到（k=0；老板 2026-10-12：群空间里只要有人收到，撤回就会
+  /// 失败——内容已被拿走；duo 同理 = 对方已拉取。本地粗筛，权威判定在
+  /// 服务端 409）。
+  bool _messageRecallable(HistoryMessage m) =>
+      m.sender == 'me' &&
+      m.env.serverSequence != null &&
+      m.status != 'failed' &&
+      MessageRepository.deliveredCountOf(
+              m.env.serverSequence, _peerReceipts) ==
+          0;
+
   Future<void> _showMessageActions(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
     final action = await showModalBottomSheet<String>(
@@ -5158,49 +5306,71 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
             // 老板要求 2026-09-10）；底色与被引消息的引用块同款浅灰，代替原来
-            // 的分隔横线（老板要求 2026-09-13）
-            _buildMessagePreviewRow(m),
+            // 的分隔横线（老板要求 2026-09-13）。
+            // 墓碑消息不展示内容（已删/已焚毁）：改一条灰字占位（老板 2026-10-10
+            // 起墓碑也可开菜单——只剩撤回一项）
+            m.deleted ? _tombstoneMenuPlaceholder() : _buildMessagePreviewRow(m),
             // 操作项改为圆角方形卡片（图标 + 文字），不再是列表式 ListTile
             // （老板要求 2026-09-13）
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: _buildActionCardGrid([
-                _buildActionCard(
-                  icon: Icons.format_quote,
-                  label: l10n.chatPageActionQuote,
-                  onTap: () => Navigator.of(ctx).pop('quote'),
-                ),
-                // 文字消息才有「拷贝」（媒体消息无文本可拷）
-                if (m.env.type == 'text')
+                // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除
+                // 均无意义；删除本来也是打本地墓碑，已做了）
+                if (m.deleted) ...[
                   _buildActionCard(
-                    // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
-                    // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
-                    // 与邻居光学对齐
-                    icon: Icons.copy_outlined,
-                    iconSize: 24,
-                    label: l10n.chatPageCopy,
-                    onTap: () => Navigator.of(ctx).pop('copy'),
+                    icon: Icons.undo_outlined,
+                    label: l10n.chatPageActionRecall,
+                    onTap: () => Navigator.of(ctx).pop('recall'),
                   ),
-                // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
-                // 存到本机（系统保存对话框选位置）；放「引用」后面
-                if (m.attachment != null)
+                ] else ...[
                   _buildActionCard(
-                    icon: Icons.save_alt,
-                    label: l10n.chatPageActionSave,
-                    onTap: () => Navigator.of(ctx).pop('save'),
+                    icon: Icons.format_quote,
+                    label: l10n.chatPageActionQuote,
+                    onTap: () => Navigator.of(ctx).pop('quote'),
                   ),
-                // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-                _buildActionCard(
-                  icon: Icons.timer_outlined,
-                  label: l10n.chatPageActionBurn,
-                  onTap: () => Navigator.of(ctx).pop('burn'),
-                ),
-                _buildActionCard(
-                  icon: Icons.delete_outline,
-                  label: l10n.chatPageActionDelete,
-                  destructive: true,
-                  onTap: () => Navigator.of(ctx).pop('delete'),
-                ),
+                  // 文字消息才有「拷贝」（媒体消息无文本可拷）
+                  if (m.env.type == 'text')
+                    _buildActionCard(
+                      // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
+                      // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
+                      // 与邻居光学对齐
+                      icon: Icons.copy_outlined,
+                      iconSize: 24,
+                      label: l10n.chatPageCopy,
+                      onTap: () => Navigator.of(ctx).pop('copy'),
+                    ),
+                  // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
+                  // 存到本机（系统保存对话框选位置）；放「引用」后面
+                  if (m.attachment != null)
+                    _buildActionCard(
+                      icon: Icons.save_alt,
+                      label: l10n.chatPageActionSave,
+                      onTap: () => Navigator.of(ctx).pop('save'),
+                    ),
+                  // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
+                  _buildActionCard(
+                    icon: Icons.timer_outlined,
+                    label: l10n.chatPageActionBurn,
+                    onTap: () => Navigator.of(ctx).pop('burn'),
+                  ),
+                  // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——
+                  // 服务端按 delivered 高水位原子判定，客户端只做**粗筛**减少
+                  // 无效入口（最终判定的权威在服务端 409）。放「删除」之后：
+                  // 撤回实质上比删除更重（删自己的还让别人收不到；2026-10-11）。
+                  // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
+                  _buildActionCard(
+                    icon: Icons.delete_outline,
+                    label: l10n.chatPageActionDelete,
+                    onTap: () => Navigator.of(ctx).pop('delete'),
+                  ),
+                  if (_messageRecallable(m))
+                    _buildActionCard(
+                      icon: Icons.undo_outlined,
+                      label: l10n.chatPageActionRecall,
+                      onTap: () => Navigator.of(ctx).pop('recall'),
+                    ),
+                ]
               ]),
             ),
           ],
@@ -5210,6 +5380,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     if (action == 'delete') {
       await _deleteMessage(m);
+    } else if (action == 'recall') {
+      await _recallMessage(m);
     } else if (action == 'quote') {
       setState(() => _quoteTarget = m);
       _inputFocusNode.requestFocus();
@@ -5231,6 +5403,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     const maxPerRow = 4;
     const spacing = 12.0;
     const maxCardWidth = 96.0;
+    // 网格容器的自然宽度=一行四卡。弹层比这宽时（如 macOS 满窗宽的底部
+    // 弹层，2026-10-11）卡片被 96 上限卡住、行尾一大片空白——整体限宽居中，
+    // 尾行也居中，与手机上填满一行的观感一致。
+    const gridMaxWidth = maxCardWidth * maxPerRow + spacing * (maxPerRow - 1);
+    // ⚠️ Center 必须带 heightFactor:1——Align 系默认**撑满约束**，弹层是
+    // isScrollControlled:true（maxHeight=全屏），不带会把整个弹层顶到顶天
+    // 立地（413535d9 引入的回归，老板 2026-10-11 实测）。heightFactor:1 =
+    // 高度包住内容、只做横向居中。
+    Widget constrain(Widget child) => Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: gridMaxWidth),
+            child: child,
+          ),
+        );
     return LayoutBuilder(
       builder: (context, constraints) {
         final fourColumnWidth =
@@ -5242,15 +5429,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ];
         if (cards.length <= maxPerRow) {
           // 不超过 4 个：等距分布、卡片等高分栏
-          return IntrinsicHeight(
+          return constrain(IntrinsicHeight(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: items,
             ),
-          );
+          ));
         }
-        // 超过 4 个：每行 4 个一组、向左对齐摆放
+        // 超过 4 个：每行 4 个一组、向左对齐摆放（末行也从第一列排起，
+        // 老板 2026-10-11；整块网格仍限宽居中）
         final rows = <Widget>[];
         for (var i = 0; i < items.length; i += maxPerRow) {
           final chunk = items.sublist(
@@ -5270,7 +5458,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ));
         }
-        return Column(
+        return constrain(Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (var i = 0; i < rows.length; i++) ...[
@@ -5278,7 +5466,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               rows[i],
             ],
           ],
-        );
+        ));
       },
     );
   }
@@ -5330,6 +5518,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
   /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
   /// 2026-09-10 修复）。
+  /// 长按菜单顶部占位行（墓碑消息专用，2026-10-10）：消息已删/已焚毁，
+  /// 不展示内容，只留一条淡灰说明——菜单里只剩「撤回」一项
+  Widget _tombstoneMenuPlaceholder() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        AppLocalizations.of(context)!.chatPageDeletedMessage,
+        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
   Widget _buildMessagePreviewRow(HistoryMessage m) {
     final mine = m.sender == 'me';
     final avatarMemberId =
@@ -5424,7 +5631,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 记录副本：标记为已删除/已焚毁（墓碑，内容隐藏、时间+焚毁记录保留）。
-  HistoryMessage _asDeleted(HistoryMessage m) => (
+  /// [kind] 传墓碑来路（'delete'=本机删除、'recall'=撤回、缺省=焚毁到期）。
+  HistoryMessage _asDeleted(HistoryMessage m, {String? kind}) => (
         env: m.env,
         plaintext: m.plaintext,
         sender: m.sender,
@@ -5434,6 +5642,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         burnAfterSeconds: m.burnAfterSeconds,
         quote: m.quote,
         deleted: true,
+        deletedKind: kind,
         burnManual: m.burnManual,
         status: m.status,
         meta: m.meta,
@@ -5449,12 +5658,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
         content: Text(l10n.chatPageDeleteConfirmMessage),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(l10n.chatPageDeleteCancel),
           ),
+          // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
+          // 用实体样式，不再是纯文字）
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.white,
+            ),
             child: Text(l10n.chatPageDeleteConfirmOk),
           ),
         ],
@@ -5468,7 +5683,60 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() {
       _messages = [
         for (final x in _messages)
-          if (x.env.messageId == m.env.messageId) _asDeleted(x) else x,
+          if (x.env.messageId == m.env.messageId) _asDeleted(x, kind: 'delete') else x,
+      ];
+    });
+  }
+
+  /// 撤回一条「已发出、对方尚未拉取」的自己消息（2026-10-10）：
+  /// 服务端原子校验 delivered 水位后真删（对方永远拉不到），本机走本地墓碑。
+  /// 409（对方已拉取）→ 提示不可撤；其余错误静默提示失败（不墓碑）。
+  Future<void> _recallMessage(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    // 确认弹窗（2026-10-11）：撤回不可恢复且对方永远收不到，比删除更重，
+    // 不做二次确认容易误触
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
+        content: Text(l10n.chatPageRecallConfirmBody),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l10n.chatPageRecallConfirmOk),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _repo.recallMessage(m.env.messageId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _notice(context,
+          e.httpStatus == 409 ? l10n.chatPageRecallBlocked : l10n.chatPageRecallFailed);
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      _notice(context, l10n.chatPageRecallFailed);
+      return;
+    }
+    if (!mounted) return;
+    await MediaCache.deleteFor(widget.spaceId, m.env.messageId);
+    unawaited(AttachmentStore.deleteFor(widget.spaceId, m.env.messageId));
+    if (!mounted) return;
+    setState(() {
+      _messages = [
+        for (final x in _messages)
+          if (x.env.messageId == m.env.messageId) _asDeleted(x, kind: 'recall') else x,
       ];
     });
   }
@@ -6345,28 +6613,44 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 附件元数据缺失的媒体消息兜底 UI（2026-10-09）：明确的「附件不可用 ·
   /// 点按重试」，替代此前的 `🎬/📎 文件名` 乱码行（两个 emoji：iOS 渲染成
   /// 豆腐块、Android 看着像"视频+别针"，都不是真媒体观感）。
-  /// 点按 = 清媒体缓存 + 立即触发一次附件元数据自愈（服务端有数据的话，
-  /// 一轮 sync 周期内自动修复；确认没有的（孤儿）保持本行）。
+  /// 点按 = 清媒体缓存 + 复位该条的自愈计数 + 立即触发一次附件元数据自愈
+  /// （服务端有数据的话，一轮 sync 周期内自动修复；服务端确认没有的（孤儿，
+  /// 404）不显示本行——见 [_healConfirmedMissing]）。
   Widget _attachmentUnusable(HistoryMessage m) {
     final l10n = AppLocalizations.of(context)!;
+    final confirmedMissing = _healConfirmedMissing.contains(m.env.messageId);
+    // 系统提示不用用户内容色：淡灰小字同气泡时间戳一族（老板 2026-10-10，
+    // 淡灰方案——红色留给「发送失败 · 点击重发」，两种状态不混淆）
+    final subtle =
+        _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.broken_image_outlined, size: 14, color: subtle),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            // 服务端确认无附件（孤儿消息）：重试注定 404，不再邀请点按
+            // （老板 2026-10-10）；网络抖动等不确定原因才保留重试入口
+            confirmedMissing
+                ? l10n.chatPageAttachmentUnusable
+                : '${l10n.chatPageAttachmentUnusable} · ${l10n.chatPageAttachmentRetry}',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: subtle),
+          ),
+        ),
+      ],
+    );
+    if (confirmedMissing) return row;
     return Clickable(
       onTap: () {
         _retryAttachment(m);
+        // 网络抖动累计放弃（计数置满）的，手动重试必须复位计数——否则
+        // _healAttachments 的筛选直接跳过这条，点按毫无反应（bug 修复）
+        _healAttempts.remove(m.env.messageId);
         unawaited(_healAttachments());
       },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.broken_image_outlined, size: 16),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              '${l10n.chatPageAttachmentUnusable} · ${l10n.chatPageAttachmentRetry}',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+      child: row,
     );
   }
 
@@ -6627,6 +6911,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (snap.hasData) {
           return Clickable(
             onTap: () => _showFullImage(m, snap.data!),
+            borderRadius: BorderRadius.circular(8),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.memory(snap.data!, width: 180, height: 180, fit: BoxFit.cover),
@@ -7620,7 +7905,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'members',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMembers(_isGroup ? 'group' : 'duo'),
+                      Text(l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
                           style: captionStyle),
                       const Spacer(),
                       // 「我的同伴」右簇：图标按空间类型区分（老板 2026-10-06）——
@@ -7838,10 +8123,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            // 与「名字/时间」的间距 16px：加上图标在 32 宽容器里的
-                            // 居中余量（(32-20)/2 = 6），到图标**视觉边缘**正好 22px，
-                            // 与对方一侧（Invite 文字 22px）一致（老板 2026-09-26）
-                            const SizedBox(width: 16),
+                            // 与「名字/时间」的间距 6px：加上图标在 32 宽容器里的
+                            // 居中余量（(32-20)/2 = 6），到图标**视觉边缘**正好 12px，
+                            // 与状态条其他间距一致（原 16px 视觉偏大，老板 2026-10-10）
+                            const SizedBox(width: 6),
                             // Flexible 要包在**Column 外面**（老板 2026-09-28 实测的溢出：
                             // 名字长到 44 字时，这一行要 767px、只给 376px →
                             // "overflowed by 391 pixels on the right"）。
@@ -7859,27 +8144,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       // 名字做成**可点胶囊**（老板 2026-10-09）：点击开
                                       // 「我的身份」弹窗（与菜单里「我的身份」同一入口），
                                       // 悬浮/按住变色，与状态条其他可点元素同口径。
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        shape: const StadiumBorder(),
-                                        clipBehavior: Clip.antiAlias,
-                                        child: InkWell(mouseCursor: SystemMouseCursors.click,
-                                          onTap: _showRenameDialog,
-                                          hoverColor:
-                                              Colors.black.withValues(alpha: 0.05),
-                                          highlightColor:
-                                              Colors.black.withValues(alpha: 0.08),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            child: Text(_myMemberName,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                textAlign: TextAlign.end,
-                                                // 与对方一侧同号（15），两侧视觉对称
-                                                style: const TextStyle(
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w500)),
+                                      child: Tooltip(
+                                        // 状态条 tooltip 全量补齐（老板 2026-10-10）
+                                        message: l10n.chatPageMyNameTooltip,
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          shape: const StadiumBorder(),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: InkWell(mouseCursor: SystemMouseCursors.click,
+                                            onTap: _showRenameDialog,
+                                            hoverColor:
+                                                Colors.black.withValues(alpha: 0.05),
+                                            highlightColor:
+                                                Colors.black.withValues(alpha: 0.08),
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6, vertical: 2),
+                                              child: Text(_myMemberName,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  // 不用 textAlign.end：长名被 ellipsis 截断后
+                                                  // Text 盒子=约束宽度，比截断文字略宽，end 对齐
+                                                  // 会把富余量挤到左侧（胶囊左边缘空一截）。
+                                                  // 默认 start 对齐，富余量落在"…"右侧，几乎不可见。
+                                                  // 与对方一侧同号（15），两侧视觉对称
+                                                  style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight: FontWeight.w500)),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -7899,17 +8191,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _statusAvatar(
-                              bytes: _myAvatarBytes,
-                              gender: _myGender,
-                              // 空头像：点它没有大图可看 → 直接进换头像流程；
-                              // 有头像：开大图，顶部「更换头像」+ 底部「保存」
-                              onTap: _myAvatarBytes == null
-                                  ? () => unawaited(_showAvatarUpload())
-                                  : () => unawaited(_showAvatarFullscreen(
-                                      _myAvatarBytes!,
-                                      allowReplace: true,
-                                      saveName: _myMemberName)),
+                            Tooltip(
+                              // 状态条 tooltip 全量补齐（老板 2026-10-10）
+                              message: l10n.chatPageMyAvatarTooltip,
+                              child: _statusAvatar(
+                                bytes: _myAvatarBytes,
+                                gender: _myGender,
+                                // 空头像：点它没有大图可看 → 直接进换头像流程；
+                                // 有头像：开大图，顶部「更换头像」+ 底部「保存」
+                                onTap: _myAvatarBytes == null
+                                    ? () => unawaited(_showAvatarUpload())
+                                    : () => unawaited(_showAvatarFullscreen(
+                                        _myAvatarBytes!,
+                                        allowReplace: true,
+                                        saveName: _myMemberName)),
+                              ),
                             ),
                           ],
                         ),
@@ -7993,8 +8289,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // 长按菜单挂**整条气泡**（老板 2026-10-08 定：气泡任意位置都能
                         // 开菜单）。唯一例外是顶栏（时间/快捷动作/沙漏）——它在内层
                         // **吸收**掉长按，见下面那处 GestureDetector。
-                        onLongPress:
-                            m.deleted ? null : () => _showMessageActions(m),
+                        // 墓碑消息仅当可撤回时开菜单（老板 2026-10-10：本地墓碑不
+                        // 影响服务端行，未送达的仍可撤）
+                        onLongPress: _messageHasActions(m)
+                            ? () => _showMessageActions(m)
+                            : null,
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
                           // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变
@@ -8119,82 +8418,117 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 onTap: () => _saveAttachment(m),
                                               ),
                                           ],
-                                          if (m.expiresAt != null) ...[
+                                          if (m.deleted) ...[
+                                            // 墓碑（2026-10-11）：按来路显示图标——
+                                            // 撤回→撤回图标、本机删除→删除图标
+                                            //（它们的沙漏+时长并未真正起作用，
+                                            // 与真焚毁的消息区分开）；焚毁到期→
+                                            // 沙漏（不带时长文字）。**不依赖是否
+                                            // 设过阅后即焚**——此前整块包在
+                                            // expiresAt 条件里，未设焚毁的撤回/
+                                            // 删除消息出不来图标（老板实测）。
+                                            // 纯显示不可点。前面多补 4（老板
+                                            // 2026-10-02）：活消息那路沙漏带
+                                            // 4 padding，墓碑裸排会窄一截
+                                            const SizedBox(width: 4),
+                                            if (m.deletedKind == 'recall' ||
+                                                m.deletedKind == 'delete')
+                                              Icon(
+                                                m.deletedKind == 'recall'
+                                                    ? Icons.undo_outlined
+                                                    : Icons.delete_outline,
+                                                size: 14,
+                                                color: _uiStyle == 'gradient'
+                                                    ? Colors.white70
+                                                    : Colors.grey,
+                                              )
+                                            else
+                                              // 焚毁到期墓碑只留沙漏（2026-10-11
+                                              // 老板：不显示具体时长了——沙漏
+                                              // 已经漏完，时长数字没有意义）。
+                                              // 颜色与相邻删除/撤回图标一致
+                                              //（沙漏本继承 IconTheme，偏深）
+                                              IconTheme(
+                                                data: IconThemeData(
+                                                  color: _uiStyle == 'gradient'
+                                                      ? Colors.white70
+                                                      : Colors.grey,
+                                                ),
+                                                child: _BurnHourglass(
+                                                    burned: true, size: 14),
+                                              ),
+                                          ] else if (m.expiresAt != null) ...[
                                             const SizedBox(width: 4),
                                             // 沙漏=阅后即焚倒计时（老板 2026-09-12，
-                                            // 替代原来的时钟图标，避免与发送中混淆）；
-                                            // 已焚毁/已删除 → 静态空沙漏（不再翻转）。
+                                            // 替代原来的时钟图标，避免与发送中混淆）。
                                             // 可点（老板 2026-10-02）：点击进档位设置
-                                            // 弹层（同长按菜单「阅后即焚」）——仅活消息；
-                                            // 墓碑无内容可操作，保持纯显示
-                                            if (!m.deleted)
-                                              Material(
-                                                color: Colors.transparent,
-                                                // 长条控件（沙漏+时长）用圆角矩形背景，
-                                                // 不跟快捷图标走圆形（老板 2026-10-02）
-                                                borderRadius: BorderRadius.circular(12),
-                                                clipBehavior: Clip.antiAlias,
-                                                child: Tooltip(
-                                                  // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
-                                                  // （老板 2026-10-08；此前只有这处没有）
-                                                  message: l10n.chatPageActionBurn,
-                                                  child: InkWell(
-                                                    mouseCursor: SystemMouseCursors.click,
-                                                    // 悬浮/点击背景同快捷动作/状态栏图标
-                                                    hoverColor:
-                                                        Colors.black.withValues(alpha: 0.05),
-                                                    highlightColor:
-                                                        Colors.black.withValues(alpha: 0.08),
-                                                    onTap: () => _setMessageBurn(m),
-                                                    child: SizedBox(
-                                                      // 与引用/拷贝/保存圆钮**同高**
-                                                      // （老板 2026-10-08：原来被文字撑高一截）
-                                                      height: _bubbleTimeRowControlHeight,
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.symmetric(
-                                                            horizontal: 4),
-                                                        child: Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            _BurnHourglass(
-                                                                burned:
-                                                                    m.deleted,
-                                                                size: 14),
-                                                            const SizedBox(
-                                                                width: 2),
-                                                            // 时钟标签：焚毁时刻 HH:MM（精确到分钟，老板 2026-10-09）
-                                                            Text(
-                                                                _burnTagLabel(m.expiresAt,
-                                                                        m.burnAfterSeconds,
-                                                                        manual: m.burnManual),
-                                                                style: TextStyle(
-                                                                    fontSize: 11,
-                                                                    color: _uiStyle == 'gradient'
-                                                                        ? Colors.white70
-                                                                        : Colors.grey)),
-                                                          ],
-                                                        ),
+                                            // 弹层（同长按菜单「阅后即焚」）
+                                            Material(
+                                              color: Colors.transparent,
+                                              // 长条控件（沙漏+时长）用圆角矩形背景，
+                                              // 不跟快捷图标走圆形（老板 2026-10-02）
+                                              borderRadius: BorderRadius.circular(12),
+                                              clipBehavior: Clip.antiAlias,
+                                              child: Tooltip(
+                                                // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
+                                                // （老板 2026-10-08；此前只有这处没有）
+                                                message: l10n.chatPageActionBurn,
+                                                child: InkWell(
+                                                  mouseCursor: SystemMouseCursors.click,
+                                                  // 悬浮/点击背景同快捷动作/状态栏图标
+                                                  hoverColor:
+                                                      Colors.black.withValues(alpha: 0.05),
+                                                  highlightColor:
+                                                      Colors.black.withValues(alpha: 0.08),
+                                                  onTap: () => _setMessageBurn(m),
+                                                  child: SizedBox(
+                                                    // 与引用/拷贝/保存圆钮**同高**
+                                                    // （老板 2026-10-08：原来被文字撑高一截）
+                                                    height: _bubbleTimeRowControlHeight,
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 4),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          _BurnHourglass(
+                                                              burned: false,
+                                                              size: 14),
+                                                          const SizedBox(
+                                                              width: 2),
+                                                          // 时钟标签：焚毁时刻 HH:MM（精确到分钟，老板 2026-10-09）
+                                                          Text(
+                                                              _burnTagLabel(m.expiresAt,
+                                                                      m.burnAfterSeconds,
+                                                                      manual: m.burnManual),
+                                                              style: TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: _uiStyle == 'gradient'
+                                                                      ? Colors.white70
+                                                                      : Colors.grey)),
+                                                        ],
                                                       ),
                                                     ),
                                                   ),
                                                 ),
-                                              )
-                                            else ...[
-                                              // 墓碑（已焚毁/已删除）：纯显示不可点。
-                                              // 前面多补 4（老板 2026-10-02）：活消息那路
-                                              // 沙漏带 4 padding，墓碑裸排会窄一截
-                                              const SizedBox(width: 4),
-                                              _BurnHourglass(
-                                                  burned: m.deleted, size: 14),
-                                              const SizedBox(width: 2),
-                                              Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
-                                                      manual: m.burnManual),
-                                                  style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: _uiStyle == 'gradient'
-                                                          ? Colors.white70
-                                                          : Colors.grey)),
-                                            ],
+                                              ),
+                                            ),
+                                          ],
+                                          // 菜单「...」（老板 2026-10-12）：时间行
+                                          // 最右侧（沙漏时长右边），单击 = 长按气泡
+                                          // 打开消息菜单弹层；与气泡长按同条件
+                                          //（_messageHasActions：墓碑仅可撤回时给）。
+                                          if (_messageHasActions(m)) ...[
+                                            const SizedBox(width: 2),
+                                            _bubbleQuickAction(
+                                              m,
+                                              icon: Icons.more_horiz,
+                                              // 「更多操作」：区别于汉堡菜单的
+                                              // chatPageMenuMore（"菜单"），这个
+                                              // 指消息操作菜单（老板 2026-10-12）
+                                              label: l10n.chatPageMsgMoreActions,
+                                              onTap: () => _showMessageActions(m),
+                                            ),
                                           ],
                                         ],
                                       ),
@@ -8211,6 +8545,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       Clickable(
                                         onTap: () => _jumpToMessage(
                                             m.quote!['messageId'] as String? ?? ''),
+                                        borderRadius: BorderRadius.circular(8),
                                         child: Container(
                                           margin: const EdgeInsets.only(top: 4),
                                           padding: const EdgeInsets.symmetric(
@@ -9281,7 +9616,7 @@ class _StatusAvatarState extends State<_StatusAvatar> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: Clickable(onTap: widget.onTap, child: body),
+      child: Clickable(onTap: widget.onTap, circle: true, child: body),
     );
   }
 }
@@ -9432,6 +9767,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
       onTap: (widget.openFullscreenOnTap && bytes != null)
           ? _showFullscreen
           : null,
+      circle: true,
       child: CircleAvatar(
         radius: widget.radius,
         backgroundColor: Colors.grey.shade300,
@@ -9547,6 +9883,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
       return Clickable(
         key: const ValueKey('videoPreview'),
         onTap: _init,
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           width: 180,
           height: 100,
@@ -9578,6 +9915,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
     return Clickable(
       key: const ValueKey('videoPreview'),
       onTap: () => _playFullscreen(c),
+      borderRadius: BorderRadius.circular(8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: SizedBox(
@@ -9671,9 +10009,12 @@ class _VideoPreviewState extends State<_VideoPreview> {
 /// 既尊重"减少动态效果"的系统偏好，也让 widget 测试里的 `pumpAndSettle` 不会
 /// 被这个常驻动画卡住（常驻动画会让 pumpAndSettle 一直等到超时）。
 class _SendingPlane extends StatefulWidget {
-  const _SendingPlane({this.color});
+  const _SendingPlane({this.color, this.size = 11});
 
   final Color? color;
+
+  /// 图标边长（2026-10-11 起气泡里传 16，与时间行快捷动作图标同档）。
+  final double size;
 
   @override
   State<_SendingPlane> createState() => _SendingPlaneState();
@@ -9694,7 +10035,7 @@ class _SendingPlaneState extends State<_SendingPlane>
 
   @override
   Widget build(BuildContext context) {
-    final icon = Icon(Icons.send, size: 11, color: widget.color);
+    final icon = Icon(Icons.send, size: widget.size, color: widget.color);
     if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return icon;
     return AnimatedBuilder(
       animation: _controller,

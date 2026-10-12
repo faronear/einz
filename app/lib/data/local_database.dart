@@ -44,6 +44,9 @@ class LocalMessages extends Table {
   // 本地墓碑（纯本地）：非空 = 本机已删除/已焚毁——内容隐藏、时间+焚毁记录保留
   // （老板决策 2026-09-09：不打破消息历史流水，只隐藏内容）
   IntColumn get deletedAt => integer().nullable()(); // NULL=正常；非空=删除时间戳
+  // 墓碑来路（2026-10-11）：'recall'=已撤回、'delete'=本机立刻删除；NULL=焚毁到期
+  // （或 v10 之前打的墓碑）——气泡时间行据此显示撤回/删除图标，焚毁才显示沙漏+时长
+  TextColumn get deletedKind => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {messageId};
@@ -267,9 +270,15 @@ class LocalDatabase extends _$LocalDatabase {
             }
           }
           if (from < 10) {
-            // v10（2026-10-09）：新增 local_voice_transcripts 表（语音消息本地转写，
+            // v10-a（2026-10-09）：新增 local_voice_transcripts 表（语音消息本地转写，
             // 纯本地派生缓存——aimemo/voiceTranscript.zhcn.md §7）。纯新表，无回填。
             await m.createTable(localVoiceTranscripts); // CREATE TABLE IF NOT EXISTS
+            // v10-b（2026-10-11）：local_messages 加墓碑来路列（deleted_kind 可空，
+            // NULL=焚毁到期/旧墓碑）——气泡时间行据 'recall'/'delete' 显示对应图标，
+            // 不再与阅后即焚的沙漏+时长混淆（老板 2026-10-11）。
+            if (!await _hasColumn('local_messages', 'deleted_kind')) {
+              await m.addColumn(localMessages, localMessages.deletedKind);
+            }
           }
         },
       );

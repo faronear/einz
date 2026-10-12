@@ -158,35 +158,47 @@ abstract class AppLocalizations {
   /// **'Enter a shared passphrase'**
   String get setupPageNeedPassphrase;
 
-  /// No description provided for @upgradeRequiredTitle.
+  /// No description provided for @upgradeFrozenTitle.
   ///
   /// In en, this message translates to:
   /// **'Update required'**
-  String get upgradeRequiredTitle;
+  String get upgradeFrozenTitle;
 
-  /// No description provided for @upgradeRequiredBody.
+  /// No description provided for @upgradeFrozenBody.
   ///
   /// In en, this message translates to:
-  /// **'This version is no longer supported by the server (needs at least {min}). Please update to continue.'**
-  String upgradeRequiredBody(String min);
+  /// **'Your app version {current} is no longer supported, you need at least {min}. Please update to continue.'**
+  String upgradeFrozenBody(String min, String current);
 
-  /// No description provided for @upgradeRequiredCurrent.
-  ///
-  /// In en, this message translates to:
-  /// **'Current version: {current}'**
-  String upgradeRequiredCurrent(String current);
-
-  /// No description provided for @upgradeRequiredDownload.
+  /// No description provided for @upgradeFrozenDownload.
   ///
   /// In en, this message translates to:
   /// **'Download update'**
-  String get upgradeRequiredDownload;
+  String get upgradeFrozenDownload;
 
-  /// No description provided for @upgradeRequiredRecheck.
+  /// No description provided for @upgradeCoolingTitle.
   ///
   /// In en, this message translates to:
-  /// **'Check again'**
-  String get upgradeRequiredRecheck;
+  /// **'Update available'**
+  String get upgradeCoolingTitle;
+
+  /// No description provided for @upgradeCoolingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your app version is old, the newest version {latest} is available for download. Please update at your convenient time.'**
+  String upgradeCoolingBody(String latest);
+
+  /// No description provided for @upgradeCoolingDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download update'**
+  String get upgradeCoolingDownload;
+
+  /// No description provided for @upgradeCoolingLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get upgradeCoolingLater;
 
   /// No description provided for @wizardJoinPassphraseRequired.
   ///
@@ -875,7 +887,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send the dedicated entrance token below to “{name}” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
+  /// **'If “{name}” loses all entrances into this space, send the dedicated entrance token below to “{name}” to join again. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -968,6 +980,12 @@ abstract class AppLocalizations {
   /// **'Menu'**
   String get chatPageMenuMore;
 
+  /// No description provided for @chatPageMsgMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get chatPageMsgMoreActions;
+
   /// No description provided for @chatPageRenameNameTitle.
   ///
   /// In en, this message translates to:
@@ -986,11 +1004,23 @@ abstract class AppLocalizations {
   /// **'Group name'**
   String get chatPageGroupNameTitle;
 
-  /// No description provided for @chatPageGroupNameEmptyHint.
+  /// No description provided for @chatPageGroupNameEditTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Name'**
-  String get chatPageGroupNameEmptyHint;
+  /// **'Change group name'**
+  String get chatPageGroupNameEditTooltip;
+
+  /// No description provided for @chatPageMyAvatarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Change my avatar'**
+  String get chatPageMyAvatarTooltip;
+
+  /// No description provided for @chatPageMyNameTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Change my name'**
+  String get chatPageMyNameTooltip;
 
   /// No description provided for @chatPageGroupNameLabel.
   ///
@@ -1304,22 +1334,16 @@ abstract class AppLocalizations {
   /// **'Invited to add a new entrance of “{target}”'**
   String wizardJoinReinviteHintNoName(String target);
 
-  /// No description provided for @chatPageMenuMembers.
-  ///
-  /// In en, this message translates to:
-  /// **'{mode, select, duo{My companion} other{My companions}}'**
-  String chatPageMenuMembers(String mode);
-
   /// No description provided for @chatPageMembersHint.
   ///
   /// In en, this message translates to:
-  /// **'If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.'**
+  /// **''**
   String get chatPageMembersHint;
 
   /// No description provided for @chatPageMembersTitle.
   ///
   /// In en, this message translates to:
-  /// **'{mode, select, duo{My companion} other{My companions}}'**
+  /// **'{mode, select, duo{My companion} group{My group} other{My space}}'**
   String chatPageMembersTitle(String mode);
 
   /// No description provided for @chatPageMembersUnnamed.
@@ -1562,6 +1586,48 @@ abstract class AppLocalizations {
   /// **'Delete now'**
   String get chatPageActionDelete;
 
+  /// No description provided for @chatPageActionRecall.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall'**
+  String get chatPageActionRecall;
+
+  /// No description provided for @chatPageRecallConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall message?'**
+  String get chatPageRecallConfirmTitle;
+
+  /// No description provided for @chatPageRecallConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Once recalled, your companion will never receive it. This cannot be undone.'**
+  String get chatPageRecallConfirmBody;
+
+  /// No description provided for @chatPageRecallConfirmOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall'**
+  String get chatPageRecallConfirmOk;
+
+  /// No description provided for @chatPageRecallBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Already delivered, can\'t recall'**
+  String get chatPageRecallBlocked;
+
+  /// No description provided for @chatPageRecallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall failed, try again later'**
+  String get chatPageRecallFailed;
+
+  /// No description provided for @chatPageDeletedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'(This message is no longer available)'**
+  String get chatPageDeletedMessage;
+
   /// No description provided for @chatPageActionQuote.
   ///
   /// In en, this message translates to:
@@ -1595,13 +1661,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDeleteConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete message'**
+  /// **'Delete message?'**
   String get chatPageDeleteConfirmTitle;
 
   /// No description provided for @chatPageDeleteConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Removed only on this device; the others aren\'t affected, and it can\'t be undone. Delete?'**
+  /// **'Removed only on this device (the others aren\'t affected), and it can\'t be undone. Delete?'**
   String get chatPageDeleteConfirmMessage;
 
   /// No description provided for @chatPageDeleteCancel.
@@ -1999,6 +2065,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Development address for debugging only'**
   String get aboutServerDevNote;
+
+  /// No description provided for @aboutStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get aboutStatusLabel;
+
+  /// No description provided for @aboutStatusChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get aboutStatusChecking;
+
+  /// No description provided for @aboutStatusConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get aboutStatusConnected;
+
+  /// No description provided for @aboutStatusUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unreachable'**
+  String get aboutStatusUnreachable;
 
   /// No description provided for @advancedMenuTitle.
   ///

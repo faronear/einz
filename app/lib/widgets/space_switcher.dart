@@ -789,8 +789,11 @@ class _SpaceCard extends StatelessWidget {
                 ),
                 // StackFit.expand：让非定位子项吃满整块，Column 才能真正**居中**
                 // （默认 loose 下 Column 会缩到内容宽度并被摆到左上角 → 看着像靠左）
+                // Clip.none：未读角标要用**负偏移**贴住/超出卡片圆角（Padding
+                // 之外），默认 hardEdge 会把它裁掉。
                 child: Stack(
                   fit: StackFit.expand,
+                  clipBehavior: Clip.none,
                   children: [
                     // 内容：群组有人时平铺成员（2×2）；**还没有人加入**（peerPending）
                     // 时 duo/group 都显示占位正文（老板 2026-10-06：duo=默认头像，
@@ -802,22 +805,14 @@ class _SpaceCard extends StatelessWidget {
                       _buildPendingBody(context, theme)
                     else
                       _buildSingleBody(context, theme),
-                    // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来。
-                    // **左上角**（老板 2026-09-24）：右下角会盖住名字；与右上角的未读角标各占一角。
-                    AnimatedOpacity(
-                      opacity: current ? 1 : 0,
-                      duration: anim,
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: Icon(Icons.check_circle,
-                            size: 20, color: _foreground ?? theme.colorScheme.primary),
-                      ),
-                    ),
-                    // 未读角标 → **右上角**（与左上角的对勾分居两角，互不遮挡）
+                    // 当前选中**不再画圆勾**（老板 2026-10-12：群组卡片会平铺成员
+                    // 头像，勾压在头像上）——选中态靠底色/前景渐变 + 浮起阴影区分。
+                    // 未读角标 → **右上角**，负偏移让它贴住甚至压出卡片圆角
+                    // （老板 2026-10-12：群组成员头像会顶到角上，不外移就压头像）。
                     if (unread > 0)
                       Positioned(
-                        right: 0,
-                        top: 0,
+                        right: -8,
+                        top: -8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(

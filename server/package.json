@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "node --env-file-if-exists=${EINZ_ENV_FILE:-../serverDocker/.env} --import tsx src/app.ts",
-    "test": "npm run build && tsx test/smoke.test.ts && tsx test/two_space_isolation.test.ts && tsx test/receipts.test.ts && tsx test/audit.test.ts && tsx test/push_scope.test.ts && tsx test/peer_status.test.ts && tsx test/entrance_name.test.ts && tsx test/member_name.test.ts && tsx test/entrance_retire.test.ts && tsx test/install_uid.test.ts && tsx test/entrance_limit.test.ts && tsx test/space_id.test.ts && tsx test/attachment_space_dir.test.ts && tsx test/backup_space.test.ts && tsx test/backup_avatars.test.ts && tsx test/unread.test.ts  && tsx test/group_chat.test.ts && tsx test/group_chat_limit.test.ts && tsx test/join_token_target.test.ts && tsx test/min_app_version.test.ts && tsx test/notify.test.ts && tsx test/data_store.test.ts",
+    "test": "npm run build && tsx test/smoke.test.ts && tsx test/two_space_isolation.test.ts && tsx test/receipts.test.ts && tsx test/audit.test.ts && tsx test/push_scope.test.ts && tsx test/peer_status.test.ts && tsx test/entrance_name.test.ts && tsx test/member_name.test.ts && tsx test/entrance_retire.test.ts && tsx test/install_uid.test.ts && tsx test/entrance_limit.test.ts && tsx test/space_id.test.ts && tsx test/attachment_space_dir.test.ts && tsx test/backup_space.test.ts && tsx test/backup_avatars.test.ts && tsx test/unread.test.ts  && tsx test/group_chat.test.ts && tsx test/group_chat_limit.test.ts && tsx test/join_token_target.test.ts && tsx test/cold_app_version.test.ts && tsx test/notify.test.ts  && tsx test/dnsReport.test.ts && tsx test/data_store.test.ts",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
     "audit": "tsx scripts/audit.ts",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
+    "chokidar": "^5.0.0",
     "hash-wasm": "^4.12.0",
     "libsodium-wrappers": "^0.8.4",
     "nodemailer": "^10.0.13",

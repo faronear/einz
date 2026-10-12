@@ -87,8 +87,11 @@ fi
 # ---------- flutter 构建 ----------
 find build/macos -name '*.sbak' -print -delete 2>/dev/null || true
 eval "$(node ../scripts/appVersion.js)"
+# 语音通话 TURN 配置（可选）：localConfig.turn.json 存在就带上（同 buildIos.sh 口径，
+# 共用 scripts/turnDefineArgs.sh——2026-10-11 补，此前 dist/dev 包都不带 TURN）
+TURN_ARGS="$(bash ../../scripts/turnDefineArgs.sh)"
 echo "==> flutter build macos --release ${APP_BUILD_NAME} (${APP_BUILD_NUMBER})"
-flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+flutter build macos --release $TURN_ARGS --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
 
 APP="build/macos/Build/Products/Release/einz.app"
 

@@ -16,10 +16,35 @@ const { execSync } = require('child_process')
 const path = require('path')
 
 const builtinAlias = {
+  ipxr: 'iPhone XR',
+  ipxs: 'iPhone Xs',
+  ip11: 'iPhone 11',
+  ip11pro: 'iPhone 11 Pro',
+  ip11pm: 'iPhone 11 Pro Max',
+  ip12: 'iPhone 12',
+  ip12mini: 'iPhone 12 mini',
+  ip12pro: 'iPhone 12 Pro',
+  ip12pm: 'iPhone 12 Pro Max',
+  ip13: 'iPhone 13',
+  ip13mini: 'iPhone 13 mini',
+  ip13pro: 'iPhone 13 Pro',
+  ip13pm: 'iPhone 13 Pro Max',
+  ip14: 'iPhone 14',
+  ip14plus: 'iPhone 14 Plus',
+  ip14pro: 'iPhone 14 Pro',
+  ip14pm: 'iPhone 14 Pro Max',
+  ip15: 'iPhone 15',
+  ip15plus: 'iPhone 15 Plus',
+  ip15pro: 'iPhone 15 Pro',
+  ip15pm: 'iPhone 15 Pro Max',
   ip16: 'iPhone 16',
   ip16plus: 'iPhone 16 Plus',
   ip16pro: 'iPhone 16 Pro',
-  ip16pm: 'iPhone 16 Pro Max'
+  ip16pm: 'iPhone 16 Pro Max',
+  ip17: 'iPhone 17',
+  ip17pro: 'iPhone 17 Pro',
+  ip17pm: 'iPhone 17 Pro Max',
+  ip17air: 'iPhone Air'
 }
 
 const rootDir = path.resolve(__dirname, '..')
@@ -32,7 +57,7 @@ try {
 
 const input =
   (process.argv[2] || '').trim() ||
-  String(pkgConfig.defaultIosEmu || 'ip16@26.3').trim()
+  String(process.env.EMU || pkgConfig.defaultIosEmu || '').trim()
 
 if (
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)
@@ -55,10 +80,43 @@ const deviceName = pkgConfig[left] || builtinAlias[left.toLowerCase()] || left
 const json = JSON.parse(
   execSync('xcrun simctl list devices available -j').toString()
 )
+
+// 辅助函数放在**所有使用之前**：下面 `if (!input)` 分支在模块顶层就跑
+// sort，比较器立刻调用 versionOf——const 声明若在使用之后会触发 TDZ
+// （ReferenceError: Cannot access 'versionOf' before initialization，
+// 2026-10-12 老板实测）。
 const runtimeKeyFor = want => `iOS-${want.replace(/\./g, '-')}`
 const versionOf = runtimeKey => {
   const matched = runtimeKey.match(/iOS-(\d+)(?:-(\d+))?/)
   return matched ? [Number(matched[1]), Number(matched[2] || 0)] : [0, 0]
+}
+
+// 空规格（裸 npm run app-ios-boot）：有 Booted 直接用它；否则挑可用的
+// iPhone 里系统版本最高的那台——任何机器上都能裸跑，不再钉死某机型。
+if (!input) {
+  const all = []
+  for (const [runtimeKey, devices] of Object.entries(json.devices)) {
+    if (!/iOS-/.test(runtimeKey)) continue
+    for (const d of devices) all.push({ ...d, runtimeKey })
+  }
+  const booted = all.find(d => d.state === 'Booted')
+  if (booted) {
+    console.log(booted.udid)
+    process.exit(0)
+  }
+  const iPhones = all.filter(d => /iPhone/i.test(d.name))
+  if (iPhones.length === 0) {
+    console.error('❌ 本机没有可用的 iPhone 模拟器')
+    console.error('   看有哪些：xcrun simctl list devices available')
+    process.exit(1)
+  }
+  iPhones.sort((a, b) => {
+    const [aMajor, aMinor] = versionOf(a.runtimeKey)
+    const [bMajor, bMinor] = versionOf(b.runtimeKey)
+    return bMajor - aMajor || bMinor - aMinor
+  })
+  console.log(iPhones[0].udid)
+  process.exit(0)
 }
 
 const matched = []

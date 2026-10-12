@@ -35,30 +35,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupPageEnvelopeKeyHint(String mode) {
-    return '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境同伴获取。';
+    return '密保信封是私下交接的一段加密文字。请询问你的同伴获取。';
   }
 
   @override
   String get setupPageNeedPassphrase => '请设置共享口令';
 
   @override
-  String get upgradeRequiredTitle => '需要升级';
+  String get upgradeFrozenTitle => '必须升级';
 
   @override
-  String upgradeRequiredBody(String min) {
-    return '这个版本已经不被服务器支持了（最低需要 $min）。升级后才能继续使用。';
+  String upgradeFrozenBody(String min, String current) {
+    return '您的应用版本 $current 已经过期，最低需要 $min。升级后才能继续使用。';
   }
 
   @override
-  String upgradeRequiredCurrent(String current) {
-    return '当前版本：$current';
+  String get upgradeFrozenDownload => '下载新版本';
+
+  @override
+  String get upgradeCoolingTitle => '建议升级';
+
+  @override
+  String upgradeCoolingBody(String latest) {
+    return '您的应用版本即将过期，目前最新版本为 $latest，建议您抽空升级。';
   }
 
   @override
-  String get upgradeRequiredDownload => '下载新版本';
+  String get upgradeCoolingDownload => '下载新版本';
 
   @override
-  String get upgradeRequiredRecheck => '重新检查';
+  String get upgradeCoolingLater => '以后再说';
 
   @override
   String get wizardJoinPassphraseRequired => '请输入共享口令进行验证';
@@ -425,15 +431,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      '把专属通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
+      '把以下的专属通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '使用专属通道码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
+      '使用以下的专属通道码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '把专属通道码发给“$name”，凭它重新加入本秘境。原有通道不受影响。24 小时内一次性有效。';
+    return '如果“$name”丢失了进入本秘境的所有通道，可凭以下的专属通道码重新加入本秘境。24 小时内一次性有效。';
   }
 
   @override
@@ -486,19 +492,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMore => '菜单';
 
   @override
+  String get chatPageMsgMoreActions => '更多操作';
+
+  @override
   String get chatPageRenameNameTitle => '我的身份';
 
   @override
   String get chatPageRenameNameLabel => '名字';
 
   @override
-  String get chatPageGroupNameTitle => '群组名字';
+  String get chatPageGroupNameTitle => '群组名称';
 
   @override
-  String get chatPageGroupNameEmptyHint => '群名';
+  String get chatPageGroupNameEditTooltip => '修改群名';
 
   @override
-  String get chatPageGroupNameLabel => '名字';
+  String get chatPageMyAvatarTooltip => '修改我的头像';
+
+  @override
+  String get chatPageMyNameTooltip => '修改我的名字';
+
+  @override
+  String get chatPageGroupNameLabel => '名称';
 
   @override
   String get chatPageGenderLabel => '性别';
@@ -680,16 +695,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String chatPageMenuMembers(String mode) {
-    return '我的同伴';
-  }
-
-  @override
-  String get chatPageMembersHint => '如果同伴不慎丢失了所有通道，点击重新邀请，生成专属通道码，让同伴凭它重新加入秘境。';
+  String get chatPageMembersHint => '';
 
   @override
   String chatPageMembersTitle(String mode) {
-    return '我的同伴';
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': '我的同伴',
+      'group': '我的群组',
+      'other': '我的秘境',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -825,6 +840,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionDelete => '立刻删除';
 
   @override
+  String get chatPageActionRecall => '撤回';
+
+  @override
+  String get chatPageRecallConfirmTitle => '撤回消息？';
+
+  @override
+  String get chatPageRecallConfirmBody => '一旦撤回，对方就不会收到这条消息。确定撤回这条消息吗？';
+
+  @override
+  String get chatPageRecallConfirmOk => '撤回';
+
+  @override
+  String get chatPageRecallBlocked => '对方已接收，无法撤回';
+
+  @override
+  String get chatPageRecallFailed => '撤回失败，请稍后重试';
+
+  @override
+  String get chatPageDeletedMessage => '（该消息已不存在）';
+
+  @override
   String get chatPageActionQuote => '引用';
 
   @override
@@ -842,11 +878,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionBurn => '阅后即焚';
 
   @override
-  String get chatPageDeleteConfirmTitle => '删除消息';
+  String get chatPageDeleteConfirmTitle => '删除消息？';
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      '删除后仅在本机消失，同伴不受影响，且无法恢复。确定删除这条消息吗？';
+      '删除仅在本机生效（你的和同伴的其他设备都不受影响），且无法恢复。确定删除这条消息吗？';
 
   @override
   String get chatPageDeleteCancel => '取消';
@@ -1069,7 +1105,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerLabel => '服务器地址';
 
   @override
-  String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
+  String get aboutServerDevNote => '开发地址，仅供测试';
+
+  @override
+  String get aboutStatusLabel => '连接状态';
+
+  @override
+  String get aboutStatusChecking => '检测中…';
+
+  @override
+  String get aboutStatusConnected => '已连接';
+
+  @override
+  String get aboutStatusUnreachable => '无法连接';
 
   @override
   String get advancedMenuTitle => '高级安全';
@@ -1129,7 +1177,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
 
   @override
-  String get spaceListHint => '点击其他秘境即可切换';
+  String get spaceListHint => '点击卡片切换当前秘境';
 
   @override
   String get spaceListTitle => '我的秘境';

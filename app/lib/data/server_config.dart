@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:einz_shared/einz_shared.dart'
+    show DoHResolver, createPinnedHttpClient, probeWithDohFallback;
 
 /// 服务器地址层（三层，见 docs/SERVER_SETTINGS.md）。
 ///
@@ -48,9 +50,15 @@ const String kPrimaryServer = 'https://einz.tic.cc';
 /// 也无需在 App 里做任何操作。
 ///
 /// 新增备用域名 = 在这里加一行常量（+ 重新发包）。
+///
+/// 2026-10-11 起三域名同源（`36.154.238.42`）：单域名被 DNS 抢答注入（见
+/// dns_fallback.dart）/ 备案 / 注册商故障时，并发探测会自动落到其余入口，
+/// 用户无感。服务器端 TLS（Caddy）与解析需先行就绪。
 const List<String> kServerCandidates = [
   kPrimaryServer, // 全球入口（无备案）
   'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
+  'https://einz.farinear.cn', // 中国备用入口 1
+  'https://einz.bittic.cn', // 中国备用入口 2
 ];
 
 /// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
@@ -111,7 +119,8 @@ class ServerHealth {
     this.ok = false,
     this.protocolVersion = '',
     this.capabilities = const <String>[],
-    this.minAppVersion,
+    this.coldAppVersion,
+    this.hotAppVersion,
     this.appDownloadUrl,
     this.maxAttachmentBytes,
   });
@@ -125,10 +134,18 @@ class ServerHealth {
   /// 能力清单（不支持 spaces 的旧服务端为空 → 向导显示"该服务器太旧"）。
   final List<String> capabilities;
 
-  /// 服务端要求的最低 App 版本（`min_app_version`；null = 不设下限）。
-  /// 格式 `yymm.ddhh.mm`（见 `scripts/appVersion.js`），与 App 自身的
+  /// 冻结线：当前可用的最低 App 版本（`cold_app_version`；null = 不设冻结线）。
+  /// 低于它 = **frozen（冻结，不可用）**。**版本三态（2026-10-10 老板定）**见
+  /// [hotAppVersion]。格式 `yymm.ddhh.mm`（见 `scripts/appVersion.js`），与 App 自身的
   /// CFBundleShortVersionString / versionName 同一个串，可直接比大小。
-  final String? minAppVersion;
+  final String? coldAppVersion;
+
+  /// 当前正热用的 App 版本（`hot_app_version`；null = 不设热版本，2026-10-10）。
+  /// **温度三态语义（2026-10-10 老板定）**：本值 = 当前正热用（hot）；
+  /// [coldAppVersion] = 冻结线；本机版本低于本值（但 ≥ 冻结线）= **cooling（正在
+  /// 冷却，仍可用）**——启动弹**可关闭**的升级提醒；低于冻结线 = **frozen（冻结）**
+  /// ——弹**不可关闭**的升级窗口。注意 cold 是"线"不是"态"。格式同 [coldAppVersion]。
+  final String? hotAppVersion;
 
   /// 升级入口 URL（`app_download_url`；null = 服务端不给链接）。
   final String? appDownloadUrl;
@@ -142,10 +159,26 @@ class ServerHealth {
 ///
 /// Multiverse：返回协议版本与能力清单——/health 不返回全局 member 表
 /// （PROTOCOL_MULTIVERSE.md §4.1）；协议版本用于旧服务器提示（不支持 spaces 的
-/// 旧 Server 明确升级提示，§8.1）。**另含最低 App 版本**（2026-10-04）：
-/// 客户端启动时据此判断"我是不是已经不被支持了"（见 widgets/version_gate.dart）。
-Future<ServerHealth> probeServer(String server) async {
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+/// 旧 Server 明确升级提示，§8.1）。**另含版本闸两个边界值**（2026-10-04 起，
+/// 2026-10-10 温度三态）：coldAppVersion（冻结线）/ hotAppVersion（当前热版本），
+/// 客户端启动时据此判断 frozen / cooling / none（见 widgets/version_gate.dart）。
+Future<ServerHealth> probeServer(
+  String server, {
+  DoHResolver? dohResolver, // 测试注入 fake；生产走真实 DoH（doh.pub → alidns）
+}) {
+  return probeWithDohFallback(
+    server,
+    () => _probeDirect(server),
+    ok: (h) => h.ok,
+    dohResolver: dohResolver,
+  );
+}
+
+/// 直连探测（原 [probeServer] 本体）。host 被钉扎时经 [createPinnedHttpClient]
+/// 直连 DoH 真 IP，TLS 仍按域名校验（DNS 污染兜底，见 dns_fallback.dart）。
+Future<ServerHealth> _probeDirect(String server) async {
+  final client =
+      createPinnedHttpClient(connectionTimeout: const Duration(seconds: 3));
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
@@ -174,7 +207,8 @@ Future<ServerHealth> probeServer(String server) async {
       ok: true,
       protocolVersion: pv,
       capabilities: caps,
-      minAppVersion: nonEmpty(json['min_app_version']),
+      coldAppVersion: nonEmpty(json['cold_app_version']),
+      hotAppVersion: nonEmpty(json['hot_app_version']),
       appDownloadUrl: nonEmpty(json['app_download_url']),
       maxAttachmentBytes: maxAttachmentBytes,
     );

@@ -31,6 +31,7 @@ typedef HistoryMessage = ({
   int burnAfterSeconds,
   Map<String, dynamic>? quote,
   bool deleted,
+  String? deletedKind, // 墓碑来路：'recall'=撤回、'delete'=本机删除、NULL=焚毁到期
   bool burnManual,
   String status,
   Map<String, dynamic>? meta,
@@ -426,10 +427,31 @@ class MessageRepository {
   /// 删除本机一条消息（**本地墓碑**，Server 不参与）：只置 deletedAt 标记，
   /// 行与附件元数据保留——UI 隐藏内容但保留时间+焚毁记录，不打破历史流水
   /// （老板决策 2026-09-09，替代原来的彻底删行；重启后记录仍在、内容仍隐藏）。
-  Future<void> tombstoneMessage(String messageId) async {
+  /// [kind] 标记来路（'delete'=本机删除、'recall'=撤回；焚毁到期走
+  /// [tombstoneExpired] 不带 kind）——气泡时间行据此显示对应图标（2026-10-11）。
+  Future<void> tombstoneMessage(String messageId, {String kind = 'delete'}) async {
     await (db.update(db.localMessages)..where((m) => m.messageId.equals(messageId))).write(
-      LocalMessagesCompanion(deletedAt: Value(DateTime.now().millisecondsSinceEpoch)),
+      LocalMessagesCompanion(
+        deletedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        deletedKind: Value(kind),
+      ),
     );
+  }
+
+  /// 撤回一条「已发出、对方尚未拉取」的消息（2026-10-10）：
+  /// 服务端原子校验 delivered 水位后真删消息行+附件（对方永远拉不到），
+  /// 成功后本机走现有本地墓碑（UI 立即消失，保留时间记录）。
+  ///
+  /// 失败原样抛 [ApiException]：409 `ALREADY_DELIVERED` = 对方已拉取不可撤
+  /// （UI 提示）；403 非本人；404 消息不在服务端（可能已被撤）——404 也按
+  /// 成功处理（本地照常墓碑，结果一致：这条消息没了）。
+  Future<void> recallMessage(String messageId) async {
+    try {
+      await _withAutoAuth((tok) => api.recallMessage(messageId, tok));
+    } on ApiException catch (e) {
+      if (e.httpStatus != 404) rethrow;
+    }
+    await tombstoneMessage(messageId, kind: 'recall');
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
@@ -580,6 +602,19 @@ class MessageRepository {
     if (peers.every((p) => p.readUptoSeq >= seq)) return 'read';
     if (peers.every((p) => p.deliveredUptoSeq >= seq)) return 'delivered';
     return null;
+  }
+
+  /// 自己某条消息**已送达的人数**（老板 2026-10-12 的"双勾+k"设计）：[peers]
+  /// 里 `deliveredUptoSeq ≥ seq` 或 `readUptoSeq ≥ seq`（已读必已送达）的人数。
+  /// 纯函数便于单测；[peers] 口径同 [receiptOf]——**必须只含接收方**（排除我
+  /// 自己那一行，见 [peerReceipts]），否则我的水位会被算进"已送达人数"。
+  /// 渲染规则见 ChatPage.\_buildSendStatusIcon：k=0 → 单勾；k≥1 → 双勾+k
+  /// （群组随时扩张，"全员送达"不是终态，裸双勾只属于 duo 单接收方）。
+  static int deliveredCountOf(int? seq, List<PeerReceipt> peers) {
+    if (seq == null) return 0;
+    return peers
+        .where((p) => p.deliveredUptoSeq >= seq || p.readUptoSeq >= seq)
+        .length;
   }
 
   /// 补发 pending 队列（成功后置 sent 并推进锚点）。
@@ -858,6 +893,7 @@ class MessageRepository {
             : (row.expiresAt == null ? 0 : max(1, row.expiresAt! - row.createdAt)),
         quote: quote,
         deleted: row.deletedAt != null,
+        deletedKind: row.deletedKind,
         burnManual: row.burnManual,
         status: row.status,
         meta: meta,

@@ -2,7 +2,7 @@ import { getDb } from "./db.js";
 import { ApiError, touchLastSeen } from "./auth.js";
 import { requireSession } from "./guard.js";
 import { type ServerConfig } from "./config.js";
-import { attachmentsForMessages, type AttachmentMeta } from "./attachments.js";
+import { attachmentsForMessages, deleteAttachmentFiles, type AttachmentMeta } from "./attachments.js";
 import { assertSafeMessageId } from "./safeId.js";
 
 const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "audio", "file", "system"]);
@@ -97,6 +97,61 @@ export function postMessage(token: string, body: unknown): { message_id: string;
   ).run(env.message_id, spaceId, env.sender_entrance_id, env.sender_member_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
 
   return { message_id: env.message_id, server_sequence: nextSeq.next, created_at: now };
+}
+
+/** 撤回一条「服务端已收下、对方尚未拉取」的消息（老板 2026-10-10）。
+ *
+ * 可撤判定（单事务内原子完成，杜绝「校验通过到删除之间对方恰好 sync 走」竞态）：
+ * 本 space 内**其他成员**的 delivered 高水位全部 < 本条 server_sequence。
+ * 2 人空间即"对方没拉过"；将来群组该条件自动升级为"所有人都没拉过"。
+ *
+ * 动作：真删 messages 行 + attachments 行 + blob 文件（不走 10 分钟孤儿窗口）。
+ * 行删了 /sync 永远不会把这条给对方；已落对方本地库的极端窗口（delivered 上报
+ * 延迟）见 docs 附件撤回设计备注——E2EE 密文，风险可接受。
+ *
+ * 错误码：404 消息不存在/不属于本 space；403 非本人发送；409 已送达不可撤。
+ */
+export function recallMessage (
+  token: string,
+  messageId: string
+): { message_id: string; server_sequence: number } {
+  const { entrance_id, space_id: spaceId, member_id: myMemberId } = requireSession(token)
+  touchLastSeen(entrance_id)
+  assertSafeMessageId(messageId)
+
+  const db = getDb()
+  const result = db.transaction(() => {
+    const row = db
+      .prepare(`SELECT message_id, sender_entrance_id, sender_member_id, server_sequence FROM messages WHERE message_id = ? AND space_id = ?`)
+      .get(messageId, spaceId) as { message_id: string; sender_entrance_id: string; sender_member_id: string | null; server_sequence: number } | undefined
+    if (!row) throw new ApiError('NOT_FOUND', 'message not found', 404)
+    // 归因校验：只有发送者本人能撤。sender_member_id 为 NULL 的 legacy 消息
+    // 按 sender_entrance_id 对照当前通道（同 member 的历史通道也放行）。
+    const mine = row.sender_member_id != null
+      ? row.sender_member_id === myMemberId
+      : row.sender_entrance_id === entrance_id
+    if (!mine) throw new ApiError('FORBIDDEN', 'not the sender', 403)
+
+    // 对方（本 space 其他成员）delivered 高水位全部 < 本条 seq 才可撤
+    const others = db
+      .prepare(`SELECT COALESCE(MAX(delivered_upto_seq), 0) AS max_delivered FROM receipts WHERE space_id = ? AND member_id != ?`)
+      .get(spaceId, myMemberId) as { max_delivered: number }
+    if (others.max_delivered >= row.server_sequence) {
+      throw new ApiError('ALREADY_DELIVERED', 'peer already fetched this message', 409)
+    }
+
+    // 附件：先取 storage_path（事务内删行，文件删放在事务外——文件系统操作
+    // 不参与 SQLite 事务，失败也只是孤儿文件，孤儿清理兜底）
+    const atts = db
+      .prepare(`SELECT storage_path FROM attachments WHERE message_id = ? AND space_id = ?`)
+      .all(messageId, spaceId) as { storage_path: string }[]
+    db.prepare(`DELETE FROM attachments WHERE message_id = ? AND space_id = ?`).run(messageId, spaceId)
+    db.prepare(`DELETE FROM messages WHERE message_id = ? AND space_id = ?`).run(messageId, spaceId)
+    return { message_id: row.message_id, server_sequence: row.server_sequence, storagePaths: atts.map(a => a.storage_path) }
+  })() as { message_id: string; server_sequence: number; storagePaths: string[] }
+  // 事务提交后才删文件：文件系统操作不参与 SQLite 事务（见上注释）
+  deleteAttachmentFiles(spaceId, result.storagePaths)
+  return { message_id: result.message_id, server_sequence: result.server_sequence }
 }
 
 /** GET /sync?after=&limit=：按 server_sequence 增量拉取（PROTOCOL.md §5.2）。 */

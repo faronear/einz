@@ -139,11 +139,18 @@ GET /health
   响应示例：{ "status": "ok", "protocol_version": "v2-multiverse",
               "version": "<server 版本>", "uptime_sec": 123,
               "capabilities": [...], "max_attachment_bytes": 67108864 }
-  **可选字段（2026-10-04，强制升级闸）**：配了才出现——
-    · `min_app_version`：服务端支持的**最低 App 版本**，格式 `yymm.ddhh.mm`
-      （UTC，与 App 打包注入的 CFBundleShortVersionString 同一个串）；
-      客户端启动时核对，低于它 → 首屏弹**不可关闭**的升级窗口。
-    · `app_download_url`：升级窗口里「下载新版本」按钮的 URL。
+  **可选字段（2026-10-04 起版本闸；2026-10-10 温度三态）**：配了才出现——
+    · `cold_app_version`：**冻结线**——服务端当前可用的最低 App 版本，格式
+      `yymm.ddhh.mm`（UTC，与 App 打包注入的 CFBundleShortVersionString 同一个串）；
+      客户端启动时核对，低于它（**frozen，冻结不可用**）→ 首屏弹**不可关闭**的升级窗口。
+    · `hot_app_version`（2026-10-10）：服务端**当前正热用的 App 版本**，格式同上。
+      **温度三态语义（老板定）**：≥ 本值 = **hot**（正热用）；≥ `cold_app_version` 但
+      < 本值 = **cooling（正在冷却，仍可用）**，客户端首屏弹**可关闭**的升级提醒，
+      不拦人；< `cold_app_version` = **frozen（冻结）**，弹**不可关闭**的升级窗口。
+      两个都低时 frozen 判定优先（只弹不可关闭的窗口）。只配本值不配
+      `cold_app_version` 时：低于它的客户端只被提醒、不被拦。注意 cold 是"线"
+      不是"态"——状态只有 cooling / frozen。
+    · `app_download_url`：升级窗口里「下载新版本」按钮的 URL（两档共用）。
   两个字段都非密、无元数据风险（不含任何空间/成员信息）。空串 = 没配（不下发）。
   **`max_attachment_bytes`（2026-10-08）**：附件 blob 大小上限（字节，默认 64 MiB，
   环境变量 `EINZ_MAX_ATTACHMENT_BYTES` 可覆盖）。客户端发送附件前据此**本地预检**：
@@ -152,6 +159,20 @@ GET /health
   与 `protocol_version` 的分工：后者是 wire 兼容闸（服务端硬拒，REST 400 / WS 4400），
   前者是**产品级**闸（协议也许还能用，但某版本有缺陷/不可靠时，改配置即可把旧客户端
   挡在门外，不必改代码）。客户端实现见 `app/lib/widgets/version_gate.dart`。
+
+```text
+POST /network/dns-report        ← 2026-10-11，免认证（见下）
+  DNS 污染上报：客户端探测直连失败 → DoH 重解析成功（= 系统解析与加密解析分歧，
+  链路被抢答注入）时 fire-and-forget 上报一条；走 DoH 钉扎连接（此时唯一保证可达）。
+  请求：{ domain, doh_ip? }（domain=被污染的入口域名；doh_ip=DoH 解析出的真 IP）
+  响应：200 { ok: true }；入参形状不对 → 400 INVALID_REQUEST
+  **免认证理由**：污染发生在启动探测阶段，客户端尚未（也无法）完成认证。
+  滥用面：dnsReport 限速桶（默认 10 次/时/IP）+ 域名/IPV4 形状校验 + 只追加表
+  （30 天懒清理）。旧服务端（404 NOT_FOUND）客户端静默忽略，前后向兼容。
+GET /network/dns-report
+  聚合只读：{ reports: [{ day, domain, count }] }（按 UTC 日 + 域名计数，近 30 天；
+  **不含 IP**）。供运维看清"哪些网络在污染"，早于用户投诉。
+```
 
 POST /spaces
   创建 Space（首条通道自举，无 token）。

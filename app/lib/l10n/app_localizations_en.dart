@@ -46,23 +46,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageNeedPassphrase => 'Enter a shared passphrase';
 
   @override
-  String get upgradeRequiredTitle => 'Update required';
+  String get upgradeFrozenTitle => 'Update required';
 
   @override
-  String upgradeRequiredBody(String min) {
-    return 'This version is no longer supported by the server (needs at least $min). Please update to continue.';
+  String upgradeFrozenBody(String min, String current) {
+    return 'Your app version $current is no longer supported, you need at least $min. Please update to continue.';
   }
 
   @override
-  String upgradeRequiredCurrent(String current) {
-    return 'Current version: $current';
+  String get upgradeFrozenDownload => 'Download update';
+
+  @override
+  String get upgradeCoolingTitle => 'Update available';
+
+  @override
+  String upgradeCoolingBody(String latest) {
+    return 'Your app version is old, the newest version $latest is available for download. Please update at your convenient time.';
   }
 
   @override
-  String get upgradeRequiredDownload => 'Download update';
+  String get upgradeCoolingDownload => 'Download update';
 
   @override
-  String get upgradeRequiredRecheck => 'Check again';
+  String get upgradeCoolingLater => 'Later';
 
   @override
   String get wizardJoinPassphraseRequired => 'Enter the shared passphrase';
@@ -472,7 +478,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'Send the dedicated entrance token below to “$name” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
+    return 'If “$name” loses all entrances into this space, send the dedicated entrance token below to “$name” to join again. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -525,6 +531,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMore => 'Menu';
 
   @override
+  String get chatPageMsgMoreActions => 'More actions';
+
+  @override
   String get chatPageRenameNameTitle => 'My identity';
 
   @override
@@ -534,7 +543,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGroupNameTitle => 'Group name';
 
   @override
-  String get chatPageGroupNameEmptyHint => 'Name';
+  String get chatPageGroupNameEditTooltip => 'Change group name';
+
+  @override
+  String get chatPageMyAvatarTooltip => 'Change my avatar';
+
+  @override
+  String get chatPageMyNameTooltip => 'Change my name';
 
   @override
   String get chatPageGroupNameLabel => 'Name';
@@ -735,23 +750,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String chatPageMenuMembers(String mode) {
-    String _temp0 = intl.Intl.selectLogic(mode, {
-      'duo': 'My companion',
-      'other': 'My companions',
-    });
-    return '$_temp0';
-  }
-
-  @override
-  String get chatPageMembersHint =>
-      'If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.';
+  String get chatPageMembersHint => '';
 
   @override
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
-      'other': 'My companions',
+      'group': 'My group',
+      'other': 'My space',
     });
     return '$_temp0';
   }
@@ -897,6 +903,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionDelete => 'Delete now';
 
   @override
+  String get chatPageActionRecall => 'Recall';
+
+  @override
+  String get chatPageRecallConfirmTitle => 'Recall message?';
+
+  @override
+  String get chatPageRecallConfirmBody =>
+      'Once recalled, your companion will never receive it. This cannot be undone.';
+
+  @override
+  String get chatPageRecallConfirmOk => 'Recall';
+
+  @override
+  String get chatPageRecallBlocked => 'Already delivered, can\'t recall';
+
+  @override
+  String get chatPageRecallFailed => 'Recall failed, try again later';
+
+  @override
+  String get chatPageDeletedMessage => '(This message is no longer available)';
+
+  @override
   String get chatPageActionQuote => 'Quote';
 
   @override
@@ -914,11 +942,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionBurn => 'Burn after reading';
 
   @override
-  String get chatPageDeleteConfirmTitle => 'Delete message';
+  String get chatPageDeleteConfirmTitle => 'Delete message?';
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      'Removed only on this device; the others aren\'t affected, and it can\'t be undone. Delete?';
+      'Removed only on this device (the others aren\'t affected), and it can\'t be undone. Delete?';
 
   @override
   String get chatPageDeleteCancel => 'Cancel';
@@ -1149,6 +1177,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutServerDevNote => 'Development address for debugging only';
+
+  @override
+  String get aboutStatusLabel => 'Connection';
+
+  @override
+  String get aboutStatusChecking => 'Checking…';
+
+  @override
+  String get aboutStatusConnected => 'Connected';
+
+  @override
+  String get aboutStatusUnreachable => 'Unreachable';
 
   @override
   String get advancedMenuTitle => 'Advanced security';

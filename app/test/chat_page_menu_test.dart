@@ -24,9 +24,15 @@ import 'real_async_settle.dart';
 /// 最小 fake ApiClient：sync 返回编排好的加密消息（模拟 Server 分配
 /// server_sequence；默认空——只测菜单交互，不涉网络）。
 class _FakeApi extends ApiClient {
-  _FakeApi({this.messages = const [], this.escrowFile}) : super('http://fake');
+  _FakeApi({this.messages = const [], this.escrowFile, this.attachmentsMeta = const []})
+      : super('http://fake');
 
   final List<MessageEnvelope> messages;
+
+  /// sync 附加返回的附件元数据（2026-10-09）：语音/图片/视频气泡渲染依赖
+  /// 本地附件行（att==null 会显示"附件不可用"兜底）——需要在无附件消息的
+  /// 测试里注入对应 meta，走真实 sync 落库路径。
+  final List<Map<String, dynamic>> attachmentsMeta;
 
   /// 假口令密保箱 + 上传捕获（修改口令测试用）。
   /// 上传成功后 getKeyEscrow 返回新上传的包且 updatedAt 推进
@@ -72,7 +78,7 @@ class _FakeApi extends ApiClient {
     ];
     return (
       messages: withSeq,
-      attachmentsMeta: <Map<String, dynamic>>[],
+      attachmentsMeta: attachmentsMeta,
       lastSequence: seq,
       hasMore: false,
     );
@@ -1099,7 +1105,16 @@ void main() {
       keyVersion: 1,
       type: 'voice',
     );
-    final api = _FakeApi(messages: [voice]);
+    final api = _FakeApi(messages: [voice], attachmentsMeta: [
+      {
+        'attachment_id': 'att-voice-1',
+        'message_id': 'msg-voice-1',
+        'key_version': 1,
+        'size': 1024,
+        'sha256': 'fake-sha256',
+        'nonce': 'fake-nonce',
+      },
+    ]);
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1406,7 +1421,7 @@ void main() {
     // 老板动机：切空间原先是「☰ → 扫菜单 → 点『切换我的秘境』」三步，后来变成状态条
     // 上的箭头（2026-09-26），现在是顶栏标题自带箭头、和标题合成一块（2026-09-28）：
     // 箭头紧贴文字，看着就是「点标题能切秘境」。
-    // 注意：箭头**只在有 2 个及以上空间时**出现（单空间不给切换暗示）。
+    // 图标**任何空间数都有**（老板 2026-10-12：单空间也给，与多空间一致）。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1542,10 +1557,11 @@ void main() {
         reason: '标题行高亮左右各留 8px');
   });
 
-  testWidgets('只有一个空间时：顶栏不给下拉箭头，品牌名也不可点',
+  testWidgets('只有一个空间时：顶栏也带多空间图标，品牌名同样可点开弹层',
       (WidgetTester tester) async {
-    // 老板 2026-09-24：单空间常常就是"只想和某一个人用"，别暗示这里能切换；
-    // 真要加空间，去汉堡菜单里找（菜单项保留）。
+    // 老板 2026-10-12：单空间顶栏也加 dynamic_feed 图标、也可点开切换弹层，
+    // 与多空间一致——图标是"空间弹层"的入口，不是"有多个空间"的暗示
+    //（推翻 2026-09-24 的"单空间不给切换暗示"）。
     // 2026-09-28：箭头原本挂在状态条的对方名字旁，现已挪到顶栏品牌名右侧。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -1575,11 +1591,11 @@ void main() {
 
     final statusBar = find.byKey(const ValueKey('chatPageStatusBar'));
     expect(statusBar, findsOneWidget);
-    expect(find.byIcon(Icons.dynamic_feed), findsNothing,
-        reason: '单空间顶栏不给切换图标');
+    expect(find.byIcon(Icons.dynamic_feed), findsOneWidget,
+        reason: '单空间顶栏同样给切换图标（老板 2026-10-12）');
     expect(find.ancestor(of: find.text('我的秘境'), matching: find.byType(InkWell)),
-        findsNothing,
-        reason: '单空间时品牌名不可点（不暗示这里能切换）');
+        findsOneWidget,
+        reason: '单空间时品牌名同样可点（开切换弹层）');
     expect(find.ancestor(of: find.byType(BrandLogo), matching: find.byType(InkWell)),
         findsOneWidget,
         reason: 'logo 那块照旧可点（开「关于」）');

@@ -79,25 +79,44 @@ dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 
 > `server/config/serverConfig.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
-> `0`=不限、`1`=退回单空间、`n`=最多 n 个；改后重启生效。当前为 `0` 时服务端启动会打一条
+> `0`=不限、`1`=退回单空间、`n`=最多 n 个；**改后自动热加载、无需重启**（服务端后台监听
+> 该文件，2026-10-10）。当前为 `0` 时服务端启动会打一条
 > "等于对公网开放建空间"的告警——自用建议设成 1~2。
 >
 > 同一文件里的 `maxEntrancesPerSpace` 控制**单个秘境的通道（登记项）数量上限**：`0`=不限、
 > `n`=该秘境最多 n 条通道，**防滥用**（一个秘境被灌进成百上千条通道会白吃存储与推送）。
 > 计数**含已撤销/已销毁的通道**（这些行只在库里被标记、不删除）——销毁不退额度，否则
-> "反复开通→销毁"可无限刷。超限加入时返回 `ENTRANCE_LIMIT_REACHED`（409）。改后重启生效。
+> "反复开通→销毁"可无限刷。超限加入时返回 `ENTRANCE_LIMIT_REACHED`（409）。改后自动热加载。
 
 > 同一文件里的 `maxMembersPerSpace` 控制**单空间成员（身份）数量上限**：`0`=不限、`n`=最多
 > n 个身份（建议 4）。注意**双人秘境恒为 2 人**、与这个值无关（空间类型在创建时选定、不可改，
 > 详见 `aimemo/groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
 >
-> **强制升级闸（2026-10-04）**：`minAppVersion` 声明**服务端支持的最低 App 版本**，格式
-> `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，见 `scripts/appVersion.js`），
-> 例如 `"2610.0412.30"`；空串/不填 = 不设下限（默认）。低于它的客户端**启动时在首屏弹
-> 不可关闭的升级窗口**（`/health` 下发 `min_app_version`）。配套的 `appDownloadUrl` 是升级
-> 窗口里「下载新版本」按钮的目标 URL（不填则只显示版本信息、不给按钮）。改后重启生效。
+> **冻结闸（2026-10-04，原"强制升级闸"）**：`coldAppVersion` 声明**冻结线**——服务端
+> 当前可用的最低 App 版本，格式 `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，
+> 见 `scripts/appVersion.js`），例如 `"2610.0412.30"`；空串/不填 = 不设冻结线（默认）。
+> 低于它的客户端（**frozen，冻结不可用**）**启动时在首屏弹不可关闭的升级窗口**
+> （`/health` 下发 `cold_app_version`）。配套的 `appDownloadUrl` 是升级
+> 窗口里「下载新版本」按钮的目标 URL（不填则只显示版本信息、不给按钮）。改后自动热加载。
 > 用途：某个客户端版本有安全缺陷、或协议虽还能用但功能已不可靠时，改配置就能把旧客户端
-> 挡在门外，不必动代码。**开发时若连着配了闸门的服务器**，用
+> 挡在门外，不必动代码。
+>
+> **冷却提醒（2026-10-10，原"建议更新"）**：`hotAppVersion` 声明**服务端当前正热用的
+> App 版本**（格式同上）。**温度三态语义（老板定）**：`hotAppVersion` = 当前正热用
+> （hot）；`coldAppVersion` = 冻结线；**介于两者之间 = cooling（正在冷却）**——仍正常
+> 可用，客户端启动弹**可关闭**的升级提醒（`/health` 下发 `hot_app_version`）——不拦人，
+> 用户可「以后再说」，下次启动再提醒；低于冻结线 = **frozen（冻结）**，弹不可关闭的
+> 窗口（frozen 判定优先）。注意 cold 是"线"不是"态"。`appDownloadUrl` 两档共用。
+> 用途：推了新版本让老用户升级、但不想拦（冷却中的版本仍正常可用）。
+>
+> **配置热加载（2026-10-10）**：服务端后台监听 `serverConfig.json`（chokidar），
+> 文件落盘后自动重读——**产品参数（`maxSpaces` / `maxEntrancesPerSpace` /
+> `maxMembersPerSpace` / `coldAppVersion` / `hotAppVersion` / `appDownloadUrl`）
+> 改完即生效，不用重启**（`/health` 与各限额端点每请求读最新配置）。两个边界：
+> ① `dataStore`（SQLite 路径）**不热加载**——DB 只在启动时打开，改了要重启；
+> ② 文件写坏（JSON 解析失败）时**保留上一次的好配置**（并打 warn 日志），不会把线上
+> 配置清成默认值。
+> **开发时若连着配了闸门的服务器**，用
 > `--dart-define=SKIP_VERSION_GATE=true` 跑本地包。
 >
 > **数据文件位置（2026-10-07）**：`dataStore` 指定 SQLite 数据文件路径——绝对路径，或
@@ -163,9 +182,11 @@ serverDocker/
 
 **服务端配置（可选）**：`serverDocker/config/serverConfig.json` 会被挂到容器
 `/config/`，由 `EINZ_CONFIG` 指向。字段：`maxSpaces`（新空间数量上限）、
-`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`minAppVersion` /
-`appDownloadUrl`（强制升级闸）、`dataStore`（数据文件路径，见 §2.2）。改后**重启容器**生效；
-文件不存在时服务端照常启动（走默认值）。示例：
+`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`coldAppVersion`（冻结
+> 线，当前可用最低版本）/ `hotAppVersion`（当前正热用版本）/ `appDownloadUrl`（升级窗口下载按钮
+> URL，两档共用）、`dataStore`（数据文件路径，见 §2.2）。除 `dataStore`（DB 路径，
+> 改了要**重启容器**）外，其余字段**改后自动热加载、不用重启**（2026-10-10，见上节
+> "配置热加载"）；文件不存在时服务端照常启动（走默认值）。示例：
 
 ```bash
 mkdir -p serverDocker/config

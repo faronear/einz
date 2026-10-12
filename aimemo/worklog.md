@@ -13579,3 +13579,667 @@ emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失
 404文本 / 400非法字符，dev 会话 token 造哈希行后 curl）；repository+
 attachment_store 30 测试全绿；flutter analyze 无告警；三端热重载。
 seq21 那条数据已丢只待焚毁/删除；seq24 类历史漏拉下一轮 sync 即自愈。
+
+
+## 2026-10-09 VPS 孤儿容器警告根治（方案B：coturn 独立项目名）
+
+**背景：** 老板 VPS `git pull && docker compose up -d --build server` 成功但
+报 `Found orphan containers ([einz-coturn])`。排查：coturn 在独立文件
+`docker-compose.coturn.yml`，但 VPS 搬迁时曾用 `-f 主 -f coturn` 一起启动，
+coturn 被打上主项目（serverdocker）标签——与目录改名无关，纯粹是"上次带的
+文件集与这次不一致"。警告本身无害（不动 `--remove-orphans` 就不删），但那
+个参数一旦随手加上会删掉 TURN 容器，跨网语音打洞失败。
+
+**修复（方案B，老板拍板）：** compose 顶部加 `name: einz-turn`——coturn 钉进
+独立项目，与主 compose 彻底分离，`up server` 永不再报孤儿。文件头注释写明
+VPS 一次性迁移命令（`docker rm -f einz-coturn` 后按新文件 `up -d` 重建——旧
+容器挂主项目标签，新文件 `down` 不到它，必须 rm）。commit 见 main 分支。
+
+**切分支注意：** 老板昨夜在 MacBook 的 feat/voice-transcript 分支有 WIP
+（sherpa_onnx pods、package.json 的 server-update-remote 加 sudo git pull、
+sessions.json）——用带说明的 stash 保存（`stash@{0}`），未丢弃；main 上的
+方案B 改动不含这些。
+
+## 【接线说明】本地 main 与 origin/main 分叉——完成当前任务后别 pull/push（2026-10-10）
+
+**现状：** 本地 main = `7e2935d + 5faff04`（5faff04 = 群名占位灰字撤回 + Ink 悬浮底色，
+是对已推送的 c89670f 的重写）；origin/main = `7e2935d + c89670f + c4f4f85(附件自愈)
++ cf2eb0a + 08b2342(coturn)`。两边分叉（ahead 1 / behind 4）。
+
+**约定（在接线完成前）：**
+- **不要** 对本地 main 执行 `git pull` / `git reset --hard origin/main`——pull 会把
+  已撤回的灰字占位合并回来，reset 会丢掉 5faff04 和未提交 WIP；
+- **不要** 直接 `git push`——非 fast-forward 会被拒，别用 force 绕；
+- **可以** 继续在本地 main 上正常提交当前任务的成果（工作区已基于 5faff04，
+  你的 WIP 与群名改动不重叠，放心写）。
+
+## 【CI 红修复】语音菜单用例被附件自愈闸门拦截（2026-10-10）
+
+**现象：** `npm run testAll` 在 GitHub CI 失败——app 全量 widget 测试 1 例红：
+`chat_page_menu_test.dart:1122`「长按语音消息：菜单预览行显示 播放键+波形+时长
+且播放键可点」期望 `find.text('25s')` 命中 1 个、实际 0。shared/cli/server
+全绿，仅此一处。
+
+**根因：** 附件自愈修复给 `_buildAudioBarBody` 加了 `att==null → 「附件不可用」`
+渲染闸门；该用例的合成 voice 消息只有信封没有附件行（`_FakeApi.sync` 返回空
+`attachmentsMeta`），被闸门拦下，时长文本整个不渲染。本地复现同红。
+
+**修复：** `_FakeApi` 加 `attachmentsMeta` 注入参数（sync 原样返回 → 走真实
+`_insertAttachmentMeta` 落库路径，不改产品代码），用例补 voice 的 meta 四字段。
+单例复绿后 `testAll.sh app` 全绿（analyze + 全量）。
+
+**插曲：** 重落发生于另一 agent 会话 `git reset 7e2935d` 丢弃 c4f4f85 之后——
+c4f4f85 内容（含本修复）已重落为 `6cdb987`；coturn yml 与 aimemo 记录随本
+提交重落。origin/main 接线（5faff04 重写了已推送的 c89670f，直接 push 会被
+拒）由老板决定时机；接线前勿 pull/reset --hard，见上节说明。
+
+**接线（由我会做，等当前任务提交完成后）：** 把新提交 `rebase --onto
+origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只剩新改动），
+再补一个「撤回灰字占位」小提交 → 之后 push 是正常 fast-forward，无需 force。
+
+**接线完成（2026-10-10）：** `rebase --onto origin/main 5faff04` 落地为
+`ef65860 + 2731f3a`（worklog 一处冲突取并集）；`c89670f` 的灰字占位随后以
+`51fc12d` 再次移除。本地 main = origin/main + 3，push 为正常 fast-forward，
+无需 force。上节【接线说明】作废。
+
+## 2026-10-10
+- 全 app 可点击元素交互反馈统一（老板提出）：Clickable 组件升级为自带遮罩——桌面悬浮 black@5%、点按/长按 black@10%，遮罩画在子组件上层（InkWell 会被不透明子项盖住故弃用）；形状参数 circle/borderRadius 逐调用点补齐；深底通知条用白色遮罩；纯长按元素（气泡菜单）仍无反馈。266 测试全过，commit e4ce046。
+- 附件不可用兜底排查（老板提问「点按重试有用吗」）：发现并修复①手动重试不复位 _healAttempts 导致点按无效的 bug；②孤儿消息（404 确认无附件）重试永远无效却仍显示「点按重试」——新增 _healConfirmedMissing 打标，UI 去掉重试邀请且不可点。l10n 复用现有文案未新增。analyze + 相关测试全过。
+- 「附件不可用」兜底行样式定稿（老板选淡灰方案）：图标+文字用时间戳同款淡灰/white70、字号 12，与红色「发送失败」告警区分；红色语义独占。
+- 撤回功能上线（老板 2026-10-10 方案）：服务端 POST /messages/recall 单事务校验 delivered 水位后真删消息+附件+文件；app 长按菜单「撤回」（自己未送达消息）；**墓碑消息也可撤**（本地墓碑不影响服务端行，菜单只剩撤回项+灰字占位）；本地删除/阅后即焚不联动服务端，撤回必须显性触发（老板拍板）。server recall.test.ts 5 场景全过。
+- 版本闸加**建议更新**档（老板 2026-10-10，与既有"必须更新"并列为两档）：
+  服务端 `serverConfig.json` 新增 `recommendAppVersion`（格式同 minAppVersion），
+  `/health` 配了才下发 `recommend_app_version`（空串=没配，同款防手滑归一化）；
+  客户端 `version_gate.dart` 改为 `VersionGateLevel`（none/recommended/required）判定，
+  required 优先——低于必须下限弹原不可关闭窗，否则低于建议版本弹**可关闭**的提醒
+  （「以后再说」+「下载新版本」，可点外部/Esc 关闭，复用 appDownloadUrl 链接行）。
+  老板拍板两点：①提示形式=可关闭弹窗（非横幅）；②每次启动都提示，不做本地记忆。
+  验证：server min_app_version.test.ts 6/6（+3 新用例）；app version_gate_test 14/14
+  （+6 新用例，含"恰好等于必须下限→只提醒不拦"的边界）；npm test 全链绿、
+  flutter analyze 干净。文档同步：PROTOCOL_MULTIVERSE.md §4.1、DEPLOYMENT.md 配置节。
+- 版本闸弹窗两处改进（老板 2026-10-10 真机测试反馈）：
+  ① 弹窗里的下载链接文本改为**可点击**（复用 LinkifiedText，蓝字+下划线，
+  点击 = 点「下载新版本」按钮，开外部浏览器；原先是 SelectableText 只能手抄）；
+  ② 删掉「重新检查」按钮（老板建议：实际只有运维改回配置时有意义，对终端用户是干扰项；
+  l10n 键 upgradeRequiredRecheck 一并删除，en/zh + gen-l10n）。
+  analyze + version_gate_test 14/14 全绿。
+- serverConfig.json **热加载**（老板 2026-10-10，参考 pex 项目 envar-tool.js 的
+  chokidar 方案）：server 新增依赖 chokidar，`configFile.ts` 加 `startConfigWatcher()`
+  ——后台监听配置文件，change 时重读并更新缓存；`app.ts` 入口启动 watcher，
+  `/health` 从模块级 `const cfg` 改为每请求 `loadConfig()`（spaces/push 本就是
+  每请求读，随缓存失效自动生效）。
+  两个刻意设计：① **dataStore 不热载**（DB 只在启动 openDb 时消费，改了要重启）；
+  ② **写坏 JSON 保留旧配置**（不冷启动回默认值——运维手滑清掉 minAppVersion =
+  强制升级闸失效，代价太大；解析失败打 warn）。测试进程不启动 watcher（配置
+  本来就是进程级固定的，避免挂出关不掉的 watcher）。
+  实测：临时配置起 server → 改文件（不重启）/health 立即反映新版本号/链接 →
+  写坏 JSON 保留旧值 + warn。npm test 全链绿。
+  DEPLOYMENT.md 同步：各字段"改后重启生效"改为"自动热加载"，新增"配置热加载"
+  小节说明分界（dataStore 例外 + 坏文件保留旧值）。
+- **版本语义重命名：recommend → hot/cooling 三态**（老板 2026-10-10，趁未 push 全
+  前后端统一）：`hotAppVersion`（当前正热用的版本）/ `minAppVersion`（当前可用的
+  最低版本）/ 介于两者之间 = **正在冷却**（仍可用，弹可关闭提醒），低于 min =
+  不可用（弹不可关闭窗）。全链路替换：serverConfig.json 键名（example.json）、
+  FileConfig/ServerConfig 字段（hotAppVersion / hot_app_version）、/health 下发键、
+  ServerHealth.hotAppVersion、VersionGateLevel 枚举 recommended → **cooling**、
+  _CoolingUpgradeDialog、l10n upgradeRecommended* → **upgradeCooling***（en/zh +
+  gen-l10n，文案微调"当前版本正在冷却，仍可继续使用"）、双侧测试与
+  PROTOCOL_MULTIVERSE.md §4.1 / DEPLOYMENT.md / productLens 全部同步。
+  **教训**：批量替换 `rec` → `hot` 时误匹配了 receipt/record/recommended 等单词里
+  的子串，污染 11 个无关测试文件——tar 备份后 git restore 恢复（该批文件无未提交
+  工作），只留 version_gate_test.dart 手工修。**全局子串替换必须带词边界**（regex
+  `\brec\b` 或完整标识符），教训记入 memory。
+  验证：server npm test 24/24 全绿；flutter analyze 干净；version_gate_test 14/14。
+- **温度词汇定稿：minAppVersion → coldAppVersion，frozen 态**（老板 2026-10-10 改主意，
+  按我推荐的全套温度三态执行，趁未 push）：配置键/wire 键 `coldAppVersion` /
+  `cold_app_version`（**冻结线**：当前可用的最低版本，低于它 = frozen 冻结不可用，
+  弹不可关闭窗）；`hotAppVersion` / `hot_app_version`（当前正热用版本）。温度序列：
+  **hot（正热用）→ cooling（正在冷却，仍可用，可关闭提醒）→ frozen（冻结，不可用，
+  不可关闭窗）**——cold 是"线"不是"态"（状态只有 cooling/frozen），已钉进注释与文档。
+  全链路替换（全部完整标识符，无子串污染）：serverConfig 键（example.json + 本机测试
+  config）、FileConfig/ServerConfig 字段、/health 下发键、ServerHealth.coldAppVersion、
+  isAppVersionUnsupported → **isAppVersionFrozen**、VersionGateLevel.required →
+  **frozen**、_FrozenUpgradeDialog、l10n upgradeRequired* → **upgradeFrozen***
+  （Current 行两档共用 → **upgradeCurrent**，en/zh + gen-l10n）、双侧测试、
+  服务端测试文件 git mv min_app_version.test.ts → **cold_app_version.test.ts**
+  （package.json 测试链同步）、PROTOCOL_MULTIVERSE.md §4.1 / DEPLOYMENT.md /
+  productLens 同步。注意：装过 2026-10-04 后旧包的 wire 键 min_app_version 失效，
+  需重装/重编（自用 + 未 push，可接受）。
+  验证：server npm test 24/24 全绿；flutter analyze 干净；version_gate_test 14/14。
+- 老板自改弹窗文案（简化：`upgradeCurrent` 合并进 `upgradeFrozenBody` 两参
+  `(min, current)`，冷却文案去掉"正在冷却"表述），改完 app 无法启动——`version_gate.dart`
+  的调用没跟上（冻结窗单参调用、冷却窗还在传已删的 currentVersion 行）。
+  补全：冻结窗改 `upgradeFrozenBody(coldVersion, currentVersion)`；冷却窗删
+  `currentVersion` 字段与传参（死代码）。analyze 干净、version_gate_test 14/14。
+  （教训已多次出现：老板常改 l10n 措辞，引用点必须同步——见 memory。）
+
+## 2026-10-10（macbook · main 分支工作日）
+
+- 状态条 tooltip 全量补齐（`014abc5`）：我的头像/我的名字/空群占位头像三处新增；
+  群名沿用 `6023413` 的「修改群名」。
+- duo 左侧对方头像点击统一开 My companion 弹层（`cbe1190`），不再走头像全屏大图，
+  与群空间头像条全局一致。
+- iOS 模拟器脚本适配（`161e758`）：emuResolveIos.js 空规格回退（Booted → 最新
+  iPhone）；emuBootIos.sh 对 Xcode 27 无 Simulator.app 加守卫。macbook 装好
+  Xcode 27 + CocoaPods，iPhone 17 (iOS 27) 模拟器可跑 app。
+- macbook 与 iMac 多机分工：macbook 在 main（今天 4 个提交，未推送），iMac 在
+  feat/voice-transcript；voice WIP 暂存 stash@{0}，合并时按 main 解 tooltip 冲突。
+
+## 2026-10-11（macbook · main）DNS 抢答注入排查 + DoH 兜底落地
+
+**排查结论（域名没有被劫持）：** 老板 ping `einz.yuanjinx.com` 拿到 `23.248.192.114`
+（RedLuff LLC，ARIN 美国段，443 直接 Connection refused）。Cloudflare 权威（DNSSEC 签名，
+TTL 300）+ Google/Cloudflare/AliDNS 公共 DNS 一致给出真 IP `36.154.238.42`（中国移动，
+即国内服务器）。连打 10 次 `dig @223.5.5.5`：4 次真、5 次假、1 次超时——**家庭宽带链路
+上的 UDP-53 抢答注入**（伪造应答 TTL 3600，抢先于真应答到达；mDNSResponder 中招后缓存
+1 小时）。腾讯 DoH（加密查询）返回干净真 IP。老板手机蜂窝（江苏）正常 → 注入只在老板
+家里那条宽带（路由器/移动网关）。**v2rayA 系误判**（当时先入为主）：已应老板确认卸载
+（launchctl bootout + 删 plist + brew uninstall --zap），但卸载后注入依旧存在，真因在
+链路上。安全面：假 IP 拿不出合法 LE 证书 → 只会"连不上"不会中间人，E2EE 无恙。
+
+**老板本机临时解法：** `/etc/hosts` 钉 `36.154.238.42 einz.yuanjinx.com`（待老板执行）。
+
+**DoH 兜底实现（老板拍板：DoH 自动解析，否掉硬编码 IP）：** 新增
+`shared/lib/src/protocol/dns_fallback.dart`（App/CLI/WS 三端共用）：
+- 探测失败 → DoH 重解析（doh.pub 优先、alidns 兜底，纯 dart:io 零新依赖）→ 真 IP
+  钉扎进进程级表（会话级，永不落盘）→ 重探一次；
+- `createPinnedHttpClient`：`connectionFactory` 直连钉扎 IP，https 经
+  `SecureSocket.secure(raw, host: 真域名)`——SNI/证书校验不变，无 onBadCertificate；
+- 自愈：钉扎 IP 连不上（搬迁后陈旧）→ 连接层清钉扎 + 原样上抛，下轮探测重 DoH；
+  每主机 60s 速率闸（防向导页 4s 重试循环打爆 DoH）；
+- 集成点：`api_client._client`（一行）、`ws_client`（`WebSocket.connect` 的
+  `customClient`，连接存活期不 close、stop 时收尾）、App `probeServer`（包
+  `probeWithDohFallback`，原体改名 `_probeDirect`）、TUI `_probeServer` 同法；
+- SDK 事实：`WebSocket.connect` 原生支持 `customClient`；`ConnectionTask.fromSocket`
+  需 Dart ≥3.13 → shared/cli pubspec `sdk` 升 `^3.13.0`。
+
+**测试：** 新 `shared/test/dns_fallback_test.dart`（解析/钉扎生效+Host 头保持真域名/
+TLS 失败清 pin/陈旧 pin 自愈/流程+60s 闸，共 15 例）；扩展 `ws_client_test`（钉扎经
+customClient 连通）与 `app/test/server_config_test.dart`（端到端 probeServer 兜底）。
+全绿：shared 82、cli 22、app 275（1 skip），三包 analyze 干净。文档
+SERVER_SETTINGS.md 新增 §4.1。**真机验证（被污染网络冷启动）待老板执行。**
+
+## 2026-10-11（续）候选列表扩至四域名（用户无感连接主线）
+
+**老板定调：** 核心目标不是修本机网络，是**用户无感无痛连生产服务器**。新增两个备案
+域名 `einz.farinear.cn` / `einz.bittic.cn`（同一服务器 `36.154.238.42`），加入候选列表。
+
+**实测就绪后才动客户端：** 两域名 DNS 解析正确、服务器证书已签（LE，CN 各自匹配）、
+`/health` 返回 v2-multiverse 正常（同机同 uptime）——老板服务器端 Caddy 已配好。
+
+**改动：** App `kServerCandidates` 与 TUI `_kServerCandidates` 各加两行；SERVER_SETTINGS.md
+§4 样例同步。app/cli analyze + 测试全绿（server_config 守卫断言不受影响）。
+
+**分层防线（用户视角）：** ① 并发多域名探测——单域名被 DNS 注入 / 备案 / 注册商故障时
+自动落到其余入口；② DoH 兜底（上一条）——单域名解析路径污染时加密重解析；③ 都失效
+也只失败不中间人（TLS 按域名校验）。**未覆盖**：服务器挂 / IP 被封（需第二网络路径，
+将来再说）；存量旧包没有 ①②，需随下次发版更新。
+
+## 2026-10-11（续 2）污染可见化 + 上报聚合 + 巡检（前后端统一升级批次）
+
+**老板定调：** 核心目标是**用户无感无痛连生产服务器**；今天前后端统一升级，一次改完。
+
+**tic.cc 之惑（老板观察）：** 劫持测试时生产 App「关于秘境」显示连接 einz.tic.cc——
+真相是**全候选探测失败 → resolveServer 兜底回主域名 tic.cc → About 显示的是名义地址**，
+App 当时处于断连重试态（tic.cc 解析 127.0.0.1 干净无注入、443 拒连，实测确认）。
+显示语义（地址 ≠ 连接状态）列为待办，未在本次改。
+
+**实测金矿：** `npm run dns-audit` 首跑就抓到现行——einz.yuanjinx.com 此刻仍被注入
+（系统=23.248.192.114，DoH=36.154.238.42），**同网络的 farinear/bittic 两域名解析
+干净** → 注入是**针对域名**的，不是整条链路。多域名候选在这类网络单独即可救用户。
+
+**本批改动：**
+1. 服务端：新增 `server/src/dnsReport.ts` + 两个免认证端点
+   `POST /network/dns-report`（dnsReport 限速桶 10/时/IP，入参形状校验，入库
+   dns_reports 表 30 天懒清理）与 `GET`（按 UTC 日/域名聚合计数，**不含 IP**）。
+   免认证已在 app.ts 鉴权约定块登记理由；协议文档 PROTOCOL_MULTIVERSE.md §4.1 补充。
+   测试 `server/test/dnsReport.test.ts`（正常上报/缺版本头/入参校验/聚合/429），npm test 全绿。
+2. 客户端：dns_fallback 新增 `onDnsPoisonDetected` 钩子（DoH 与系统解析分歧即触发）
+   + `_reportPoison` fire-and-forget 上报（走钉扎连接、5s 超时、失败静默、旧服务端
+   404 静默忽略）。App debug 包 debugPrint 警报（assert 块内，正式包静默）；
+   TUI stderr 打可见警告。
+3. 巡检：`cli/bin/dns_audit.dart` + 根 `npm run dns-audit`——四域名系统 vs DoH 双通道
+   比对，分歧/无法判定退出码 1（可接 cron）。
+
+**验证：** server npm test 全链绿（含新 dnsReport 5 组断言）；shared 83 / cli 22 /
+app 275 全绿，三包 analyze 干净。**服务端上线：VPS git pull + docker 重建后，新包
+客户端的上报才开始入库；旧客户端/旧服务端组合完全兼容（404 静默）。**
+
+## 2026-10-11（续 3）TURN 域名迁移 + DoH 预解析
+
+**背景**：coturn 的客户端地址 `turn:einz.yuanjinx.com:3478` 用的是被定点劫持的
+FQDN（relay 仅兜底场景触发，故未暴露）。老板拍板：换独立新域名 + 客户端 DoH
+预解析，为将来 coturn 拆分独立服务器铺路。
+
+**实测核账（ssh 只读）**：VPS coturn 一切正常——turnserver.conf 在
+/faronear/einz/serverDocker/coturn/（老板记成"没创建"系多机混淆）、容器 Up、
+凭证与 App 编译值一致、STUN Binding Request 外网探测 3478/UDP 应答正常。
+realm 保持不变（不参与解析，改随机串无安全收益）。
+
+**改动**：
+1. `app/lib/data/voice_call_service.dart`：新增 `resolveTurnUrls`——TURN 地址中
+   的域名一律 DoH 预解析成 IP（doh.pub→alidns→cloudflare 同套体系；失败退系统
+   解析，再失败保留原样优雅降级；IP 字面量零解析；会话级缓存 host→ip）；
+   `_iceServers` 转 async 并接入。
+2. `localConfig.turn.json`：`VOICE_TURN_URLS` 改为
+   `turn:turn.farinear.cn:3478,turn:turn.bittic.cn:3478`（双条目 ICE 择优）。
+3. 测试 `app/test/turn_resolve_test.dart` 6 例全绿（IP 透传/改写/系统回退/优雅
+   降级/未知形态透传/缓存命中）；flutter analyze 干净。
+4. voiceCall.zhcn.md 设计文档同步。
+
+**待老板**：CF 里给 farinear.cn / bittic.cn 各加 `turn` A 记录 → 36.154.238.42
+（**灰云**）——**下版打包前必须就位**，否则新包中继全失效（DoH+系统解析都查无
+此名）。就位后喊我 dig 验证。
+
+## 2026-10-11（续 4）About 弹层如实显示连接状态（全不可达不再冒充兜底）
+
+**老板要求**：全部域名都连不上时，「关于秘境」必须明确显示这一点，而不是默默
+展示一个连不上的兜底名义地址（einz.tic.cc 之谜的 UI 侧修复）。
+
+**实现**（widgets/about_sheet.dart）：弹层新增「连接状态」行——并发探测
+kServerCandidates 全部候选（复用带 DoH 兜底的 probeServer，可注入 fake）：
+- 任一可达 → **已连接**（主色），名义地址 ≠ 实际入口时附注"当前实际入口：X"
+- 全部不可达 → **无法连接任何服务器入口（自动重试中）**（error 色）
+- 服务器地址行保持展示 effectiveServer 名义值（可复制排查用）
+
+**测试抓出真实 bug**：首版用 hasData 判定——全不可达时 future 正常完成但结果
+null（hasData=false），导致"无法连接"被永远显示成"检测中…"。改用
+connectionState 判定后修复。**这正是本次要修的那类静默错误，被测试当场复现。**
+
+**其他**：l10n 新增 5 键（zh/en + gen）；AboutSheet 加可选 probe 参数（入口
+show() 透传，三处调用点零改动）。app 全量 285 测试通过、analyze 干净。
+
+**TURN 配置（本机 gitignore 文件，无提交）**：老板拍板全 4 条——
+farinear/bittic/yuanjinx（新子域实测干净）/tic.cc（127.0.0.1 死入口，教义同
+kServerCandidates：留配置，将来搬海外改 DNS 即复活存量 App）。
+老板本机已临时撤销系统级 Ali DoH，保留金丝雀视角（Tailscale 开关 = 净化切换）。
+
+## 2026-10-11（续 5）release 打包脚本补齐 TURN 配置 + us2 TURN 上线核验
+
+**缺口（老板问"其他版本怎么引入"时查出）**：只有 `app/ios/buildIos.sh` 自动带
+`localConfig.turn.json`；`app-apk-build`（正式 APK）/ `app-ios-build-raw` /
+`app-mac-build-raw` / `app-mac-build-dist`（经 buildMacos.sh）全部没带 → 走这些
+脚本出的包**没有 TURN**，跨网严格 NAT 通话必挂。docs/TURN.md 只写了手工命令。
+
+**修复**：新增 `scripts/turnDefineArgs.sh`（stdout 只输出参数、提示走 stderr；
+存在才带、缺失警告不拦——与 buildIos.sh 同口径），接入四个脚本：
+app-apk-build / app-ios-build-raw / app-mac-build-raw / buildMacos.sh（dev+dist
+全渠道）。JSON 校验通过、helper 干跑验证（stdout 参数 / stderr 提示分离正确）。
+
+**us2（甲骨文）TURN 上线核验（老板操作 + 本机实测）**：
+- `turn.tic.cc` 曾被误设橙云 → STUN 探测无应答（CF 不转发 UDP，企业版 Spectrum
+  才有此能力）→ 老板切灰云后实测通过；
+- 灰云解析 `129.153.80.126`（甲骨文美国段），STUN Binding Request **应答正常**；
+  cn1（36.154.238.42）同步复测也正常——双 TURN 服务器就绪；
+- us2 conf：老板拷贝 cn1 的（user:密码不变=与客户端凭证一致，只改 realm +
+  external-ip）——标准做法。realm 两台可以不同（各自自报，客户端不感知）。
+
+**追记**：`buildIos.sh` 的内联 TURN 块也抽取为 `scripts/turnDefineArgs.sh` 调用
+（数组语义保持：while read 填充 TURN_DEFINE_ARGS，stderr 提示原样透传）——单一
+实现，五条打包路径（ipa adhoc/appstore/raw、apk、macos dev/dist）同口径。
+
+## 2026-10-11 会话：修复「撤回」菜单项从不显示的 bug
+
+**现象（老板报告）：** 本地测试环境、最新代码，macOS 以「一往无前」发群组消息
+"nobody is online"（无人上线），长按刚发的消息没有「撤回」按钮。
+
+**排查：** 撤回功能（02def732，2026-10-10）本身完好——提交在 origin/main 与
+github/main，server/shared/repo 代码齐全。根因是**字符串值不匹配**：
+`message_repository.dart:858` 里 `sender` 取值为 `'me'`/`'peer'`，但
+`chat_page.dart` 撤回功能新增的 `_messageHasActions` / `_messageRecallable`
+两处都写成 `m.sender == 'mine'`——永远为 false，菜单项从不出现（双人/群组
+均如此）。当时测试全过是因为测试直接调 `_recallMessage` 与服务端接口，未
+覆盖菜单可见性。
+
+**修复：** 两处 `'mine'` → `'me'`。flutter analyze 0 issue；chat_page_menu
+相关测试 34 项全过。
+
+**验证：** iOS/macOS pid 文件在跑，已发 USR1 热重载。
+
+## 2026-10-11 会话：撤回菜单三项改进（老板要求）
+
+1. **撤回挪到「立刻删除」之后**：撤回实质上比删除更重（删自己的还不让别人
+   收到），菜单顺序跟着严重度走；撤回卡片同时标 `destructive` 红色。
+2. **撤回前加确认弹窗**：AlertDialog（标题居中，同菜单弹窗口径）——
+   「撤回这条消息？/ 撤回后对方将永远收不到这条消息，且不可恢复。」
+   取消/撤回（红字）；ARB 新增 3 键（chatPageRecallConfirmTitle/Body/Ok），
+   gen-l10n 重新生成。
+3. **操作卡片网格 macOS 宽弹层不协调修复**：`_buildActionCardGrid` 此前
+   卡片宽度被 96 上限卡住，宽弹层（macOS 满窗宽）里一行四卡只占一半宽、
+   行尾大片空白。修复：网格整体限宽为一行四卡自然宽度（4×96+3×12=420）
+   并居中；末行不满一行时也居中。iOS 弹层窄于 420 不受影响。
+
+**验证：** analyze 0 issue；app flutter test 285 项全过；iOS/macOS 已发
+USR2 热重启。
+
+## 2026-10-11 会话（二）：菜单末行左对齐 + 墓碑按来路显示图标（老板要求）
+
+1. **末行从第一列排起**：撤回上一轮「末行居中」——整块网格仍限宽 420 居中
+   （老板认可），但超过 4 个时的末行改回向左对齐。
+2. **撤回墓碑去沙漏**：撤回/立刻删除的消息此前也显示「沙漏+时长」（若通道
+   设了阅后即焚），与真焚毁的消息无差别。改为本地库区分**墓碑来路**：
+   - `local_messages` 加 `deleted_kind` 列（schema v10，幂等迁移）：
+     `'recall'`=撤回、`'delete'`=本机立刻删除、NULL=焚毁到期（及 v10 前旧墓碑）；
+   - `tombstoneMessage` 带 `kind` 参数（删除默认 'delete'，`recallMessage`
+     传 'recall'）；`HistoryMessage` typedef / 行映射 / `_asDeleted` /
+     `_mergeRefreshed`（墓碑单调合并保留来路）/ `_setMessageBurn` 就地更新
+     record 全链路透传；
+   - 气泡时间行：撤回→撤回图标（undo）、立刻删除→删除图标（均 14 号灰），
+     焚毁到期保持沙漏+时长。
+3. **老板问答**：删除时间本地有记录（`deletedAt`，2026-09-09 墓碑方案起就有）。
+
+**踩坑**：build_runner 崩溃——pub 缓存里 windows_file_picker-1.3.0 缺
+pubspec.yaml（损坏），`rm -rf` 该目录 + `flutter pub get` 重取后恢复；
+build_runner 全量生成耗时 ~150s，`flutter test` 全量在_busy 机器上超过
+300s 前台上限，改后台跑。
+
+**验证：** analyze 0 issue；迁移测试更新为断言升到 v10 + deleted_kind 列
+存在；全量测试后台运行中（结果见下轮追记）。
+
+**追记（同日）**：全量 285 测试后台跑完全过；已提交 4f144896。老板 iOS 端
+看不到撤回图标 = iOS app 未跑到新代码（USR2 后已重启）+ 更新前打的旧墓碑
+无来路标记（NULL，显示沙漏，无法事后区分，属预期）。另按老板要求：焚毁
+到期墓碑也**只留沙漏、去掉时长文字**（沙漏已漏完，数字无意义）——仅删
+墓碑分支的 Text，活消息的沙漏+时长不受影响。
+
+**追记（同日，二）**：老板实测发现真正根因——**未设阅后即焚的消息撤回/
+删除后完全没有图标**（iOS/macOS 一致，设了焚毁的才有）：墓碑图标分支整个
+包在 `if (m.expiresAt != null)` 里，没设焚毁的消息根本进不了那个块。修复：
+把墓碑图标从焚毁条件里拆出——`if (m.deleted)` 一律显示（撤回/删除按
+deletedKind、焚毁到期空沙漏），活消息的沙漏+时长倒计时保留
+`else if (m.expiresAt != null)`。analyze 0 issue。
+
+**追记（同日，三）**：墓碑里焚毁沙漏颜色比删除/撤回图标深——沙漏组件
+（`_BurnHourglass`/`_HourglassFlip` 的 Icon 不带 color，继承 IconTheme），
+删除/撤回是显式灰。修复：墓碑分支的沙漏包 `IconTheme`（gradient→white70、
+其余→Colors.grey）与相邻图标同色。analyze 0 issue。
+
+**追记（同日，四）**：长按菜单里「立刻删除」「撤回」卡片去掉红色
+（`destructive`）——有确认弹窗把关，不必特殊显示。analyze 0 issue。
+
+**追记（同日，五）**：删除确认弹窗的确认按钮从 FilledButton 改为红字
+TextButton（与撤回确认弹窗同款）。analyze 0 issue。
+
+**追记（同日，六）**：撤回墓碑**永远显示单勾**（老板定）：回执按成员高水位
+记、不按单条消息——对方之后拉到更大 seq 会让撤回墓碑误显双勾；撤回=没
+送达，`_buildSendStatusIcon` 加 `deletedKind == 'recall'` 特判固定单勾。
+analyze 0 issue。
+
+**追记（同日，七）**：删除/撤回确认弹窗按钮从纯文字（TextButton）改实体
+样式——取消 → OutlinedButton、确认 → 红底白字 FilledButton，两弹窗同款。
+analyze 0 issue。
+
+**追记（同日，八）：发行版「我的」灯常红的根因修复（老板报告）。**
+现象：发行版 macOS/iOS「我的」灯常红、About 显示已连接（REST 正常、消息
+能互发）、WS 握手从未到达服务器（生产 node 日志 30 分钟零 WS 记录，仅有
+的两条 400 是诊断 curl 走 HTTP/2 所致）；本地 dev（ws://localhost:3901）
+绿灯正常。通知条「离线 N 条待发送」与 About「已连接」矛盾 = 判据不同源
+（About 走 /health 探测，通知条走 WS/发送状态）。
+
+**根因**：`createPinnedHttpClient` 的 `connectionFactory`（c70f3c10 引入）
+对 `wss` scheme 失效——Dart 的 Uri 不认 wss 默认端口（`uri.port` 返回 **0**）
+且 `isScheme('https')` 对 wss 为 false → 走进明文 `Socket.startConnect(host, 0)`
+→ errno 49 恒失败。dev 的 `ws://localhost:3901` 端口显式非 0 所以绿灯；
+REST 是 https scheme 端口正常所以不受影响。**凡走 pinned client 的生产
+WS 全断**——与发行版时间线完全吻合。
+
+**修复**：connectionFactory 归一化端口（0 → 443/80 按 TLS 判定）与 TLS
+判定（isScheme('https') || isScheme('wss')）。临时探针脚本（shared/bin/
+ws_probe.dart，已删）验证：farinear.cn / bittic.cn 握手成功（假 token
+4401 关闭=预期）。dart analyze 0 issue；shared 83 测试全过。
+
+**连带发现（待老板处理）**：① `einz.tic.cc` 的 DNS A 记录**真的是
+127.0.0.1**——DoH（TLS 校验，不可注入）与系统解析一致，需查 tic.cc 的
+解析配置；② `einz.yuanjinx.com` 系统 DNS 被污染到 23.248.192.114（DoH
+正确 36.154.238.42），App 靠 DoH 钉扎自救，属 2026-10-11 容灾设计预期。
+③ 发行版要**重新打包**才能带上此修复（dev app 热重启已生效）。
+
+**追记（同日，九）**：About 弹层「当前实际入口」探测语义调整（老板定）：
+优先探测 `effectiveServer`（正在用的那个），可达就显示它、与「服务器地址」
+一致；只有它不可达时才按候选顺序报备用可达入口——此前每次打开都按列表
+顺序重探，会出现「服务器地址 A、实际入口 B」让人误以为 App 连的不是自己
+选的地址（实际是两次独立探测：启动=先到先得、About=列表顺序）。另确认
+tic.cc→127.0.0.1 是老板**有意**的防封禁设置（无备案不能指向国内服务器），
+已记忆。about_sheet 4 测试全过。
+
+**追记（同日，十）**：气泡时间行**状态小标**（催发小飞机/重发警告）样式与
+后面的快捷动作统一（老板 2026-10-11）：
+- 悬浮/点击加圆形背景遮罩（Material CircleBorder + InkWell，hover/highlight
+  色同 `_bubbleQuickAction`），热区高度同 `_bubbleTimeRowControlHeight`(28)；
+- 图标 11/12 → **16**（小飞机组件加 `size` 参数），与引用/拷贝/保存同档；
+- 渐变主题深蓝气泡上蓝色小飞机几乎不可见 → 渐变下改 white70（同快捷动作），
+  浅色主题保留超链接蓝；「加速中」期间仍用中性色。
+analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十一）**：「我的同伴」弹层群空间**列表前插入「群名称」卡**
+（老板 2026-10-11）：与同伴卡同款尺寸/底色（中性 tint、圆角 12、h12/v8），
+左侧 40×40 群图标圆形占位（同成员头像尺寸），中间现有群名或淡色占位词
+「群空间名称/Group space name」（ARB 新增 chatPageMembersGroupNameHint），
+右侧 edit_outlined 图标；**点整卡**打开改群名弹窗（`_showGroupNameDialog`，
+同状态条点群名；先收弹层再经 `_menuAction` 打开，同「重新邀请」的 route
+交接处理）。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十二）**：① 群名卡按老板要求调整：**去掉头像占位**，群名/
+占位词**整卡居中**（Stack 真居中，edit 图标 Positioned 绝对居右不挤占文字），
+垂直 padding 8→20 撑起卡片体量。② 群空间下菜单项与弹层标题「我的同伴」→
+**「我的群组」**（`chatPageMenuMembers`/`chatPageMembersTitle` 的 select
+分支 other 改「我的群组」/ "My group"；zh 两键补上 mode 占位符结构）。
+analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十三）**：群名展示再调整（老板 2026-10-11）：**不用卡片**——
+白底上的标题文字（同弹层标题字号 16/字重 600，未设置仍淡色占位词），编辑
+按钮紧跟文字右侧（Center + Row min，不顶到最右），InkWell 圆角 8 只罩
+文字+图标热区；点它仍打开改群名弹窗。analyze 0 issue；chat_page_menu
+34 测试全过。
+
+**追记（同日，十四）**：群名字体再放大（老板 2026-10-11：弹层里最显眼）：
+16/w600 → **22/w700**（height 1.2），超过弹层标题（16/w600）；占位词仍
+淡色。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十五）**：两处微调（老板 2026-10-11）：① 群名占位词单独
+降档——字号 18 + 更浅的 outline 色（真群名 22/w700 深色不变，保持弹层
+里最显眼）；② 群名行与下方同伴卡间距 bottom 4 → 14。analyze 0 issue；
+chat_page_menu 34 测试全过。
+
+**追记（同日，十六）**：群名占位词与改群名弹窗标题**合并为一个文案键**
+（老板 2026-10-11）：占位词直接用 `chatPageGroupNameTitle`（群组名称/
+Group name），删除专用键 `chatPageMembersGroupNameHint`。**提交注意**：
+zh/en ARB 里混有老板未提交的文案改动（邀请提示 ×3、GroupNameTitle
+「群组名字→群组名称」、MembersHint 清空）——已用 `git apply --cached`
+按 hunk 只提交我的键删除，老板的 ARB 改动与再生成的 l10n 文件留在工作区
+（等老板自己提交）。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十七）**：群空间状态条**左侧胶囊改成一个大的**（老板
+2026-10-11）：编辑图标或群名 + 在线人数/总人数整体包进一个 StadiumBorder
+大胶囊（含 Tooltip「我的同伴」），点它打开「我的群组」弹层（与头像槽同
+动作，改名走弹层里的群名行）；原「单独可点的编辑图标/群名胶囊」去掉。
+analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十八）**：状态条进一步合并（老板 2026-10-11：不要两个胶囊
+要一个）——**多人头像条 + 群名/编辑图标 + 在线人数整体包进同一个
+StadiumBorder 大胶囊**，悬浮/按住显色，点击打开「我的群组」弹层；头像槽
+的独立胶囊壳去掉（空群占位头像的 tooltip 保留，头像条内每人 tooltip 保留）。
+analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，十九）**：状态条大胶囊（及空群占位头像）的 tooltip 改为与
+「我的群组」菜单项/弹层标题**共享同一文案键** `chatPageMenuMembers('group')`
+（老板 2026-10-11），删除旧键 `chatPageMyGroupCompanionsTooltip`（我的群组
+同伴/My group companions）。analyze 0 issue；chat_page_menu 34 测试全过。
+
+**追记（同日，二十）**：三处「我的群组/同伴」文案**合并为一个键**
+（老板 2026-10-11：tooltip 与弹层标题共享，三个都共享更好）——统一用
+`chatPageMembersTitle`（select duo{我的同伴}/other{我的群组}），删除
+`chatPageMenuMembers`；调用处=顶栏菜单项、成员弹层标题、状态条大胶囊
+tooltip（含空群占位头像）。members_reinvite 测试同步改用新键。analyze
+0 issue；chat_page_menu 34 + members_reinvite 全过。
+
+**追记（同日，二十一）**：修复 GitHub CI（run 38144759618）——昨晚大胶囊
+改版后 `group_status_bar_test.dart` 6 个用例仍走旧交互（点状态条编辑图标
+直接弹群名编辑框）而失败。修法：①chat_page 给「我的同伴」弹层的群名行
+InkWell 加测试 key `membersSheetGroupNameRow`（状态条上可能有同文案，需
+二义区分）；②测试加 `_openGroupNameDialog` helper（点胶囊→点弹层群名行
+→弹窗），并补 pump(400ms) 冲 `_menuAction` 的 300ms route 交接纯计时器
+（pumpAndSettle 停不到不排帧的 timer）；③「点人数/群名不开弹层」用例按
+新语义反转重写（大胶囊一体可点）；④间距用例按老板 2026-10-11 拍板改为
+断言胶囊内统一 8px（不再沿用 2026-10-09 的「与我的名字↔我的头像一致
+14px」规则）。顺手修了真 bug：大胶囊 Row 溢出 12px——maxWidth 预算没扣
+胶囊自身水平 Padding（左右各 6），已补 `capsulePad = 12`。analyze
+0 issue；group_status_bar 10/10 + 全量 app 285 测试全过。
+
+**追记（同日，二十二）**：duo 状态条同步大胶囊改版（老板 2026-10-11）——
+对方头像 + 名字/在线状态（或「待加入/Waiting」）合并为**同一个
+StadiumBorder 大胶囊**，整体可点开「My companion」弹层；胶囊 tooltip 与
+弹层标题、菜单项共享同一文案键 `chatPageMembersTitle('duo')`。胶囊内
+Padding(horizontal 6, vertical 2) 与 group 大胶囊同款（此前头像"三面贴壁"
+的 pad 约定由胶囊自身 Padding 接管）；「邀请加入」/「语音通话」仍在胶囊外
+（trailing 不变，peer_invite_link 测试不受影响）。analyze 0 issue；全量
+app 285 测试全过。
+
+**追记（同日，二十三）**：duo 大胶囊头像恢复「三面贴壁」——胶囊内
+Padding 从 horizontal 6/vertical 2 改为只留右 6（老板 2026-10-11：duo
+沿用 2026-09-26 的贴壁约定，与 group 大胶囊不同）。analyze 0 issue。
+
+**追记（同日，二十四）**：修复附件弹层「顶天立地」回归——`413535d9`
+（桌面版网格限宽居中）给 `_buildActionCardGrid` 的 `constrain()` 用了不带
+`heightFactor` 的 `Center`：Align 系默认撑满约束，弹层 `isScrollControlled:
+true`（maxHeight=全屏）→ 整个弹层被顶到满屏。该 helper 为长按菜单与附件
+弹层共用（老板 clue：长按弹层操作按钮居中调整连带）。修复 = `Center`
+加 `heightFactor: 1`（高度包内容、只横向居中）。新增探针回归测试
+`attach_sheet_probe_test.dart`（真实 ChatPage 打开附件弹层，断言高度
+< 70% 屏高）。analyze 0 issue。
+
+**追记（同日，二十五）**：「我的通道」弹层通道卡片改**一卡占满整行**
+（老板 2026-10-11）：不再一行 3 张，卡片 `width: double.infinity`、高度
+仍由内容自然撑出；`Wrap` 去掉横向 spacing（只剩纵向 runSpacing），
+LayoutBuilder + 边长反算整段移除，连带清掉死常量
+`_entranceCardsPerRow`/`_entranceCardMaxSize`/`_entranceCardSizeFor`/
+`_entranceSheetMaxWidth`/`_entranceSheetHPadding`。analyze 0 issue。
+
+**（2026-10-12，二十六）**：`chatPageMembersTitle` 的 select 补显式
+`group{My group}` 分支（老板提议）——此前 `other{My group}` 在兼任 group
+分支，语义不直白；ICU select 强制要求 `other` 存在不能删，故写成
+duo+group+other 三键（other 留作强制兜底，文案同 group，行为不变）。
+重新 gen-l10n；members_reinvite + group_status_bar 11 测试全过，
+analyze 0 issue。
+
+**（2026-10-12，二十七）**：group 大胶囊头像同步「三面贴壁」——胶囊内
+Padding 从 horizontal 6/vertical 2 改为只留右 6（老板 2026-10-12，与 duo
+的 fromLTRB(0,0,6,0) 同款）；宽度预算 capsulePad 12→6（左 0 后减半）。
+group_status_bar 10 测试全过，analyze 0 issue。
+
+**（2026-10-12，二十八）**：duo 大胶囊头像去掉自己的悬浮变色（老板
+2026-10-12：胶囊是一个整体）——不再用带 MouseRegion/Clickable 的
+`_statusAvatar`，改为在胶囊里直接画 Ink 头像（照片 `Ink.image` + ClipOval、
+无图性别 tint + Ink，与群占位头像同款），点击/悬浮都归外层 InkWell，
+外层悬浮高亮能盖在头像上。analyze 0 issue。
+
+**（2026-10-12，二十九）**：修复 `npm run app-ios-boot` 的 TDZ 崩溃——
+`scripts/emuResolveIos.js` 里 `versionOf`（const 箭头函数）声明在 113 行，
+但 `if (!input)` 分支在模块顶层就执行 sort、比较器立刻调用它 →
+`ReferenceError: Cannot access 'versionOf' before initialization`。修复 =
+把 `versionOf`/`runtimeKeyFor` 挪到所有使用之前（json 解析之后）。
+`node scripts/emuResolveIos.js` 验证通过（exit=0）。
+
+**（2026-10-12，三十）**：About 弹层信息行改「标签左 --- 值右」同一行
+（老板 2026-10-12）：版本号/服务器地址/连接状态三行不再上下两行——
+`_InfoRow` 改 Row（label 小字在左 + 12 间距 + Expanded 里 SelectableText
+textAlign 右对齐，baseline 对齐）；note（开发地址标注等补充说明）也属于
+value 侧、与值同侧右对齐。⚠️ textAlign 只在文本框比文字宽时起作用：Column
+的 crossAxisAlignment.start 会把 Text 收缩到自然宽（框=字宽）→ 对齐无效
+仍靠左，须先 `SizedBox(width: double.infinity)` 撑满整行再 textAlign 右
+（老板热重启后实测抓出）。长值换行时每行仍右对齐、label 恒在左；长按复制
+保留。about_sheet_status 4 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十一）**：About 连接状态改口径（老板 2026-10-12）：只探测
+**启动时定下的活地址** effectiveServer——可达→已连接，断开→如实显示
+"无法连接"，**不再尝试其他候选**（About 是状态展示不是连接管理器，候选
+切换/兜底是启动探测的事；开发环境连 localhost 断开时跑去显示连上线上域名
+没有意义）。实现：`_probeEntrances`→`_probeEffective`（Future<bool>），删
+"当前实际入口"附注；l10n 键 aboutStatusEntranceNote 删除、
+aboutStatusUnreachable 文案改为"无法连接/Unreachable"（去掉"任何入口/
+自动重试中"）。测试同步反转为新语义（备用候选可达也显示无法连接）。
+about_sheet_status 4 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十二）**：气泡时间行最右（沙漏时长右边）加「...」图标
+（老板 2026-10-12）：单击 = 长按气泡打开消息菜单弹层（_showMessageActions）；
+复用 `_bubbleQuickAction`（圆形热区 28/图标 16/tooltip 菜单 chatPageMenuMore/
+同款 hover 色）；显示条件与气泡长按同口径 `_messageHasActions`（墓碑仅可
+撤回时给）。chat_page_menu + 引用 38 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十三）**：墓碑消息的「...」收紧显示条件（老板
+2026-10-12）：仅**本机删除或焚毁到期、且仍是单勾**（status == 'sent'、无
+对方回执）的自己消息才给菜单（唯一操作 Recall）；已送达/已读（回执双勾或
+delivered/read 状态）、已撤回（deletedKind == 'recall'）的墓碑不再提供
+「...」/长按——Recall 都不可能成功。`_messageHasActions` 墓碑分支加
+deletedKind != 'recall' + status == 'sent' + receiptOf == null 三条件。
+chat_send_status + chat_page_menu + message_repository 71 测试全过，
+analyze 0 issue。
+
+**（2026-10-12，三十四）**：墓碑消息**一律不给**「...」/长按菜单（老板
+2026-10-12 复杂度收敛）：上一条试过"仅单勾+本机删除/焚毁"细筛，但群空间
+里"一部分成员已收到"时撤回必然失败，单勾粗筛在群语义下不可靠——干脆
+`_messageHasActions` 收敛回 `!m.deleted`，墓碑不提供任何菜单入口。
+_messageRecallable 仅剩未墓碑语义（注释同步）。chat_send_status +
+chat_page_menu 44 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十五）**：气泡「...」的 tooltip 从 chatPageMenuMore
+（"菜单"/"Menu"，汉堡菜单在用，不能改）换成新键 chatPageMsgMoreActions
+（"更多操作"/"More actions"，老板 2026-10-12）。gen-l10n 重新生成；
+chat_page_menu 34 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十六）**：群消息送达进度"双勾+k"（老板 2026-10-12 设计
+定稿）：MessageRepository 加纯函数 `deliveredCountOf(seq, peers)`
+（deliveredUptoSeq≥seq 或 readUptoSeq≥seq，已读蕴含送达，口径同 receiptOf
+排除我自己——水位表内存常驻随回执轮询刷新，无需新机制）。渲染
+`_buildSendStatusIcon`：k=0 → 单勾；k≥1 → **「k 双勾」**（数字在勾前、
+无加号、间 1px——先后试过"+k"后缀/紧贴/2px/3px，老板逐版定稿）；
+**群组永远不出现裸双勾**（群随时扩张"全员送达"不是终态，新人进群自动退
+回"旧k 双勾"无图标降级）；duo 单接收方 k=1 即全体，保持经典裸双勾。
+撤回墓碑固定单勾、failed 红警不变。补 3 接收方不同水位 + 已读蕴含送达 +
+边界共 7 断言的单测。message_repository + chat_send_status 38 测试全过，
+analyze 0 issue。
+
+**（2026-10-12，三十七）**：老板文案修改入库——zh：aboutServerDevNote
+"开发地址（非生产），仅用于开发调试"→"开发地址，仅供测试"、spaceListHint
+"点击其他秘境即可切换"→"点击卡片切换当前秘境"；en：chatPageDeletedMessage
+"(This message was deleted)"→"(This message is no longer available)"。
+
+**（2026-10-12，三十八）**：菜单里 Recall 只给**纯粹单勾**（k=0，还没有
+任何人收到）的消息（老板 2026-10-12：群空间里只要有人收到，撤回就会失败
+——内容已被拿走，不提供无效入口；duo 同理=对方已拉取）。`_messageRecallable`
+加 deliveredCountOf == 0 条件；墓碑本就不给菜单（_messageHasActions =
+!m.deleted）。chat_page_menu 34 测试全过，analyze 0 issue。
+
+**（2026-10-12，三十九）**：两处 UI 修复。① **duo 状态条对方照片头像不圆**——
+根因：`Ink.image + ClipOval` 组合里 Ink 画在 Material 墨水层画布上，**不经过
+widget 树的 ClipOval**，照片贴成方块（无图占位分支恰好是 `Ink` 圆 decoration
+所以一直正常）。修法：照片分支改用 `Ink` + `BoxDecoration(shape: circle,
+image: DecorationImage(cover))`，与占位分支同口径（chat_page.dart）。② **空间
+切换弹层当前卡片**——去掉左上角 `check_circle` 圆勾（群组卡片成员头像会顶到
+角上被压住；选中态靠底色/前景渐变 + 浮起阴影已够），未读角标负偏移
+`right/top: -5` 贴住甚至压出卡片右上圆角（Stack 开 `Clip.none`，否则被默认
+hardEdge 裁掉；space_switcher.dart）。随后老板看了效果定稿 **-8**（再外推一点、
+和头像拉开距离）。analyze 0 issue；space_switcher_avatar +
+multi_space_pages 12 测试全过。
+
+**（2026-10-12，四十）**：单空间顶栏「我的秘境」也带多空间图标并可点开切换弹层
+（老板 2026-10-12，推翻 2026-09-24 的"单空间不给切换暗示"——图标是"空间弹层"
+的入口，不是"有多个空间"的暗示）。`_brandTitle` 去掉 `if (_multiSpace)` 分支：
+图标与 Tooltip/InkWell 对任何空间数都生效；`_multiSpace` getter 随之无引用删除。
+测试同步反转：`chat_page_menu` 里"单空间不给箭头/不可点"用例改为断言图标出现 +
+品牌名可点（logo 可点开「关于」不变），另一测试的过时注释更正。analyze 0 issue；
+chat_page_menu + multi_space_pages + space_switcher_avatar 46 测试全过。
+
+**（2026-10-12，四十一）**：feat/voice-transcript 嫁接到最新 main（merge-base
+cf2eb0a6，main 领先 88 提交，voice 3 提交）。冲突仅 2 处，均因**双方都占用
+v10**：voice 的 v10 = 新增 local_voice_transcripts 表，main 的 v10 =
+local_messages.deleted_kind 墓碑来路列——两项纯增量、可共存，合并进同一
+`if (from < 10)` 块（v10-a 建表 + v10-b 加列，幂等判存在），schemaVersion
+仍 10；迁移测试两侧断言合并（升到 v10 + 两表/两列俱在）。chat_page.dart
+（main 改 1157 行 vs voice 258 行）、local_database.g.dart、l10n 全套均被
+git 自动合入且语义完整：build_runner 重生成 .g.dart 与合并结果**逐字节
+一致**（生成文件零漂移）；转写 UI（_buildVoiceTranscriptLine /
+_enqueueVoiceTranscripts / 模型下载重试）与 main 新 UI（气泡「...」菜单、
+Recall 单勾限制、双勾进度）经 grep 抽查俱在。flutter pub get 后 lock 零
+漂移（镜像未污染）；app 与 shared 两侧 flutter/dart analyze 均 0 issue。
+转写入口与 main 新菜单的交互 UI 待老板真机自测。

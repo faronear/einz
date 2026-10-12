@@ -149,6 +149,26 @@ export function getAttachmentBlob(token: string, attachmentId: string): Buffer {
   return readFileSync(full);
 }
 
+/** 按空间分片路径解析出绝对路径并校验仍在 FILES_ROOT 内（撤回删除用）。
+ *  storage_path 入库前已按 space 分片规则生成，这里纵深防御再校验一次。 */
+export function resolveStoredFile(spaceId: string, storagePath: string): string {
+  const full = join(FILES_ROOT, storagePath);
+  assertInsideFilesRoot(full);
+  return full;
+}
+
+/** 撤回消息时物理删除附件 blob 文件（行删除由调用方在同一事务处理）。
+ *  文件缺失视为已清理（幂等），不抛错。 */
+export function deleteAttachmentFiles(spaceId: string, storagePaths: string[]): void {
+  for (const p of storagePaths) {
+    try {
+      rmSync(resolveStoredFile(spaceId, p), { force: true });
+    } catch {
+      // 文件已缺失或只读文件系统等：跳过，不阻断撤回主流程
+    }
+  }
+}
+
 /** 按消息列表取附件元数据（供 /sync 附加）。 */
 export function attachmentsForMessages(messageIds: string[]): AttachmentMeta[] {
   if (messageIds.length === 0) return [];

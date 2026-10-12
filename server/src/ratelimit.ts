@@ -40,7 +40,12 @@ const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const GLOBAL_MAX = Number(process.env.EINZ_RATELIMIT_GLOBAL ?? 600);
 const GLOBAL_WINDOW_MS = 60 * 1000;
 
-export type RateLimitBucket = "spaceCreate" | "auth" | "global";
+/** DNS 污染上报（免认证端点）：每 IP 每小时。客户端每次会话每域名最多报
+ *  一两次（60s DoH 闸 + 钉扎存在即不重报），10 只防恶意灌表。 */
+const DNS_REPORT_MAX = Number(process.env.EINZ_RATELIMIT_DNS_REPORT ?? 10);
+const DNS_REPORT_WINDOW_MS = 60 * 60 * 1000;
+
+export type RateLimitBucket = "spaceCreate" | "auth" | "global" | "dnsReport";
 
 function limitOf(bucket: RateLimitBucket): { max: number; windowMs: number } {
   switch (bucket) {
@@ -50,6 +55,8 @@ function limitOf(bucket: RateLimitBucket): { max: number; windowMs: number } {
       return { max: AUTH_MAX, windowMs: AUTH_WINDOW_MS };
     case "global":
       return { max: GLOBAL_MAX, windowMs: GLOBAL_WINDOW_MS };
+    case "dnsReport":
+      return { max: DNS_REPORT_MAX, windowMs: DNS_REPORT_WINDOW_MS };
   }
 }
 

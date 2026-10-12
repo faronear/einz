@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../crypto/passphrase_crypto.dart';
+import 'dns_fallback.dart';
 import 'types.dart';
 import '../crypto/message_crypto.dart';
 
@@ -33,11 +34,10 @@ class ApiClient {
   /// 30s 取值偏宽松：大陆网络经代理时 RTT 可能较长，宁可慢也不要误判失败。
   static const responseTimeout = Duration(seconds: 30);
 
-  HttpClient get _client {
-    final c = HttpClient();
-    c.connectionTimeout = const Duration(seconds: 10);
-    return c;
-  }
+  // 经 dns_fallback 的钉扎工厂：host 被钉扎时直连 DoH 解析出的真 IP，
+  // TLS 仍按真实域名校验（DNS 污染兜底，见 dns_fallback.dart 头注释）。
+  HttpClient get _client =>
+      createPinnedHttpClient(connectionTimeout: const Duration(seconds: 10));
 
   /// 对瞬时网络错误（握手/连接/超时）自动重试；业务错误（4xx/5xx）不重试。
   Future<T> _withRetry<T>(Future<T> Function() fn) async {
@@ -225,6 +225,14 @@ class ApiClient {
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     final res = await _post(Api.messages, env.toJson(), token: token);
     return PostMessageResult.fromJson(res);
+  }
+
+  /// 撤回一条「已发出、对方尚未拉取」的消息（2026-10-10）。
+  /// 服务端原子校验：本 space 其他成员 delivered 高水位 < 本条 seq 才删行。
+  /// 失败抛 [ApiException]：409 `ALREADY_DELIVERED` = 对方已拉取，不可撤；
+  /// 403 非本人发送；404 消息不存在/不属于本 space。
+  Future<void> recallMessage(String messageId, String token) async {
+    await _post('${Api.messages}/recall', {'message_id': messageId}, token: token);
   }
 
   /// 注册 Push Token（PROTOCOL.md §7.3）：platform = ios | android。

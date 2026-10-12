@@ -263,6 +263,21 @@ export function openDb(path?: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_dev_act_entrance_at ON entrance_activity (entrance_id, at_ms);
     CREATE INDEX IF NOT EXISTS idx_dev_act_kind_at   ON entrance_activity (kind, at_ms);
     CREATE INDEX IF NOT EXISTS idx_dev_act_space_at  ON entrance_activity (space_id, at_ms);
+
+    -- ── DNS 污染上报（2026-10-11）──
+    -- 客户端在"系统解析与 DoH 加密解析分歧"（链路 UDP-53 抢答注入）时上报；
+    -- 服务端聚合后用于看清"哪些网络在污染"，早于用户投诉发现问题。
+    -- 定位同审计表：只追加、不参与业务语义。保留 30 天（写入时懒清理）。
+    CREATE TABLE IF NOT EXISTS dns_reports (
+      report_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+      at_ms      INTEGER NOT NULL,      -- 上报时刻（ms）
+      domain     TEXT NOT NULL,         -- 被污染的入口域名（客户端实际连的那个）
+      doh_ip     TEXT,                  -- DoH 解析出的真 IP（对照/诊断用）
+      ip         TEXT,                  -- 来源 IP（metaOf，看"哪些网络/地区在污染"）
+      user_agent TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_dns_reports_at ON dns_reports (at_ms);
+    CREATE INDEX IF NOT EXISTS idx_dns_reports_domain ON dns_reports (domain, at_ms);
   `);
 
   // 迁移：messages 表补充 sender_member_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
