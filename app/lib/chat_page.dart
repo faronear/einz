@@ -376,6 +376,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
   StreamSubscription<Amplitude>? _ampSub; // 录音振幅流订阅（波形驱动）
   Timer? _recordTimer; // 录音秒数计时（60s 上限自动停）
+  // 首次录音会先弹 macOS/Android 授权框：hasPermission() 等待期间用户早已松手
+  // （onLongPressEnd 先于授权回调触发），授权成功后 recorder.start() 才真正开录，
+  // 此后再松手没人会去停它——只能等 60s 上限自动停。用该标记让 _stopVoice 在
+  // 「还没进录音态但正在启动」时也能执行取消，而不是被 inputMode 检查直接放过。
+  bool _voiceStarting = false;
   int _recordSeconds = 0;
   bool _previewPlaying = false; // 预览态试听播放中
   String? _playingMessageId; // 播放意图（点按即置：含下载解密等待期，按钮变停止）
@@ -6045,6 +6050,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     // 录音时收起键盘（输入框被录音条覆盖，键盘占屏无意义）
     FocusManager.instance.primaryFocus?.unfocus();
+    _voiceStarting = true;
     try {
       // 重新录音（预览态再长按）：先清掉上一次未发送的临时文件
       final old = _recordingPath;
@@ -6064,12 +6070,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 否则无权限设备上 AudioRecord 初始化失败：要么 start 抛错（无波形），
       // 要么读到全零数据（波形极小、文件 0 字节发不出）。
       if (!await recorder.hasPermission()) {
+        _voiceStarting = false;
         if (!mounted) return;
         _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
       }
       final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await recorder.start(const RecordConfig(), path: path);
+      // 上面 hasPermission() 等待授权弹窗期间用户可能已松手（_voiceStarting 已被
+      // _stopVoice 清掉）：此时录制已开但无人会再去停它，直接停掉并丢弃本次启动
+      if (!_voiceStarting) {
+        await recorder.stop();
+        return;
+      }
+      _voiceStarting = false;
       // 振幅流：实时驱动录音条波形（record 插件内部无订阅者时不做事）
       _voiceSamples.clear();
       _recordSeconds = 0;
@@ -6102,7 +6116,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 松手 / 60s 到点：停录音 → 文件有效进预览态（不自动发送），空录音直接取消回输入框。
   Future<void> _stopVoice() async {
-    if (_inputMode != _InputMode.recording) return;
+    if (_inputMode != _InputMode.recording) {
+      // 录音尚未真正开始（首次授权弹窗期间已松手）：只标记「本次启动作废」，
+      // _startVoice 在 recorder.start() 完成后看到标记会自行停掉并丢弃。
+      _voiceStarting = false;
+      return;
+    }
     final path = _recordingPath;
     _recordTimer?.cancel();
     _recordTimer = null;

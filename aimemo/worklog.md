@@ -14642,3 +14642,13 @@ loadHistory 后——它开头 clear messages）；`_tuiReady` 就绪后（含 W
 一次钩子触发，pty 实测聊天态可见「⚠️ DNS 污染：…（已上报服务器）」系统消息，
 仪器已还原。App 侧（app/lib/main.dart）那条仍是 debugPrint——只 debug 可见，
 是否也要在 App 内持久展示待老板定。
+
+**（2026-10-13T08:45:32Z / 2026-10-13 16:45）**：修复 macOS 首次授权后录音失控
+（授权弹窗期间松手 → 自动录满 60s 才停）。根因：`_startVoice` 里
+`hasPermission()` 首次会弹 TCC 授权框，等待期间用户早已松手——`onLongPressEnd`
+触发的 `_stopVoice` 因 `_inputMode != recording` 直接 return，无人停录；授权回调
+返回后 `recorder.start()` 才真正开录，此后再无 stop 调用，只能等 60s 定时器兜底。
+第二次起已授权不再弹框，故一切正常。修法（chat_page.dart）：新增 `_voiceStarting`
+标记——`_startVoice` 入口置 true；`_stopVoice` 在非录音态时清标记而非直接 return；
+`start()` 完成后发现标记已被清则立即 `recorder.stop()` 丢弃本次启动。flutter
+analyze 通过。
