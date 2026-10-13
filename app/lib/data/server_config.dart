@@ -61,6 +61,31 @@ const List<String> kServerCandidates = [
   'https://einz.bittic.cn', // 中国备用入口 2
 ];
 
+/// 下载入口的**兜底**地址（老板 2026-10-13 定「服务端优先、硬编码兜底」）：
+/// GitHub releases 的 `latest` 页——`latest` 是 GitHub 的固定别名，releases
+/// 置顶即指向它，不跟具体版本号，永不过期。
+///
+/// 正常路径用不到它：服务端 `/health` 下发 `app_download_url` 时以服务端为准
+/// （改地址只改 serverConfig.json 一处，已发的旧 App 无需更新，见
+/// [resolveAppDownloadUrl]）。只有服务端没给（旧服务端没这字段 / 配置没写 /
+/// 探测不通）时才回退到这里——下载入口是相对固定的产品功能，不能因为服务端
+/// 没说就没有。About 页下载行与版本闸升级窗共用这一处。
+const String kAppDownloadUrlFallback =
+    'https://github.com/faronear/einz/releases/tag/latest';
+
+/// 下载入口 URL 解析：**服务端优先、硬编码兜底**（唯一实现）。
+///
+/// About 页下载行与版本闸升级窗都必须走它——两处若各写各的逻辑，会出现
+/// "弹窗给服务端链接、About 给兜底链接"，用户看到两个不同地址。
+///
+/// [served] = `/health` 的 `app_download_url`（[ServerHealth.appDownloadUrl]；
+/// 客户端侧已归一化：非字符串/空串 → null）。空（null / 空串 / 纯空白）→
+/// 回退 [kAppDownloadUrlFallback]。
+String resolveAppDownloadUrl(String? served) {
+  final s = served?.trim() ?? '';
+  return s.isEmpty ? kAppDownloadUrlFallback : s;
+}
+
 /// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
 ///
 /// **给默认值而非 late**：单元测试不走 `main()`，late 未初始化会直接崩。

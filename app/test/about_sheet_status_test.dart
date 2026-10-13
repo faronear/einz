@@ -2,6 +2,8 @@
 // 只探测**启动时定下的活地址**（effectiveServer）——可达 → 已连接；不可达 →
 // 如实显示"无法连接"，**不尝试其他候选**（候选切换/兜底是启动探测的事，老板
 // 2026-10-12：开发环境连 localhost 断开时，跑去显示连上了线上域名没有意义）。
+// 下载入口行（2026-10-13）：URL **服务端优先**（/health 的 app_download_url）、
+// **硬编码兜底**（服务端没给/探测不通）——两条路径各有单测守着。
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -54,7 +56,7 @@ void main() {
     expect(find.text('检测中…'), findsOneWidget);
   });
 
-  testWidgets('版本号下有下载入口：releases 链接原样展示且排在版本号下方',
+  testWidgets('下载入口：服务端没给 URL → 回退硬编码 releases 地址，排在版本号下方',
       (tester) async {
     await _pump(tester, (server) async => const ServerHealth(ok: true));
     await tester.pumpAndSettle();
@@ -70,5 +72,28 @@ void main() {
       greaterThan(tester.getTopLeft(find.text(l10n.aboutVersionLabel)).dy),
       reason: '下载入口应排在版本号下一行',
     );
+  });
+
+  testWidgets('下载入口：服务端下发 app_download_url → 用它，不显示硬编码地址',
+      (tester) async {
+    const served = 'https://example.com/einz-download';
+    await _pump(tester,
+        (server) async => const ServerHealth(ok: true, appDownloadUrl: served));
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(served), findsOneWidget);
+    expect(find.text('https://github.com/faronear/einz/releases/tag/latest'),
+        findsNothing);
+    expect(find.text(l10n.aboutDownloadLabel), findsOneWidget);
+  });
+
+  testWidgets('下载入口：探测不通 → 仍回退硬编码地址（入口不消失）',
+      (tester) async {
+    await _pump(tester, (server) async => const ServerHealth());
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutDownloadLabel), findsOneWidget);
+    expect(find.text('https://github.com/faronear/einz/releases/tag/latest'),
+        findsOneWidget);
   });
 }

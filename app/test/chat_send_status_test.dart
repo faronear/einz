@@ -451,7 +451,7 @@ void main() {
         reason: '墓碑不影响在途路径，状态图标仍应显示');
   });
 
-  testWidgets('服务端不可达且有未确认消息：显示「离线 · N 条待发送」提示',
+  testWidgets('服务端不可达且有未确认消息：显示「N 条待发送」重发提示',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -492,7 +492,9 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
-    expect(find.text('离线 · 1 条待发送'), findsOneWidget,
+    // 绑 l10n 键不绑字面（文案常改；2026-10-13 已去掉"离线"前缀）
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.chatPageMsgsUnsent(1)), findsOneWidget,
         reason: '有未确认消息 + 连接异常 → 应给出明确提示');
   });
 

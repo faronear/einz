@@ -7,6 +7,7 @@
 //
 // 运行：flutter test test/version_gate_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:einz/data/server_config.dart';
 import 'package:einz/widgets/version_gate.dart';
 
 void main() {
@@ -118,6 +119,26 @@ void main() {
         appVersionGateLevel('', coldVersion: cold, hotVersion: hot),
         VersionGateLevel.none,
       );
+    });
+  });
+
+  // 下载入口 URL 解析（2026-10-13）：About 页下载行与版本闸升级窗共用这一处
+  // （server_config.dart）——两处必须同一逻辑，否则用户会看到两个不同地址。
+  group('resolveAppDownloadUrl（服务端优先、硬编码兜底）', () {
+    test('服务端下发 → 用服务端的', () {
+      expect(resolveAppDownloadUrl('https://example.com/app'),
+          'https://example.com/app');
+    });
+
+    test('null / 空串 / 纯空白 → 回退硬编码兜底地址', () {
+      expect(resolveAppDownloadUrl(null), kAppDownloadUrlFallback);
+      expect(resolveAppDownloadUrl(''), kAppDownloadUrlFallback);
+      expect(resolveAppDownloadUrl('   '), kAppDownloadUrlFallback);
+    });
+
+    test('服务端值首尾带空白 → trim 后用', () {
+      expect(resolveAppDownloadUrl('  https://example.com/app  '),
+          'https://example.com/app');
     });
   });
 }

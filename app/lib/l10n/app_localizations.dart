@@ -1751,7 +1751,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMsgsUnsent.
   ///
   /// In en, this message translates to:
-  /// **'Auto-retries when back online · {count} unsent, local messages only'**
+  /// **'Waiting to sync… {count} unsent, will retry when back online'**
   String chatPageMsgsUnsent(int count);
 
   /// No description provided for @chatPageEntranceUnrecognized.
@@ -1763,7 +1763,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMsgsSyncing.
   ///
   /// In en, this message translates to:
-  /// **'Auto-syncs when back online · send/receive temporarily unavailable, local messages only'**
+  /// **'Waiting to sync… send/receive temporarily unavailable, local messages only'**
   String get chatPageMsgsSyncing;
 
   /// No description provided for @chatPageMsgResending.

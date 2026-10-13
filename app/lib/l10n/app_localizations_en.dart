@@ -1015,7 +1015,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageMsgsUnsent(int count) {
-    return 'Auto-retries when back online · $count unsent, local messages only';
+    return 'Waiting to sync… $count unsent, will retry when back online';
   }
 
   @override
@@ -1024,7 +1024,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMsgsSyncing =>
-      'Auto-syncs when back online · send/receive temporarily unavailable, local messages only';
+      'Waiting to sync… send/receive temporarily unavailable, local messages only';
 
   @override
   String get chatPageMsgResending => 'Resending…';

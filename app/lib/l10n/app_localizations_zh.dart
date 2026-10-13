@@ -951,7 +951,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageMsgsUnsent(int count) {
-    return '网络恢复后自动重发 · $count 条待发送，仅可查看本地消息';
+    return '等待同步中… $count 条消息待发送，网络恢复后自动重发';
   }
 
   @override
@@ -959,7 +959,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
 
   @override
-  String get chatPageMsgsSyncing => '网络恢复后自动同步 · 暂时无法收发，仅可查看本地消息';
+  String get chatPageMsgsSyncing => '等待同步中… 暂时无法收发，仅可查看本地消息';
 
   @override
   String get chatPageMsgResending => '重发中…';

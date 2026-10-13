@@ -8,12 +8,6 @@ import '../l10n/app_localizations.dart';
 import 'clickable.dart';
 import 'version_gate.dart';
 
-/// 下载入口（老板 2026-10-12）：GitHub releases 的 latest 页（与服务端
-/// `appDownloadUrl` 同一地址）。`latest` 是 GitHub 的固定别名， releases 置顶
-/// 即指向它——不跟具体版本号，永不过期。
-const String _kReleasesUrl =
-    'https://github.com/faronear/einz/releases/tag/latest';
-
 /// 链接色：品牌深蓝 #2271F7（与 LinkifiedText / 「邀请加入」链接同源）。
 const Color _kLinkColor = Color(0xFF2271F7);
 
@@ -62,17 +56,20 @@ class _AboutSheetState extends State<AboutSheet> {
   /// 只探测**启动时定下的活地址** [effectiveServer]（2026-10-12 老板决策）：
   /// About 是状态展示，不是连接管理器——重新去连其他候选没有意义（候选切换/
   /// 兜底是启动探测的事，App 的实际连接也一直走 effectiveServer）。断开就如实
-  /// 显示断开，不尝试其他地址。true = 可达。
-  late final Future<bool> _reachable = _probeEffective();
+  /// 显示断开，不尝试其他地址。
+  ///
+  /// 存**整个 [ServerHealth]**（不只是可达性）：下载入口的 URL 也从这里出
+  /// （`app_download_url`，见 [_DownloadRow]）——一次探测，两处消费。
+  late final Future<ServerHealth> _health = _probeEffective();
 
   Future<AboutInfo> _load() async {
     final pkg = await PackageInfo.fromPlatform();
     return (version: pkg.version, buildNumber: pkg.buildNumber);
   }
 
-  Future<bool> _probeEffective() async {
+  Future<ServerHealth> _probeEffective() async {
     final probe = widget.probe ?? probeServer;
-    return (await probe(effectiveServer)).ok;
+    return probe(effectiveServer);
   }
 
   @override
@@ -125,14 +122,10 @@ class _AboutSheetState extends State<AboutSheet> {
                       ),
                       const SizedBox(height: 14),
                       // 下载入口（版本号下一项，老板 2026-10-12）：整行可点 →
-                      // 外部浏览器打开 releases 页；打不开（无浏览器/地址非法）
-                      // 静默——URL 原样展示在行里，用户能手抄（同 version_gate
-                      // 的 openAppDownloadUrl 口径）
-                      _InfoRow(
-                        label: l10n.aboutDownloadLabel,
-                        value: _kReleasesUrl,
-                        onTap: () => openAppDownloadUrl(context, _kReleasesUrl),
-                      ),
+                      // 外部浏览器打开；打不开（无浏览器/地址非法）静默——URL
+                      // 原样展示在行里，用户能手抄（同 version_gate 口径）。
+                      // URL 服务端优先、硬编码兜底（见 [_DownloadRow]）。
+                      _DownloadRow(health: _health),
                       const SizedBox(height: 14),
                       // 服务器地址可长按选中复制（排查连不上时最常问的就是这个）。
                       // 非出厂域名（--server / 编译期覆盖）时标注，避免把开发包当正式包。
@@ -142,11 +135,11 @@ class _AboutSheetState extends State<AboutSheet> {
                         note: isDevServer ? l10n.aboutServerDevNote : null,
                       ),
                       const SizedBox(height: 14),
-                      FutureBuilder<bool>(
-                        future: _reachable,
+                      FutureBuilder<ServerHealth>(
+                        future: _health,
                         builder: (context, snap) {
-                          // 判定用 connectionState 而非 hasData：探测结果是
-                          // bool，全部路径都有数据；不可达是 false——若按
+                          // 判定用 connectionState 而非 hasData：探测结果必带
+                          // ok（bool），全部路径都有数据；不可达是 false——若按
                           // hasData 判定会把"无法连接"显示成"检测中"
                           // （首版实现的真实 bug，测试抓出）。
                           final String value;
@@ -154,7 +147,7 @@ class _AboutSheetState extends State<AboutSheet> {
                           if (snap.connectionState == ConnectionState.waiting) {
                             value = l10n.aboutStatusChecking;
                             valueColor = null;
-                          } else if (snap.data == true) {
+                          } else if (snap.data?.ok == true) {
                             value = l10n.aboutStatusConnected;
                             valueColor = Theme.of(context).colorScheme.primary;
                           } else {
@@ -176,6 +169,46 @@ class _AboutSheetState extends State<AboutSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 下载入口行：URL 走**全 App 唯一的解析** [resolveAppDownloadUrl]（服务端
+/// 优先、硬编码兜底，老板 2026-10-13 定；与版本闸升级窗同一逻辑，别在这里
+/// 另写一套）：
+///
+/// - 服务端 `/health` 下发 `app_download_url`（serverConfig.json 的
+///   [ServerHealth.appDownloadUrl]）→ 用它：改下载地址只改服务端一处，
+///   已发的旧 App 无需更新；
+/// - 服务端没给（旧服务端没这字段 / 配置没写 / 探测不通）→ 回退到编译期
+///   硬编码的 [kAppDownloadUrlFallback]——下载入口相对固定，不能因为服务端
+///   没说就没有。
+///
+/// 整行可点 → 外部浏览器打开；打不开（无浏览器/地址非法）静默——URL 原样展示
+/// 在行里，用户能手抄（同 version_gate 的 [openAppDownloadUrl] 口径）。
+/// 探测中摆 '…' 占位：探通后行内弹出会把下方的行往下推，占位让布局一次到位。
+class _DownloadRow extends StatelessWidget {
+  const _DownloadRow({required this.health});
+
+  final Future<ServerHealth> health;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return FutureBuilder<ServerHealth>(
+      future: health,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return _InfoRow(label: l10n.aboutDownloadLabel, value: '…');
+        }
+        // 服务端优先；空（null / 空串 / 探测失败无 data）→ 硬编码兜底
+        final url = resolveAppDownloadUrl(snap.data?.appDownloadUrl);
+        return _InfoRow(
+          label: l10n.aboutDownloadLabel,
+          value: url,
+          onTap: () => openAppDownloadUrl(context, url),
+        );
+      },
     );
   }
 }
