@@ -15,6 +15,7 @@ import 'widgets/linkified_text.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:pasteboard/pasteboard.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
@@ -60,7 +61,7 @@ import 'widgets/clickable.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
-enum _AttachmentKind { emoji, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
+enum _AttachmentKind { emoji, paste, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
 
 /// 本平台是否具备**相机采集**能力（拍照/拍摄）。
 ///
@@ -75,6 +76,30 @@ bool get _hasCameraCapture =>
 /// 本平台是否能从系统拖文件进来（仅桌面）。移动端无此交互，且 desktop_drop 的
 /// Android 实现还是 preview，不挂上去更稳。
 bool get _fileDropSupported =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+/// 本平台是否支持「剪贴板粘贴」能力（附件面板的「粘贴」入口 + 读取逻辑）。
+/// **全平台**（老板 2026-10-12：桌面端经附件面板同样可用，移动端经同一入口）：
+/// 走 `pasteboard` 插件——iOS/macOS 零配置，Android 只读剪贴板也不需要
+/// FileProvider（那只在 writeImage 时才用，我们从不写剪贴板）。
+bool get _clipboardPasteSupported =>
+    !kIsWeb &&
+    (Platform.isAndroid ||
+        Platform.isIOS ||
+        Platform.isMacOS ||
+        Platform.isWindows ||
+        Platform.isLinux);
+
+/// 桌面端专属：Cmd/Ctrl+V 快捷键 + 配套的输入框 autofocus / onTapOutside
+/// 行为调整（焦点链实测定的，见 build 里 CallbackShortcuts 注释）。
+/// 移动端没有键盘快捷键这一说，入口走附件面板。
+bool get _pasteShortcutSupported =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+/// 剪贴板**文件**分支仅桌面：插件在 Android 返回的是 content:// URI
+/// （dart:io 读不了，要 content resolver——v1 不碰原生），iOS 侧恒返回空；
+/// 桌面两端（macOS 路径 / Windows 临时文件中转）都是可直接读的路径。
+bool get _pasteboardFilesSupported =>
     !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
 /// 拖入文件的类型归类（扩展名 → 附件类型）。桌面拖放与相册/文件对话框各入口
@@ -100,6 +125,19 @@ String _dropAttachmentType(String fileName) {
   if (_kDropVideoExts.contains(ext)) return 'video';
   if (_kDropAudioExts.contains(ext)) return 'audio';
   return 'file';
+}
+
+/// 剪贴板给的"文件路径"是否是**本地真实存在的普通文件**（老板 2026-10-12）：
+/// 浏览器拷图有时会连带一个 http URL，插件取 `url.path` 得到个不存在的本地
+/// 路径（如 `/images/foo.png`）——那种必须落空，让粘贴回落到图片数据分支，
+/// 否则 statSync 抛错、用户看到"发送失败"。
+bool _isLocalReadableFile(String path) {
+  if (path.isEmpty) return false;
+  try {
+    return FileStat.statSync(path).type == FileSystemEntityType.file;
+  } catch (_) {
+    return false;
+  }
 }
 
 /// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
@@ -562,7 +600,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 三档优先级：
   /// - 服务器不认本通道（库被重置）→ 淡红：明确"数据没被清除"，用户可继续读本地消息；
   /// - 有 pending 消息 + 连接异常 → 淡琥珀（原有：解释"小飞机停了很久"）；
-  /// - 仅连续同步失败（无 pending）→ 淡琥珀「离线 · 仅可查看本地消息」。
+  /// - 仅连续同步失败（无 pending）→ 淡琥珀：只讲后果与自动恢复，**不诊断网络**
+  ///   （2026-10-13 合并：原先按 WS 态分「同步中… / 离线」两种措辞，但网络诊断由
+  ///   状态条红绿灯承担，条里复述"离线"在绿灯时自相矛盾、复述"同步中"在红灯深退避
+  ///   时名不副实——统一成状态中性的一句，灯管灯、条管条）。
   /// 判定用 `_consecutiveSyncFailures > 0` 而不是 `!_ws.connected`，避免普通重连闪条。
   Widget _buildOfflineHint() {
     final l10n = AppLocalizations.of(context)!;
@@ -577,14 +618,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _consecutiveSyncFailures > 0 || (_ws != null && !_ws!.connected.value);
     if (_unsentCount > 0 && troubled) {
       return _hintBanner(
-        l10n.chatPageOfflineUnsent(_unsentCount),
+        l10n.chatPageMsgsUnsent(_unsentCount),
         bg: const Color(0xFFFFF3E0), // 淡琥珀：提示而非报错
         fg: const Color(0xFF8A5300),
       );
     }
     if (_consecutiveSyncFailures == 0) return const SizedBox.shrink();
     return _hintBanner(
-      l10n.chatPageOfflineLocalOnly,
+      l10n.chatPageMsgsSyncing,
       bg: const Color(0xFFFFF3E0),
       fg: const Color(0xFF8A5300),
     );
@@ -1649,12 +1690,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 底部「保存」（移动端入相册、桌面弹保存对话框）。先关大图再
                     // 保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面会看不见。
@@ -3016,21 +3052,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
-                  // 标题下备注行（老板 2026-10-06）：式样同「我的秘境」「通道列表」
-                  // 弹层标题下的说明——淡色小字、居中。duo **对方尚未加入**时不显示
-                  // （那时按钮是「邀请」新同伴，与备注说的「重新邀请」不符；对方
-                  // 加入后 duo 按钮也是「重新邀请」，同样适用这条备注）。
-                  if (!(!_isGroup && _peerJoined == false))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Center(
-                        child: Text(l10n.chatPageMembersHint,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(ctx).colorScheme.outline)),
-                      ),
-                    ),
                   // 群空间：成员列表前放「群名称」标题行（老板 2026-10-11）：
                   // **不用卡片**——白底上的标题文字（同弹层标题字号/字重），
                   // 未设置 → 淡色占位词「群空间名称/Group space name」；
@@ -5068,7 +5089,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 实际轮询周期 = 基准 × 2^(连续失败次数)，上限 60s。
   /// 目的：离线期间把"每 3s 一轮、每轮最多 30s"的请求风暴收敛为"每分钟一次"。
+  ///
+  /// **WS 在线 + 同步失败例外**（老板 2026-10-12：绿灯与"离线"条同框 60s+）：
+  /// WS 还连着 = 网络与服务端已被证明可达，失败几乎总是会话续期一类的应用层
+  /// 问题，下一轮往往就成功——不该套用"服务端宕机"的指数退避。固定 5s 快速
+  /// 重试：窗口期从 60s+ 缩到 ≤5s，又比 3s 略松，给续期往返留余量。
   Duration get _tickerInterval {
+    if (_consecutiveSyncFailures > 0 && _ws?.connected.value == true) {
+      return const Duration(seconds: 5);
+    }
     if (_consecutiveSyncFailures == 0) return _baseTickerInterval;
     final growth = 1 << _consecutiveSyncFailures.clamp(0, 5);
     final seconds = _baseTickerInterval.inSeconds * growth;
@@ -6425,6 +6454,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               label: l10n.chatPageAttachEmoji,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
             ),
+            // 「粘贴」排表情符之后——整个网格的末尾（老板 2026-10-12 指定）。
+            // **总显示、不做剪贴板预检**：iOS 上 App 读剪贴板会弹系统"已粘贴"
+            // 横幅，每开一次面板弹一次没人受得了；空了就空了，点了由
+            // _pasteFromClipboard 提示「剪贴板是空的」兜底（老板拍简：接受这个
+            // 代价，换实现简单 + iOS 不被横幅骚扰）。放末尾也不挤常用入口。
+            // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
+            if (_clipboardPasteSupported)
+              _buildActionCard(
+                icon: Icons.content_paste,
+                label: l10n.chatPageAttachPaste,
+                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
+              ),
           ]),
         ),
       ),
@@ -6456,6 +6497,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       switch (kind) {
         case _AttachmentKind.emoji:
           return; // 已在 _showAttachmentSheet 中分流（展开表情面板），不走上传
+        case _AttachmentKind.paste:
+          // 粘贴：读剪贴板 → 图/文件走确认弹窗 → 发送；文本插入输入框。
+          // 自己的 try/catch 在 _pasteFromClipboard 里（错误提示同口径）
+          await _pasteFromClipboard();
+          return;
         case _AttachmentKind.photo:
           image = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
           if (image == null) return;
@@ -6606,6 +6652,188 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _notice(context, _attachmentSendError(l10n, e));
       }
     }
+  }
+
+  // ---------- 剪贴板粘贴：附件面板入口 + 桌面 Cmd/Ctrl+V（老板 2026-10-12） ----------
+
+  /// 剪贴板图片的合成文件名。粘贴没有"原名"可言（截图/浏览器拷图都不带名），
+  /// 用时间戳保证连发多条不重名；扩展名跟字节格式走——`pasteboard` 在
+  /// macOS（NSPasteboard）、Windows（DIB 转换）、iOS（UIPasteboard）三端
+  /// 返回的都是 PNG。这名字会写进消息明文（`📎 <fileName>`，引用快照/对端保存都看它）。
+  String _pastedImageName() {
+    final t = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '粘贴图片_${two(t.month)}${two(t.day)}_${two(t.hour)}${two(t.minute)}${two(t.second)}.png';
+  }
+
+  /// 粘贴的落点：读剪贴板 → 分流（与微信口径一致——**同时有图和文时发图**）：
+  /// ① **文件路径优先**（访达/资源管理器里拷的文件，仅桌面，见
+  ///    [_pasteboardFilesSupported]）→ 按扩展名归类后走 [_sendPastedFiles]；
+  /// ② 没有真实本地文件 → 图片**字节**（截图 / 图片 App 拷贝 / 浏览器拷图）
+  ///    → **确认弹窗**（缩略图）→ 走 [_sendAttachmentOptimistic] 发送；
+  /// ③ 都没有 → 纯文本，插入输入框光标处（见 [_insertPastedText]）；
+  /// ④ 全空 → 提示「剪贴板是空的」（附件面板点了没反馈会很懵）。
+  ///
+  /// **为什么文件优先于图片字节**（老板 2026-10-12 实测 + 机制）：macOS 在
+  /// Finder 里拷文件时，剪贴板里的"图片数据"是**文件类型图标**（系统合成的
+  /// 缩略图，pdf/mp4 等同理），不是文件内容——先读 image 分支会把图标当成
+  /// 图发出去（弹窗显示图标、发出去也是一张图标）。文件路径才是真内容，
+  /// 所以先判 files；校验过本地真实存在（浏览器拷图有时会带一个 http 派
+  /// 生的假路径，自然落空）才走文件分支。
+  ///
+  /// 为什么发送前要确认（老板 2026-10-12）：剪贴板内容不可见——可能是几分钟前
+  /// 拷的旧图/旧文件，而 E2EE 消息对方可能已收到、撤不回。图片/文件弹窗给一次
+  /// **带预览**的确认；纯文本只是插进输入框（随时可改），不弹。
+  ///
+  /// 为什么文本要自己插：桌面快捷键一旦被页面级 CallbackShortcuts 匹配就会消费掉，
+  /// WidgetsApp 默认的文字粘贴不会跑，所以这一支得自己来（等价于原生粘贴：
+  /// 替换选中区、光标落到插入文本尾）。
+  Future<void> _pasteFromClipboard() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final localFiles = _pasteboardFilesSupported
+          ? (await Pasteboard.files()).where(_isLocalReadableFile).toList()
+          : const <String>[];
+      if (!mounted) return;
+      if (localFiles.isNotEmpty) {
+        await _sendPastedFiles(localFiles.map(XFile.new).toList());
+        return;
+      }
+      final bytes = await Pasteboard.image;
+      if (!mounted) return;
+      if (bytes != null) {
+        // 超限预检放确认前：都看预览了才被告知超大，不如先拦（老板 2026-10-08 同思路）
+        if (!_withinAttachmentLimit(bytes.length)) return;
+        final ok = await _confirmPasteSend(_PastePayload.image(bytes));
+        if (!ok || !mounted) return;
+        await _sendAttachmentOptimistic(
+            fileBytes: bytes, fileName: _pastedImageName(), type: 'image');
+        return;
+      }
+      final text = await Pasteboard.text ?? '';
+      if (!mounted) return;
+      if (text.isEmpty) {
+        _notice(context, l10n.chatPagePasteEmpty);
+        return;
+      }
+      _insertPastedText(text);
+    } catch (e) {
+      if (!mounted) return;
+      _notice(context, _attachmentSendError(l10n, e));
+    }
+  }
+
+  /// 剪贴板里的**文件**（Finder/资源管理器里拷的）按扩展名归类后走确认弹窗：
+  /// - 单张图片 → 读真实字节、弹窗给**缩略图**、按图片消息发（用真名，不是
+  ///   合成名——它本来就是有名字的文件；老板 2026-10-12：拷 png 粘贴就该
+  ///   跟图片 App 里拷贝一样看到图、发出去也是图）；
+  /// - 其余（多图/视频/音频/混合/其他文件）→ 按 [kind] 问的名单弹窗
+  ///   （标题和图标按类型走），发送仍走 [_sendDroppedFiles]——它逐文件按
+  ///   扩展名分型，视频发视频、音频发音频（带时长探测）、图片发图片。
+  Future<void> _sendPastedFiles(List<XFile> xfiles) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final kinds = xfiles.map((f) => _dropAttachmentType(f.name)).toSet();
+      if (kinds.length == 1 && kinds.first == 'image' && xfiles.length == 1) {
+        final bytes = await xfiles.first.readAsBytes();
+        if (!mounted) return;
+        if (!_withinAttachmentLimit(bytes.length)) return;
+        final ok = await _confirmPasteSend(_PastePayload.image(bytes));
+        if (!ok || !mounted) return;
+        await _sendAttachmentOptimistic(
+            fileBytes: bytes, fileName: xfiles.first.name, type: 'image');
+        return;
+      }
+      // 同类媒体按那个类型问（视频/音频），混合或非媒体按"文件"问
+      final kind = kinds.length == 1 ? kinds.first : 'file';
+      final ok = await _confirmPasteSend(_PastePayload.files(xfiles, kind));
+      if (!ok || !mounted) return;
+      // 逐个的大小预检在 _sendDroppedFiles 里（要先读盘才知道，同拖放口径）
+      await _sendDroppedFiles(xfiles);
+    } catch (e) {
+      if (!mounted) return;
+      _notice(context, _attachmentSendError(l10n, e));
+    }
+  }
+
+  /// 粘贴发送前的确认弹窗（老板 2026-10-12）：图片给预览、文件给名单，
+  /// 按钮 取消/发送。点遮罩或系统返回 = 取消（不能默认发送）。
+  /// 返回 true = 用户确认发送。
+  Future<bool> _confirmPasteSend(_PastePayload payload) async {
+    final l10n = AppLocalizations.of(context)!;
+    final bytes = payload.bytes;
+    final files = payload.files;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
+        // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"
+        title: Text(switch (payload.kind) {
+          'image' => l10n.chatPagePasteSendImageTitle,
+          'video' => l10n.chatPagePasteSendVideoTitle(files!.length),
+          'audio' => l10n.chatPagePasteSendAudioTitle(files!.length),
+          _ => l10n.chatPagePasteSendFilesTitle(files!.length),
+        }),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
+          child: bytes != null
+              ? Image.memory(bytes, fit: BoxFit.contain)
+              // 名单用 SingleChildScrollView + Column(min)：对话框要算内容
+              // 固有宽度，ListView(shrinkWrap) 会抛 intrinsic dimensions 异常
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final f in files!)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          // 图标也按类型：视频/音频不该挂个通用文件图标
+                          leading: Icon(switch (payload.kind) {
+                            'video' => Icons.movie,
+                            'audio' => Icons.music_note,
+                            _ => Icons.insert_drive_file,
+                          }),
+                          title: Text(f.name,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.send),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  /// 文本粘贴回退：把剪贴板文本插到输入框光标处（选中区替换）。
+  /// 焦点不在输入框时（焦点在消息列表/别处）先把焦点拉回来——否则插了字
+  /// 用户看不见光标，也不知道字去哪儿了。
+  void _insertPastedText(String text) {
+    if (text.isEmpty) return;
+    final controller = _input;
+    final sel = controller.selection;
+    // 从未聚焦过的输入框 selection 是 -1（无效值）：按"追加到末尾"处理
+    final hasSelection = sel.start >= 0 && sel.end >= 0;
+    final start =
+        hasSelection ? math.min(sel.start, sel.end) : controller.text.length;
+    final end =
+        hasSelection ? math.max(sel.start, sel.end) : controller.text.length;
+    final newText = controller.text.replaceRange(start, end, text);
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + text.length),
+    );
+    _inputFocusNode.requestFocus();
   }
 
   // ---------- 视频：下载解密 → 临时文件 → video_player 播放 ----------
@@ -6941,10 +7169,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
+  /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 点任何位置关闭，与头像全屏一致）。
   /// useSafeArea:false + 直角 shape：背景铺满整屏，不留圆角和上下安全区空隙。
   /// 背景 = kBrandGradient（老板 2026-09-15：全屏查看用首屏同款渐变，更有品牌感）。
   /// 底部「保存」按钮（老板 2026-10-08）：移动端存相册 / 桌面弹保存对话框。
+  /// 轻触关闭（老板 2026-10-12）：点击屏幕任何地方都返回聊天页，不必非找右上角 ✕；
+  /// 与 _showAvatarFullscreen 同一套 Clickable 包裹——缩放/拖动仍归 InteractiveViewer，
+  /// 只有"轻触"（ pointer 未移动即抬起）才关，双指放大后误触不会关掉大图。
   Future<void> _showFullImage(HistoryMessage m, Uint8List bytes) async {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
@@ -6961,20 +7192,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: InteractiveViewer(
-                        child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+                      child: Clickable(
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: InteractiveViewer(
+                          child: Center(
+                              child: Image.memory(bytes, fit: BoxFit.contain)),
+                        ),
                       ),
                     ),
                     Positioned(
                       top: 8,
                       right: 8,
                       // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
                     // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。
@@ -7628,9 +7858,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _notice(context, l10n.chatPageAttachmentMetaMissing);
       return;
     }
-    // 留存副本还在 → 直接交给系统应用打开
+    // 留存副本还在 → 直接交给系统应用打开。
+    // Linux 没有 open_filex 实现：跳过「直接打开」，落到下方的下载→保存→
+    // 提示路径流程（文件落 Documents，用户自己打开）
     final stored = await _storedFile(m);
-    if (stored != null) {
+    if (stored != null && !Platform.isLinux) {
       await _openFileWith(stored.path);
       return;
     }
@@ -7640,7 +7872,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         keyVersion: att['key_version'] as int,
         nonce: base64Decode(att['nonce'] as String),
       );
-      if (_storeAttachments) {
+      // 留存落盘成功 → 交给系统应用打开；Linux 无 open_filex：落到下方的
+      // Documents 保存 + 提示路径（与 secured 模式同一条出口）
+      if (_storeAttachments && !Platform.isLinux) {
         final file = await AttachmentStore.ensure(
             widget.spaceId, m.env.messageId, _attachmentExtOf(m), () async => bytes);
         if (file != null) {
@@ -7674,7 +7908,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final page = Scaffold(
+    // 非 final：桌面端下面还要按需套 CallbackShortcuts（粘贴快捷键）/DropTarget
+    // （拖放），见方法末尾两处包裹
+    Widget page = Scaffold(
       // gradient 风格：body 延伸到 AppBar 之后，AppBar 透明浮在渐变上（同向导全屏
       // 渐变做法）；plain 风格保持原有布局（AppBar 浅粉底，body 从其下方开始）
       extendBodyBehindAppBar: _uiStyle == 'gradient',
@@ -8666,6 +8902,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               child: TextField(
                                 controller: _input,
                                 focusNode: _inputFocusNode,
+                                // 桌面端自动聚焦（老板 2026-10-12 粘贴功能配套）：
+                                // Cmd/Ctrl+V 走焦点链分发——新开聊天页若输入框无
+                                // 焦点，页面级 CallbackShortcuts 收不到按键，粘贴
+                                // 会"没反应"（实测五种焦点状态定的方案）。桌面聊天
+                                // 客户端打开会话即聚焦输入框也是惯例（Discord 同款）；
+                                // 移动端不抢焦点（会弹软键盘）。
+                                autofocus: _pasteShortcutSupported,
                                 // 多行输入框：文字到达宽度后自动折行，输入框随之增高，
                                 // 最多 8 行；超过 8 行不再增高，转为内部纵向滚动
                                 // （老板要求 2026-09-13：原先单行 + 横向滚动体验差）。
@@ -8697,8 +8940,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 // 发送后键盘常驻遮挡消息流；点按输入框以外的任意处
                                 // （消息列表/空白/其他控件）收起键盘（老板要求 2026-09-12）。
                                 // 移动端默认不动 focus，需显式 unfocus。
-                                onTapOutside: (_) =>
-                                    FocusManager.instance.primaryFocus?.unfocus(),
+                                // **桌面端不收起**：桌面没有软键盘要收，且失焦后
+                                // Cmd/Ctrl+V 粘贴快捷键（焦点链上的 CallbackShortcuts）
+                                // 就收不到按键了——点消息列表不该让粘贴失灵
+                                // （老板 2026-10-12 粘贴功能配套）。
+                                onTapOutside: (_) {
+                                  if (!_pasteShortcutSupported) {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                  }
+                                },
                               ),
                             ),
                             if (_inputMode != _InputMode.text)
@@ -8753,6 +9004,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 桌面端：整页套一个投递区，从访达/资源管理器拖文件进来即发送；移动端不挂
     // （无此交互，且 desktop_drop 的 Android 实现是 preview，不挂更稳）。
     if (!_fileDropSupported) return page;
+    // 桌面端：Cmd/Ctrl+V 粘贴快捷通道（与附件面板「粘贴」入口同汇到
+    // _pasteFromClipboard；移动端没有键盘这一说，只走面板入口）。
+    // CallbackShortcuts 内部就是一层 canRequestFocus:false + skipTraversal 的
+    // Focus——不抢焦点、不进 Tab 遍历，只在页面内任意控件（含输入框）持焦时
+    // 沿焦点链收到按键。匹配即消费：文字分支由 _pasteFromClipboard 自己插，
+    // WidgetsApp 默认粘贴不会跑。**对话框/弹层打开时本层自然失活**——焦点已
+    // 移到上层路由，不是本 Shortcuts 的后代（实测）。
+    if (_pasteShortcutSupported) {
+      page = CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          SingleActivator(
+            LogicalKeyboardKey.keyV,
+            control: !Platform.isMacOS, // Win/Linux 用 Ctrl
+            meta: Platform.isMacOS, // macOS 用 Cmd
+          ): () => unawaited(_pasteFromClipboard()),
+        },
+        child: page,
+      );
+    }
     return DropTarget(
       onDragEntered: (_) => setState(() => _fileDragHover = true),
       onDragExited: (_) => setState(() => _fileDragHover = false),
@@ -9633,6 +9903,44 @@ class _StatusAvatarState extends State<_StatusAvatar> {
   }
 }
 
+/// 全屏查看（图片 / 视频 / 头像大图）右上角的关闭键（老板 2026-10-12）：
+/// 白 ✕ + 黑 54% 半透明圆底。内容铺满全屏时若图片偏白，纯白 ✕ 会融进背景
+/// 看不见；半透明深灰圆底压在任何底色上都能衬出白叉——用半透明而非实心灰，
+/// 是会随底色自适应：深色内容上不显脏、浅色内容上够压得住。48 直径正好是
+/// Material 最小触控区域，不比原来的裸 IconButton 多占地方。
+/// 四间全屏查看（消息图片 / 视频 / 消息头像 / 状态条头像）共用这一只。
+class _FullscreenCloseButton extends StatelessWidget {
+  const _FullscreenCloseButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.black54,
+        shape: const CircleBorder(),
+      ),
+      icon: const Icon(Icons.close, color: Colors.white),
+      onPressed: () => Navigator.of(context).pop(),
+    );
+  }
+}
+
+/// 粘贴待确认的内容（老板 2026-10-12 确认弹窗的载荷）：
+/// - 图片：clipboard 里的图片**字节**（截图 / 图片 App 拷贝），弹窗给缩略图；
+/// - 文件：访达/资源管理器里拷的**文件路径**，按扩展名归类到
+///   [kind]（image/video/audio/file），弹窗按类型问、图标按类型给。
+/// 两者都空不可能出现（那走文本分支，不弹窗）。
+class _PastePayload {
+  const _PastePayload.image(this.bytes)
+      : files = null,
+        kind = 'image';
+  const _PastePayload.files(this.files, this.kind) : bytes = null;
+
+  final Uint8List? bytes;
+  final List<XFile>? files;
+  final String kind;
+}
+
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar(
       {this.memberId,
@@ -9718,6 +10026,8 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   /// 背景 = kBrandGradient，与图片全屏一致（老板 2026-09-15）。
   /// 底部「保存」按钮（老板 2026-10-08）：仅在调用方给了 [onSaveImage] 时出现
   /// （别人的头像可下载；状态条头像条不开全屏、也没给回调）。
+  /// 轻触关闭（老板 2026-10-12）：点屏幕任何地方返回聊天页（Image.memory 的
+  /// hitTestSelf 恒真，整块 fill 区域都接得住轻触），与图片/视频全屏一致。
   Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
@@ -9735,16 +10045,16 @@ class _MessageAvatarState extends State<_MessageAvatar> {
                 decoration: const BoxDecoration(gradient: kBrandGradient),
                 child: Stack(
                   children: [
-                    Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
+                    Positioned.fill(
+                      child: Clickable(
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: Image.memory(bytes, fit: BoxFit.contain),
+                      ),
+                    ),
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见
                     if (onSave != null)
@@ -9854,7 +10164,9 @@ class _VideoPreviewState extends State<_VideoPreview> {
   @override
   void initState() {
     super.initState();
-    _init();
+    // Linux 没有 video_player 实现（连最新 2.14.1 也只有 android/ios/macos/
+    // web）：初始化必失败，跳过——build 里走「保存到本地」占位
+    if (!Platform.isLinux) _init();
   }
 
   Future<void> _init() async {
@@ -9888,6 +10200,40 @@ class _VideoPreviewState extends State<_VideoPreview> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // Linux（无 video_player 实现）：不摆播放器，给「保存到本地」入口——
+    // 字节已解密到手（_buildVideo 的 FutureBuilder 传进来的），保存走桌面
+    // 保存对话框（_saveAttachment → FilePicker.saveFile）。与失败态同尺寸，
+    // 但不可重试（重试无意义）——文案说清「不支持播放」而非「加载失败」
+    if (Platform.isLinux) {
+      return Clickable(
+        key: const ValueKey('videoPreview'),
+        onTap: widget.onDownload == null ? null : () => widget.onDownload!(),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 180,
+          height: 100,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.movie_outlined, size: 26),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(l10n.chatPageVideoUnsupportedPlatform,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final c = _controller;
     // 初始化失败：给可点重试的明确错误态，而不是一个没有内容的空白框
     // （三种状态都带同一个 key：测试按 key 定位视频气泡，不受具体控件类型影响）
@@ -9947,6 +10293,9 @@ class _VideoPreviewState extends State<_VideoPreview> {
     );
   }
 
+  /// 全屏播放（品牌渐变底 + 铺满整屏 + 点任何位置关闭）。
+  /// 轻触关闭（老板 2026-10-12）与图片/头像全屏一致：点画面或四周压边都返回
+  /// 聊天页；右上角 ✕ 保留作显式出口。
   Future<void> _playFullscreen(VideoPlayerController c) async {
     await c.seekTo(Duration.zero);
     await c.play();
@@ -9968,22 +10317,24 @@ class _VideoPreviewState extends State<_VideoPreview> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio: c.value.aspectRatio,
-                          child: VideoPlayer(c),
+                      child: Clickable(
+                        // opaque：视频在 AspectRatio 里不遮满屏幕，四周渐变压边
+                        // 也要接得住轻触（deferToChild 会漏掉这些区域）——
+                        // 老板 2026-10-12：点任何地方关闭全屏
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: c.value.aspectRatio,
+                            child: VideoPlayer(c),
+                          ),
                         ),
                       ),
                     ),
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      child: SafeArea(child: _FullscreenCloseButton()),
                     ),
                     // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
                     // 先关全屏再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。

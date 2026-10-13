@@ -18,6 +18,7 @@
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
+import { createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -29,8 +30,14 @@ import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 const ROOT = join(import.meta.dirname, '..')
 const PASSPHRASE = 'pass12345'
 
-function freePort (): number {
-  return 40000 + Math.floor(Math.random() * 20000)
+function freePort (): Promise<number> {
+  return new Promise(resolve => {
+    const srv = createServer()
+    srv.listen(0, () => {
+      const port = (srv.address() as AddressInfo).port
+      srv.close(() => resolve(port))
+    })
+  })
 }
 
 async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
@@ -58,7 +65,7 @@ function req (port: number, path: string, init?: RequestInit): Promise<Response>
 
 test('定向 attach：帮别人找回身份（口令授权）+ duo 永续', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-target-'))
-  const port = freePort()
+  const port = await freePort()
   const proc: ChildProcess = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
     env: {
       ...process.env,

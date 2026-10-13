@@ -53,6 +53,9 @@ node_modules/
 # 生成物仍保持忽略。
 !app/macos/Runner/*.swift
 !app/macos/RunnerTests/*.swift
+# www 介绍站的 logoslogan.png 生成脚本（Swift/AppKit，对标参照站的 .psd 源文件），
+# 同样被上面的 *.sw* 误伤——显式放行，换机器靠它重新出图。
+!www/images/theme/*.swift
 *.sln
 *.suo
 .gitattributes

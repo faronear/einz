@@ -150,11 +150,13 @@ Future<void> checkVersionGate(
         ? _FrozenUpgradeDialog(
             currentVersion: current,
             coldVersion: health.coldAppVersion!,
-            downloadUrl: health.appDownloadUrl,
+            // 下载入口：服务端优先、硬编码兜底（与 About 页同一逻辑，
+            // 见 [resolveAppDownloadUrl]）——升级窗永远给下载入口
+            downloadUrl: resolveAppDownloadUrl(health.appDownloadUrl),
           )
         : _CoolingUpgradeDialog(
             hotVersion: health.hotAppVersion!,
-            downloadUrl: health.appDownloadUrl,
+            downloadUrl: resolveAppDownloadUrl(health.appDownloadUrl),
           ),
   );
 }
@@ -175,18 +177,19 @@ class _FrozenUpgradeDialog extends StatelessWidget {
   const _FrozenUpgradeDialog({
     required this.currentVersion,
     required this.coldVersion,
-    this.downloadUrl,
+    required this.downloadUrl,
   });
 
   final String currentVersion;
   final String coldVersion;
-  final String? downloadUrl;
+
+  /// 下载入口 URL：[checkVersionGate] 传入时已解析（服务端优先、硬编码兜底），
+  /// 必然非空——升级窗永远给下载入口。
+  final String downloadUrl;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final url = downloadUrl;
-    final hasUrl = url != null && url.isNotEmpty;
     return PopScope(
       canPop: false,
       child: AlertDialog(
@@ -196,20 +199,17 @@ class _FrozenUpgradeDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.upgradeFrozenBody(coldVersion, currentVersion)),
-            if (hasUrl) ...[
-              const SizedBox(height: 10),
-              // 链接本身可点（= 点「下载新版本」按钮，开外部浏览器）；
-              // LinkifiedText 渲染蓝字+下划线，与全 app 链接样式一致
-              LinkifiedText(url, style: const TextStyle(fontSize: 12)),
-            ],
+            const SizedBox(height: 10),
+            // 链接本身可点（= 点「下载新版本」按钮，开外部浏览器）；
+            // LinkifiedText 渲染蓝字+下划线，与全 app 链接样式一致
+            LinkifiedText(downloadUrl, style: const TextStyle(fontSize: 12)),
           ],
         ),
         actions: [
-          if (hasUrl)
-            FilledButton(
-              onPressed: () => openAppDownloadUrl(context, downloadUrl),
-              child: Text(l10n.upgradeFrozenDownload),
-            ),
+          FilledButton(
+            onPressed: () => openAppDownloadUrl(context, downloadUrl),
+            child: Text(l10n.upgradeFrozenDownload),
+          ),
         ],
       ),
     );
@@ -224,17 +224,17 @@ class _FrozenUpgradeDialog extends StatelessWidget {
 class _CoolingUpgradeDialog extends StatelessWidget {
   const _CoolingUpgradeDialog({
     required this.hotVersion,
-    this.downloadUrl,
+    required this.downloadUrl,
   });
 
   final String hotVersion;
-  final String? downloadUrl;
+
+  /// 下载入口 URL：同 [_FrozenUpgradeDialog.downloadUrl]，已解析、必然非空。
+  final String downloadUrl;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final url = downloadUrl;
-    final hasUrl = url != null && url.isNotEmpty;
     return AlertDialog(
       title: Center(child: Text(l10n.upgradeCoolingTitle)),
       content: Column(
@@ -242,11 +242,9 @@ class _CoolingUpgradeDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(l10n.upgradeCoolingBody(hotVersion)),
-          if (hasUrl) ...[
-            const SizedBox(height: 10),
-            // 链接本身可点（= 点「下载新版本」按钮），同 _FrozenUpgradeDialog
-            LinkifiedText(url, style: const TextStyle(fontSize: 12)),
-          ],
+          const SizedBox(height: 10),
+          // 链接本身可点（= 点「下载新版本」按钮），同 _FrozenUpgradeDialog
+          LinkifiedText(downloadUrl, style: const TextStyle(fontSize: 12)),
         ],
       ),
       actions: [
@@ -254,11 +252,10 @@ class _CoolingUpgradeDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.upgradeCoolingLater),
         ),
-        if (hasUrl)
-          FilledButton(
-            onPressed: () => openAppDownloadUrl(context, downloadUrl),
-            child: Text(l10n.upgradeCoolingDownload),
-          ),
+        FilledButton(
+          onPressed: () => openAppDownloadUrl(context, downloadUrl),
+          child: Text(l10n.upgradeCoolingDownload),
+        ),
       ],
     );
   }

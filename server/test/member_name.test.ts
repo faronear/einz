@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
+import { createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -23,8 +24,14 @@ import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 const ROOT = join(import.meta.dirname, '..')
 
-function freePort (): number {
-  return 42000 + Math.floor(Math.random() * 20000)
+function freePort (): Promise<number> {
+  return new Promise(resolve => {
+    const srv = createServer()
+    srv.listen(0, () => {
+      const port = (srv.address() as AddressInfo).port
+      srv.close(() => resolve(port))
+    })
+  })
 }
 
 async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
@@ -64,7 +71,7 @@ test('assertMemberName：合规放行（含 emoji），不合规 400', () => {
 
 test('端到端：create 的创建者名、join 的自填名、改名都按白名单收口', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-member-'))
-  const port = freePort()
+  const port = await freePort()
   const proc: ChildProcess = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
     env: { ...process.env, PORT: String(port), EINZ_DB: join(dir, 'einz.sqlite.db'), EINZ_FILES: join(dir, 'files') },
     stdio: 'ignore'

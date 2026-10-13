@@ -237,7 +237,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryTitle => '秘境向导';
 
   @override
-  String get setupEntryHint => '秘境是端到端加密的私密聊天和共享空间，可以从头创建，或者受邀加入。';
+  String get setupEntryHint => '秘境是你的私密聊天和共享空间，可以从头创建，或者受邀加入。';
 
   @override
   String get setupEntryCreate => '创建秘境';
@@ -472,7 +472,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAvatar => '我的头像';
 
   @override
-  String get chatPageAvatarUploaded => '✅ 头像已更新';
+  String get chatPageAvatarUploaded => '✅ 我的头像已更新';
 
   @override
   String get chatPageAvatarTooLarge => '图片过大（最大 2MB）';
@@ -695,9 +695,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageMembersHint => '';
-
-  @override
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': '我的同伴',
@@ -891,6 +888,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDeleteConfirmOk => '删除';
 
   @override
+  String get chatPagePasteSendImageTitle => '发送这张图片？';
+
+  @override
+  String chatPagePasteSendVideoTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '发送这 $count 个视频？',
+      one: '发送这个视频？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendAudioTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '发送这 $count 个音频？',
+      one: '发送这个音频？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendFilesTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '发送这 $count 个文件？',
+      one: '发送这个文件？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatPagePasteEmpty => '剪贴板是空的';
+
+  @override
   String chatPageSendFailed(String error) {
     return '发送失败: $error';
   }
@@ -911,8 +947,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMsgFailedTap => '点击重发';
 
   @override
-  String chatPageOfflineUnsent(int count) {
-    return '离线 · $count 条待发送';
+  String chatPageMsgsUnsent(int count) {
+    return '等待同步中… $count 条消息待发送，网络恢复后自动重发';
   }
 
   @override
@@ -920,7 +956,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
 
   @override
-  String get chatPageOfflineLocalOnly => '离线 · 仅可查看本地消息，无法收发';
+  String get chatPageMsgsSyncing => '等待同步中… 暂时无法收发，仅可查看本地消息';
 
   @override
   String get chatPageMsgResending => '重发中…';
@@ -963,6 +999,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEmojiKeyboard => '键盘';
+
+  @override
+  String get chatPageAttachPaste => '粘贴';
 
   @override
   String get chatPageAttachPhoto => '拍照';
@@ -1037,6 +1076,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageVideoLoadFailed => '视频加载失败，点击重试';
 
   @override
+  String get chatPageVideoUnsupportedPlatform => '此设备不支持播放视频，点按保存到本地';
+
+  @override
   String chatPageFileOpenFailed(String error) {
     return '打开文件失败: $error';
   }
@@ -1096,10 +1138,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageTitle => '关于秘境';
 
   @override
-  String get aboutIntro => '秘境是端到端加密的私密聊天和共享空间，没有任何第三方（包括秘境自身）能够偷看内容，严格保障隐私安全。';
+  String get aboutIntro =>
+      '秘境是你的私密聊天和共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。';
 
   @override
   String get aboutVersionLabel => '版本号';
+
+  @override
+  String get aboutDownloadLabel => '下载';
 
   @override
   String get aboutServerLabel => '服务器地址';

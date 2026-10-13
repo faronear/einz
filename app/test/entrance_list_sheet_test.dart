@@ -301,10 +301,11 @@ void main() {
     expect(sheetText('旧手机'), findsOneWidget);
     // 本机绿勾只在当前通道那张卡上（恒列第一位）
     expect(sheetLocalCheck(), findsOneWidget);
-    // 第一张卡就是本机那张（老板 2026-09-25：恒列首位，作为区分依据之一）
+    // 第一张卡就是本机那张（老板 2026-09-25：恒列首位，作为区分依据之一）。
+    // 一卡占满整行（老板 2026-10-11）→ 排序体现在**纵向**：本机卡在 iPad 上方
     expect(
-      tester.getTopLeft(sheetText('iPhone')).dx,
-      lessThan(tester.getTopLeft(sheetText('iPad')).dx),
+      tester.getTopLeft(sheetText('iPhone')).dy,
+      lessThan(tester.getTopLeft(sheetText('iPad')).dy),
       reason: '本机通道应排在我本人的其他通道之前',
     );
     // 红绿灯：2 绿（本机+iPad 在线）+ 1 红（MacBook 离线）+ 1 灰（已撤销）
@@ -319,12 +320,11 @@ void main() {
       for (final n in ['iPhone', 'iPad', 'MacBook', '旧手机']) cardOf(tester, n).height,
     };
     expect(heights.length, 1, reason: '所有通道卡片应等高（时间行恒占一行）');
-    // 卡片边长上限 = 弹层最大宽度下"一行 3 张"的边长（老板 2026-09-26）：
-    // 弹层内容限在 640、减左右各 16 = 608 可用 → (608 − 2×12) / 3 = 194.67 → 取整 194。
-    // 原来硬写 160 时，三张卡只铺到 504，宽窗口里右边空一大截。
-    expect(cardOf(tester, 'iPhone').width, 194,
-        reason: '卡片上限应跟着弹层最大宽度走，不再卡在 160');
-    // 第一行三张（iPhone / iPad / MacBook）铺满内容宽度：右缘应对齐刷新按钮的右缘
+    // 卡片宽 = 弹层内容区全宽（老板 2026-10-11：一卡占满整行，不再一行 3 张）：
+    // M3 modal bottom sheet 把内容限在 640（窗口再宽也不长），减左右各 16 = 608。
+    expect(cardOf(tester, 'iPhone').width, 608,
+        reason: '卡片应占满弹层内容区宽度，不再卡在一行 3 张的边长');
+    // 每张卡都铺满内容宽度：右缘应对齐刷新按钮的右缘
     // （刷新按钮与卡片是同层 Padding 的两个兄弟 → 它的右缘 = 内容区右缘）
     final contentRight = tester
         .getRect(find.ancestor(of: sheetRefresh(), matching: find.byType(IconButton)))

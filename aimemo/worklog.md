@@ -14285,3 +14285,279 @@ model.int8.onnx，sha256 与期望值完全一致——多路拷贝写的是同�
 实为 `<容器>/Library/Application Support/cc.tic.einz/voice_transcript/`；
 _rootDir 不加 applyDevDataDir 是刻意的——模型是派生缓存，dev/生产共用
 一份比分存两份好（DB/附件才是要隔离的数据）。
+
+**（2026-10-12，四十一）**：服务端 `[req]` 控制台日志每条加时间戳（老板要求）。
+新增 `server/src/reqLog.ts`：`reqTimestamp()`（`2026-10-12 11:23:40` 本地时间，
+pm2 日志跨天滚动所以日期一起给）+ `logReq(message)` 统一打 `[时间戳] [req] 正文`；
+app.ts 的请求/响应行与 ws.ts 的 connect / call / disconnect 三处共 4 个调用点
+全部改走它。`tsc` 干净、`npm test` 5 套件全绿；本地 PORT=3901 冒烟确认
+`[2026-10-12 11:23:40] [req] GET /health 200 6ms` 格式正确。
+
+**（2026-10-12，四十二）**：`[req]` 时间戳改为**时区无关**的 UTC 格式
+（老板 2026-10-12）：`reqTimestamp()` 全部走 getUTC*，输出
+`2026-10-12T03:24:23Z`（ISO 风格 + `Z` 后缀，跨时区/跨机器日志可比可排序）。
+冒烟确认格式；tsc 干净。
+
+**（2026-10-12，四十三）**：修 main 上 `npm run testAll` 两项失败。① **app
+widget 测试**（entrance_list_sheet_test）——88bf7e51（10-11 晚）把「我的通道」
+弹层卡片改成一卡占满整行，但漏改测试：仍在按旧「一行 3 张」几何断言（iPhone.dx
+< iPad.dx、卡宽 194）。一卡一行后两卡 dx 恒等 → 实测 105.0 == 105.0 挂掉。
+修法：排序断言改比 dy（本机卡在首行），卡宽改 608（M3 弹层内容限宽 640 −
+左右各 16），注释同步。② **server npm test**（receipts.test.ts）——WS hello
+处理器里 `void bob.postReceipt(...)` 是漂浮 promise：WS 广播先于 HTTP 响应
+到达 → done() 先返回 → finally 杀 server 掐断在途请求 → rejection 无人接 →
+Node 22 直接崩（"fetch failed / other side closed"）。smoke.test.ts:500 同型
+同险。两处都挂 `.catch(fail)`：真失败→测试失败，done 后迟归→无害。另记一笔：
+app/pubspec.lock 曾被整文件替换成 voice 分支版本（含 sherpa_onnx；pubspec.yaml
+未动）——疑 Seafile 跨机同步把 voice 工作区状态带进来，testAll 的 lock 守卫
+只比对自身跑前跑后故未拦下；已还原，提交前 git status 复核过。修复后单独重跑
+（无并发）testAll 四栈全过、汇总「全部通过 ✅」；此前失败的两项分别隔离复现/修复验证：
+entrance_list_sheet 修复后 6 用例全过；receipts 修复前隔离两连过（证明是负载
+敏感的竞态）、修复后通过；smoke 修复后通过。
+
+**（2026-10-12，四十四）**：About 弹层版本号下新增「下载」一行（老板
+2026-10-12）：标签 下载/Download（新 l10n 键 aboutDownloadLabel），值 =
+GitHub releases latest 页 URL（与服务端 appDownloadUrl 同址），整行可点 →
+openAppDownloadUrl 外部浏览器打开（打不开静默、URL 留底可手抄，同
+version_gate 口径）。实现：_InfoRow 加可选 onTap——入口行的值渲染成 app
+统一链接样式（品牌蓝 #2271F7 + 下划线，同 LinkifiedText），文字本身挂
+TapGestureRecognizer、外层 Clickable 包整行（老板口径：整块可点）；普通行
+仍是 SelectableText 不变。about_sheet_status_test 加一例（绑 l10n 键、
+URL 原样、下载行 dy 大于版本号行）；about + chat_page_menu + version_gate
+三文件 53 测试全过，全量 analyze 0 issue。
+
+**（2026-10-12，四十五）**：新建 `www/`——面向用户的介绍站（老板 2026-10-12，
+仿 productX/pex/pex-web-md/info.agidin.com 的结构与文案风格，上传 file.tic.cc
+后由 Seafile 发布库渲染成站）。Seafile 发布库约定：首页=根目录 home.md、
+左侧导航=根目录 index.md（多级无序列表，无则退化成目录树）、md 内联渲染、
+相对路径链接。站点：home.md/README.md（同文，语言选择）、index.md（中英
+分区导航）、_zhcn/_enus 目录页、about/what_is_einz、howto/get_started、
+news、rules/privacy_policy 四组内容（全部中英双语）、images/logo.png（拷自
+app/assets）。内容只写主线已上线事实：二人/群秘境（群 2026-10-03）、E2EE、
+本地优先、阅后即焚、单双勾、我的通道（09-25）、界面语言（08-30）、下载走
+GitHub releases；纪念日/共同回忆/私人笔记等未实现项不写。隐私政策如实说明
+服务器存密文+元数据、不存明文/PIN/口令/密钥。发布前用脚本全量校验相对链接
+（修掉一处少上一级的 `../`）。
+
+**（2026-10-12，四十六）**：www 站点补齐 `images/theme/`（老板 2026-10-12：
+按 info.agidin.com 约定放 logo 与 favicon，发布渲染自动拾取）。三件产物：
+favicon.png（sips 由 app/assets/logo.png 缩放到 256）、favicon.ico（纯 Python
+包 PNG 的 256 单帧，`file` 验证合法）、logoslogan.png（秘境 Einz 横版文字
+标志——logo 圆角块 + PingFangSC 双行文字，Swift/AppKit 脚本绘制，600×150
+逻辑画布 2x 光栅化出 1200×300 RGBA 透明底）。生成脚本随目录提交
+（logoslogan.swift，对标参照站的 .psd 源文件角色，素材路径相对脚本解析，
+换机可跑）。踩坑记录：NSBezierPath.addClip 的裁剪区**持续生效**，画 logo
+不包 save/restoreGraphicsState 会把右侧文字整块裁掉。另修 .gitignore：`*.sw*`（本想挡 vim 交换文件）把
+logoslogan.swift 静默漏掉，补 `!www/images/theme/*.swift` 例外（与 macOS
+Runner 源码同因）。
+
+**（2026-10-12，四十七）**：www 站点文案从「二人专属」改为「二人 + 群组」
+双形态（老板 2026-10-12：已不局限于二人秘境）。改动：about 两页「它适合
+谁」不再把群组排除在外（两个人→小圈子：两个人、挚友、家人）；中文简介
+「属于两个人，或一小群」→「属于两个人，也属于一小群」；logoslogan 标语
+「端到端加密的二人私密空间」→「端到端加密的私密空间」（脚本同步改并重新
+出图）。howto 的「二人/群秘境」类型选择与 news 2026-10-03 的历史条目保持
+原样（前者是向导事实、后者是历史记录）。
+
+**（2026-10-12，四十八）**：修 CI 偶发失败（本地 testAll 全绿但 GitHub CI
+挂）——server/test/cold_app_version.test.ts 第 6 项 `waitReady` 超时
+（`server not ready`）。根因：4 个测试文件（cold_app_version /
+entrance_name / join_token_target / member_name）的 `freePort()` 是纯随机
+猜号（40000–62000 区间），恰好落在 Linux 临时端口范围（32768–60999）内，
+撞上别的进程或同进程 fetch 源端口 → server 启动即 EADDRINUSE 退出
+（`stdio: 'ignore'` 吞掉报错）→ waitReady 干等 10s 超时。本地不触发、
+CI 负载下偶发必触发。修法与项目内另一版可靠实现（audit/smoke/receipts
+等已用）对齐：`listen(0)` 让系统分配真实空闲端口，调用点改 `await`。
+4 文件 × import + 函数体 + 调用点，tsc 通过、4 个测试全绿。
+
+**（2026-10-12，四十九）**：全屏查看（图片 / 头像 / 视频）统一支持「点屏幕
+任何地方关闭」（老板 2026-10-12：以前必须点右上角 ✕ 才能返回聊天页）。
+三处改动都在内容层外包 `Clickable(onTap: pop)`——与 2026-09-26 起
+`_showAvatarFullscreen`（状态条头像大图，commit 9a056c47）同一套模式，
+四处行为自此一致：`_showFullImage`（消息图片）、
+`_MessageAvatarState._showFullscreen`（消息列表头像大图）、
+`_VideoPreviewState._playFullscreen`（视频全屏）。关键点：①
+InteractiveViewer 只管双指缩放/拖动，只有"轻触"（未移动即抬起）才关，
+放大后误触不关；② 视频那处传 `behavior: HitTestBehavior.opaque`——视频在
+AspectRatio 里不遮满屏幕，四周渐变压边也要接得住轻触；③ 右上角 ✕ 保留作
+显式出口，底部「保存」按钮在 Stack 上层不受影响。新增回归测试
+`chat_fullscreen_tap_close_test.dart`（3 例：压边轻触关、大图本体轻触关、
+拖动不误关 + ✕ 仍可关）。**踩坑（测试环境专有）**：
+`withImmersiveFullscreen` 里的 `SystemChrome.setEnabledSystemUIMode` 走
+flutter/platform 通道，widget 测试无引擎、调用永不回调 → `await` 挂住、
+`showDialog` 永远不执行（全屏压根打不开）；测试里 mock 该通道统一回 null
+解决（真机不受影响，通道有系统回）。全量 291 测试全过、analyze 0 issue。
+
+**（2026-10-12，五十）**：全屏查看的关闭键加**深灰半透明圆底**（老板
+2026-10-12：内容铺满全屏时若图片偏白，纯白 ✕ 会融进背景看不见；不限定方案，
+"有更好的可直接执行"）。落地：抽出共用的 `_FullscreenCloseButton`
+（chat_page.dart）——`IconButton.styleFrom(backgroundColor: Colors.black54,
+shape: CircleBorder())` + 白 ✕，替换四处原裸 IconButton（消息图片
+`_showFullImage`、视频 `_playFullscreen`、消息头像 `_showFullscreen`、
+状态条头像 `_showAvatarFullscreen`），行为/尺寸不变。选型理由：**半透明**
+（黑 54%）而非实心灰——圆底会随底色自适应，深色内容上不显脏、浅色内容上
+够压得住；48 直径正好是 Material 最小触控区域，不比原来多占地方；保留
+ripple 与语义（仍是真按钮，不是贴图）。回归测试加第 4 例：断言 Dialog 里
+的关闭键 resolve 出 black54 背景 + CircleBorder（圆底真的画上、且是圆）。
+全量测试全过、analyze 0 issue。
+
+**（2026-10-12，五十一）**：桌面端 **Cmd/Ctrl+V 粘贴剪贴板内容直接发送**
+（老板 2026-10-12 要"微信那样把图片粘进输入框"，图片+文件一起做）。新增
+依赖 `pasteboard ^0.5.0`（Mixin 团队，Apache 2.0，2026-08 还在修 bug；
+备选 super_clipboard 要 Rust 工具链且自称 experimental，不选）——macOS/
+Windows/Linux **零配置**，Windows 的 generated_plugin_registrant 自动注册，
+无一行原生代码；iOS/macOS 的 Podfile.lock 已同步（pod install 跑过）。
+
+**实现**（chat_page.dart）：页面级 `CallbackShortcuts` 拦 Cmd+V（macOS
+meta / Win、Linux ctrl，SingleActivator 平台分支）→ `_pasteFromClipboard`
+三级分流，与微信口径一致（**同时有图和文时发图**）：① 图片 → 时间戳合成名
+`粘贴图片_MMdd_HHmmss.png` + 大小预检 + 走 `_sendAttachmentOptimistic`
+（与相册/拖放同一收口）；② 文件（访达拷的）→ `Pasteboard.files()` 复用
+拖放的 `_sendDroppedFiles`；③ 都没有 → 文本插输入框光标处。桌面门控
+`_clipboardPasteSupported`（与拖放同平台集、独立成门）。
+
+**焦点链实测（五种状态定方案，本项目的关键经验）**：页面级 Shortcuts 只有
+在**页面内有控件持焦**时才收到按键——① 输入框持焦 ✓；② 新开页面全页无焦点
+✗；③ 点消息列表（onTapOutside 失焦）✗；④ 给输入框加 autofocus 可修复 ②
+✓；⑤ 对话框打开时本层自然失活 ✓（焦点已移上层路由，无需护栏）。配套两个
+桌面小改：输入框 `autofocus: _clipboardPasteSupported`（桌面打开会话即聚焦，
+Discord 同款；移动端不抢焦点）、桌面端 onTapOutside 不再 unfocus（桌面无
+软键盘要收，失焦还会让粘贴失灵）。另核实过全局
+`HardwareKeyboard.addHandler` 路线不可行：KeyEventManager 文档明确"所有
+目的地都会收到事件、互不打断"，全局 handler 压不掉 TextField 的原生文字
+粘贴，会有双重动作。
+
+**测试**（chat_paste_test.dart 四例）：mock `pasteboard` + `flutter/platform`
+两个通道（项目已有 mock 先例）；图片发出 / 文件发出 / 文本只插入不发消息 /
+空剪贴板无动作。两个 FakeAsync 踩坑：① testWidgets 身体里**真实文件 I/O
+不会完成**（写临时文件必须包 `tester.runAsync`，否则整条挂死）；②
+`settleRealAsync` 首轮就因"没有转圈"退出，等不到文件分支的 length/
+readAsBytes 两步真实 I/O——需显式补 pump+runAsync 轮次。CI 在 ubuntu 上
+跑，测试按宿主平台选修饰键（mac meta / 其他 control），与生产分支一致。
+全量 296 测试全过、analyze 0 issue。
+
+**（2026-10-12，五十二）**：修发布版 macOS app 点录音报「麦克风权限被
+拒绝」（老板 2026-10-12：测试版正常、GitHub releases 下载版必现）。
+根因：`app/macos/Runner/Info.plist` **从来没有** `NSMicrophoneUsageDescription`
+（git 历史 -S 确认从未加过；iOS 的 plist 四项声明齐全，macOS 漏了）。
+macOS 缺用途声明时系统**不弹**麦克风授权框，`AVCaptureDevice.requestAccess`
+（record 插件 `hasPermission()` 默认 request:true 会触发）直接回 false →
+app 自己的 toast。开发版能用是因为其 TCC 记录早已 authorized（旧版授权/
+手动开过）；发布版 Developer ID 签名（TeamID CQ6733CTMV）在 TCC 里是
+另一个身份，首次录音时想弹框也弹不出来（没声明），永远停在未授权。
+修法：Info.plist 补 `NSMicrophoneUsageDescription`（文案与 iOS 端一字不差：
+"Einz 需要使用麦克风录制语音消息、进行语音通话，并加密发送给对方。"）。
+相机不用加——桌面端无相机采集入口（`_hasCameraCapture` 仅 Android/iOS，
+见 chat_page.dart 2026-09-20 记录）。
+**发布版需重新走 CI 构建 + 重新下载**才生效；新构建首点录音会正常弹系统
+授权框。临时绕过（不想等重新构建）：系统设置→隐私与安全性→麦克风，
+若列表里已有"einz"直接打开开关即可（手动授权不需要用途声明）。
+
+**（2026-10-12，五十三）**：修「状态灯绿灯 + 通知条『离线 · 无法收发』同框
+不一致」（老板 2026-10-12：发布版 macos，主要出现在切换空间时，过一会儿
+自己会消失）。诊断：灯与条本就是**两个解耦信号**（灯=WS 连接态；条=HTTP
+同步连续失败计数 `_consecutiveSyncFailures>0`，chat_page.dart 有意为之防
+重连闪条）。切空间 `pushReplacement` 全新页：WS 秒连先变绿（此刻计数还是
+0，"连上即补同步"的恢复钩子不触发）→ 新页第一次 HTTP 同步失败（切到的
+空间用得少、Vault 里 24h 会话 token 常正好过期，401 续期往返碰上抖动即
+整轮失败）→ 条出现而灯是绿的；恢复要等下一轮 ticker——WS 在线基准 30s
+× 2^失败次数 → 最快 60s 后重试，窗口期就这么来的。修法（老板拍板 A+措辞）：
+① `_tickerInterval` 加例外：WS 在线+有失败 → 固定 5s 快速重试（服务端已被
+WS 证明可达，不套"宕机"指数退避），窗口从 60s+ 缩到 ≤5s；② 条的措辞按
+WS 态分两种：灯绿 → 新键 `chatPageSyncingLocalOnly`「同步中… 暂时无法收发，
+仅可查看本地消息」（老板原话），真离线时保留原「离线 · …」（那时"离线"
+是准的）。中英 arb 各加一 key，gen-l10n + analyze 0 issue。
+
+**（2026-10-12，五十二）**：粘贴功能补全——**附件面板加「粘贴」入口**（桌面
+移动端都走它，桌面另有 Cmd/Ctrl+V）+ **移动端支持** + **发送前确认弹窗**
+（老板 2026-10-12：剪贴板内容不可见，可能是几分钟前的旧图，E2EE 发错撤不回）。
+- 平台门一分为三：`_clipboardPasteSupported`（全平台：面板入口+读取逻辑）、
+  `_pasteShortcutSupported`（桌面：快捷键/autofocus/onTapOutside）、
+  `_pasteboardFilesSupported`（仅桌面：Android 插件返回 content:// URI，
+  dart:io 读不了；iOS 的 files() 恒返回空、自动落到文本分支）。
+- **不需要 Android FileProvider**：插件只在 writeImage 时才用 provider，
+  我们只读剪贴板（查过 0.5.0 的 Kotlin 源码确认）。
+- 确认弹窗 `_confirmPasteSend`：图片给预览、文件给名单（SingleChildScrollView
+  + Column(min)——ListView(shrinkWrap) 在 AlertDialog 固有宽度计算里会抛
+  intrinsic dimensions 异常，踩过），取消/发送；点遮罩=取消。**纯文本不弹**
+  （只是插入输入框，随时可改）。全空 → 提示「剪贴板是空的」。
+- 面板入口排网格第一位（剪贴板内容"在手边"是最短路径）；桌面端同样显示。
+- l10n 四新键（chatPageAttachPaste / PasteSendImageTitle /
+  PasteSendFilesTitle 复数形态 / PasteEmpty），按钮复用通用 cancel/send。
+- 测试扩到六例（chat_paste_test.dart）：图片确认后发 / 文件确认后发 /
+  取消不发 / 文本不弹窗 / 空提示 / 面板入口同链路。
+
+**（2026-10-12，五十三）**：修 Finder 拷文件粘贴的**图标当图发** bug（老板
+macOS 实测 + 自己定位了机制）。根因：macOS 在 Finder 里拷文件时，剪贴板里的
+"图片数据"是**文件类型图标**（系统合成缩略图，mp4/pdf 同理），不是文件内容；
+老逻辑先读 `Pasteboard.image`，把图标当图发了——弹窗显示图标、发出去也是一张
+图标图。而"在图片 App 里拷贝"是纯图片字节（无文件路径），一切正常。
+- 修复：`_pasteFromClipboard` 改**文件路径优先**——先 `Pasteboard.files()`，
+  经 `_isLocalReadableFile` 校验本地真实存在才走文件分支；没有真实文件才读
+  图片字节。该校验同时兜住浏览器拷图（插件会把 http URL 的 `url.path` 当成
+  文件路径返回，如 `/images/x.png`，不存在 → 落空 → 回落图片分支，不会误报
+  "发送失败"）。Windows 侧同理（Explorer 拷文件也可能带图标位图）。
+- 新增 `_sendPastedFiles`：单张图片 → 读**真实字节**走缩略图弹窗、按图片
+  消息发（用真名）；多图/视频/音频/混合 → 按扩展名归类的名单弹窗 + 仍走
+  `_sendDroppedFiles`（它逐文件分型：视频发视频、音频探时长、图片发图片）。
+- 确认弹窗分类感知：`_PastePayload` 加 `kind`，标题与行图标按
+  image/video/audio/file 走（新增两个复数标题键）。拷 mp4 不再问"发送这个
+  文件？"而是"发送这个视频？"。
+- 测试加到九例，新增 Finder 拷 png（断言弹窗缩略图是文件内容而非图标字节，
+  listEquals 比字节）、Finder 拷 mp4（视频弹窗 + 视频消息）、浏览器拷图
+  （假路径回落图片分支）。单图分支先 readAsBytes 再弹窗，测试里要 runAsync
+  给真实 I/O 让路（第三个 FakeAsync 踩点）。
+
+**（2026-10-12，五十四）**：附件面板「粘贴」入口移到**网格末尾（表情符之后）**
+（老板 2026-10-12 指定）。同时拍定**不做剪贴板预检**：原设想"空剪贴板时隐藏
+入口"，实现层评估后否掉——iOS 上 App 读剪贴板会弹系统"已粘贴"横幅，每开一次
+面板弹一次没人受得了；macOS/Windows 虽可静默预检，但跨平台行为分裂 + 要等读取
+才能开面板（大剪贴板图几十 ms）。老板拍简：**总显示，点了空的由提示兜底**
+（`chatPagePasteEmpty` 已有）。入口显隐/顺序加回归断言（粘贴位置必须在表情符
+之后——同行比 x、换行比 y）。
+
+**（2026-10-12，五十四）**：新建 `feat/linux`——Linux GUI 支持（老板 2026-10-12：
+要在他的 Debian 13.3 上跑）。**依赖审计结论**（按各包自己 pubspec 的 platforms
+声明，非 lock——lock 按平台过滤不可靠）：19 个直接依赖 14 个支持 Linux
+（secure_storage=libsecret、record、audioplayers、webrtc、file_picker、
+image_picker、url_launcher、desktop_drop、path_provider、device_info、
+package_info、wakelock + 纯 Dart 族）；sqlite3 3.5.2 的 native-asset hook
+**自带 Linux 编译**（还专处了与系统 SQLite 的符号冲突，产物内嵌 libsqlite3，
+运行期不用装）。5 个无 Linux 实现：video_player（最新 2.14.1 仍只有
+android/ios/macos/web）、mobile_scanner、open_filex、video_thumbnail、gal。
+**代码改动**：① gal 无需动（canSaveToGallery 早已仅移动端）；②
+video_thumbnail 无需动（_buildVideoThumb 的 FutureBuilder 早有失败兜底，
+注释原话「平台无取帧能力」）；③ video_player：_VideoPreview 在 Linux 跳过
+初始化 + 改渲染「此设备不支持播放视频，点按保存到本地」占位（新 l10n 键
+chatPageVideoUnsupportedPlatform，整块可点→_saveAttachment 桌面保存对话框）；
+④ open_filex：_downloadFile 两处「直接打开」短路加 !Platform.isLinux，
+Linux 落下载→Documents→提示路径的既有出口；⑤ mobile_scanner：join token
+页扫码 suffixIcon 在 Linux 隐藏。**CI**：buildMultiPlatform.yml 加 linux-gui
+job（ubuntu-latest + GTK/libsecret 构建依赖 → flutter build linux --release
+→ bundle 打 tar.gz 附运行说明 → artifact + 传 latest Release）；该文件头部
+「Linux GUI 未发布」的注释同步更新。**测试**：widget_test 的扫码断言按平台
+分流（Linux 下 findsNothing——否则 CI 的 ubuntu 上必红）；chat_quote_video
+不受影响（缩略图走 mock 通道）。analyze 0 issue；widget_test +
+chat_quote_video 11 测试全过。**注意**：分支推不上 CI 自动触发（CI 只认
+main/tag），用 workflow_dispatch 选 linux 手动出包；产物 glibc 线 = runner
+的 2.39，Debian 13.3（2.41）满足。
+
+**（2026-10-12，五十五）**：feat/linux 首跑 CI 即败——
+`No Linux desktop project configured`。根因：`app/.gitignore` 有一条
+`/linux/`（历史策略「linux/web 暂不需要，继续忽略」），**app/linux 脚手架
+从未入 git**，CI checkout 出来没有该目录，`flutter build linux` 直接拒。
+解禁：删掉该条（保留 /web/）、注释同步更新；app/linux 的内层 .gitignore
+本来就有（排除 flutter/ephemeral），10 个脚手架文件（CMakeLists/runner/
+generated_*）全部入库，无本机产物。教训：本地能 `ls` 到目录 ≠ 目录在 git
+里——平台目录是否 tracked 要看 `git ls-files`（上次 voice_model 239MB 也是
+同类坑，方向相反）。
+
+**（2026-10-12，五十六）**：feat/linux CI 第二败——
+`audioplayers_linux` CMake 要 gstreamer-1.0 / gstreamer-app-1.0 /
+gstreamer-audio-1.0（pkg-config），构建机没装。已把全部 *_linux 插件的
+CMakeLists 依赖扫齐（其余无额外构建依赖），apt 清单补
+libgstreamer1.0-dev + libgstreamer-plugins-base1.0-dev（app/audio 的
+.pc 都在后者）；运行说明同步补 gstreamer plugins-base/good + 按声音
+系统选 pipewire/pulseaudio。另确认 VSCode 里 linux 目录显灰只是
+gitignore 缓存未刷新（git check-ignore 已放行、10 文件已跟踪），
+Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代码问题。

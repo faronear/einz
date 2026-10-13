@@ -515,7 +515,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.'**
+  /// **'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.
@@ -947,7 +947,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAvatarUploaded.
   ///
   /// In en, this message translates to:
-  /// **'✅ Avatar updated'**
+  /// **'✅ My avatar updated'**
   String get chatPageAvatarUploaded;
 
   /// No description provided for @chatPageAvatarTooLarge.
@@ -1334,12 +1334,6 @@ abstract class AppLocalizations {
   /// **'Invited to add a new entrance of “{target}”'**
   String wizardJoinReinviteHintNoName(String target);
 
-  /// No description provided for @chatPageMembersHint.
-  ///
-  /// In en, this message translates to:
-  /// **''**
-  String get chatPageMembersHint;
-
   /// No description provided for @chatPageMembersTitle.
   ///
   /// In en, this message translates to:
@@ -1682,6 +1676,36 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get chatPageDeleteConfirmOk;
 
+  /// No description provided for @chatPagePasteSendImageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this image?'**
+  String get chatPagePasteSendImageTitle;
+
+  /// No description provided for @chatPagePasteSendVideoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Send this video?} other {Send these {count} videos?}}'**
+  String chatPagePasteSendVideoTitle(int count);
+
+  /// No description provided for @chatPagePasteSendAudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Send this audio?} other {Send these {count} audio files?}}'**
+  String chatPagePasteSendAudioTitle(int count);
+
+  /// No description provided for @chatPagePasteSendFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Send this file?} other {Send these {count} files?}}'**
+  String chatPagePasteSendFilesTitle(int count);
+
+  /// No description provided for @chatPagePasteEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard is empty'**
+  String get chatPagePasteEmpty;
+
   /// No description provided for @chatPageSendFailed.
   ///
   /// In en, this message translates to:
@@ -1718,11 +1742,11 @@ abstract class AppLocalizations {
   /// **'Tap to resend'**
   String get chatPageMsgFailedTap;
 
-  /// No description provided for @chatPageOfflineUnsent.
+  /// No description provided for @chatPageMsgsUnsent.
   ///
   /// In en, this message translates to:
-  /// **'Offline · {count} unsent'**
-  String chatPageOfflineUnsent(int count);
+  /// **'Waiting to sync… {count} unsent, will retry when back online'**
+  String chatPageMsgsUnsent(int count);
 
   /// No description provided for @chatPageEntranceUnrecognized.
   ///
@@ -1730,11 +1754,11 @@ abstract class AppLocalizations {
   /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
   String get chatPageEntranceUnrecognized;
 
-  /// No description provided for @chatPageOfflineLocalOnly.
+  /// No description provided for @chatPageMsgsSyncing.
   ///
   /// In en, this message translates to:
-  /// **'Offline · local messages only, cannot send or receive'**
-  String get chatPageOfflineLocalOnly;
+  /// **'Waiting to sync… send/receive temporarily unavailable, local messages only'**
+  String get chatPageMsgsSyncing;
 
   /// No description provided for @chatPageMsgResending.
   ///
@@ -1807,6 +1831,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keyboard'**
   String get chatPageEmojiKeyboard;
+
+  /// No description provided for @chatPageAttachPaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get chatPageAttachPaste;
 
   /// No description provided for @chatPageAttachPhoto.
   ///
@@ -1940,6 +1970,12 @@ abstract class AppLocalizations {
   /// **'Video failed to load — tap to retry'**
   String get chatPageVideoLoadFailed;
 
+  /// No description provided for @chatPageVideoUnsupportedPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'This device can\'t play video — tap to save it'**
+  String get chatPageVideoUnsupportedPlatform;
+
   /// No description provided for @chatPageFileOpenFailed.
   ///
   /// In en, this message translates to:
@@ -2045,7 +2081,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.'**
+  /// **'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.
@@ -2053,6 +2089,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version'**
   String get aboutVersionLabel;
+
+  /// No description provided for @aboutDownloadLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get aboutDownloadLabel;
 
   /// No description provided for @aboutServerLabel.
   ///

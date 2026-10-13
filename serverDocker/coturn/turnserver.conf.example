@@ -1,5 +1,6 @@
 # coturn 配置样例（复制为 turnserver.conf 后改这几处：**密码、realm、external-ip**）
-#
+# user/realm 要与 app/localConfig.turn.json 配合一致
+
 # 生成密码：openssl rand -hex 16
 # 客户端侧对应：--dart-define=VOICE_TURN_USERNAME=einz --dart-define=VOICE_TURN_CREDENTIAL=<同一个密码>
 

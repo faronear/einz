@@ -260,7 +260,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
+      'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -511,7 +511,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAvatar => 'My avatar';
 
   @override
-  String get chatPageAvatarUploaded => '✅ Avatar updated';
+  String get chatPageAvatarUploaded => '✅ My avatar updated';
 
   @override
   String get chatPageAvatarTooLarge => 'Image too large (max 2MB)';
@@ -750,9 +750,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageMembersHint => '';
-
-  @override
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
@@ -955,6 +952,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageDeleteConfirmOk => 'Delete';
 
   @override
+  String get chatPagePasteSendImageTitle => 'Send this image?';
+
+  @override
+  String chatPagePasteSendVideoTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count videos?',
+      one: 'Send this video?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendAudioTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count audio files?',
+      one: 'Send this audio?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendFilesTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count files?',
+      one: 'Send this file?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatPagePasteEmpty => 'Clipboard is empty';
+
+  @override
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }
@@ -975,8 +1011,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
-  String chatPageOfflineUnsent(int count) {
-    return 'Offline · $count unsent';
+  String chatPageMsgsUnsent(int count) {
+    return 'Waiting to sync… $count unsent, will retry when back online';
   }
 
   @override
@@ -984,8 +1020,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
 
   @override
-  String get chatPageOfflineLocalOnly =>
-      'Offline · local messages only, cannot send or receive';
+  String get chatPageMsgsSyncing =>
+      'Waiting to sync… send/receive temporarily unavailable, local messages only';
 
   @override
   String get chatPageMsgResending => 'Resending…';
@@ -1029,6 +1065,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEmojiKeyboard => 'Keyboard';
+
+  @override
+  String get chatPageAttachPaste => 'Paste';
 
   @override
   String get chatPageAttachPhoto => 'Take photo';
@@ -1105,6 +1144,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageVideoLoadFailed => 'Video failed to load — tap to retry';
 
   @override
+  String get chatPageVideoUnsupportedPlatform =>
+      'This device can\'t play video — tap to save it';
+
+  @override
   String chatPageFileOpenFailed(String error) {
     return 'Could not open file: $error';
   }
@@ -1167,10 +1210,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
+      'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';
+
+  @override
+  String get aboutDownloadLabel => 'Download';
 
   @override
   String get aboutServerLabel => 'Server';
