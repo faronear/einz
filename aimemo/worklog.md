@@ -14682,3 +14682,32 @@ TUI 端到端仪器验证：聊天态可见「⚠️ DNS 污染：einz.tic.cc �
 about_sheet 10 测全过、TUI analyze 无问题。
 
 **（2026-10-13T09:20:33Z / 2026-10-13 17:20）**：dart-docker.sh 启动慢根因与修复。老板在 cn1 上有时 root 直接运行、有时 sudo 运行：脚本挂载 `$HOME/.pub-cache`，sudo 下 HOME=/var/root、root 下 HOME=/root，都是与普通用户各异的空缓存目录 → 每次启动 pub 全量重新下载 + 全量编译，慢 30-60s；残留容器是强杀时 --rm 未清理，与慢无直接关系。修复：检测 SUDO_USER 自动切回真实用户的 HOME/uid/gid（容器本就无需特权）；直接 root 运行时警告缓存分裂并提示固定方式，另加 DART_PUB_CACHE_HOME 环境变量可让 root 与普通用户共用一份缓存。bash -n 与 sudo/非 sudo 两条路径 sourcing 验证通过；cn1 上待老板实测首次后第二次启动应秒级（pub get 秒回、dart run 走快照缓存）。
+
+**（策略更新，2026-10-13）**：dart-docker.sh 身份策略定稿——**允许直接 root 运行、禁止 sudo 运行**。cn1 实测第二阶段：sudo 曾以 root 身份往 adot 家目录写 ~/.pub-cache/_temp、.einz（HOME 未重置的污染），adot 随后 `pub get` 报 Permission denied。脚本改为检测 SUDO_USER 直接 exit 1 并提示；root 直接登录放行（写 /root 自己的，无污染），保留 root 运行警告与 DART_PUB_CACHE_HOME 共享缓存选项。修复污染：sudo chown -R adot:adot /home/adot/.pub-cache（.einz 同查）。
+
+**（2026-10-13T09:57:51Z / 2026-10-13 17:57）**：cn1 启动慢第二阶段定位与修复。chown 后仍 30s+：实测 pub get 仅 2s 且不下载（缓存已热），大头是 dart run 每次 JIT 全量编译 TUI ~15s（dart run 不落内核缓存，cn1 CPU 慢放大）。另发现 cli/.dart_tool 为 root 属主（9月 root 跑 pub get 残留），adot 写不进——属主污染第二现场。老板定稿身份策略：cn1 上该仓库**统一 root 运行**（禁 sudo 脚本已拦截；git/构建也 root）。实施：① dart-docker.sh tui 改为 compile kernel 一次（源码未变跳过，find -newer 判过期）+ dart 直跑 dill（提交 fdf56bc）；② cn1 实测：compile 首次 7s、dill 运行 1s、二次启动 1s（30s→~10s 含 pub get，之后启动 ~3-4s）；③ .einz 身份 myeinz.json 已迁 /root/.einz（root 属主），.dart_tool 归 root。
+
+**（2026-10-13T10:02:19Z / 2026-10-13 18:02）**：身份策略再修订——老板澄清 /root/.einz 才是真仓库，sudo 的目的就是用它；此前 my cp -a 已把 /root/.einz/myeinz.json 覆盖为 adot 那份（老板确认放弃抢救，重新加入空间）。脚本改为：sudo 与直接 root 统一按 root 挂载 /root/.pub-cache + /root/.einz（提交 e55d46f），普通用户运行时提示身份差异；废除"禁止 sudo"。cn1 已同步验证 root dill 启动 2s。教训：动别人家目录里的"疑似污染"文件前先确认哪份才是真数据——/root/.einz 的目录 mtime（9月4日）当时就暗示文件早已存在，cp 前应先查。
+
+**（2026-10-13T09:20:00Z / 2026-10-13 17:20）**：修 DNS 污染警报**误报**（老板
+服务器实测：bittic 与 tic.cc 两个入口都报“被劫持”，其实都是正确 DNS 设置）。
+根因：兜底逻辑是“首次连接失败 + DoH 成功”就报警+钉扎，**从未比较系统解析与
+DoH 的结果**——连接失败可能只是服务没起来，与 DNS 无关。两类误报：
+① 系统解析本就正确（与 DoH 一致，36.154.238.42）却报“假 IP”；
+② hosts 刻意指向 127.0.0.1 自部署，被当“假 IP”报警，还会把本地覆盖悄悄
+改道到公网（信任问题更严重）。
+
+修复（shared `probeWithDohFallback`）：DoH 成功后先取系统解析（仅 IPv4，
+与 DoH 的 A 记录同口径）再判定——
+- 系统解析与 DoH **一致** → 不钉扎不报警（钉同一 IP 无意义）；
+- 系统解析指向**回环/内网/链路本地**（127/8、10/8、172.16/12、192.168/16、
+  169.254/16，rawAddress 逐字节判）→ 用户刻意本地配置，尊重而非“修复”，
+  原样返回失败；
+- 系统解析**无答案**而 DoH 有 → 仍算分歧（NXDOMAIN 注入），钉扎+报警
+  （假 IP 未知降级展示）；
+- 公网假 IP 与 DoH 分歧 → 真·劫持，钉扎+报警（原路径）。
+新增 `systemResolver` 注入参数（测试/排查用；App/TUI 生产路径用默认真实解析）。
+
+回归：shared 87 测全过（+4 新用例：一致/回环/内网/无答案）；app
+server_config+about_sheet 13 测全过；**真实环境实测**（本机 hosts 同样把
+tic.cc 指向 127.0.0.1）：四个入口域名全部不钉扎不报警；TUI analyze 无问题。
