@@ -11602,6 +11602,7 @@ setup_join_passphrase / wizard_envelope_entry / wizard_autofocus）。
 ### 顺带修：两批"硬写文案"的测试 rot
 
 全量跑出 5 条红，两类：
+
 1. **我这次改名弄红的**：`widget_test` / `setup_join_duplicate_space_test` /
    `setup_join_passphrase_test` 里硬写了「验证开通码」「开通码无效」「不是开通码本身的问题」。
 2. **老板 `a382429`（伴侣→同伴）弄红的**：`widget_test` 断言硬写了
@@ -11626,6 +11627,7 @@ token 仍 24h 过期 + 一次性，所以**暂不做显性作废**。
 ### 2026-10-05（二·补）`setupTokenHint` 收句
 
 「通道 / 通道码 / 通道」三连词读着重，收成更顺的一句：
+
 - zh：**凭通道码开启从本机到秘境的专属通道。24 小时内一次性有效，可由本秘境任一已认证的通道生成。**
 - en（再收一版，老板提「还有三个 entrance」）：**An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.**
   （相对老板试写版：`your device`→`this device` 对齐「本机」口径；`of the space`→`in the space`；去掉 `after verification`——本屏就是验证页，重复。entrance 3→2。）
@@ -11694,7 +11696,7 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 
 - `chat_page._showMembersSheet` 重写 + 新增 `_membersCard()`：
   - 卡 = `Material(color: _genderTint(gender))`（男浅蓝 / 女浅粉 / 性别未知=中性灰）
-    + `InkWell` **整卡可点**（老板偏好：别让人去点中某个小控件）+ 右 `TextButton`。
+    - `InkWell` **整卡可点**（老板偏好：别让人去点中某个小控件）+ 右 `TextButton`。
   - 头像用 `_MessageAvatar`（会给它加 `radius` 参数，默认 16 不变，卡里用 20）。
   - 未满员 → 末尾追加「邀请」占位卡（默认头像、**不显名字**）；群组用
     `chatPageMembersInviteNew`（邀请新成员）、duo 用 `chatPageMembersInvitePartner`（邀请）。
@@ -11727,6 +11729,7 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 那时拼的是 `FullWithMax`）。
 
 老板选了"末尾灰卡"（简化/复用、不堆元素）：
+
 - `_membersCard` 加 `muted` + `actionLabel/onAction` 可选：muted → 底色取中性灰
   （`_genderTint('')`）、文字次要色、**不放按钮**、`InkWell.onTap=null` 不可点。
 - 弹层末尾：`if (_canInvite) 邀请卡 else if (_isGroup) 满员灰卡`
@@ -11773,9 +11776,10 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 约 1 分钟后才出现上线时间。
 
 **根因**：状态条有两条更新路径，只喂了一条。
+
 - 灯（`_peerOnline`）走 **WS 广播** `_onPeerStatus`（`chat_page:846`）——**立即**翻绿。
 - 时间（`_peerSinceMs`）只在 **30s 轮询** `_refreshPeerOnline`（`_sinceOfRow`）里算。
-→ 灯先亮、时间要等下一次轮询（30–60s），正好对上"约 1 分钟"。
+  → 灯先亮、时间要等下一次轮询（30–60s），正好对上"约 1 分钟"。
 
 **而 WS 事件本来就带时刻**：服务端 `ws.ts:68` 在 `peer.online` 的 payload 上放了
 `online_since`；客户端 `ws_client.dart:349` 已解析成 `WsPeerStatusEvent.onlineSince`
@@ -11800,6 +11804,7 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 上一轮只修了上线（绿灯即有时间）；下线仍"红灯先亮、时间等下一次 30s 轮询"。这轮补对称。
 
 **服务端**
+
 - `ws.ts`：`broadcastPeerStatus()` 加第三参 `offlineSinceMs`；`peer.offline` 的 payload
   带 `offline_since`（与 `entrances.offline_since` **同值**——close 时那个 `atMs`，
   退役时那个 `now`）。close 处传 `atMs`；`forgetEntranceConnection()` 加参透传。
@@ -11809,11 +11814,13 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
   ——本次不碰（"别顺手改成先广播再删"是代码里写死的告诫）。
 
 **shared**
+
 - `WsPeerStatusEvent`：`onlineSince` → **`since`**（把两帧的"起始时刻"归一；调用方用
   `type` 区分是上线还是下线时刻）；解析 `payload['online_since'] ?? payload['offline_since']`。
   这样 app 侧不必再分两种情况（`event.since` 一把写）。
 
 **app**
+
 - `_onPeerStatus`：翻 `_peerOnline` 的同一帧里写 `_peerSinceMs = event.since`；
   `since == null`（老服务端）才补一次 `_refreshPeerOnline()`。
 
@@ -11870,6 +11877,7 @@ offline_since / 老服务端不带 → null）；`server/test/peer_status.test.t
 约定是**错峰 300ms** 再做下一步。
 
 而 re-invite 是**唯一没走错峰**的一条路：
+
 - 成员卡 `onAction`：`Navigator.of(ctx).pop()` 之后**同步**弹口令框
   → 弹层 exit 动画没跑完就 push 一个 DialogRoute（交叉卸载 ①）；
 - 口令框 pop 后 `_reinviteMemberIdentity` 立刻开通道码弹窗（中间只有一次网络往返，
@@ -11878,6 +11886,7 @@ offline_since / 老服务端不带 → null）；`server/test/peer_status.test.t
 （注：这不是本次成员弹层重做引入的——旧的"大按钮 / 行内图标"也是同一写法。）
 
 **修法**（复用既有约定，不发明新机制）：
+
 - 把 300ms 错峰抽成 `_waitRouteHandoff()` + 常量 `_kRouteHandoff`；`_menuAction` 收窄成
   它的 fire-and-forget 版（16 处调用行为不变）。
 - 成员卡 / 邀请卡的 `onAction`：pop 后走 `_menuAction(...)`。
@@ -11966,6 +11975,7 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
 
 老板问的。查了 `server/src` + `shared/lib` + `app/lib` + `cli`：**是，统一为 `member`**。
 全仓 `partner` 只剩三类，都不是活的标识符：
+
 1. **历史注释**（"串术语改名 partner→member"、"partner 加入时自己填名"）；
 2. **老库迁移**：`local_database.dart` v9 把存量库的 `partner_id` → `member_id`
    （`peer_receipts` / `spaces`）——只服务旧安装，不是现役列；
@@ -12065,10 +12075,10 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
 老板决定放弃实验、回到 2026-09-10 那版（已提交的浅底墨字 + 淡粉描边 + 白底 Logo 徽章）。
 `git checkout HEAD -- app/lib/widgets/top_notice.dart`，**未产生代码改动**。
 
-| 试过 | 结果 |
-| --- | --- |
-| 深蓝底 `#33415A` + 白字 + 圆角 24 | 黄线在 |
-| 同上 + 85% 透明（`0xD933415A`） | 黄线**仍在** |
+| 试过                                                   | 结果         |
+| ------------------------------------------------------ | ------------ |
+| 深蓝底 `#33415A` + 白字 + 圆角 24                      | 黄线在       |
+| 同上 + 85% 透明（`0xD933415A`）                        | 黄线**仍在** |
 | 浅粉白底 + **墨字** + **深墨 1.5px 描边** + 小喇叭图标 | 黄线**仍在** |
 
 ### ⚠️ 结论：颜色不是病因——之前两次的判断被推翻
@@ -12121,8 +12131,8 @@ const TextStyle _errorTextStyle = TextStyle(
 );
 ```
 
-Flutter 自己的注释（同文件 39~44 行）就写着：*看到文字用了这个样式，说明它没被 `Material`
-包着——请放进 `Material`，或另设 `DefaultTextStyle`。*
+Flutter 自己的注释（同文件 39~44 行）就写着：_看到文字用了这个样式，说明它没被 `Material`
+包着——请放进 `Material`，或另设 `DefaultTextStyle`。_
 
 通知插在**根 Overlay**（`Overlay.of(context, rootOverlay: true)`），`OverlayEntry`
 **不是任何路由 `Material` 的后代** → 拿不到 `Material` 提供的 `bodyMedium`，
@@ -12131,12 +12141,12 @@ Flutter 自己的注释（同文件 39~44 行）就写着：*看到文字用了�
 
 **探针实测**（临时测试，已删）：
 
-| | 通知文字（根 Overlay） | 路由内文字（对照） |
-| --- | --- | --- |
-| decoration | **underline** | none |
-| decorationColor | **黄 (1,1,0)** | — |
-| decorationStyle | **double** | — |
-| fontFamily | **monospace** | Roboto |
+|                 | 通知文字（根 Overlay） | 路由内文字（对照） |
+| --------------- | ---------------------- | ------------------ |
+| decoration      | **underline**          | none               |
+| decorationColor | **黄 (1,1,0)**         | —                  |
+| decorationStyle | **double**             | —                  |
+| fontFamily      | **monospace**          | Roboto             |
 
 → **每行文字下方一道黄线**，两行文字就是老板说的"两条"。
 顺带一个连带 bug：**安卓端通知文字是等宽字体**（iOS 上 `monospace` 解析不到才躲着没露）。
@@ -12183,11 +12193,11 @@ TextDecoration.underline`）；恢复 → 绿。**这条链此前零覆盖。**
 
 老板定的版式：群空间那一格代表的是**一群人**，所以两处跟着变。
 
-| 位置 | duo（不变） | **group（新）** |
-| --- | --- | --- |
+| 位置     | duo（不变）                                | **group（新）**                                                                                                                  |
+| -------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | 左侧头像 | 对方头像（没设头像 → 性别底色 + 单人图标） | **群组图标 `Icons.groups_outlined`** ——就是创建空间时选「群组秘境」那一页同一枚（`setup_page:1490`）；不用性别底色、不可点开大图 |
-| 第一行 | 对方名字 | 其他成员名单（`Alice、Bob、Carol`）——**本来就有，未改**，这次补测试钉住 |
-| 第二行 | 红绿灯 + 上/下线时刻 | **「其他人在线数 / 其他人总数」**，**两个数都不含我自己** |
+| 第一行   | 对方名字                                   | 其他成员名单（`Alice、Bob、Carol`）——**本来就有，未改**，这次补测试钉住                                                          |
+| 第二行   | 红绿灯 + 上/下线时刻                       | **「其他人在线数 / 其他人总数」**，**两个数都不含我自己**                                                                        |
 
 ### 实现
 
@@ -12209,6 +12219,7 @@ TextDecoration.underline`）；恢复 → 绿。**这条链此前零覆盖。**
 
 群组图标 / 单人图标只剩我自己那一个 / 第一行名单 / `2/3` / 红绿灯只剩我自己那半格。
 fake 里刻意放了三种边角，覆盖真正的去重与排除逻辑：
+
 - Alice **两条**通道都在线 → 按 member 去重后只算 **1 人**（不是 2）；
 - Carol 离线（`connected_at: null`）；
 - **我自己另一台设备**也在线 —— 靠 `entrance_id` 排除不掉它，必须靠"排除我自己的
@@ -12279,11 +12290,11 @@ fake 里刻意放了三种边角，覆盖真正的去重与排除逻辑：
 
 ### 现在的形态
 
-| | duo（不变） | **group（新）** |
-| --- | --- | --- |
-| 左侧 | 对方头像 + 名字 + 红绿灯/时刻 | **一排其他成员的头像**（32 直径、间隔 4），竖居中、离左缘 10 |
-| 文字 | 有 | **无**（既没有人名，也没有"在线/总数"） |
-| 装不下 | — | 末尾**渐隐**（`ShaderMask`），且**只构建装得下的那几个** |
+|        | duo（不变）                   | **group（新）**                                              |
+| ------ | ----------------------------- | ------------------------------------------------------------ |
+| 左侧   | 对方头像 + 名字 + 红绿灯/时刻 | **一排其他成员的头像**（32 直径、间隔 4），竖居中、离左缘 10 |
+| 文字   | 有                            | **无**（既没有人名，也没有"在线/总数"）                      |
+| 装不下 | —                             | 末尾**渐隐**（`ShaderMask`），且**只构建装得下的那几个**     |
 
 ### 三个决定（老板说"你看着办"）
 
@@ -12382,7 +12393,7 @@ o1 在线、o2 离线）、**人数在头像右侧**、**整块不越过胶囊�
   通道在线即算在线，按 member 去重），只是这次把集合留下来而不只留个数字。
   进 `setState` 的条件用 `setEquals` 比（Set 不能用 `!=` 比内容）。
 - `_stripAvatar(memberId)`：不在线 → 直接返回头像；在线 → `SizedBox(32) + Stack
-  (StackFit.expand)[头像, 带圆环 border 的 DecoratedBox]`。
+(StackFit.expand)[头像, 带圆环 border 的 DecoratedBox]`。
   （`StackFit.expand` 必须配**定宽**的 `SizedBox`：Row 给子项的是无界宽度，
   直接 expand 会报错。）
 - 环上挂 `ValueKey('statusAvatarOnline-<$memberId>')` 供测试数"谁在线"
@@ -12411,12 +12422,12 @@ o1 在线、o2 离线）、**人数在头像右侧**、**整块不越过胶囊�
 
 ### 调查（模拟器 + 服务端真库实测，非推断）
 
-| 证据 | 结果 |
-|---|---|
-| 模拟器库 `spaces` 表 | **只剩 3 行**（ccc / rose / xixi） |
-| 同库 `app_state` | `install_uid=feef527b…`；**10 个** `app_lock.profile.*` |
-| 服务端库该 install_uid | **13 条 active 通道**（跨 7 个"本地已无凭证"的空间） |
-| Keychain | 当前明文 vault 条目只装得下 3 个空间 |
+| 证据                   | 结果                                                    |
+| ---------------------- | ------------------------------------------------------- |
+| 模拟器库 `spaces` 表   | **只剩 3 行**（ccc / rose / xixi）                      |
+| 同库 `app_state`       | `install_uid=feef527b…`；**10 个** `app_lock.profile.*` |
+| 服务端库该 install_uid | **13 条 active 通道**（跨 7 个"本地已无凭证"的空间）    |
+| Keychain               | 当前明文 vault 条目只装得下 3 个空间                    |
 
 → 本地 Vault 只剩 3 个秘境、服务端还留着其余 7 个通道；2026-09-25 那次"残档自愈"
 （`_syncSpaceRows` 删掉 Vault 里没有的 spaces 行）又把本地闸门 `_isSpaceAlreadyAdded`
@@ -12684,6 +12695,7 @@ server 当时在运行（PID 21160 持有该库）→ 没敢动数据。启用�
 `assume-unchanged`（老文档那条其实没生效——`Caddyfile` 只是被 .gitignore 忽略而已）。
 
 步骤：
+
 1. 停旧项目：`cd deployment && sudo docker compose -f docker-compose.yml -f docker-compose.coturn.yml down`
 2. `sudo git pull --ff-only`（→ `9f7d74a`；git 搬走**已跟踪**文件，未跟踪/忽略的留在旧目录）
 3. 把残留的非 git 文件 `mv` 进 `serverDocker/`，删掉空 `deployment/`
@@ -12720,8 +12732,6 @@ sudo env COMPOSE_PROGRESS=plain docker compose -f docker-compose.yml -f docker-c
 `tsc` 14 秒、导出镜像 ~72 秒；`better-sqlite3` 若无预编译包会回退 `node-gyp` 源码编 SQLite
 （慢但可靠）。
 
-
-
 ## 2026-10-07 TUI 退出清屏 + 通道码签发扩展
 
 ### /exit 后聊天画面残留终端（老板提出）
@@ -12733,6 +12743,7 @@ sudo env COMPOSE_PROGRESS=plain docker compose -f docker-compose.yml -f docker-c
 exit(0)——清屏必须挂进兜底路径本身。
 
 **修复（cli/bin/einz_tui.dart，commit 4868a3a）：**
+
 - 新增 `_wipeScreen()`：向 **stderr** 写 `\x1B[2J\x1B[3J\x1B[H`（清屏+清回滚缓冲+光标回家）
 - 新增 `_scheduleExitWithWipe()`：立即清屏 + 保留原 2 秒兜底 exit(0)；
   四处退出兜底（Ctrl+C / 引导 /exit / whenComplete / 命令 /exit）统一走它
@@ -12752,13 +12763,14 @@ exit(0)——清屏必须挂进兜底路径本身。
 
 **结论：** 服务端与 ApiClient 早已支持（purpose=attach + targetMemberId + 共享口令校验，
 server/src/app.ts join-tokens 端点），仅 TUI 未接。本次补齐三种签法：
+
 - `/invite` → 新成员（开新身份）
 - `/invite attach` → 我自己的其他设备（进我的已有身份，免口令）
 - `/invite attach <名字|member_id>` → 指定成员的专属码（进他的已有身份；需共享口令，
   服务端按"对别人身份动手=撤销同档授权"硬校验；目标=自己时归一为免口令）
 
 解析用 memberNames（GET /space），找不到报现有名单、同名多个要求 member_id 精确指定；
-失败按码给人话提示（_inviteErrorHint，与 _revokeErrorHint 同构）。
+失败按码给人话提示（\_inviteErrorHint，与 \_revokeErrorHint 同构）。
 
 ### 附带发现
 
@@ -12778,13 +12790,14 @@ server/src/app.ts join-tokens 端点），仅 TUI 未接。本次补齐三种签
 ApiClient.createJoinToken（targetMemberId/passphrase 参数）早已支持，仅 TUI 未接。
 
 **实现（cli/bin/einz_tui.dart）：** `/invite <arg>` 三种签法——
+
 - `/invite` → 新成员（开新身份，加入时自填名字）
 - `/invite attach` → 我自己的其他设备（进我的已有身份，免口令）
 - `/invite attach <名字|member_id>` → 指定成员的专属码（进他的已有身份）：
   · 目标从 memberNames（GET /space）解析；找不到 → 报现有名单；同名多个 → 要求 member_id
   · 目标=别人 → 先问共享口令（hidden 输入，服务端按"对别人身份动手=撤销同档授权"硬校验）
   · 目标=自己 → 归一为不定向（免口令，与 /invite attach 等价）
-  · 失败按码给人话提示 _inviteErrorHint（与 _revokeErrorHint 同构：说清"未签发任何码、无副作用"）
+  · 失败按码给人话提示 \_inviteErrorHint（与 \_revokeErrorHint 同构：说清"未签发任何码、无副作用"）
 - /help 同步三种签法说明
 
 **E2E 验证（pty + 本地 server，11/11 通过）：** A 建空间 → B 用 /invite 码加入 →
@@ -12793,10 +12806,11 @@ attach Bob 错口令拒绝→对口令出码）→ preflight 确认专属码 pur
 C 用专属码加入（不问名字，attach 流）→ C 的 member_id == B 的 member_id（同一身份）。
 
 **测试脚本教训（重要）：**
+
 - 倒计时/长等待期间必须**持续 drain pty**：只 sleep 不读会让输出堆积把 TUI 卡死
   （表现为"命令无响应"假象——debug2 全程排水后 hello 立即回显，定位到根因）
 - 全屏重绘会把旧消息（含旧通道码）重打一遍且逐行绘制顺序自下而上：取"新码"的唯一
-  可靠判据是**只出现在本轮新输出里的 e1_**（旧码必在之前的缓冲里出现过）；
+  可靠判据是**只出现在本轮新输出里的 e1\_**（旧码必在之前的缓冲里出现过）；
   wait_text 断言也要传 offset 只搜新输出，防旧文本误命中（曾致 TOKEN_USED 假失败）
 - server 匿名端点 curl 需带 `X-Protocol-Version: 3` 头，否则 PROTOCOL_VERSION_MISMATCH
 
@@ -12815,6 +12829,7 @@ C 用专属码加入（不问名字，attach 流）→ C 的 member_id == B 的 
 **老板拍板（AskUserQuestion）：** 选「看到最新即已读」——放宽 2026-09-12 那条，等同主流 IM。
 
 **改动（仅 `app/lib/chat_page.dart`，`flutter analyze` 0 issue）：**
+
 - `_loadInitial` 在跳最新之后补一次 `_scheduleReadReport()`（首屏/切换进入即视为看到最新）；
 - 新增 `_onScrollForRead` 滚动监听（与 `_maybeLoadOlder` 并列 `_scrollController` listener，
   dispose 一并移除）：`extentAfter <= 48` 且**越过"离开底部→回到贴底"的边沿**时上报一次，
@@ -12864,9 +12879,10 @@ l10n `chatPageMembersUnnamed`（「未命名」/`Unnamed`），与成员弹层�
 ### /entoken 命令族：通道码签发重命名定稿（2026-10-07 老板定名）
 
 **定名：** `/entoken` = "为我自己生成通道码"（attach for myself），命令族三种签法：
+
 - `/entoken` → 我自己的其他设备（attach 进我的身份，免口令）
 - `/entoken invite` → 新成员（开新身份）；`/invite` 保留为它的**别名**（无参等价；
-  带旧参数 /invite attach* 不静默改签——身份语义签错＝冒充，只给指路提示）
+  带旧参数 /invite attach\* 不静默改签——身份语义签错＝冒充，只给指路提示）
 - `/entoken reinvite` → 其他成员的专属码（进他的已有身份，需共享口令）：
   **duo（一个同伴）验证口令后直接出码；group（多个同伴）验证口令后列成员清单
   让用户选（序号或名字），再出码**
@@ -12888,7 +12904,7 @@ memberNames；口令**本地校验**——GET /key-escrow + openPackage 解封�
 刷新， Carol 永远进不了成员表（duo 无感、group E2E 才暴露）。已把刷新移出布尔判定。
 
 **渲染坑复认：** 同步完成的命令分支只靠 whenComplete 的 microtask 渲染，真实终端
-不显示（本文件既有已知行为）——/invite 带参指路、_execEntoken 默认分支、_reinvite
+不显示（本文件既有已知行为）——/invite 带参指路、\_execEntoken 默认分支、\_reinvite
 同步早退三处补 `_scheduleRender()`。纯同步分支必须显式调度，这是第二次踩同一坑。
 
 ### App 对齐修复：同款"上线刷新成员表"guard 的 group 边缘缺口（2026-10-07）
@@ -12920,6 +12936,7 @@ chat_bubble_gender_test + chat_page_menu_test（35 条）全过。
 老板备选方案：保留拷贝隐喻、按比例缩小（8%）。
 
 **改动（app/lib/chat_page.dart）：**
+
 - `_bubbleQuickAction` / `_buildActionCard` 各加可选 `iconSize`（缺省 12/26 不影响
   其他调用点）
 - 气泡快捷拷贝 12 → 11；长按菜单拷贝卡片 26 → 24
@@ -12957,6 +12974,7 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 下载按钮（自己头像例外——它现在是「更换头像」按钮，不改）。
 
 **新增依赖：`gal ^2.3.3`**（老板拍板用 gal；项目本来没有写相册的能力）。平台配置：
+
 - iOS：`NSPhotoLibraryAddUsageDescription` **已在** Info.plist（当年就写好了"保存下载解密的
   照片/视频到相册"）；
 - Android：补 `WRITE_EXTERNAL_STORAGE`（`maxSdkVersion=28`）——Android 10+ 走 MediaStore
@@ -12965,6 +12983,7 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 - `flutter pub get` 顺带改了 windows 的生成注册文件（gal 也声明了 windows 平台）。
 
 **落地：**
+
 - 新增 `app/lib/data/media_saver.dart`：`canSaveToGallery`（仅移动端）、
   `saveImageToGallery(bytes, name)` / `saveVideoToGallery(path)`（首次调用申请权限，
   被拒抛错）。桌面端没有"相册"，调用方在桌面走 `FilePicker.saveFile`。
@@ -12988,10 +13007,11 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 且**下次启动后与系统提示消息一样不作为历史消息出现**（老板补充）。
 
 **实现：**
+
 - `chat_core.dart` 新增 `ChatSession.addCommandEcho(line)`：伪造"我的消息"气泡入
   `messages` 展示缓存（isMine + 自己的 memberId/entranceId、与普通消息同风格渲染）；
   **纯本地展示**——不加密、不入离线队列、不上服务器、不落盘，loadHistory 只重建
-  store 持久化内容 → 重启后回显自然消失（与 _systemMessage 同机制）
+  store 持久化内容 → 重启后回显自然消失（与 \_systemMessage 同机制）
 - messageId 用 `echo-` 前缀，`sentStatusOf` 据此不显示发送状态符（永不发送，
   不存在 pending ⋯）
 - TUI 输入循环 busy 提交点回显（命令执行前入列，结果消息紧随其后）；仅聊天态
@@ -13009,6 +13029,7 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 ## 2026-10-08 气泡时间行：图标统一/高度对齐/tooltip 补齐；长按菜单下移到正文
 
 **老板四条（含一条确认）：**
+
 1. **「保存」比「下载」好**——不改（全屏按钮文案本来就是「保存」）；
 2. 图片全屏里的保存图标与气泡/长按弹层的不一样 → 统一；
 3. 气泡里「沙漏+时长」的背景比引用/拷贝/保存高 → 拉齐高度；
@@ -13017,6 +13038,7 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
    → 统一为**长按菜单只挂在消息正文**，顶栏一律不激发。
 
 **改动（`app/lib/chat_page.dart`）：**
+
 - 新增常量 `_bubbleTimeRowControlHeight = 20`（12 图标 + 上下各 4，沿用原热区口径）。
   `_bubbleQuickAction` 由 `Padding(4)+Icon` 改为 `SizedBox.square(20)+Center(Icon)`——
   图标字号变化不再影响高度；沙漏胶囊加 `SizedBox(height: 20)` + 只留水平 padding，
@@ -13030,7 +13052,7 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
   · 顶栏（时间/快捷动作/沙漏）长按 → 不开菜单（桌面不再误开；手机留给 Tooltip）；
   · 正文（文字/图片/视频/音频/文件/引用块）长按 → 照常开菜单；
   · 墓碑消息（正文隐藏）→ 长按无菜单（本就如此，`m.deleted ? null` 的旧守卫随之
-    冗余、一并去掉，因为正文整块 `if (!m.deleted)` 才渲染）。
+  冗余、一并去掉，因为正文整块 `if (!m.deleted)` 才渲染）。
 
 **未动的既有测试**（人工核对，未代跑）：`chat_quote_image/video_test` 长按的是图片/
 视频气泡、`chat_page_menu_test` 长按 '我的消息'/'对方消息'/语音时长——全是**正文**，
@@ -13059,6 +13081,7 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 这两个键。
 
 **三路加固（cli/bin/einz_tui.dart）：**
+
 - Ctrl+B / Ctrl+F（0x02/0x06）：单字节控制码不经转义序列，任何键盘/终端/SSH 都
   原样送达，步长一屏（Emacs 直觉 B=Back、F=Forward）
 - Shift+↑/↓（老板指定）：xterm 标准 CSI 1;2A/B + rxvt 变体 ESC a/b
@@ -13088,6 +13111,7 @@ WS 连入时踢掉旧连接（4408 duplicate）；客户端 WsClient 断线自�
 把 PgUp 映射成了 ↑ 之类所致（上一轮 E2E 验证的是序列解析，防不了改键）。
 
 **老板拍板（第二轮修正）：**
+
 - 步长对调分工：PgUp/PgDn 一次一屏，Shift+↑/↓ 一次一行（细粒度慢走）
 - 删掉 Ctrl+B/F——与老板常用 tmux 快捷键冲突；PgUp/PgDn + Shift+箭头已够用
 
@@ -13123,11 +13147,12 @@ WS 连入时踢掉旧连接（4408 duplicate）；客户端 WsClient 断线自�
 
 **要求：** group 空间不再按 duo 模式显示单个"对方状态"，改成与 App 类似的名单——
 在线在前、离线在后，右侧 n/N（在线/总人数，**不含我**），不超左侧 1/3 限长
-（超宽由 _titleBarThree 统一尾部截断）；人名用 () 包起（老板补充）。
+（超宽由 \_titleBarThree 统一尾部截断）；人名用 () 包起（老板补充）。
 
 **实现（cli/bin/einz_tui.dart）：**
-- `_TuiState` 加 `isGroupSpace`（GET /space 的 mode，_refreshMemberNames 捕获）+
-  `memberOnline`（member_id → 任一通道在线，_refreshPeerOnline 按 member_id 聚合）
+
+- `_TuiState` 加 `isGroupSpace`（GET /space 的 mode，\_refreshMemberNames 捕获）+
+  `memberOnline`（member_id → 任一通道在线，\_refreshPeerOnline 按 member_id 聚合）
 - 标题栏左段分支：group → `_groupMemberListLabel`（●绿(名) 在前、○白(名) 在后、
   ` n/N`；名单不含我；成员序 = /space 成员表序）；duo → 原对方状态不变
 - 变化检测把 memberOnline 表纳入（成员上下线即使计数不变也重绘）
@@ -13137,6 +13162,7 @@ WS 连入时踢掉旧连接（4408 duplicate）；客户端 WsClient 断线自�
 `○(BobG) 0/1`（服务端 close 即 last_seen=0 + peer.offline 广播，秒级翻转）。
 
 **E2E 归因教训（5 连失败全是脚本问题，产品代码零 bug）：**
+
 - group 的 /entoken **invite 免口令**（此前误等口令提示）；B 加入向导文案是
   「你的名字/你的性别是/验证共享口令」（非「我的…/锁屏码」）
 - 断言别只看"最后一帧首行"：全屏重绘的行序会复用，直接在末帧全文搜特征
@@ -13147,6 +13173,7 @@ WS 连入时踢掉旧连接（4408 duplicate）；客户端 WsClient 断线自�
 ### TUI group 名单格式微调：删 ()、竖线分隔、n/N 提到最左（2026-10-08 老板三轮修正）
 
 最终格式 `n/N ●BobG|○Carol`：
+
 - 删掉人名外的 ()——每人自带红绿灯，括号多余（老板：你做的很好，后续修正）
 - 人名之间竖线 | 分隔
 - 在线人数/总人数提到左段最左（此前在名单右侧）
@@ -13161,6 +13188,7 @@ E2E（pty 双窗口）4/4：`1/1●BobG`（B 在线）→ B 退出后 `0/1○Bob
 先做**最小可用**（只加入口，不动内部结构），老板实测通过后再补压缩等附加特性。
 
 **实现（最小可用）：**
+
 - `app/pubspec.yaml` 加 `desktop_drop ^0.8.4`：返回 `cross_file.XFile`，与既有
   image_picker/file_picker **同类型**，零转换；macOS/Windows/Linux 支持。
 - `ChatPage.build` 把整页 `Scaffold` 装上 `DropTarget`（**仅桌面**：`_fileDropSupported`；
@@ -13174,6 +13202,7 @@ E2E（pty 双窗口）4/4：`1/1●BobG`（B 在线）→ B 退出后 `0/1○Bob
 「过好久才报错，报错也偏技术化」。
 
 **大文件改进（第二轮）：**
+
 - 根因：客户端**先把整文件读进内存再加密**，服务端 413 要等这些做完才轮到 → 慢。
 - `server/src/app.ts`：`/health` 下发 `max_attachment_bytes`（= `EINZ_MAX_ATTACHMENT_BYTES`，
   默认 64 MiB）；纯静态配置值，非密、无元数据风险。`server/test/smoke.test.ts` 加断言。
@@ -13199,6 +13228,7 @@ E2E（pty 双窗口）4/4：`1/1●BobG`（B 在线）→ B 退出后 `0/1○Bob
 `_sendMedia` 仍是"读满内存 → 加密 → 上传 → 413 → 技术串"的老路。老板要求补上。
 
 **改动（`app/lib/chat_page.dart`）：**
+
 - `_sendMedia` 六个分支在 `readAsBytes()` **之前**统一预检：XFile 用 `await x.length()`；
   file_picker 的 `PlatformFile` 用 `await p.length()`（**v3.4 无 `.size` 字段，是 `length()`**）；
   超限即 `return`（一次选择只有一个文件）。
@@ -13223,16 +13253,18 @@ windows/linux 同）。即桌面端"选择器图片"与"拖入图片"其实都�
 与加密改动。
 
 **实现（cli/bin/einz_tui.dart）：**
+
 - `/switch <路径>` 分支 + `_execSwitch`：加载目标 store → PIN 闸门（**目标有 PIN
-  才验**——"进来要解锁、离开不设卡"，老板口径：不重验当前空间；会话内 _prompt
-  hidden 输入，不能复用启动期 _unlockPin 的同步 readByteSync——会与 raw 模式
-  stdin 订阅抢字节）→ 换装四件套（停旧 WS/轮询 + flushPending 兜底 → 换 _state →
-  loadHistory → 欢迎块 + _startPeerPolling + **立即 _refreshMemberNames**
+  才验**——"进来要解锁、离开不设卡"，老板口径：不重验当前空间；会话内 \_prompt
+  hidden 输入，不能复用启动期 \_unlockPin 的同步 readByteSync——会与 raw 模式
+  stdin 订阅抢字节）→ 换装四件套（停旧 WS/轮询 + flushPending 兜底 → 换 \_state →
+  loadHistory → 欢迎块 + \_startPeerPolling + **立即 \_refreshMemberNames**
   （启动路径靠向导钩子拉 mode/名单，切换路径没有，不拉标题栏先渲染 duo 形态））
 - 失败/取消不半切换：路径不存在、PIN 留空取消、验证错误重试——任一都保持原会话
 - `~` 展开；/help 补条目
 
 **踩坑记录：**
+
 - store.spaceAddress 是 0x 空间地址（链上标识）**不是 HTTP URL**——拿它当 server
   打请求全部静默失败（dbg 才抓到）；server 沿用当前会话（跨服务器切换暂不支持）
 - store2 自己建的 group 唯一成员是自己，名单口径不含我 → `0/0` 空名单是正确渲染
@@ -13269,7 +13301,8 @@ group 形态标题栏、切回无 PIN 直切、旧消息仍在、再进目标空
 ### TUI /help：命令列表按字母序 + 合并为单条系统消息（2026-10-08 老板要求）
 
 **改动（cli/bin/einz_tui.dart）：**
-- 22 条手写 _systemMessage 重构为 `helpEntries` 常量列表 + `sort` + 循环——新增命令
+
+- 22 条手写 \_systemMessage 重构为 `helpEntries` 常量列表 + `sort` + 循环——新增命令
   只需加一行，顺序自动维持；补了此前缺失的 /help 自身条目
 - 按老板追加要求合并为**一条**系统消息：此前每条命令一条消息、每行都带
   [时间 秘境] 前缀，视觉零散；现在单条消息内 \n 分行，只有 1 个时间前缀
@@ -13281,6 +13314,7 @@ group 形态标题栏、切回无 PIN 直切、旧消息仍在、再进目标空
 气泡+help 块，回显是 echo 机制的正常行为）、翻页说明在列表尾。
 
 **E2E 教训（几轮失败全是脚本问题，产品代码一开始就对）：**
+
 - 我脚本自己的 entries 列表两次写错字母序（entoken/entrance、help/history），
   断言先于产品失败——写断言前先人肉确认期望序列
 - TUI 消息区**自底向上绘制**（最新消息字节流最先）：块内位置断言方向要倒过来；
@@ -13296,6 +13330,7 @@ group 形态标题栏、切回无 PIN 直切、旧消息仍在、再进目标空
 
 **② group 空间状态条左侧改两行**（`app/lib/chat_page.dart` `_othersSummary`）：
 布局由「头像条 + 在线/总数」改成 `[成员头像条] [ 群名 / 在线·总数 ]`——
+
 - 第一行**群组名字**（样式同「我的状态胶囊」名字行：15 号 w500）；**无名字时
   只显示一个编辑图标**，点击进编辑弹窗；
 - 第二行「在线人数/总人数」，**在线人数绿色**（与在线灯同色）、`/总数` 保持原灰
@@ -13328,17 +13363,18 @@ chat_profile_refresh / ui_style_switch / chat_bubble_gender / multi_space_isolat
 不是：`trailing` 在 `peerJoined != false` 且群空间时都是 `SizedBox.shrink()`，不占位。
 
 **① 截断的根因（`_othersSummary`）**：
+
 - 名字列宽被 `SizedBox(width: 量出的宽)` **钉死**，而 `measure()` 用裸
   `TextStyle` 量——没并入环境 `DefaultTextStyle`、也没带 `textScaler`，与渲染端
   `Text` 的解析不一致，量出的宽**偏小** → 名字提前省略（截图里名字列只有
   ~120 逻辑像素，远小于本该给它的上限 ~370）。
 - 附带：`leadingPad` 只扣了 `pad.left(10)` 没扣 `pad.right(10)`，长名顶满时
   实测 **RenderFlex overflow 10px**（widget 测试复现）。
-**修**：量宽只用来**分头像预算**（名字优先、剩下的给头像，这个次序不变）；
-名字列改 `ConstrainedBox(maxWidth: 去掉头像条后的全部剩余)`，要不要省略由文本
-按真实渲染宽自己决定。`measure()` 修成 `DefaultTextStyle.merge(style)` +
-`MediaQuery.textScalerOf`（与渲染端同源）。`leadingPad` 10→20。实测：960 宽
-窗口下 32 字群名右缘 464（中线 480）、1200 宽下 584（中线 600），均不再提前。
+  **修**：量宽只用来**分头像预算**（名字优先、剩下的给头像，这个次序不变）；
+  名字列改 `ConstrainedBox(maxWidth: 去掉头像条后的全部剩余)`，要不要省略由文本
+  按真实渲染宽自己决定。`measure()` 修成 `DefaultTextStyle.merge(style)` +
+  `MediaQuery.textScalerOf`（与渲染端同源）。`leadingPad` 10→20。实测：960 宽
+  窗口下 32 字群名右缘 464（中线 480）、1200 宽下 584（中线 600），均不再提前。
 
 **② 胶囊只包头像条**：`Material+InkWell` 从整块 `body` 收窄到只包
 `_avatarStrip`（`Transform.translate(-10)` 贴左缘保留）；点人数/点群名不再开
@@ -13388,13 +13424,14 @@ hover/highlight；群名同样包胶囊。④ 查实**本来就同人名同一�
 顶到胶囊边缘之外，很难看。
 **修（`_othersSummary`）：** 头像位**恒在**——有人加入 = 成员头像条；还没人加入
 = **群组头像占位**：40px 圆底（`_genderTint('')` 中性灰，与「待加入」卡片同源）
-+ `Icons.groups_outlined`（与菜单「我的同伴」行同款图标）。老板追加：这个占位
-**也可点**，同样开「我的同伴」弹层——与成员头像条同一颗 InkWell（胶囊收窄后
-只包头像位的口径不变，人数/群名仍在可点区之外）。
-名字列宽度计算随之统一：`nameColMax = maxWidth − slotWidth − gap`（slotWidth =
-成员条实际宽或占位 40）。
-**测试：** `group_status_bar_test` 新增"还没人加入"例（占位在场 / 编辑图标左缘
-≥ 胶囊左缘+40−1 / 点占位开成员弹层），共 10 例全绿。
+
+- `Icons.groups_outlined`（与菜单「我的同伴」行同款图标）。老板追加：这个占位
+  **也可点**，同样开「我的同伴」弹层——与成员头像条同一颗 InkWell（胶囊收窄后
+  只包头像位的口径不变，人数/群名仍在可点区之外）。
+  名字列宽度计算随之统一：`nameColMax = maxWidth − slotWidth − gap`（slotWidth =
+  成员条实际宽或占位 40）。
+  **测试：** `group_status_bar_test` 新增"还没人加入"例（占位在场 / 编辑图标左缘
+  ≥ 胶囊左缘+40−1 / 点占位开成员弹层），共 10 例全绿。
 
 ### 群名为空时显示灰字「设置群名」占位（2026-10-09 老板要求）
 
@@ -13432,6 +13469,7 @@ gen-l10n 重生成，测试 10 例全绿。
 恢复**，必须彻底退出 App 重开才好。
 
 **查实（`app/lib/chat_page.dart`）：**
+
 - 该条由 `_consecutiveSyncFailures > 0` 驱动；复位只发生在 `_onSyncSucceeded`。
 - 恢复（即复位）**完全依赖轮询 ticker 再发一轮 `_refresh`**——一旦 ticker 不再触发，
   条就永久留着，正对上"要重启"。写临时 widget 测试确认：只要 ticker 正常再跑一轮，
@@ -13446,8 +13484,9 @@ gen-l10n 重生成，测试 10 例全绿。
      重建才凑巧生效，脆弱）。
 
 **修复（三处，均 best-effort、不改正常在线时的请求量）：**
+
 - `_onWsStatusChanged`：WS 变在线且**确有离线迹象**（`_consecutiveSyncFailures>0 ||
-  _entranceUnrecognized`）时立即 `_refresh()`——以"连上"为恢复触发点，与 ticker 周期
+_entranceUnrecognized`）时立即 `_refresh()`——以"连上"为恢复触发点，与 ticker 周期
   解耦；正常在线不额外发请求，避免 WS 抖动把 `/sync` 打成一串。
 - `_onSyncSucceeded`：复位 `_consecutiveSyncFailures`/`_entranceUnrecognized` 后按需
   `setState`（对称于失败路径）。
@@ -13458,7 +13497,6 @@ gen-l10n 重生成，测试 10 例全绿。
 `group_status_bar_test` 全绿（含"离线提示出现"回归）；临时复现用例确认 ticker 恢复
 后提示条会消失，跑完即删。真机自动恢复行为由老板自测。
 
-
 ## 2026-10-09 阅后即焚时钟标签统一显示焚毁时刻
 
 **背景：** 老板确认阅后即焚计时起点为「本设备接收时刻」（`_insertLocal` 落库时
@@ -13467,6 +13505,7 @@ gen-l10n 重生成，测试 10 例全绿。
 如 ⏰ 20:47+5m、全局快照的纯时长如 ⏰ 5m）。
 
 **改动（app/lib/chat_page.dart）：**
+
 - `_burnTagLabel` 重写：直接显示 `expiresAt`，格式复用 `_timeStampLabel`
   （当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM，与其他时间戳口径一致）；
 - 删除只为旧格式服务的 `_burnDurationLabel`、`_burnSetTimeLabel`（无其他引用）；
@@ -13480,10 +13519,10 @@ gen-l10n 重生成，测试 10 例全绿。
 不一致；按方案 A 修测试（`myOtherOnlineSince` 期望 `{'mine2': now}`），
 shared 67 用例全绿。commit `28acc89`。
 
-
 ## 2026-10-09 头像全屏与气泡顶栏 UI 系列（老板逐项验收）
 
 **头像全屏（状态条点开的大图）：**
+
 - 气泡消息旁「我的头像」全屏补「保存」按钮（此前只有对方头像有）；
 - 底部统一「保存」（本人/对方一致，与图片/视频全屏口径同），本人的
   「更换头像」从底部移到**顶部居中**（原 FilledButton 样式不变——中途曾
@@ -13494,6 +13533,7 @@ shared 67 用例全绿。commit `28acc89`。
   已录长期记忆：提交前必须核对 hunk 归属。
 
 **气泡顶栏快捷图标加大（手机点按）：**
+
 - 时间行控件统一高度 20→28（引用/拷贝/保存圆钮与沙漏胶囊同步）、
   图标 12→16（拷贝 15/沙漏 14 光学对齐）、时间戳 11→12；
 - 沙漏图标默认 size=11 写死未跟随，单独修（气泡两处传 size:14）；
@@ -13507,7 +13547,6 @@ shared 67 用例全绿。commit `28acc89`。
 镜像只在本机用户级 init.gradle，不进 git（老板要求仓库保持通用）。
 之后 `flutter run -d emulator-5554` 装上模拟器。
 
-
 ## 2026-10-09 附件元数据自愈 + 发送端防孤儿（.mov 乱码根因修复）
 
 **现象：** macOS 发的 IMG_7096.MOV 在 iOS 显示「两个豆腐块+文件名」、
@@ -13519,6 +13558,7 @@ Android 显示「视频摄像机+别针+文件名」，长按弹层无「保存�
 emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失败的摄像机
 占位；无「保存」因 `m.attachment==null`。根因=接收端 `local_attachments`
 缺行，翻 macOS/iOS/server 三份 sqlite 锁定**两个独立成因**：
+
 1. seq24（49MB）：服务端 attachments.created_at 晚于 messages 约 1.2s
    （两阶段上传的窗口），iOS 恰在此窗口 sync → 消息行落库、附件行没拉到，
    anchor 推进后永久漏拉（服务端数据完好，可自愈）；
@@ -13526,6 +13566,7 @@ emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失
    服务端孤儿消息，附件数据已丢（不可恢复）。
 
 **修复（commit `c4f4f85`，方案1+2+3 全做）：**
+
 - 服务端新增 `GET /attachments/by-message?message_id=`（鉴权+空间归属
   校验同 getAttachmentBlob；无附件行 404；非法字符 400）；
 - shared ApiClient 加 `attachmentMetaByMessage`；repo 加 `healAttachmentMeta`
@@ -13533,7 +13574,7 @@ emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失
 - ChatPage 每轮 sync 后 `_healAttachments`：补拉缺附件的媒体消息（仅
   serverSequence 非空的；404 置满计数立即放弃、网络失败计数到 5 放弃、
   `_healInFlight` 重入保护）——接手时这版逻辑有三处 bug（`_healAttempts
-  [key]!` 空指针崩溃、404 break 错位导致后续消息被跳过、无重入保护），
+[key]!` 空指针崩溃、404 break 错位导致后续消息被跳过、无重入保护），
   换模型后逐一修正；
 - 防孤儿：`local_attachments.status`（pending|uploaded|downloaded，此前
   从未写入）启用为 blob 上传标记；`_flushPending`/`retryMessage` 发消息
@@ -13547,7 +13588,6 @@ emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失
 404文本 / 400非法字符，dev 会话 token 造哈希行后 curl）；repository+
 attachment_store 30 测试全绿；flutter analyze 无告警；三端热重载。
 seq21 那条数据已丢只待焚毁/删除；seq24 类历史漏拉下一轮 sync 即自愈。
-
 
 ## 2026-10-09 VPS 孤儿容器警告根治（方案B：coturn 独立项目名）
 
@@ -13572,9 +13612,11 @@ sessions.json）——用带说明的 stash 保存（`stash@{0}`），未丢弃�
 
 **现状：** 本地 main = `7e2935d + 5faff04`（5faff04 = 群名占位灰字撤回 + Ink 悬浮底色，
 是对已推送的 c89670f 的重写）；origin/main = `7e2935d + c89670f + c4f4f85(附件自愈)
-+ cf2eb0a + 08b2342(coturn)`。两边分叉（ahead 1 / behind 4）。
+
+- cf2eb0a + 08b2342(coturn)`。两边分叉（ahead 1 / behind 4）。
 
 **约定（在接线完成前）：**
+
 - **不要** 对本地 main 执行 `git pull` / `git reset --hard origin/main`——pull 会把
   已撤回的灰字占位合并回来，reset 会丢掉 5faff04 和未提交 WIP；
 - **不要** 直接 `git push`——非 fast-forward 会被拒，别用 force 绕；
@@ -13611,8 +13653,9 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
 无需 force。上节【接线说明】作废。
 
 ## 2026-10-10
+
 - 全 app 可点击元素交互反馈统一（老板提出）：Clickable 组件升级为自带遮罩——桌面悬浮 black@5%、点按/长按 black@10%，遮罩画在子组件上层（InkWell 会被不透明子项盖住故弃用）；形状参数 circle/borderRadius 逐调用点补齐；深底通知条用白色遮罩；纯长按元素（气泡菜单）仍无反馈。266 测试全过，commit e4ce046。
-- 附件不可用兜底排查（老板提问「点按重试有用吗」）：发现并修复①手动重试不复位 _healAttempts 导致点按无效的 bug；②孤儿消息（404 确认无附件）重试永远无效却仍显示「点按重试」——新增 _healConfirmedMissing 打标，UI 去掉重试邀请且不可点。l10n 复用现有文案未新增。analyze + 相关测试全过。
+- 附件不可用兜底排查（老板提问「点按重试有用吗」）：发现并修复①手动重试不复位 \_healAttempts 导致点按无效的 bug；②孤儿消息（404 确认无附件）重试永远无效却仍显示「点按重试」——新增 \_healConfirmedMissing 打标，UI 去掉重试邀请且不可点。l10n 复用现有文案未新增。analyze + 相关测试全过。
 - 「附件不可用」兜底行样式定稿（老板选淡灰方案）：图标+文字用时间戳同款淡灰/white70、字号 12，与红色「发送失败」告警区分；红色语义独占。
 - 撤回功能上线（老板 2026-10-10 方案）：服务端 POST /messages/recall 单事务校验 delivered 水位后真删消息+附件+文件；app 长按菜单「撤回」（自己未送达消息）；**墓碑消息也可撤**（本地墓碑不影响服务端行，菜单只剩撤回项+灰字占位）；本地删除/阅后即焚不联动服务端，撤回必须显性触发（老板拍板）。server recall.test.ts 5 场景全过。
 - 版本闸加**建议更新**档（老板 2026-10-10，与既有"必须更新"并列为两档）：
@@ -13650,7 +13693,7 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   不可用（弹不可关闭窗）。全链路替换：serverConfig.json 键名（example.json）、
   FileConfig/ServerConfig 字段（hotAppVersion / hot_app_version）、/health 下发键、
   ServerHealth.hotAppVersion、VersionGateLevel 枚举 recommended → **cooling**、
-  _CoolingUpgradeDialog、l10n upgradeRecommended* → **upgradeCooling***（en/zh +
+  \_CoolingUpgradeDialog、l10n upgradeRecommended\* → **upgradeCooling\***（en/zh +
   gen-l10n，文案微调"当前版本正在冷却，仍可继续使用"）、双侧测试与
   PROTOCOL_MULTIVERSE.md §4.1 / DEPLOYMENT.md / productLens 全部同步。
   **教训**：批量替换 `rec` → `hot` 时误匹配了 receipt/record/recommended 等单词里
@@ -13667,7 +13710,7 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   全链路替换（全部完整标识符，无子串污染）：serverConfig 键（example.json + 本机测试
   config）、FileConfig/ServerConfig 字段、/health 下发键、ServerHealth.coldAppVersion、
   isAppVersionUnsupported → **isAppVersionFrozen**、VersionGateLevel.required →
-  **frozen**、_FrozenUpgradeDialog、l10n upgradeRequired* → **upgradeFrozen***
+  **frozen**、\_FrozenUpgradeDialog、l10n upgradeRequired\* → **upgradeFrozen\***
   （Current 行两档共用 → **upgradeCurrent**，en/zh + gen-l10n）、双侧测试、
   服务端测试文件 git mv min_app_version.test.ts → **cold_app_version.test.ts**
   （package.json 测试链同步）、PROTOCOL_MULTIVERSE.md §4.1 / DEPLOYMENT.md /
@@ -13709,6 +13752,7 @@ TTL 300）+ Google/Cloudflare/AliDNS 公共 DNS 一致给出真 IP `36.154.238.4
 
 **DoH 兜底实现（老板拍板：DoH 自动解析，否掉硬编码 IP）：** 新增
 `shared/lib/src/protocol/dns_fallback.dart`（App/CLI/WS 三端共用）：
+
 - 探测失败 → DoH 重解析（doh.pub 优先、alidns 兜底，纯 dart:io 零新依赖）→ 真 IP
   钉扎进进程级表（会话级，永不落盘）→ 重探一次；
 - `createPinnedHttpClient`：`connectionFactory` 直连钉扎 IP，https 经
@@ -13757,15 +13801,16 @@ App 当时处于断连重试态（tic.cc 解析 127.0.0.1 干净无注入、443 
 干净** → 注入是**针对域名**的，不是整条链路。多域名候选在这类网络单独即可救用户。
 
 **本批改动：**
+
 1. 服务端：新增 `server/src/dnsReport.ts` + 两个免认证端点
    `POST /network/dns-report`（dnsReport 限速桶 10/时/IP，入参形状校验，入库
    dns_reports 表 30 天懒清理）与 `GET`（按 UTC 日/域名聚合计数，**不含 IP**）。
    免认证已在 app.ts 鉴权约定块登记理由；协议文档 PROTOCOL_MULTIVERSE.md §4.1 补充。
    测试 `server/test/dnsReport.test.ts`（正常上报/缺版本头/入参校验/聚合/429），npm test 全绿。
 2. 客户端：dns_fallback 新增 `onDnsPoisonDetected` 钩子（DoH 与系统解析分歧即触发）
-   + `_reportPoison` fire-and-forget 上报（走钉扎连接、5s 超时、失败静默、旧服务端
-   404 静默忽略）。App debug 包 debugPrint 警报（assert 块内，正式包静默）；
-   TUI stderr 打可见警告。
+   - `_reportPoison` fire-and-forget 上报（走钉扎连接、5s 超时、失败静默、旧服务端
+     404 静默忽略）。App debug 包 debugPrint 警报（assert 块内，正式包静默）；
+     TUI stderr 打可见警告。
 3. 巡检：`cli/bin/dns_audit.dart` + 根 `npm run dns-audit`——四域名系统 vs DoH 双通道
    比对，分歧/无法判定退出码 1（可接 cron）。
 
@@ -13785,6 +13830,7 @@ FQDN（relay 仅兜底场景触发，故未暴露）。老板拍板：换独立�
 realm 保持不变（不参与解析，改随机串无安全收益）。
 
 **改动**：
+
 1. `app/lib/data/voice_call_service.dart`：新增 `resolveTurnUrls`——TURN 地址中
    的域名一律 DoH 预解析成 IP（doh.pub→alidns→cloudflare 同套体系；失败退系统
    解析，再失败保留原样优雅降级；IP 字面量零解析；会话级缓存 host→ip）；
@@ -13806,6 +13852,7 @@ realm 保持不变（不参与解析，改随机串无安全收益）。
 
 **实现**（widgets/about_sheet.dart）：弹层新增「连接状态」行——并发探测
 kServerCandidates 全部候选（复用带 DoH 兜底的 probeServer，可注入 fake）：
+
 - 任一可达 → **已连接**（主色），名义地址 ≠ 实际入口时附注"当前实际入口：X"
 - 全部不可达 → **无法连接任何服务器入口（自动重试中）**（error 色）
 - 服务器地址行保持展示 effectiveServer 名义值（可复制排查用）
@@ -13835,6 +13882,7 @@ app-apk-build / app-ios-build-raw / app-mac-build-raw / buildMacos.sh（dev+dist
 全渠道）。JSON 校验通过、helper 干跑验证（stdout 参数 / stderr 提示分离正确）。
 
 **us2（甲骨文）TURN 上线核验（老板操作 + 本机实测）**：
+
 - `turn.tic.cc` 曾被误设橙云 → STUN 探测无应答（CF 不转发 UDP，企业版 Spectrum
   才有此能力）→ 老板切灰云后实测通过；
 - 灰云解析 `129.153.80.126`（甲骨文美国段），STUN Binding Request **应答正常**；
@@ -13898,7 +13946,7 @@ USR2 热重启。
 
 **踩坑**：build_runner 崩溃——pub 缓存里 windows_file_picker-1.3.0 缺
 pubspec.yaml（损坏），`rm -rf` 该目录 + `flutter pub get` 重取后恢复；
-build_runner 全量生成耗时 ~150s，`flutter test` 全量在_busy 机器上超过
+build_runner 全量生成耗时 ~150s，`flutter test` 全量在\_busy 机器上超过
 300s 前台上限，改后台跑。
 
 **验证：** analyze 0 issue；迁移测试更新为断言升到 v10 + deleted_kind 列
@@ -13972,12 +14020,13 @@ tic.cc→127.0.0.1 是老板**有意**的防封禁设置（无备案不能指向
 
 **追记（同日，十）**：气泡时间行**状态小标**（催发小飞机/重发警告）样式与
 后面的快捷动作统一（老板 2026-10-11）：
+
 - 悬浮/点击加圆形背景遮罩（Material CircleBorder + InkWell，hover/highlight
   色同 `_bubbleQuickAction`），热区高度同 `_bubbleTimeRowControlHeight`(28)；
 - 图标 11/12 → **16**（小飞机组件加 `size` 参数），与引用/拷贝/保存同档；
 - 渐变主题深蓝气泡上蓝色小飞机几乎不可见 → 渐变下改 white70（同快捷动作），
   浅色主题保留超链接蓝；「加速中」期间仍用中性色。
-analyze 0 issue；chat_page_menu 34 测试全过。
+  analyze 0 issue；chat_page_menu 34 测试全过。
 
 **追记（同日，十一）**：「我的同伴」弹层群空间**列表前插入「群名称」卡**
 （老板 2026-10-11）：与同伴卡同款尺寸/底色（中性 tint、圆角 12、h12/v8），
@@ -14129,7 +14178,7 @@ aboutStatusUnreachable 文案改为"无法连接/Unreachable"（去掉"任何入
 about_sheet_status 4 测试全过，analyze 0 issue。
 
 **（2026-10-12，三十二）**：气泡时间行最右（沙漏时长右边）加「...」图标
-（老板 2026-10-12）：单击 = 长按气泡打开消息菜单弹层（_showMessageActions）；
+（老板 2026-10-12）：单击 = 长按气泡打开消息菜单弹层（\_showMessageActions）；
 复用 `_bubbleQuickAction`（圆形热区 28/图标 16/tooltip 菜单 chatPageMenuMore/
 同款 hover 色）；显示条件与气泡长按同口径 `_messageHasActions`（墓碑仅可
 撤回时给）。chat_page_menu + 引用 38 测试全过，analyze 0 issue。
@@ -14147,7 +14196,7 @@ analyze 0 issue。
 2026-10-12 复杂度收敛）：上一条试过"仅单勾+本机删除/焚毁"细筛，但群空间
 里"一部分成员已收到"时撤回必然失败，单勾粗筛在群语义下不可靠——干脆
 `_messageHasActions` 收敛回 `!m.deleted`，墓碑不提供任何菜单入口。
-_messageRecallable 仅剩未墓碑语义（注释同步）。chat_send_status +
+\_messageRecallable 仅剩未墓碑语义（注释同步）。chat_send_status +
 chat_page_menu 44 测试全过，analyze 0 issue。
 
 **（2026-10-12，三十五）**：气泡「...」的 tooltip 从 chatPageMenuMore
@@ -14175,7 +14224,7 @@ analyze 0 issue。
 **（2026-10-12，三十八）**：菜单里 Recall 只给**纯粹单勾**（k=0，还没有
 任何人收到）的消息（老板 2026-10-12：群空间里只要有人收到，撤回就会失败
 ——内容已被拿走，不提供无效入口；duo 同理=对方已拉取）。`_messageRecallable`
-加 deliveredCountOf == 0 条件；墓碑本就不给菜单（_messageHasActions =
+加 deliveredCountOf == 0 条件；墓碑本就不给菜单（\_messageHasActions =
 !m.deleted）。chat_page_menu 34 测试全过，analyze 0 issue。
 
 **（2026-10-12，三十九）**：两处 UI 修复。① **duo 状态条对方照片头像不圆**——
@@ -14206,7 +14255,7 @@ app.ts 的请求/响应行与 ws.ts 的 connect / call / disconnect 三处共 4 
 `[2026-10-12 11:23:40] [req] GET /health 200 6ms` 格式正确。
 
 **（2026-10-12，四十二）**：`[req]` 时间戳改为**时区无关**的 UTC 格式
-（老板 2026-10-12）：`reqTimestamp()` 全部走 getUTC*，输出
+（老板 2026-10-12）：`reqTimestamp()` 全部走 getUTC\*，输出
 `2026-10-12T03:24:23Z`（ISO 风格 + `Z` 后缀，跨时区/跨机器日志可比可排序）。
 冒烟确认格式；tsc 干净。
 
@@ -14231,7 +14280,7 @@ entrance_list_sheet 修复后 6 用例全过；receipts 修复前隔离两连过
 2026-10-12）：标签 下载/Download（新 l10n 键 aboutDownloadLabel），值 =
 GitHub releases latest 页 URL（与服务端 appDownloadUrl 同址），整行可点 →
 openAppDownloadUrl 外部浏览器打开（打不开静默、URL 留底可手抄，同
-version_gate 口径）。实现：_InfoRow 加可选 onTap——入口行的值渲染成 app
+version_gate 口径）。实现：\_InfoRow 加可选 onTap——入口行的值渲染成 app
 统一链接样式（品牌蓝 #2271F7 + 下划线，同 LinkifiedText），文字本身挂
 TapGestureRecognizer、外层 Clickable 包整行（老板口径：整块可点）；普通行
 仍是 SelectableText 不变。about_sheet_status_test 加一例（绑 l10n 键、
@@ -14243,7 +14292,7 @@ URL 原样、下载行 dy 大于版本号行）；about + chat_page_menu + versi
 后由 Seafile 发布库渲染成站）。Seafile 发布库约定：首页=根目录 home.md、
 左侧导航=根目录 index.md（多级无序列表，无则退化成目录树）、md 内联渲染、
 相对路径链接。站点：home.md/README.md（同文，语言选择）、index.md（中英
-分区导航）、_zhcn/_enus 目录页、about/what_is_einz、howto/get_started、
+分区导航）、\_zhcn/\_enus 目录页、about/what_is_einz、howto/get_started、
 news、rules/privacy_policy 四组内容（全部中英双语）、images/logo.png（拷自
 app/assets）。内容只写主线已上线事实：二人/群秘境（群 2026-10-03）、E2EE、
 本地优先、阅后即焚、单双勾、我的通道（09-25）、界面语言（08-30）、下载走
@@ -14383,6 +14432,7 @@ WS 态分两种：灯绿 → 新键 `chatPageSyncingLocalOnly`「同步中… �
 **（2026-10-12，五十二）**：粘贴功能补全——**附件面板加「粘贴」入口**（桌面
 移动端都走它，桌面另有 Cmd/Ctrl+V）+ **移动端支持** + **发送前确认弹窗**
 （老板 2026-10-12：剪贴板内容不可见，可能是几分钟前的旧图，E2EE 发错撤不回）。
+
 - 平台门一分为三：`_clipboardPasteSupported`（全平台：面板入口+读取逻辑）、
   `_pasteShortcutSupported`（桌面：快捷键/autofocus/onTapOutside）、
   `_pasteboardFilesSupported`（仅桌面：Android 插件返回 content:// URI，
@@ -14390,9 +14440,9 @@ WS 态分两种：灯绿 → 新键 `chatPageSyncingLocalOnly`「同步中… �
 - **不需要 Android FileProvider**：插件只在 writeImage 时才用 provider，
   我们只读剪贴板（查过 0.5.0 的 Kotlin 源码确认）。
 - 确认弹窗 `_confirmPasteSend`：图片给预览、文件给名单（SingleChildScrollView
-  + Column(min)——ListView(shrinkWrap) 在 AlertDialog 固有宽度计算里会抛
-  intrinsic dimensions 异常，踩过），取消/发送；点遮罩=取消。**纯文本不弹**
-  （只是插入输入框，随时可改）。全空 → 提示「剪贴板是空的」。
+  - Column(min)——ListView(shrinkWrap) 在 AlertDialog 固有宽度计算里会抛
+    intrinsic dimensions 异常，踩过），取消/发送；点遮罩=取消。**纯文本不弹**
+    （只是插入输入框，随时可改）。全空 → 提示「剪贴板是空的」。
 - 面板入口排网格第一位（剪贴板内容"在手边"是最短路径）；桌面端同样显示。
 - l10n 四新键（chatPageAttachPaste / PasteSendImageTitle /
   PasteSendFilesTitle 复数形态 / PasteEmpty），按钮复用通用 cancel/send。
@@ -14404,6 +14454,7 @@ macOS 实测 + 自己定位了机制）。根因：macOS 在 Finder 里拷文件
 "图片数据"是**文件类型图标**（系统合成缩略图，mp4/pdf 同理），不是文件内容；
 老逻辑先读 `Pasteboard.image`，把图标当图发了——弹窗显示图标、发出去也是一张
 图标图。而"在图片 App 里拷贝"是纯图片字节（无文件路径），一切正常。
+
 - 修复：`_pasteFromClipboard` 改**文件路径优先**——先 `Pasteboard.files()`，
   经 `_isLocalReadableFile` 校验本地真实存在才走文件分支；没有真实文件才读
   图片字节。该校验同时兜住浏览器拷图（插件会把 http URL 的 `url.path` 当成
@@ -14438,11 +14489,11 @@ package_info、wakelock + 纯 Dart 族）；sqlite3 3.5.2 的 native-asset hook
 运行期不用装）。5 个无 Linux 实现：video_player（最新 2.14.1 仍只有
 android/ios/macos/web）、mobile_scanner、open_filex、video_thumbnail、gal。
 **代码改动**：① gal 无需动（canSaveToGallery 早已仅移动端）；②
-video_thumbnail 无需动（_buildVideoThumb 的 FutureBuilder 早有失败兜底，
-注释原话「平台无取帧能力」）；③ video_player：_VideoPreview 在 Linux 跳过
+video_thumbnail 无需动（\_buildVideoThumb 的 FutureBuilder 早有失败兜底，
+注释原话「平台无取帧能力」）；③ video_player：\_VideoPreview 在 Linux 跳过
 初始化 + 改渲染「此设备不支持播放视频，点按保存到本地」占位（新 l10n 键
 chatPageVideoUnsupportedPlatform，整块可点→_saveAttachment 桌面保存对话框）；
-④ open_filex：_downloadFile 两处「直接打开」短路加 !Platform.isLinux，
+④ open_filex：\_downloadFile 两处「直接打开」短路加 !Platform.isLinux，
 Linux 落下载→Documents→提示路径的既有出口；⑤ mobile_scanner：join token
 页扫码 suffixIcon 在 Linux 隐藏。**CI**：buildMultiPlatform.yml 加 linux-gui
 job（ubuntu-latest + GTK/libsecret 构建依赖 → flutter build linux --release
@@ -14460,13 +14511,13 @@ main/tag），用 workflow_dispatch 选 linux 手动出包；产物 glibc 线 = 
 从未入 git**，CI checkout 出来没有该目录，`flutter build linux` 直接拒。
 解禁：删掉该条（保留 /web/）、注释同步更新；app/linux 的内层 .gitignore
 本来就有（排除 flutter/ephemeral），10 个脚手架文件（CMakeLists/runner/
-generated_*）全部入库，无本机产物。教训：本地能 `ls` 到目录 ≠ 目录在 git
+generated\_\*）全部入库，无本机产物。教训：本地能 `ls` 到目录 ≠ 目录在 git
 里——平台目录是否 tracked 要看 `git ls-files`（上次 voice_model 239MB 也是
 同类坑，方向相反）。
 
 **（2026-10-12，五十六）**：feat/linux CI 第二败——
 `audioplayers_linux` CMake 要 gstreamer-1.0 / gstreamer-app-1.0 /
-gstreamer-audio-1.0（pkg-config），构建机没装。已把全部 *_linux 插件的
+gstreamer-audio-1.0（pkg-config），构建机没装。已把全部 \*\_linux 插件的
 CMakeLists 依赖扫齐（其余无额外构建依赖），apt 清单补
 libgstreamer1.0-dev + libgstreamer-plugins-base1.0-dev（app/audio 的
 .pc 都在后者）；运行说明同步补 gstreamer plugins-base/good + 按声音
