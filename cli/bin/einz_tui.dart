@@ -157,6 +157,17 @@ class _TuiState {
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
   bool pendingGuideRequired = false; // 当前引导问答是否必填（留空回车不提交）
+
+  /// 机密**验证**问答进行中（锁屏码/共享口令验证——与"设置"相对）：输入循环对
+  /// / 开头的回答**不当命令拦截**，按一次（错误的）机密尝试提交；这里不认
+  /// /exit，退出只能直接回车取消（老板 2026-10-13 定的验证机密策略）。
+  bool pendingSecretVerify = false;
+
+  /// 启动期锁屏码解锁问答进行中：**空回车 = 退出整个 TUI**（区别于普通问答的
+  /// 空回车=跳过/取消——启动期没有"取消后回到哪里"，退个干净；与 App 锁屏页
+  /// 返回键同口径）。由 _unlockPin 置位、输入循环落地退出序列。
+  bool pendingUnlock = false;
+
   bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
 }
 
@@ -495,9 +506,10 @@ Future<bool> _verifyPin(String hash, String pin) async {
 }
 
 /// 入网最后一步：询问设置 锁屏码（直接回车跳过 = 不设置；以后可以 /pin 设置）。
+/// **明文输入**（设置机密 = 明文回显 + 随时可 /exit——老板 2026-10-13 策略：
+/// 只有"验证"机密才隐藏回显且不认 /exit，见 _unlockPin）。
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
-  // 明文输入（与解锁一致——引导中也可输入 /exit）
   while (true) {
     if (!_state!.running) return;
     final pin = await _prompt(session,
@@ -523,10 +535,70 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
   _scheduleRender();
 }
 
-/// 启动进对话前：store 已设 PIN 则校验解锁（错误重试，/exit 可退出）；未设直接进。
+/// 启动进对话前：store 已设 PIN 则校验解锁（错误重试）；未设直接进。
+///
+/// **这一步只认两种输入**（老板 2026-10-13 定，与 App 锁屏页同口径）：
+/// - 输入内容 → 当锁屏码校验。`/exit` 等命令在此**不识别**（只是错码——由
+///   [_TuiState.pendingSecretVerify] 保证 / 开头不被输入循环当命令拦截）；
+/// - 直接回车（空）→ 退出整个 TUI（[_TuiState.pendingUnlock]：输入循环落地
+///   完整退出序列；启动期没有"取消后回到哪里"，退个干净）。
+///
+/// PIN **不明文回显**（hidden：输入行回显 *）——TUI 整体策略（老板 2026-10-13）：
+/// **设置**机密时明文回显、随时可 /exit（[_askSetPin]、/pin、入网口令问答）；
+/// **验证**机密时隐藏回显、不认 /exit、直接回车=取消/退出（相当于 App 弹窗
+/// 里按取消按钮）。
+///
+/// 为什么走消息流问答（[_prompt]）而不是循环外同步读行：旧实现用同步
+/// readByteSync，"中止"（/exit / EOF）只把 running 置 false 就返回，main 不
+/// 检查便继续 loadHistory → _render → _runInputLoop——**没验证的历史被全屏
+/// 渲染出来**，随后输入循环因 running=false 吞掉所有按键（含 Ctrl+C）挂死，
+/// 只能强杀进程（老板 2026-10-13 实测的 bug）。现在中止统一走输入循环的退出
+/// 序列，main 见 running=false 直接收尾：历史一行都不加载、一帧都不渲染。
+/// 验证成功的确认消息由 **main 在 loadHistory 之后**补（这里不加）：微任务里的
+/// 渲染不落地，且 loadHistory 开头会 clear messages——加在这里只会被抹掉
+/// （2026-10-13 实测）。
+/// 返回 true = 验证通过（false = 解锁期退出，running 已为 false）。
+Future<bool> _unlockPin(ChatSession session) async {
+  final hash = session.store.pinHash;
+  if (hash == null) return true; // 未设置：直接进入
+  // 状态条给提示：否则底部仍广告 "/exit 退出系统"——这一步并不认 /exit
+  _state!.status = '🔒 输入锁屏码解锁（直接回车退出）';
+  while (_state!.running) {
+    _state!.pendingUnlock = true;
+    final pin = await _prompt(session, '❓ 输入锁屏码（直接回车退出）:',
+        hidden: true, secret: true);
+    if (!_state!.running) return false; // 解锁期 Ctrl+C / EOF：退出序列已由输入循环跑完
+    final answer = pin.trim();
+    if (answer.isEmpty) return false; // 空回车 = 退出整个 TUI（输入循环已落地退出序列）
+    // argon2id 校验约几十毫秒：期间置 processing 忽略误按键（防被当命令执行）
+    _state!.processing = true;
+    bool ok;
+    try {
+      ok = await _verifyPin(hash, answer); // str 哈希自含盐，true = 验证通过
+    } catch (e) {
+      _state!.processing = false;
+      session.messages.add(
+          _systemMessage(session, '⚠️ 锁屏码校验失败: $e（直接回车退出）'));
+      _scheduleRender();
+      continue;
+    }
+    _state!.processing = false;
+    if (ok) {
+      _state!.status = ''; // 解锁提示退场，状态条交还常用命令提示
+      return true; // 成功消息由 main 在 loadHistory 之后补（见函数文档）
+    }
+    session.messages.add(
+        _systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入（直接回车退出）'));
+    _scheduleRender();
+  }
+  return false;
+}
+
 /// 同步读一行（兼容 \r / \n / \r\n）：部分终端回车只发 \r，readLineSync 在
 /// macOS/Linux 上单独 \r 不算行结束会挂起等 \n（表现"需按两次回车"）；
 /// 逐字节读到任一换行符即返回。EOF 返回 null。
+/// 仅用于**进 TUI 前**的 cooked 模式问答（[_onboard] 的服务器地址）——TUI 里
+/// raw 模式的 stdin 归输入循环所有，任何地方都不能再同步读行抢字节。
 String? _readLineCompat() {
   final buf = StringBuffer();
   while (true) {
@@ -534,43 +606,6 @@ String? _readLineCompat() {
     if (b < 0) return buf.isEmpty ? null : buf.toString(); // EOF
     if (b == 10 || b == 13) return buf.toString(); // \n 或 \r 均算行结束
     buf.writeCharCode(b);
-  }
-}
-
-Future<void> _unlockPin(ChatSession session) async {
-  final hash = session.store.pinHash;
-  if (hash == null) return; // 未设置：直接进入
-  // 解锁在 main 中提前于输入循环（_runInputLoop）——不能走 _prompt
-  // （completer 由输入循环 complete，此时尚未启动会永久挂起——老板实测
-  // "提示后直接退出"）：改为同步读行（明文 echo；可输入 /exit 退出）
-  while (_state!.running) {
-    session.messages.add(_systemMessage(session, '❓ 输入锁屏码:'));
-    _render(); // 同步渲染提示（_scheduleRender 异步——readLineSync 阻塞期间不会执行）
-    final line = _readLineCompat();
-    if (line == null) {
-      _state!.running = false; // EOF（终端关闭/重定向）：退出
-      return;
-    }
-    // readByteSync 之后紧随的 stdout.write 会同步抛 "StreamSink is bound to a
-    // stream"（Dart 已知行为：阻塞读会绑定 stdin/stdout 共享的 StreamSink），
-    // 被 _render 的 try-catch 吞掉 → 错误反馈渲染丢失，界面"冻结"到下一次
-    // 输入才出现（老板实测）。让步一个事件循环轮次（Timer）恢复可写再渲染。
-    await Future<void>.delayed(Duration.zero);
-    final pin = line.trim();
-    if (pin.isEmpty) continue; // 空行（如 CRLF 残留 \n）：跳过，不判错
-    if (pin == '/exit' || pin == '/quit') {
-      _state!.running = false;
-      return;
-    }
-    if (!_state!.running) return;
-    // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
-    if (await _verifyPin(hash, pin)) {
-      session.messages.add(_systemMessage(session, '✅ 锁屏码验证成功'));
-      _render();
-      return;
-    }
-    session.messages.add(_systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入（/exit 可退出）'));
-    _render();
   }
 }
 
@@ -1357,56 +1392,74 @@ Future<void> main(List<String> args) async {
   // → 立即清盘退出：撤销语义在"所有已开通的通道"上一致（老板 2026-09-16）。
   // FORBIDDEN（库被重置/未登记）不会走这里，只在消息流里警告。
   session.onEntranceRevoked = () => _exitRevoked(storePath);
-  // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
+  // 全局状态提前初始化：_unlockPin / 输入循环都用 _state!——解锁与输入循环必须在
   // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
   _state = _TuiState(session, storePath);
   // 展示缓存变化即重绘：离线发送时乐观上屏的消息在补发网络等待前就刷新到屏幕
   // （老板 2026-09-13：App 能立刻显示离线消息，TUI 之前要等网络超时回来才显示）
   session.onChanged = _scheduleRender;
-  // 锁屏码：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
-  // 刚入网的 _askSetPin 仍在 _runGuide 内处理）
+  // 锁屏码：已有 PIN 时先解锁——**先起输入循环**（raw 模式 + stdin 订阅），
+  // 解锁问答作为消息流里的隐藏回显提示进行（_unlockPin 走 _prompt）。历史消息
+  // 在解锁成功前不加载/不显示（防泄漏；刚入网的 _askSetPin 仍在 _runGuide 内处理）。
+  //
+  // 解锁期退出（空回车 / Ctrl+C / EOF）→ running=false → 下方整段启动被跳过，
+  // 直接走收尾退出——**绝不在未验证时加载或渲染历史**（2026-10-13 bug 根因：
+  // 旧实现中止后 main 不检查 running，把没验证的历史全屏渲染出来，再因输入循环
+  // 吞掉所有按键挂死，只能强杀进程）。
+  Future<void>? inputLoop;
+  var justUnlocked = false;
   if (store.pinHash != null) {
-    await _unlockPin(session);
+    inputLoop = _runInputLoop();
+    justUnlocked = await _unlockPin(session);
   }
-  await session.loadHistory();
-  // 引导阶段提示（自举/托管/通道码指引）作为 system 消息进入对话流——
-  // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
-  for (final note in _guidanceNotes) {
-    session.messages.add(_systemMessage(session, note));
-  }
-  _guidanceNotes.clear();
-  _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
-  _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
-  // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
-  // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
-  _state!.memberNames = Map.of(store.memberNames);
-  _state!.memberGenders = Map.of(store.memberGenders);
-  _state!.memberSlots = Map.of(store.memberSlots);
-  _refreshMemberNames(_state!); // 认证后刷新（保持最新，并回写缓存）
+  if (_state!.running) {
+    await session.loadHistory();
+    if (justUnlocked) {
+      // 解锁成功的确认放这里（_unlockPin 里加会被 loadHistory 的 clear 抹掉，
+      // 微任务渲染也不落地——2026-10-13 实测）：作为聊天态首条消息出现。
+      session.messages.add(_systemMessage(session, '✅ 锁屏码验证成功'));
+    }
+    // 引导阶段提示（自举/托管/通道码指引）作为 system 消息进入对话流——
+    // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
+    for (final note in _guidanceNotes) {
+      session.messages.add(_systemMessage(session, note));
+    }
+    _guidanceNotes.clear();
+    _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
+    _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
+    // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
+    // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
+    _state!.memberNames = Map.of(store.memberNames);
+    _state!.memberGenders = Map.of(store.memberGenders);
+    _state!.memberSlots = Map.of(store.memberSlots);
+    _refreshMemberNames(_state!); // 认证后刷新（保持最新，并回写缓存）
 
-  // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
-  // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
-  final guide =
-      _runGuide(session, storePath, server);
+    // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
+    // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
+    final guide =
+        _runGuide(session, storePath, server);
 
-  _render();
+    _render();
 
-  // 终端窗口尺寸变化（SIGWINCH，macOS/Linux）→ 防抖后全量重绘：
-  // 否则缩窗后旧折行仍残留（终端物理重排了显示内容，但我们的布局未按新列数重算）。
-  // Windows 无 SIGWINCH，watch 会抛 UnsupportedError → try-catch 兜底。
-  try {
-    _sigwinchSub = ProcessSignal.sigwinch.watch().listen((_) {
-      _resizeTimer?.cancel();
-      _resizeTimer = Timer(const Duration(milliseconds: 120), () {
-        if ((_state?.running ?? false)) _render();
+    // 终端窗口尺寸变化（SIGWINCH，macOS/Linux）→ 防抖后全量重绘：
+    // 否则缩窗后旧折行仍残留（终端物理重排了显示内容，但我们的布局未按新列数重算）。
+    // Windows 无 SIGWINCH，watch 会抛 UnsupportedError → try-catch 兜底。
+    try {
+      _sigwinchSub = ProcessSignal.sigwinch.watch().listen((_) {
+        _resizeTimer?.cancel();
+        _resizeTimer = Timer(const Duration(milliseconds: 120), () {
+          if ((_state?.running ?? false)) _render();
+        });
       });
-    });
-  } catch (_) {
-    // 非 POSIX 平台忽略：尺寸变化不自动重绘，下次输入/消息会触发
-  }
+    } catch (_) {
+      // 非 POSIX 平台忽略：尺寸变化不自动重绘，下次输入/消息会触发
+    }
 
-  await _runInputLoop();
-  await guide; // 引导任务收尾（启动同步/WS 已在其内部完成；异常已内部处理）
+    await (inputLoop ?? _runInputLoop());
+    await guide; // 引导任务收尾（启动同步/WS 已在其内部完成；异常已内部处理）
+  } else if (inputLoop != null) {
+    await inputLoop; // 解锁期退出：输入循环的退出序列已跑完，这里等它收尾
+  }
   _exitRaw();
   session.stopWs();
   _sigwinchSub?.cancel(); // 取消终端尺寸监听：否则 event loop 不空闲，进程挂起回不到命令行
@@ -1507,8 +1560,8 @@ String _expandHomePath(String path) {
 
 /// `/switch <store路径>`：不退出进程切换到另一个空间的 store（老板 2026-10-08）。
 ///
-/// 流程：加载目标 store → 目标有 PIN 先解锁（会话内 _prompt 隐藏输入——不能复用
-/// 启动期 _unlockPin 的同步 readByteSync，会与 raw 模式 stdin 订阅抢字节；
+/// 流程：加载目标 store → 目标有 PIN 先解锁（会话内问答走 _prompt 隐藏输入——
+/// raw 模式下 stdin 归输入循环所有，任何地方都不能同步读行抢字节；
 /// **进来才解锁、离开不设卡**——当前空间已解锁过，切换=离开，无再验理由）→
 /// 复用 _resetToFreshStart 的换装四件套（停旧 WS/轮询 → 换 _state → 重启轮询）→
 /// loadHistory → 清屏重绘。任一步失败保持原会话不动（不半切换）。
@@ -1534,7 +1587,8 @@ Future<void> _execSwitch(_TuiState s, String path) async {
     _scheduleRender();
     var ok = false;
     while (_state!.running) {
-      final pin = await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true);
+      final pin =
+          await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true, secret: true);
       if (!_state!.running) return; // /exit：中止一切
       if (pin.trim().isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '✅ 已取消切换（未做任何改动）'));
@@ -2690,6 +2744,19 @@ Future<void> _runInputLoop() async {
   // 终端转义序列缓冲：raw 模式下方向键等到达为 ESC [ A 等多个字节（可能跨 chunk），
   // 需在此拼合完整后再解释，避免 '[' 与字母被当成普通字符打进输入（曾显示 [D[C[A[B）。
   var esc = '';
+  // 退出序列（Ctrl+C / 引导中 /exit / 解锁空回车 / 命令处理后 !running 五处共用）：
+  // 置退出标志 → 释放引导/解锁问答等待（否则 _runGuide/_unlockPin 的 await 挂起）
+  // → 恢复终端（必须在 sub.cancel 之前，否则 fd 失效设不了 echoMode）→ 取消监听
+  // → 结束主流程（否则 await 永远挂起）→ 兜底 2 秒强退（main 收尾在部分场景如
+  // WS 连接中会挂起到不了 exit(0)——进程退出自动关闭连接）。
+  void exitNow() {
+    _state!.running = false;
+    _abortPendingGuide();
+    _restoreTerminal();
+    sub.cancel();
+    if (!completer.isCompleted) completer.complete();
+    _scheduleExitWithWipe();
+  }
   // utf8.decoder：raw 模式下多字节字符（如中文）可能被拆成多个字节到达，
   // 由解码器缓冲拼合后再逐字符处理（避免中文乱码）。
   sub = stdin.transform(utf8.decoder).listen((chunk) {
@@ -2759,15 +2826,8 @@ Future<void> _runInputLoop() async {
         continue;
       }
       if (code == 3) {
-        // Ctrl+C → 退出（先恢复终端，再取消监听，见 _restoreTerminal 注释）
-        _state!.running = false;
-        _abortPendingGuide(); // 释放引导问答等待，避免 _runGuide 挂起
-        _restoreTerminal();
-        sub.cancel();
-        if (!completer.isCompleted) completer.complete();
-        // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
-        // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-        _scheduleExitWithWipe();
+        // Ctrl+C → 退出（exitNow：先恢复终端，再取消监听，见 _restoreTerminal 注释）
+        exitNow();
         return;
       }
       if (code == 13 || code == 10) {
@@ -2775,23 +2835,26 @@ Future<void> _runInputLoop() async {
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
           final answer = _state!.input.toString().trim();
-          if (answer.startsWith('/')) {
+          // 启动解锁问答的空回车 = 退出整个 TUI（老板 2026-10-13：这一步只认
+          // "输内容验 PIN"与"空回车退出"两种；区别于普通问答的空回车=跳过/取消）
+          if (answer.isEmpty && _state!.pendingUnlock) {
+            _state!.input.clear();
+            _state!.cursor = 0;
+            exitNow();
+            return;
+          }
+          if (answer.startsWith('/') && !_state!.pendingSecretVerify) {
             // / 开头的输入按命令处理，不当作口令/通道码回答提交（用户：要求
-            // 输入口令时 /exit 被当口令发送核对进"口令对接中"——应直接退出）
+            // 输入口令时 /exit 被当口令发送核对进"口令对接中"——应直接退出）。
+            // **机密验证问答例外**（pendingSecretVerify：锁屏码/共享口令验证）：
+            // 那里不认 /exit——按一次错误尝试提交，由校验失败提示引导回车取消
+            // （老板 2026-10-13：验证机密时唯一的"退出"就是直接回车）
             _state!.input.clear();
             _state!.cursor = 0; // 同步复位光标：否则下个字符 _insertAtCursor 越界崩溃
             if (answer == '/exit' || answer == '/quit') {
               // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
               // 用户困在通道码/口令重试循环无法退出
-              _state!.running = false;
-              _abortPendingGuide();
-              _restoreTerminal();
-              sub.cancel();
-              if (!completer.isCompleted) completer.complete();
-              inputChanged = true;
-              // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
-              // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-              _scheduleExitWithWipe();
+              exitNow();
               return;
             }
             final cur = _state!.session; // 用当前的（/reset 会换掉 _state）
@@ -2814,6 +2877,8 @@ Future<void> _runInputLoop() async {
           // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
+          _state!.pendingSecretVerify = false;
+          _state!.pendingUnlock = false;
           if (!gc.isCompleted) gc.complete(answer);
           try {
             _render(); // complete 后立即全量渲染（界面即时响应，不等 _runGuide continuation）
@@ -2876,15 +2941,9 @@ Future<void> _runInputLoop() async {
         future.whenComplete(() {
           busy = false;
           if (!(_state?.running ?? false)) {
-            // /exit 或 /quit：先恢复终端（必须在 sub.cancel 之前，否则 fd 失效
-            // 无法设 echoMode），再取消监听并结束主流程（否则 await 永远挂起）
-            _abortPendingGuide(); // 释放引导问答等待，避免 _runGuide 挂起（await guide 卡死）
-            _restoreTerminal();
-            sub.cancel();
-            if (!completer.isCompleted) completer.complete();
-            // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
-            // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-            _scheduleExitWithWipe();
+            // /exit 或 /quit：exitNow（先恢复终端——必须在 sub.cancel 之前，
+            // 否则 fd 失效设不了 echoMode——再取消监听并结束主流程）
+            exitNow();
           } else {
             // busy 期间的「稍后再发」提示退场（若还挂着——后续 handler 自己写的状态不动）
             if (_state!.status == _kBusyResendHint) _state!.status = '';
@@ -2915,8 +2974,11 @@ Future<void> _runInputLoop() async {
       _inputLoopCrash(e, st);
     }
   }, onDone: () {
+    // stdin EOF（终端关闭/重定向）：置退出标志并**释放引导/解锁问答等待**
+    // （否则 _runGuide/_unlockPin 的 await 永远挂起，main 收不了尾），结束循环。
     if (!completer.isCompleted) {
       _state!.running = false;
+      _abortPendingGuide();
       completer.complete();
     }
   });
@@ -3132,7 +3194,7 @@ Future<void> _execReset(String storePath) async {
   final pinHash = session.store.pinHash;
   if (pinHash != null) {
     final pin = await _promptAction(session, '❓ 输入本机锁屏码，或直接回车取消:',
-        hidden: true);
+        hidden: true, secret: true);
     if (!s.running) return;
     if (pin == null) {
       session.messages.add(_systemMessage(session, '✅ 已取消，未做任何改动'));
@@ -3523,7 +3585,7 @@ Future<void> _execCommand(String line) async {
         // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权
         final passphrase = await _promptAction(
             s.session, '❓ 输入共享口令以确认操作，或直接回车取消:',
-            hidden: true);
+            hidden: true, secret: true);
         if (!s.running) break;
         if (passphrase == null) {
           s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
@@ -3839,7 +3901,7 @@ Future<void> _reinvite(_TuiState s) async {
   // （GET /key-escrow 拉密保箱 + openPackage 解封），失败不出码、不发签发请求——
   // 与 /revoke 同一口径。取消/留空 = 放弃签发。
   final entered = await _promptAction(s.session,
-      '❓ 输入共享口令以授权签发，或直接回车取消:', hidden: true);
+      '❓ 输入共享口令以授权签发，或直接回车取消:', hidden: true, secret: true);
   if (!s.running) return;
   if (entered == null) {
     s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未签发任何通道码）'));
@@ -4107,8 +4169,9 @@ Future<int> _probeRevoked(EntranceStore store, String server) async {
 /// 无从校验旧口令，跳过校验直接用新口令重建（与 App 同口径）。
 /// 口令输入**故意明文回显**（`hidden: false`）——老板 2026-09-14 要求：隐藏回显时
 /// 看不见自己敲的内容（连 `/exit` 这类控制命令都看不见），而口令提交后只用于本地
-/// 加密上传、不会进入消息流，明文回显的风险可接受。（对比：`_spaceJoin` 的接入
-/// 口令校验用 `hidden: true`。）
+/// 加密上传、不会进入消息流，明文回显的风险可接受。这也符合老板 2026-10-13 定的
+/// 整体策略：**设置/修改**机密时明文回显、随时可 /exit；只有**验证**机密（锁屏码
+/// 解锁、/switch、/reset、/revoke、/entoken 的口令授权）才隐藏回显且不认 /exit。
 /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
 /// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
 Future<void> _checkEscrowRotated(ChatSession session) async {
@@ -4464,12 +4527,19 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 ///   这里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit` / Ctrl+C。
 /// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase` 这类可从聊天里放弃的操作）
 ///   → 用 [_promptAction]：留空回车 = 放弃这个动作。
+/// - **机密验证**（启动解锁 `_unlockPin`、`/switch` 目标 PIN、`/reset` PIN、
+///   `/revoke` 与 `/entoken reinvite` 的共享口令授权）→ `hidden: true, secret: true`：
+///   不明文回显；`/` 开头**不当命令**（按一次错误尝试提交，不退出）；直接回车 =
+///   取消/退出（老板 2026-10-13 策略：验证机密时唯一的"退出"就是回车——相当于
+///   App 弹窗里按取消按钮）。设置机密（`/pin`、入网口令）不在此列：那些明文
+///   回显、随时可 /exit。
 Future<String> _prompt(ChatSession session, String message,
-    {bool hidden = false, bool required = false}) {
+    {bool hidden = false, bool required = false, bool secret = false}) {
   final s = _state!;
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
   s.pendingGuideRequired = required; // 必填问答：留空回车由输入循环拦截不提交
+  s.pendingSecretVerify = secret; // 机密验证问答：/ 开头按错误尝试提交，不当命令
   session.messages.add(_systemMessage(session, message));
   _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
   final completer = Completer<String>();
@@ -4487,8 +4557,11 @@ Future<String> _prompt(ChatSession session, String message,
 /// 与 [_prompt] 的差别只在意图：调用方拿到 null 就"已取消 + 不做任何改动"，无需再判空串。
 /// 退出（`/exit`）时 [_abortPendingGuide] 也会 complete 空回答 → 这里同样返回 null，
 /// 故调用方**必须先判 `running`**，否则退出时会多打一条"已取消"。
-Future<String?> _promptAction(ChatSession session, String message, {bool hidden = false}) async {
-  final answer = (await _prompt(session, message, hidden: hidden)).trim();
+/// 机密验证（`secret: true`，见 [_prompt]）时不认 /exit——空回车即取消，返回 null。
+Future<String?> _promptAction(ChatSession session, String message,
+    {bool hidden = false, bool secret = false}) async {
+  final answer =
+      (await _prompt(session, message, hidden: hidden, secret: secret)).trim();
   return answer.isEmpty ? null : answer;
 }
 
@@ -4498,6 +4571,8 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
+  _state?.pendingSecretVerify = false;
+  _state?.pendingUnlock = false;
 }
 
 /// 新通道的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如

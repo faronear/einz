@@ -14542,6 +14542,48 @@ Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代�
 .gitignore 注释差异取 voice 原版、worklog 两侧日志都保留；合并后 flutter analyze
 0 issue。
 
+**（2026-10-13T03:47:00Z / 2026-10-13 11:47）**：TUI 启动解锁 bug 根因修复 + 验证机密策略统一
+（老板 2026-10-13 要求）。bug：启动 TUI 要锁屏码时输入 `/exit`，全屏历史
+消息被渲染出来但不能继续输入，只能 Ctrl-C 强杀。根因链条：`_unlockPin`
+的"中止"只把 `running` 置 false 就返回，main **不检查** 就继续
+loadHistory → `_render`（没验证的历史全屏渲染）→ `_runInputLoop`；输入循环
+对每个字符第一件事是 `if (!running) break`——**连 Ctrl+C 字节都吞掉**
+（该判断在 code==3 分支之前），completer 永不 complete → 挂死。
+
+重构（`cli/bin/einz_tui.dart`）：
+1. 解锁从"循环外同步 readByteSync"改为"输入循环内的消息流问答"
+   （`_prompt(hidden: true, secret: true)`）——**先起输入循环再解锁**，
+   main 的启动后续全部裹进 `if (_state!.running)` 守卫：中止（空回车 /
+   Ctrl+C / EOF）→ 输入循环 exitNow 退出序列 → main 直接收尾，历史一条
+   都不加载、一帧都不渲染。根因结构性消灭（中止再也流不进 TUI 启动路径）。
+2. 解锁步只认两种输入：输内容 = 当 PIN 校验（`/exit` 不识别，只是错码）；
+   直接回车 = 退出整个 TUI（新增 `pendingUnlock`，输入循环落地退出）。
+3. PIN 不明文回显（hidden 输入行回显 *）。
+4. 统一策略落地到全部"验证机密"提示（新增 `secret` 参数 →
+   `pendingSecretVerify`：/ 开头不当命令拦截、按错误尝试提交；退出只能
+   直接回车取消）：启动解锁、/switch 目标 PIN、/reset PIN、/revoke 与
+   /entoken reinvite 的共享口令授权。"设置机密"（/pin、_askSetPin、
+   入网口令、/passphrase）保持明文 + 随时 /exit（老板 2026-09-14 规则）。
+5. 顺手：输入循环五处退出序列收敛为 `exitNow()`；stdin EOF（onDone）
+   补 `_abortPendingGuide()`——否则引导/解锁问答的 await 永远挂起。
+
+实测踩坑记录（都有测试佐证）：
+- 解锁成功消息**不能加在 _unlockPin 里**：微任务渲染不落地 + loadHistory
+  开头 clear messages，会被抹掉——改由 main 在 loadHistory 之后补。
+- pty 下告别语「已退出 Einz」稳定丢失（exit(0) 与 stderr 异步 sink 竞速，
+  既有行为）——测试不断言告别语，只断言退出码。
+- pty 无控制终端时字节 3 被行规丢弃（补 setsid+TIOCSCTTY 也是内核 SIGINT
+  直接杀进程）——Ctrl+C 不在 pty 测试范围内，空回车走同一条退出序列已覆盖。
+- 输入若整串一次写入（'\r 与字符同 chunk），提交即清输入，* 掩码来不及
+  渲染——测试逐字符发送模拟真人。
+
+回归：新增 `cli/test/unlock_flow_check.py`（6 场景 19 断言全过：错码重试、
+/exit 只是错码、* 掩码、正确 PIN、空回车退出、EOF 退出、/switch 闸门、
+/reset 闸门）；`guide_input_rules_check.py`（PIN 设置规则 + 入网口令）
+与 `revoke_command_check.py`（/revoke 口令闸门取消/错码）全过。
+`guide_exit_check` / `reset_returns_to_guide_check` / `cliMultiverseE2E`
+三项在**未改动的代码上同样失败**（向导流程早已演进：秘境类型选择、c/j
+入口——测试陈旧，非本次回归，待另行适配）。
 **（2026-10-13T07:52:23Z / 2026-10-13 15:52）**：修正式版 macOS app 录音「麦克风权限被
 拒绝」（必现，修复 NSMicrophoneUsageDescription 后依旧）。TCC 日志给出权威根因：
 `Prompting policy for hardened runtime; service: kTCCServiceMicrophone requires
