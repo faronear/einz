@@ -178,6 +178,11 @@ bool _onboarded = false;
 /// 入网收尾（向导态→聊天态的切换）是否已执行（只跑一次）。
 bool _onboardingFinalized = false;
 
+/// 身份未揭示（老板 2026-10-13）：设了锁屏码的空间启动后、PIN 验证通过前，
+/// 标题栏两侧一律渲染中性占位「?」——本地缓存的成员名称表（store.memberNames /
+/// peerName / memberName 兜底）此时不得上屏，否则锁屏期间真实名字直接暴露在标题栏。
+bool _identityHidden = false;
+
 /// 入网向导收尾：向导完成后作为最后一条 system 消息出现，随后自动
 /// 倒计时（屏幕上跳动显示剩余秒数）进入聊天态——倒计时结束清空全部 system
 /// 消息、只留真实对话（老板 2026-09-15 定稿：不再要求按回车，自动倒计时更直观）。
@@ -559,6 +564,8 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
 Future<bool> _unlockPin(ChatSession session) async {
   final hash = session.store.pinHash;
   if (hash == null) return true; // 未设置：直接进入
+  // 身份未揭示：解锁前标题栏两侧显示「?」，不泄本地缓存的真名（见 _identityHidden）
+  _identityHidden = true;
   // 状态条给提示：否则底部仍广告 "/exit 退出系统"——这一步并不认 /exit
   _state!.status = '🔒 输入锁屏码解锁（直接回车退出）';
   while (_state!.running) {
@@ -582,6 +589,7 @@ Future<bool> _unlockPin(ChatSession session) async {
     }
     _state!.processing = false;
     if (ok) {
+      _identityHidden = false; // 解锁成功：恢复真实名字显示
       _state!.status = ''; // 解锁提示退场，状态条交还常用命令提示
       return true; // 成功消息由 main 在 loadHistory 之后补（见函数文档）
     }
@@ -1983,7 +1991,7 @@ void _render() {
     WsStatus.reconnecting => '$_red✗$_white',
     WsStatus.stopped => '$_gray○$_white',
   };
-  final peerName = _peerNameOf(s);
+  final peerName = _identityHidden ? '?' : _peerNameOf(s);
   // 对方灯三态（老板 2026-10-08：撤销是独立状态，绝不同于离线）：
   // 绿●=有在线通道 灰⊘=通道全被撤销 红○=离线（含对方未加入）
   final peerDot = s.peerOnline
@@ -1995,7 +2003,9 @@ void _render() {
   // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
   // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
   final String leftSeg;
-  if (s.isGroupSpace) {
+  if (_identityHidden) {
+    leftSeg = '?'; // 解锁前 group 名单同样不得上屏
+  } else if (s.isGroupSpace) {
     leftSeg = _groupMemberListLabel(s);
   } else {
     final peerEntrances = _peerEntranceLabel(s);
@@ -2015,7 +2025,7 @@ void _render() {
     // 右段（我）：`灯 名字 @本机名 #n/m#其它在线通道…`（老板 2026-09-16）——
     // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
     // 后面的 #n/m 与通道列表**扣除本机**，两者严格一一对应。
-    '$myDot ${_memberLabel(s.session.store, s.memberNames)}'
+    '$myDot ${_identityHidden ? '?' : _memberLabel(s.session.store, s.memberNames)}'
         '${_myEntranceTag(s)}'
         '${_entranceCountLabel(s.myOtherOnlineSince.length, s.myOtherEntranceTotal)}'
         '${_myOtherEntrancesLabel(s)}',
