@@ -14541,3 +14541,18 @@ Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代�
 20 提交：Linux GUI、粘贴发送、全屏查看、macOS 麦克风权限等），冲突 2 处均已解——
 .gitignore 注释差异取 voice 原版、worklog 两侧日志都保留；合并后 flutter analyze
 0 issue。
+
+**（2026-10-13T07:52:23Z / 2026-10-13 15:52）**：修正式版 macOS app 录音「麦克风权限被
+拒绝」（必现，修复 NSMicrophoneUsageDescription 后依旧）。TCC 日志给出权威根因：
+`Prompting policy for hardened runtime; service: kTCCServiceMicrophone requires
+entitlement com.apple.security.device.audio-input but it is missing`——Developer ID
+分发（hardened runtime）下，麦克风授权框的**弹框资格**需要 entitlements 声明
+`com.apple.security.device.audio-input`，缺了 TCC 直接静默拒绝，系统设置→麦克风列表
+里也根本不出现 app。与 10-12 补的 NSMicrophoneUsageDescription 缺一不可（当时只补了
+plist 一半）。debug 版不受此策略影响（开发签名），故一直正常。
+修法：`app/macos/Runner/Release.entitlements` 补
+`com.apple.security.device.audio-input`（app-sandbox 保持不动）。已验证本地
+/Applications/einz.app 签名里确无此项。待 CI 重新打包后：装新版 → 首录应弹框 →
+允许即恢复；此前 reset 过的 TCC 记录无残留影响。附带经验：同 bundle id 的 debug/
+release 双签名在 TCC 里各记各的，授权互不继承；排查此类静默拒绝先看
+`log show --predicate 'process == "tccd"'`，别再猜 TCC 记录残留。
