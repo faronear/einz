@@ -191,6 +191,19 @@ StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（�
 /// 出厂主域名（候选列表的第一个，也是全不通时的兜底）。
 const String _kPrimaryServer = 'https://einz.tic.cc';
 
+/// 启动探测期（进 TUI 前）缓冲的 DNS 污染警报文本。
+///
+/// 污染发生在启动探测阶段（`_defaultServer`/`_probeRevoked`），那时全屏 TUI 还没
+/// 起来，stderr 打一行会被随后的清屏渲染冲掉——老板 2026-10-13 反馈「一闪而过
+/// 等于没提示」。改为：启动期先缓冲，进聊天态后作为系统消息补显（main 里
+/// loadHistory 之后统一 flush）；会话期（WS 重连再触发）直接进消息流。
+final List<String> _dnsPoisonNotes = [];
+
+/// TUI 聊天态是否就绪（loadHistory 之后）：就绪后污染警报直接进消息流；
+/// 之前（含探测期）一律先进 _dnsPoisonNotes 缓冲——那时连 session 都还没有，
+/// 且 loadHistory 开头会 clear messages，提前加进去也会被抹掉。
+bool _tuiReady = false;
+
 /// 出厂域名候选（按优先级，第一个是主域名）——与 App 端 `kServerCandidates`
 /// 同构：同一服务的**多个入口**，不是多台服务器；主域名失效时客户端自己连上备用入口
 /// （如切到备案域名），用户不需要做任何操作。加备用域名 = 这里加一行（+ 重新发布）。
@@ -1349,10 +1362,23 @@ Future<void> main(List<String> args) async {
   if (Platform.environment['EINZ_UNITTEST'] == '1') return;
   await sodium();
 
-  // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。TUI 直接打一行可见警告
-  // （污染事件极少发生，偶尔打断一帧渲染值得换取确定性提示）。
-  onDnsPoisonDetected = (host, ip) =>
-      stderr.writeln('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip（已上报服务器）');
+  // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。启动探测期（进 TUI 前）先
+  // 缓冲、聊天态就绪后作为系统消息补显；会话期触发直接进消息流（不再打 stderr
+  // ——raw 模式下那会花屏，且一闪而过没有持久提示，老板 2026-10-13）。
+  onDnsPoisonDetected = (host, ip) {
+    final text =
+        '⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip（已上报服务器）';
+    final s = _state;
+    if (_tuiReady && s != null && s.running) {
+      s.session.messages.add(_systemMessage(s.session, text));
+      _scheduleRender();
+      return;
+    }
+    // 连续的同一事件只留一条（探测重试不刷屏）；不同域名各留一条
+    if (_dnsPoisonNotes.isEmpty || _dnsPoisonNotes.last != text) {
+      _dnsPoisonNotes.add(text);
+    }
+  };
 
   var storePath = '';
   var server = '';
@@ -1454,6 +1480,13 @@ Future<void> main(List<String> args) async {
       // 微任务渲染也不落地——2026-10-13 实测）：作为聊天态首条消息出现。
       session.messages.add(_systemMessage(session, '✅ 锁屏码验证成功'));
     }
+    // DNS 污染警报补显（启动探测期触发，见 _dnsPoisonNotes）：必须排在
+    // loadHistory 之后（它开头会 clear messages），作为聊天态系统消息持久可见
+    for (final note in _dnsPoisonNotes) {
+      session.messages.add(_systemMessage(session, note));
+    }
+    _dnsPoisonNotes.clear();
+    _tuiReady = true; // 此后（含 WS 重连）再触发就直接进消息流
     // 引导阶段提示（自举/托管/通道码指引）作为 system 消息进入对话流——
     // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
     for (final note in _guidanceNotes) {

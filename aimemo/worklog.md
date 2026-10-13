@@ -14631,3 +14631,14 @@ plist 一半）。debug 版不受此策略影响（开发签名），故一直�
 允许即恢复；此前 reset 过的 TCC 记录无残留影响。附带经验：同 bundle id 的 debug/
 release 双签名在 TCC 里各记各的，授权互不继承；排查此类静默拒绝先看
 `log show --predicate 'process == "tccd"'`，别再猜 TCC 记录残留。
+
+**（2026-10-13T08:05:00Z / 2026-10-13 16:05）**：DNS 污染警报改为聊天态系统消息
+（老板反馈「一闪而过等于没提示」）。原实现在启动探测期直接 stderr 打一行，
+随后被全屏 TUI 清屏冲掉。改为：启动期（进 TUI 前，连 session 都还没有）先缓冲
+进 `_dnsPoisonNotes`，main 在 loadHistory 之后作为系统消息补显（必须排在
+loadHistory 后——它开头 clear messages）；`_tuiReady` 就绪后（含 WS 重连期间
+再触发）直接进消息流。顺带去掉 stderr 直打——raw 模式下那会花屏。连续同一事件
+（同 host+ip）只留一条，不同域名各留一条。端到端验证：临时仪器在 main 里伪造
+一次钩子触发，pty 实测聊天态可见「⚠️ DNS 污染：…（已上报服务器）」系统消息，
+仪器已还原。App 侧（app/lib/main.dart）那条仍是 debugPrint——只 debug 可见，
+是否也要在 App 内持久展示待老板定。
