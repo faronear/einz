@@ -14473,3 +14473,20 @@ libgstreamer1.0-dev + libgstreamer-plugins-base1.0-dev（app/audio 的
 系统选 pipewire/pulseaudio。另确认 VSCode 里 linux 目录显灰只是
 gitignore 缓存未刷新（git check-ignore 已放行、10 文件已跟踪），
 Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代码问题。
+
+**（2026-10-13，五十七）**：MacBook 上 macOS debug 热重载崩溃，根因是 **TCC 授权差**（非代码问题）。现象：`npm run app-mac-run-local` 启动正常，按 r/R 后 app 退出，报 `Flutter failed to create file at "/Users/luk/Library/Containers/cc.tic.einz/Data/tmp/appXXXXXX/app/main.dart.incremental.dill"` + `Lost connection to device`；同机 shell `ls -le` 该 tmp 目录也无权（iMac 同操作正常）。机制（flutter_tools 源码确认）：沙盒 App 的 VM 通过 `fs.create` 在自己容器 tmp 下建 DevFS 根（`app`+6 位随机/内层 `app/`）并回报给工具；**工具侧** `LocalDevFSWriter`（desktop_device.dart:49）把增量 dill **直接写进该目录**（devfs.dart:852 落到 baseUri；compile.dart:304 `createSync(recursive:true)` 即报错点）。App 自身（沙盒内、自己的容器）建得写得、工具进程（VS Code 集成终端子进程）写不进——POSIX 属主若不对会连 App 一起挡，**只有 TCC 能解释这个分裂**，且 shell 同样 ls 失败（同源）。真凶：iMac 的 VS Code 曾被弹窗授权「访问其他 App 的数据」；MacBook 从未授权。修复：系统设置 → 隐私与安全性 → **完全磁盘访问**，给 VS Code 开权限，然后**完全退出重开 VS Code**（集成终端子进程才继承）。教训/待办：① 换 iTerm/Terminal 直接跑 `flutter run` 也要给对应终端 App 授权；② docs/ONBOARDING.md「新机环境准备」应补这条；③ 排查同类「工具写不进沙盒容器」先用 `id` + `stat -f '%Su %Sg %Sp'` + `ls` 区分属主问题与 TCC，再谈修法。
+
+**（2026-10-13T04:12:34Z / 2026-10-13 12:12）**：worklog 条目编号弃用「四十一」
+这类递增中文序号，改用「UTC 时间戳 + 本地日期时刻」双段格式（如本条
+`**（2026-10-13T04:12:34Z / 2026-10-13 12:12）**`），老板 2026-10-13 定。
+两段各司其职：UTC 段精确到秒，是全球唯一自然可排序的键（本地日期跨时区
+不统一，中美机器按本地时间排会乱序），排序一律按 UTC 段；本地段精确到
+分钟，便于人读。
+动因：feat/voice-transcript 与 main 各自维护序号序列，本次合并 worklog 时两侧都
+从「四十一」编起产生重复（main 侧自身还有五十二/五十三/五十四各编了两次的旧乱
+账）；时间戳天然唯一、可排序，多 agent 并行追加无需协调，合并时两侧块按时间自
+然归位。存量旧编号条目保留原样不回改。规则已写入 AGENTS.md「工作规范」节。
+同日早些时候：main 已合并进 feat/voice-transcript（合并提交 b6adaf40，main 领先
+20 提交：Linux GUI、粘贴发送、全屏查看、macOS 麦克风权限等），冲突 2 处均已解——
+.gitignore 注释差异取 voice 原版、worklog 两侧日志都保留；合并后 flutter analyze
+0 issue。
