@@ -1,29 +1,36 @@
 #!/usr/bin/env python3
-# 引导输入规则回归（老板 2026-09-11）
-#   0) create 各必填问答（秘境向导/我的名字/我的性别/秘境类型）
-#      留空回车 → 必须被**静默拒绝**：不提交、不前进，也**不打印任何提示**
-#      （老板 2026-09-23：早先会打一条「请输入内容」，每按一次回车就把提问往上顶
-#       一行、屏幕跟着跳；提示还在上面、光标还在输入行就够了）
-#   1) create 口令必填：走到「设置共享口令」留空回车 → 同样静默拒绝、不进入创建；
-#      补输口令后创建成功
-#      （向导里**只有锁屏码**可以空回车跳过——`_askSetPin` 不带 required）
-#   2) 锁屏码规则（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
+# 引导输入规则回归（老板 2026-09-11 立；2026-10-13 改为「回车回退」模型后重写）
+#   0) create 问答链（秘境向导 c/j → 我的名字 → 我的性别 → 秘境类型 → 设置共享口令）：
+#      无效输入原地重问；**空回车 = 退回上一问**（老板 2026-10-13）——本用例在口令步
+#      起连续空回车，一路退到秘境入口，再边走边补答，验证回退与重问都正常
+#      （旧规则是必填问答空回车静默拒绝，2026-09-23；/exit 逃生门 2026-10-13 废除）
+#   1) 锁屏码规则（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
 #      数字」；5 位数字 → 提示「锁屏码至少 6 位数字」；6 位数字 → 设置成功
-#   3) join 口令必填：第二条通道走到「验证共享口令」留空回车 → 同样静默拒绝
-#      （不进入加入——否则会先 joinSpace 再取不到 Space Key，通道卡在
-#      "已登记但无密钥"的坏状态）；补输同一口令后加入成功
-#   4) join 口令输错：应停在口令环节提示重输，且**同一个** join token 仍可用
-#      （旧实现先 joinSpace 消费 token 再验口令 → 一输错就被踢回通道码环节，
-#      已接受的 token 作废——老板 2026-09-12 反馈）
+#      （向导里唯一允许空回车跳过的是锁屏码——_askSetPin，空间建立后的普通设置）
+#   2) join 口令验证：空回车 → 退回上一问（性别）；口令输错 → 停在口令环节提示重输，
+#      且**同一个** join token 仍可用（旧实现先 joinSpace 消费 token 再验口令 →
+#      一输错就被踢回通道码环节，已接受的 token 作废——老板 2026-09-12 反馈）
+#
+# 断言方法：TUI 全屏重绘，消息区**自下而上**绘制——一帧的字节流里**最新的消息排最前**。
+# 故「最后一个完整帧里字节序最靠前的提问」= 当前提问（不受消息区历史文本干扰）。
+# 每次输入后读到输出静默（quiet 秒无新字节），保证拿到完整帧。
 #
 # 运行：python3 cli/test/guide_input_rules_check.py
 import json
-import os, pty, subprocess, select, time, socket, tempfile, urllib.request, sys
+import os, pty, re, select, subprocess, time, socket, tempfile, urllib.request, sys
 
 # __file__ = <repo>/cli/test/x.py → 仓库根 = 上三级
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CLI = os.path.join(ROOT, 'cli')
 WORK = tempfile.mkdtemp(prefix='einz-passphrase-')
+
+ANSI = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
+CLEAR = '\x1b[2J'  # _render 每帧开头清屏
+PROMPT_KEYS = [
+    '❓ 设置共享口令', '❓ 验证共享口令', '❓ 秘境类型',
+    '❓ 我的性别', '❓ 你的性别', '❓ 我的名字', '❓ 你的名字',
+    '❓ 秘境向导', '❓ 输入通道码',
+]
 
 
 def free_port():
@@ -54,33 +61,68 @@ def send(master, s):
     os.write(master, s.encode())
 
 
-def assert_silent_required(master, label, forbid, wait=1.5):
-    """必填问答留空回车：必须**静默拒绝**（老板 2026-09-23）。
-
-    判据：① 不出现「请输入内容」这类反馈；② 后续步骤的提示不出现（说明没被接受而前进）。
-    forbid 可为字符串或字符串列表。
-    """
-    forbids = [forbid] if isinstance(forbid, str) else list(forbid)
-    send(master, '\r')
+def drain_quiet(master, quiet=0.8, timeout=20):
+    """读到输出静默（quiet 秒无新字节）或超时——保证拿到完整帧（防 pty 缓冲半帧）。"""
     out = ''
-    deadline = time.time() + wait
+    deadline = time.time() + timeout
+    last = time.time()
     while time.time() < deadline:
-        out += drain(master, 0.4)  # 本探针的 drain 已解码（无 strip_ansi）
-    if '请输入内容' in out:
-        print(f'❌ {label}：留空回车仍打印了提示（应为静默拒绝）')
-        print(out[-500:]); raise SystemExit(1)
-    for f in forbids:
-        if f and f in out:
-            print(f'❌ {label}：留空回车竟被接受（出现了「{f}」）')
-            print(out[-500:]); raise SystemExit(1)
+        chunk = drain(master, 0.2)
+        if chunk:
+            out += chunk
+            last = time.time()
+        elif time.time() - last >= quiet:
+            break
     return out
 
 
-def wait_text(master, text, timeout=40):
+def current_prompt(text):
+    """最后一个完整帧里字节序最靠前的提问 = 当前提问（消息区自下而上绘制）。"""
+    frames = text.split(CLEAR)
+    frame = frames[-1] if len(frames) > 1 else text
+    clean = ANSI.sub('', frame)
+    best, bestpos = None, len(clean) + 1
+    for k in PROMPT_KEYS:
+        i = clean.find(k)
+        if 0 <= i < bestpos:
+            bestpos, best = i, k
+    return best
+
+
+def wait_prompt(master, expect, timeout=40):
+    """等到当前提问为 expect（中途持续读）。"""
     out = ''
     deadline = time.time() + timeout
-    while text not in out and time.time() < deadline:
-        out += drain(master, 0.8)
+    while time.time() < deadline:
+        out += drain(master, 0.5)
+        if current_prompt(out) == expect:
+            return out
+    return out
+
+
+def go(master, payload, expect, label=None, timeout=20):
+    """发送 payload，静默后断言当前提问 = expect。"""
+    send(master, payload)
+    out = drain_quiet(master, timeout=timeout)
+    cur = current_prompt(out)
+    if cur != expect:
+        print(f'❌ {label or payload!r}：当前提问是 {cur!r}，期望 {expect!r}')
+        print(ANSI.sub('', out)[-500:])
+        raise SystemExit(1)
+    return out
+
+
+def back(master, expect, label, timeout=20):
+    """空回车 = 退回上一问：静默后断言当前提问 = expect（上一问的提问）。"""
+    send(master, '\r')
+    out = drain_quiet(master, timeout=timeout)
+    cur = current_prompt(out)
+    if cur != expect:
+        print(f'❌ {label}：空回车后当前提问是 {cur!r}，期望退回 {expect!r}')
+        print(ANSI.sub('', out)[-500:])
+        raise SystemExit(1)
+    if '↩️ 已返回' not in out:
+        print(f'⚠️ {label}：未见「↩️ 已返回」反馈（仅提示）')
     return out
 
 
@@ -117,44 +159,44 @@ def main():
         m, p = start_tui(store, port)
         spawned.append((m, p))
 
-        steps = [
-            ('秘境向导', 'c\r'),
-            ('我的名字', 'Lukas\r'),
-            ('我的性别', '1\r'),
-            ('秘境类型', '1\r'),  # v3：不再预置同伴——2026-10-08 起改为类型问答，1=双人
-        ]
-        for i, (expect, payload) in enumerate(steps):
-            out = wait_text(m, expect)
-            if expect not in out:
-                print(f'❌ 未到「{expect}」问答')
-                print(out[-600:])
-                return 1
-            # 必填：留空回车静默拒绝（老板 2026-09-23）——不提交、不打提示
-            nxt = steps[i + 1][0] if i + 1 < len(steps) else '设置共享口令'
-            assert_silent_required(m, f'「{expect}」', nxt)
-            send(m, payload)
-
-        # 关键：口令留空回车 → 必须拦住
-        out = wait_text(m, '设置共享口令')
-        if '设置共享口令' not in out:
-            print('❌ 未到口令问答')
-            print(out[-600:])
+        # ---------- create 问答链：前进 → 逐级回退 → 重走补答 ----------
+        out = wait_prompt(m, '❓ 秘境向导')
+        if current_prompt(out) != '❓ 秘境向导':
+            print('❌ 未到「秘境向导」问答')
+            print(ANSI.sub('', out)[-600:])
             return 1
-        assert_silent_required(m, '设置共享口令', ['正在创建秘境', '成功创建秘境'])
+        go(m, 'c\r', '❓ 我的名字', 'create 首问')
+        go(m, 'Lukas\r', '❓ 我的性别', '名字步')
+        go(m, '1\r', '❓ 秘境类型', '性别步')
+        go(m, '1\r', '❓ 设置共享口令', '类型步')  # 1=双人秘境
+        print('✅ create：问答链前进正常（c → 名字 → 性别 → 类型 → 口令）')
 
-        # 补输口令 → 创建成功（≥ kPassphraseMinLength=8 位——老板 2026-09-15 起）
-        send(m, 'abc12345\r')
-        out = wait_text(m, '成功创建秘境', timeout=40)
+        # 口令步起连续空回车：口令 → 类型 → 性别 → 名字 → 秘境入口
+        back(m, '❓ 秘境类型', '口令步回退')
+        back(m, '❓ 我的性别', '类型步回退')
+        back(m, '❓ 我的名字', '性别步回退')
+        back(m, '❓ 秘境向导', '名字步回退')
+        print('✅ create：空回车逐级回退（口令→类型→性别→名字→秘境入口）')
+
+        # 从秘境入口重走问答链，补输口令 → 创建成功
+        go(m, 'c\r', '❓ 我的名字', '重走首问')
+        go(m, 'Lukas\r', '❓ 我的性别', '重走名字')
+        go(m, '1\r', '❓ 秘境类型', '重走性别')
+        go(m, '1\r', '❓ 设置共享口令', '重走类型')
+        send(m, 'abc12345\r')  # ≥ kPassphraseMinLength=8 位——老板 2026-09-15 起
+        out = ''
+        deadline = time.time() + 40
+        while '成功创建秘境' not in out and time.time() < deadline:
+            out += drain(m, 0.8)
         if '成功创建秘境' not in out:
             print('❌ 输入口令后未创建成功')
-            print(out[-600:])
+            print(ANSI.sub('', out)[-600:])
             return 1
-
-        print('✅ create：口令留空被拦下，补输后创建成功')
+        print('✅ create：回退后重走问答链，补输口令创建成功')
 
         # ---------- 锁屏码规则：纯数字 + 至少 6 位 ----------
-        # 注意：TUI 在阻塞读键盘期间不会重绘（已知行为——提示要等下一次按键才
-        # 出现），故不先等提示，直接发；未命中就重发（非法值会被拒，重发无害）。
+        # 文案实为「✅ 锁屏码 🔢 已设置」：中间有 emoji，且渲染会插入 ANSI 着色，
+        # 不能整串匹配——🔢 在全 TUI 仅此一处，作为"锁屏码已设置"的判定锚点。
         def input_until(payload, expect, tries=6, timeout=8):
             out = ''
             for _ in range(tries):
@@ -164,10 +206,12 @@ def main():
                     break
             return out
 
-        # 文案实为「✅ 锁屏码 🔢 已设置」：中间有 emoji，且渲染会插入 ANSI 着色，
-        # 不能整串匹配——🔢 在全 TUI 仅此一处，作为"锁屏码已设置"的判定锚点。
-        def pin_set(out):
-            return '🔢' in out
+        def wait_text(master, text, timeout=40):
+            out = ''
+            deadline = time.time() + timeout
+            while text not in out and time.time() < deadline:
+                out += drain(master, 0.8)
+            return out
 
         for wrong, expect in (
             ('abc\r', '锁屏码只能是数字'),      # 字母
@@ -176,19 +220,19 @@ def main():
             out = input_until(wrong, expect)
             if expect not in out:
                 print(f'❌ 锁屏码 {wrong.strip()!r} 未被拦住（未提示「{expect}」）')
-                print(out[-800:])
+                print(ANSI.sub('', out)[-800:])
                 return 1
-            if pin_set(out):
+            if '🔢' in out:
                 print(f'❌ 非法锁屏码 {wrong.strip()!r} 竟被接受')
                 return 1
         out = input_until('123456\r', '🔢')
-        if not pin_set(out):
+        if '🔢' not in out:
             print('❌ 6 位数字锁屏码未被接受')
-            print(out[-800:])
+            print(ANSI.sub('', out)[-800:])
             return 1
         print('✅ 锁屏码规则：字母/不足 6 位被拒，6 位数字通过')
 
-        # ---------- 通道 B：join 的口令也必须必填 ----------
+        # ---------- 通道 B：join 口令验证：空回车回退 + 输错停在口令步 ----------
         with open(store) as f:
             store_a = json.load(f)
         # 签发通道码是空间级操作，必须带本空间成员会话（server C1 修复后要求
@@ -210,52 +254,53 @@ def main():
         store_b = os.path.join(WORK, 'b.json')
         m2, p2 = start_tui(store_b, port)
         spawned.append((m2, p2))
-        b_steps = [
-            ('秘境向导', 'j\r'),
-            ('输入通道码', join_token + '\r'),
-            ('你的名字', 'Alice\r'),
-            ('你的性别', '2\r'),
-        ]
-        for i, (expect, payload) in enumerate(b_steps):
-            out = wait_text(m2, expect)
-            if expect not in out:
-                print(f'❌ B 未到「{expect}」问答')
-                print(out[-600:])
-                return 1
-            nxt = b_steps[i + 1][0] if i + 1 < len(b_steps) else '验证共享口令'
-            assert_silent_required(m2, f'B「{expect}」', nxt)
-            send(m2, payload)
-
-        out = wait_text(m2, '验证共享口令')
-        if '验证共享口令' not in out:
-            print('❌ B 未到口令问答')
-            print(out[-600:])
+        out = wait_prompt(m2, '❓ 秘境向导')
+        if current_prompt(out) != '❓ 秘境向导':
+            print('❌ B 未到「秘境向导」问答')
+            print(ANSI.sub('', out)[-600:])
             return 1
-        assert_silent_required(m2, 'B 验证共享口令', ['正在加入秘境', '成功加入秘境'])
+        go(m2, 'j\r', '❓ 输入通道码', 'B 首问')
+        go(m2, join_token + '\r', '❓ 你的名字', 'B 通道码')
+        go(m2, 'Alice\r', '❓ 你的性别', 'B 名字')
+        go(m2, '2\r', '❓ 验证共享口令', 'B 性别')
+        print('✅ join：问答链前进正常（j → 通道码 → 名字 → 性别 → 口令）')
+
+        # 口令步空回车 → 退回性别步；补答性别后回到口令步
+        back(m2, '❓ 你的性别', 'B 口令步回退')
+        go(m2, '2\r', '❓ 验证共享口令', 'B 回退补答')
+        print('✅ join：口令步空回车退回性别，补答后回到口令步')
 
         # ---------- 口令错误：必须停在口令环节重输，且不能烧掉 join token ----------
         # （旧实现：先 joinSpace 消费一次性 token 再验口令 → 失败即落到「加入秘境
         #   失败」并退回通道码环节，已接受的 token 作废——老板 2026-09-12 反馈）
         send(m2, 'wrong-pass\r')
-        out = wait_text(m2, '口令错误', timeout=30)
+        out = ''
+        deadline = time.time() + 30
+        while '口令错误，请重新输入' not in out and time.time() < deadline:
+            out += drain(m2, 0.8)
         if '口令错误，请重新输入' not in out:
             print('❌ B 输错口令未被拦在口令环节（未提示重新输入）')
-            print(out[-800:])
+            print(ANSI.sub('', out)[-800:])
             return 1
-        if '加入秘境失败' in out or '输入通道码' in out:
-            print('❌ B 输错口令竟退回通道码环节（token 被烧掉）')
-            print(out[-800:])
+        # 当前提问必须仍是口令步（停在环节里重输）
+        out2 = drain_quiet(m2, timeout=10)
+        if current_prompt(out + out2) != '❓ 验证共享口令':
+            print('❌ B 输错口令后当前提问变了（应仍在口令步）')
+            print(ANSI.sub('', out + out2)[-800:])
             return 1
 
         # 同一个 token：重输正确口令 → 应加入成功（token 未被消耗）
         send(m2, 'abc12345\r')
-        out = wait_text(m2, '成功加入秘境', timeout=40)
+        out = ''
+        deadline = time.time() + 40
+        while '成功加入秘境' not in out and time.time() < deadline:
+            out += drain(m2, 0.8)
         if '成功加入秘境' not in out:
             print('❌ B 输错后重输正确口令未加入成功（token 应仍有效）')
-            print(out[-800:])
+            print(ANSI.sub('', out)[-800:])
             return 1
 
-        print('✅ join：口令留空被拦下、输错停在口令环节重输，补输后加入成功')
+        print('✅ join：空回车回退正常、输错停在口令环节重输，补输后加入成功')
         return 0
     finally:
         for m, p in spawned:

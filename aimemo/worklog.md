@@ -14527,21 +14527,6 @@ Reload Window 即可。两次 CI 失败都是「环境清单」问题而非代�
 
 **（2026-10-13，五十七）**：MacBook 上 macOS debug 热重载崩溃，根因是 **TCC 授权差**（非代码问题）。现象：`npm run app-mac-run-local` 启动正常，按 r/R 后 app 退出，报 `Flutter failed to create file at "/Users/luk/Library/Containers/cc.tic.einz/Data/tmp/appXXXXXX/app/main.dart.incremental.dill"` + `Lost connection to device`；同机 shell `ls -le` 该 tmp 目录也无权（iMac 同操作正常）。机制（flutter_tools 源码确认）：沙盒 App 的 VM 通过 `fs.create` 在自己容器 tmp 下建 DevFS 根（`app`+6 位随机/内层 `app/`）并回报给工具；**工具侧** `LocalDevFSWriter`（desktop_device.dart:49）把增量 dill **直接写进该目录**（devfs.dart:852 落到 baseUri；compile.dart:304 `createSync(recursive:true)` 即报错点）。App 自身（沙盒内、自己的容器）建得写得、工具进程（VS Code 集成终端子进程）写不进——POSIX 属主若不对会连 App 一起挡，**只有 TCC 能解释这个分裂**，且 shell 同样 ls 失败（同源）。真凶：iMac 的 VS Code 曾被弹窗授权「访问其他 App 的数据」；MacBook 从未授权。修复：系统设置 → 隐私与安全性 → **完全磁盘访问**，给 VS Code 开权限，然后**完全退出重开 VS Code**（集成终端子进程才继承）。教训/待办：① 换 iTerm/Terminal 直接跑 `flutter run` 也要给对应终端 App 授权；② docs/ONBOARDING.md「新机环境准备」应补这条；③ 排查同类「工具写不进沙盒容器」先用 `id` + `stat -f '%Su %Sg %Sp'` + `ls` 区分属主问题与 TCC，再谈修法。
 
-**（2026-10-13T04:12:34Z / 2026-10-13 12:12）**：worklog 条目编号弃用「四十一」
-这类递增中文序号，改用「UTC 时间戳 + 本地日期时刻」双段格式（如本条
-`**（2026-10-13T04:12:34Z / 2026-10-13 12:12）**`），老板 2026-10-13 定。
-两段各司其职：UTC 段精确到秒，是全球唯一自然可排序的键（本地日期跨时区
-不统一，中美机器按本地时间排会乱序），排序一律按 UTC 段；本地段精确到
-分钟，便于人读。
-动因：feat/voice-transcript 与 main 各自维护序号序列，本次合并 worklog 时两侧都
-从「四十一」编起产生重复（main 侧自身还有五十二/五十三/五十四各编了两次的旧乱
-账）；时间戳天然唯一、可排序，多 agent 并行追加无需协调，合并时两侧块按时间自
-然归位。存量旧编号条目保留原样不回改。规则已写入 AGENTS.md「工作规范」节。
-同日早些时候：main 已合并进 feat/voice-transcript（合并提交 b6adaf40，main 领先
-20 提交：Linux GUI、粘贴发送、全屏查看、macOS 麦克风权限等），冲突 2 处均已解——
-.gitignore 注释差异取 voice 原版、worklog 两侧日志都保留；合并后 flutter analyze
-0 issue。
-
 **（2026-10-13T03:47:00Z / 2026-10-13 11:47）**：TUI 启动解锁 bug 根因修复 + 验证机密策略统一
 （老板 2026-10-13 要求）。bug：启动 TUI 要锁屏码时输入 `/exit`，全屏历史
 消息被渲染出来但不能继续输入，只能 Ctrl-C 强杀。根因链条：`_unlockPin`
@@ -14584,6 +14569,54 @@ loadHistory → `_render`（没验证的历史全屏渲染）→ `_runInputLoop`
 `guide_exit_check` / `reset_returns_to_guide_check` / `cliMultiverseE2E`
 三项在**未改动的代码上同样失败**（向导流程早已演进：秘境类型选择、c/j
 入口——测试陈旧，非本次回归，待另行适配）。
+
+**（2026-10-13T04:12:34Z / 2026-10-13 12:12）**：worklog 条目编号弃用「四十一」
+这类递增中文序号，改用「UTC 时间戳 + 本地日期时刻」双段格式（如本条
+`**（2026-10-13T04:12:34Z / 2026-10-13 12:12）**`），老板 2026-10-13 定。
+两段各司其职：UTC 段精确到秒，是全球唯一自然可排序的键（本地日期跨时区
+不统一，中美机器按本地时间排会乱序），排序一律按 UTC 段；本地段精确到
+分钟，便于人读。
+动因：feat/voice-transcript 与 main 各自维护序号序列，本次合并 worklog 时两侧都
+从「四十一」编起产生重复（main 侧自身还有五十二/五十三/五十四各编了两次的旧乱
+账）；时间戳天然唯一、可排序，多 agent 并行追加无需协调，合并时两侧块按时间自
+然归位。存量旧编号条目保留原样不回改。规则已写入 AGENTS.md「工作规范」节。
+同日早些时候：main 已合并进 feat/voice-transcript（合并提交 b6adaf40，main 领先
+20 提交：Linux GUI、粘贴发送、全屏查看、macOS 麦克风权限等），冲突 2 处均已解——
+.gitignore 注释差异取 voice 原版、worklog 两侧日志都保留；合并后 flutter analyze
+0 issue。
+
+**（2026-10-13T07:42:00Z / 2026-10-13 15:42）**：TUI「全面去 /exit、统一回车取消」+ 向导回退模型 +
+/auth 带参（老板 2026-10-13 拍板）。规则：TUI 里**所有要求输入的地方都不识别
+/exit 等命令**（输入只是输入），唯一退出/取消手段是直接回车；向导问答链
+（c/j→名字→性别→类型→口令 / j→通道码→名字→性别→验证口令）**空回车=退回上一问**，
+首问（c/j）与启动锁屏码空回车=退出整个 TUI；向导末的设 PIN 属空间建立后的普通
+设置，空回车=取消设置；动作类问答（/revoke、/reset、/passphrase、/switch、
+/entoken）空回车=取消动作（原语义）。
+
+实现（cli/bin/einz_tui.dart）：
+- `_prompt` 参数收敛为 `{hidden, exitOnEmpty}`（删 required/secret）；输入循环
+  删除整个「/ 开头当命令」拦截（旧 /exit 逃生门与"引导中仅支持 /exit"提示一并废除）
+- `_spaceCreate`/`_spaceJoin` 的顺序 while 循环重构为**步骤索引机**：无效输入原地
+  重问，空回车 step--（链首空回车=退出/回到通道码），_runGuide 的 c/j 作链首；
+  每个提问文案补「（直接回车返回上一步）」，回退有「↩️ 已返回上一步」反馈
+- `/auth <通道码>` 未绑定直接加入（替换 pendingJoinToken 子模式）；
+  pendingSpaceKey 本就是从未置 true 的死代码，两个 handler 连路由一起删
+- 顺手：`myGender`/`peerGender` 全局变量清除（_spaceJoin 本就有局部变量）
+
+踩坑记录（都有佐证）：
+- **Dart switch 没有 break 会穿透**：步骤机初版每个 case 结尾没 break，前进时
+  碰巧穿透到下一问看似正常，回退时 step 改了却继续穿透执行下一 case（类型步
+  回退→跑去问口令）——测试抓到的。修法：每 case 尾 break 回 while 重新分发。
+- **pty 输出缓冲写满会阻塞 app**：诊断脚本在 sleep 期间不读 master，几帧全屏
+  重绘就写满 pty 缓冲，stdout.write 阻塞 → 输入循环假死、Ctrl+C 失灵——是测试
+  脚本产物，非 app bug。教训：pty 测试必须持续 drain；断言要用「最后一帧里
+  字节序最靠前的提问=当前提问」（消息区自下而上绘制），不能靠文本存在性
+  （消息区历史会污染）。
+
+回归（全过）：guide_input_rules_check 重写为回退模型（前进/逐级回退/重走补答/
+PIN 规则/join 回退+输错停步+token 不烧）；guide_exit_check 改测「首问空回车退出」
+（顺带救活这个陈旧测试）；guide_crash_check 的 '/' 崩溃回归仍有效 + 退出步改空回车；
+revoke_command_check、unlock_flow_check（19 断言）全过；dart analyze 无问题。
 **（2026-10-13T07:52:23Z / 2026-10-13 15:52）**：修正式版 macOS app 录音「麦克风权限被
 拒绝」（必现，修复 NSMicrophoneUsageDescription 后依旧）。TCC 日志给出权威根因：
 `Prompting policy for hardened runtime; service: kTCCServiceMicrophone requires

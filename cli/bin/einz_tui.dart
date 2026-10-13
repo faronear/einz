@@ -4,7 +4,8 @@
 //   - 分栏布局：消息区（滚动）+ 输入区（底部）+ 状态栏（顶部，含 WS 状态）
 //   - 手写 ANSI 渲染（零新依赖；pub 缓存无 TUI 库且国内网络下载不稳）
 //   - 后台 WS 实时监听（复用 shared WsClient，断线自动重连）
-//   - 逐键输入（raw 模式），Ctrl+C 或 /exit 退出
+//   - 逐键输入（raw 模式），聊天态 Ctrl+C 或 /exit 退出；**提问/向导问答时不认
+//     /exit 等命令**（老板 2026-10-13）——唯一的退出/取消手段是直接回车（见 _prompt）
 //
 // 用法：
 //   dart run bin/einz_tui.dart --store demo/store-a.json --server http://127.0.0.1:3901
@@ -132,12 +133,6 @@ class _TuiState {
   /// 退出标志。
   bool running = true;
 
-  /// 等待通道码输入（/auth 未登记引导）：输入循环的下一次输入按通道码处理。
-  bool pendingJoinToken = false;
-
-  /// 等待共享口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
-  bool pendingSpaceKey = false;
-
   /// member_id → memberName（GET /space 拉取，消息前缀显示 memberName 用）。
   Map<String, String> memberNames = {};
 
@@ -156,27 +151,17 @@ class _TuiState {
 
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
-  bool pendingGuideRequired = false; // 当前引导问答是否必填（留空回车不提交）
 
-  /// 机密**验证**问答进行中（锁屏码/共享口令验证——与"设置"相对）：输入循环对
-  /// / 开头的回答**不当命令拦截**，按一次（错误的）机密尝试提交；这里不认
-  /// /exit，退出只能直接回车取消（老板 2026-10-13 定的验证机密策略）。
-  bool pendingSecretVerify = false;
-
-  /// 启动期锁屏码解锁问答进行中：**空回车 = 退出整个 TUI**（区别于普通问答的
-  /// 空回车=跳过/取消——启动期没有"取消后回到哪里"，退个干净；与 App 锁屏页
-  /// 返回键同口径）。由 _unlockPin 置位、输入循环落地退出序列。
-  bool pendingUnlock = false;
+  /// 当前问答是"没有上一问可回退的门"（启动锁屏码、向导首问 c/j）：
+  /// **空回车 = 退出整个 TUI**。其余问答的空回车由调用方自行解释——回退上一步
+  /// / 跳过 / 取消动作（老板 2026-10-13 统一规则：要求输入时不认 /exit 等命令，
+  /// 唯一的"退出"就是直接回车）。
+  bool pendingExitOnEmpty = false;
 
   bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
 }
 
 _TuiState? _state;
-
-/// 首条通道 create 时询问的性别（我的/同伴）：仅接受 男/女（否则重新询问），
-/// 登记时随名字一并提交服务端（person_gender/peer_gender）。
-String? myGender;
-String? peerGender;
 
 /// 性别提交规范化：中文 男/女 → 服务端规范值 male/female（与 App 一致；
 /// 服务端 meta person_gender:* 以 male/female 为规范，旧 TUI 直传中文导致
@@ -506,8 +491,9 @@ Future<bool> _verifyPin(String hash, String pin) async {
 }
 
 /// 入网最后一步：询问设置 锁屏码（直接回车跳过 = 不设置；以后可以 /pin 设置）。
-/// **明文输入**（设置机密 = 明文回显 + 随时可 /exit——老板 2026-10-13 策略：
-/// 只有"验证"机密才隐藏回显且不认 /exit，见 _unlockPin）。
+/// **明文输入**（设置机密 = 明文回显——老板 2026-10-13 策略：只有"验证"机密才
+/// 隐藏回显且不认 /exit，见 _unlockPin）。空间已建立后的普通设置：空回车 =
+/// 取消设置（老板 2026-10-13 确认口径）。
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
   while (true) {
@@ -538,10 +524,9 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
 /// 启动进对话前：store 已设 PIN 则校验解锁（错误重试）；未设直接进。
 ///
 /// **这一步只认两种输入**（老板 2026-10-13 定，与 App 锁屏页同口径）：
-/// - 输入内容 → 当锁屏码校验。`/exit` 等命令在此**不识别**（只是错码——由
-///   [_TuiState.pendingSecretVerify] 保证 / 开头不被输入循环当命令拦截）；
-/// - 直接回车（空）→ 退出整个 TUI（[_TuiState.pendingUnlock]：输入循环落地
-///   完整退出序列；启动期没有"取消后回到哪里"，退个干净）。
+/// - 输入内容 → 当锁屏码校验。`/exit` 等命令在此**不识别**（只是错码）；
+/// - 直接回车（空）→ 退出整个 TUI（[_TuiState.pendingExitOnEmpty]：输入循环
+///   落地完整退出序列；启动期没有"取消后回到哪里"，退个干净）。
 ///
 /// PIN **不明文回显**（hidden：输入行回显 *）——TUI 整体策略（老板 2026-10-13）：
 /// **设置**机密时明文回显、随时可 /exit（[_askSetPin]、/pin、入网口令问答）；
@@ -564,9 +549,9 @@ Future<bool> _unlockPin(ChatSession session) async {
   // 状态条给提示：否则底部仍广告 "/exit 退出系统"——这一步并不认 /exit
   _state!.status = '🔒 输入锁屏码解锁（直接回车退出）';
   while (_state!.running) {
-    _state!.pendingUnlock = true;
+    _state!.pendingExitOnEmpty = true;
     final pin = await _prompt(session, '❓ 输入锁屏码（直接回车退出）:',
-        hidden: true, secret: true);
+        hidden: true, exitOnEmpty: true);
     if (!_state!.running) return false; // 解锁期 Ctrl+C / EOF：退出序列已由输入循环跑完
     final answer = pin.trim();
     if (answer.isEmpty) return false; // 空回车 = 退出整个 TUI（输入循环已落地退出序列）
@@ -624,10 +609,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     while (true) {
       if (!_state!.running) return;
       // 一条系统消息内多行（\n 分隔）：整体被消息间空行隔开、又不会
-      // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）
+      // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）。
+      // c/j 是向导问答链的**首问**：空回车 = 退出整个 TUI（没有上一问可回退；
+      // 老板 2026-10-13）。无效输入原地重问。
       final choice = (await _prompt(
-              session, '❓ 秘境向导\n   c: 创建秘境\n   j: 加入秘境',
-              required: true)) // 必填：留空回车不接受
+              session,
+              '❓ 秘境向导\n   c: 创建秘境\n   j: 加入秘境\n（直接回车退出）',
+              exitOnEmpty: true))
           .trim()
           .toLowerCase();
       if (!_state!.running) return;
@@ -636,25 +624,28 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         session.messages.add(_systemMessage(session, '----------------'));
         await _spaceCreate(session, store, storePath);
         if (_onboarded) break; // 创建成功进入会话
-        continue; // 创建失败：循环可重试
+        continue; // 创建失败/回退：重问秘境入口
       }
       if (choice == 'j' || choice == 'join' || choice == '2') {
         session.messages.add(_systemMessage(session, '✅ 加入秘境'));
         session.messages.add(_systemMessage(session, '----------------'));
-        // 加入流程：token 错误被拒后直接重输 token（不回到 create/join 首问——
-        // 老板 2026-09-10）
+        // 加入流程的问答链：通道码 →（invite 时名字/性别，在 _spaceJoin 内）→
+        // 验证口令。token 错误被拒后原地重输（不回到 c/j 首问——老板 2026-09-10）；
+        // **空回车 = 回退到 c/j 首问**（老板 2026-10-13 回退模型）。
         while (true) {
-          // 必填（老板 2026-09-15）：留空回车不接受，继续等待输入
-          final token =
-              (await _prompt(session, '❓ 输入通道码或邀请链接:', required: true)).trim();
+          if (!_state!.running) return;
+          final token = (await _prompt(session,
+                  '❓ 输入通道码或邀请链接（直接回车返回上一步）:'))
+              .trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 请输入通道码或邀请链接（可由任意一条已开通的通道生成）'));
+            session.messages.add(_systemMessage(session, '↩️ 已返回秘境入口'));
             _scheduleRender();
-            continue;
+            break; // 回退到 c/j 首问
           }
           await _spaceJoin(session, store, storePath, token);
           if (_onboarded) break; // 加入成功进入会话
+          // _spaceJoin 内回退（口令步空回车等）也会走到这：重问通道码
         }
         if (_onboarded) break; // 跳出外层引导循环进入会话
       }
@@ -679,29 +670,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   }
 
   // 已绑定但未进入空间（无 Space Key，如重启的第二条通道）：自动进入口令
-  // 接入流程（输错反复重输直到成功——成功获得 Space Key 才能收发密文）
+  // 接入流程（输错反复重输直到成功——成功获得 Space Key 才能收发密文）。
+  // 单问链：**空回车 = 退出整个 TUI**（首问即末问，没有上一问可回退；
+  // 老板 2026-10-13）；口令不认 /exit 等命令（只是错码）。
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 输入共享口令，才能查看秘境内容：', required: true);
-      if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
+      final passphrase = await _prompt(
+          session, '❓ 输入共享口令，才能查看秘境内容（直接回车退出）:',
+          exitOnEmpty: true);
+      if (!_state!.running) break; // 退出中（Ctrl+C/EOF——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
         // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
-        session.messages.add(_systemMessage(session, '⚠️ 请输入共享口令（/exit 可退出）'));
-        _scheduleRender();
-        continue;
-      }
-      if (passphrase.startsWith('/')) {
-        // / 开头的输入（输入循环 / 检查被绕过时的兜底）：/exit、/quit 按退出
-        // 处理（逃生门——不能提示"非法口令"重输而困住用户）；其他 / 不当口令发送核对
-        if (passphrase == '/exit' || passphrase == '/quit') {
-          _state!.running = false;
-          break; // running=false 后由 main 收尾 + 2 秒兜底退出（exit(0) 死代码已移除）
-        }
-        session.messages.add(_systemMessage(session, '⚠️ 共享口令不能以 / 开头，请重新输入（/exit 可退出）'));
-        _scheduleRender();
-        continue;
+        break;
       }
       try {
         await _busy(session, '⏳ 共享口令核对中......', () => session.accessByEscrow(passphrase));
@@ -713,7 +695,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _scheduleRender();
         break;
       } catch (e3) {
-        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: 请重新输入口令'));
+        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: 请重新输入口令（直接回车退出）'));
         _scheduleRender();
       }
     }
@@ -723,7 +705,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记但口令密保箱未上传（创建者引导中断）：重启再进引导设置口令。
   // （判据用 slot == 0 = 创建者/第一人；v1 时代的 memberId == 'memberA'
   //   在 v2 下恒不成立，会让这条恢复路径永不触发）
-  // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
+  // （running 检查：口令阶段退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.slot == 0 && !store.escrowUploaded) {
     // 先问服务端：本地没标记 ≠ 服务端没有箱。创建空间时密保箱是随 `POST /spaces`
     // 一并上传的（此前没记 escrowUploaded），老 store 重启后会走到这里 —— 直接再问
@@ -739,7 +721,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // /exit 退出后（口令/其他引导步骤触发 running=false）：立即结束引导，
+  // 退出后（口令/其他引导步骤触发 running=false）：立即结束引导，
   // 不再认证/同步/起 WS（由 main 收尾退出）
   if (!_state!.running) return;
 
@@ -874,7 +856,7 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
   if (_onboarded) {
     // 入网收尾：致欢迎辞 → 等用户回车 → 清空 system 消息切到聊天态
     await _finalizeOnboarding(session);
-    if (!_state!.running) return; // 回车期间 /exit：不再继续
+    if (!_state!.running) return; // 回车期间退出：不再继续
     // 已显性进入聊天态：此时才补同步 + 启 WS（入网期间对方发的消息在此一次补齐，
     // 不再插进向导消息之间）
     await startupSync();
@@ -888,7 +870,7 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
 /// 「向导态 → 聊天态」的切换点：清空全部 system 消息（向导日志 + 欢迎辞），
 /// 只留真实对话并滚到最新。此前的"等用户按回车"实测不好理解（用户不知道
 /// 要按回车、也不知道按了会发生什么），自动倒计时无需学习成本。倒计时期间
-/// 忽略普通按键（Ctrl+C / /exit 仍可退出），回车等输入不会变成消息。
+/// 忽略全部按键（Ctrl+C 仍可退出），回车等输入不会变成消息。
 Future<void> _finalizeOnboarding(ChatSession session) async {
   if (_onboardingFinalized) return;
   _onboardingFinalized = true;
@@ -907,7 +889,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   _scheduleRender();
   for (var remain = _kWelcomeCountdownSeconds - 1; remain >= 1; remain--) {
     await Future<void>.delayed(const Duration(seconds: 1));
-    if (!_state!.running) return; // 倒计时期间 /exit / Ctrl+C：立即结束
+    if (!_state!.running) return; // 倒计时期间 Ctrl+C：立即结束
     // 读秒消息：不替换原消息，在文本尾部追加数字（同一条内 "5 4 3 …" 逐秒延长）
     countdownMsg = _systemMessage(
         session, _welcomeCountdownText(countdownMsg, remain));
@@ -915,7 +897,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
     _scheduleRender();
   }
   await Future<void>.delayed(const Duration(seconds: 1));
-  if (!_state!.running) return; // 倒计时期间 /exit：不再继续
+  if (!_state!.running) return; // 倒计时期间退出：不再继续
   _state!.processing = false;
   // 切换到聊天态：清空全部 system 消息，只留真实对话（对方预发 / 自己发出的）
   session.messages.removeWhere((m) => m.isSystem);
@@ -944,6 +926,10 @@ String _newCliSpaceId() {
 /// Multiverse：/space create 新建空间（POST /spaces——创建者登记 + session +
 /// 首个 join token 一并返回；Space Key 由客户端生成，口令加密 sealed 包随
 /// 创建提交，服务端只存密文）。
+///
+/// 问答链（老板 2026-10-13 回退模型）：名字 → 性别 → 秘境类型 → 共享口令。
+/// 无效输入原地重问；**空回车 = 退回上一问**（名字步空回车 = 回到秘境入口 c/j，
+/// 由 _runGuide 重问）；store 已有 memberName 的老通道从性别步起。
 Future<void> _spaceCreate(ChatSession session, EntranceStore store, String storePath) async {
   final server = session.server;
   if (server.isEmpty) {
@@ -955,104 +941,122 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
         _systemMessage(session, '✅ 当前通道已绑定秘境（不重复创建）——/space address 查看'));
     return;
   }
+  // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）；
+  // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，最长 32。
   var displayName = store.memberName ?? '';
-  if (displayName.isEmpty) {
-    // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）
-    while (true) {
-      displayName =
-          (await _prompt(session, '❓ 我的名字（后期可改）:', required: true)).trim();
-      if (!_state!.running) return;
-      // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，最长 32
-      final violation = checkMemberNamePolicy(displayName);
-      if (violation == MemberNameViolation.empty) {
-        session.messages.add(_systemMessage(session, '❌ 名字必填，请输入'));
-        _scheduleRender();
-        continue;
-      }
-      if (violation != null) {
-        session.messages.add(_systemMessage(session, _memberNameRuleHint(violation)));
-        _scheduleRender();
-        continue;
-      }
-      session.messages.add(_systemMessage(session, '✅ ${displayName}'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      break;
+  final firstStep = displayName.isEmpty ? 0 : 1; // 老通道已有名字：跳过名字步
+  var step = firstStep; // 0=名字 1=性别 2=秘境类型 3=共享口令
+  String? myGender;
+  var spaceMode = 'duo';
+  var passphrase = '';
+  while (_state!.running && step < 4) {
+    switch (step) {
+      case 0:
+        final input = (await _prompt(session,
+                '❓ 我的名字（后期可改）（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (input.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回秘境入口'));
+          _scheduleRender();
+          return; // 回到 c/j 首问（_runGuide 的入口循环重问）
+        }
+        final violation = checkMemberNamePolicy(input);
+        if (violation != null) {
+          session.messages.add(_systemMessage(session,
+              violation == MemberNameViolation.empty ? '❌ 名字必填，请输入' : _memberNameRuleHint(violation)));
+          _scheduleRender();
+        } else {
+          displayName = input;
+          session.messages.add(_systemMessage(session, '✅ $displayName'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 1;
+        }
+      break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+      case 1:
+        // 我的性别（本地记录；Multiverse create 暂不提交——服务端不收 gender）。
+        // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
+        final g = (await _prompt(session,
+                '❓ 我的性别是\n  1: 男\n  2: 女\n（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (g.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+          _scheduleRender();
+          step = 0;
+        } else if (g == '1') {
+          myGender = '男';
+          session.messages.add(_systemMessage(session, '✅ 男'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 2;
+        } else if (g == '2') {
+          myGender = '女';
+          session.messages.add(_systemMessage(session, '✅ 女'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 2;
+        } else {
+          session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
+          _scheduleRender();
+        }
+      break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+      case 2:
+        // 秘境类型（2026-10-08 对齐 App 向导第 2 步）：duo/group **创建时定死、之后
+        // 不可改**（老板拍板：不支持升格）。此前 TUI 从不询问——ApiClient 缺省 'duo'
+        // 把 TUI 的创建入口悄悄锁死双人（能加入 group 却不能创建）。
+        // 只接受数字 1/2（与性别问答同风格：不接受文字输入）
+        final k = (await _prompt(session,
+                '❓ 秘境类型（创建后不可更改）\n  1: 双人秘境：仅限两人，永远没有其他人。\n  2: 群组秘境：多人群组，每个成员都可以添加新人。\n（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (k.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+          _scheduleRender();
+          step = 1;
+        } else if (k == '1') {
+          spaceMode = 'duo';
+          session.messages.add(_systemMessage(session, '✅ 双人秘境（2 人）'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 3;
+        } else if (k == '2') {
+          spaceMode = 'group';
+          session.messages.add(_systemMessage(session, '✅ 群组秘境（多人）'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 3;
+        } else {
+          session.messages.add(_systemMessage(session, '⚠️ 请输入 1（双人）或 2（群组）'));
+          _scheduleRender();
+        }
+      break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+      case 3:
+        // 群聊一期（2026-10-03，v3）：create **不再预置同伴**——只录创建者自己。
+        // 同伴（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
+        // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
+        // ② 群空间里"对方"不止一人，预置两人身份的协议本身不成立。
+        // 原"同伴的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
+        // 留着就是白问 + 顶部条显示一个服务端根本不存在的名字）。
+        // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让同伴无法
+        // 凭口令加入、本机也没有口令密保箱可用）
+        final p = (await _prompt(session,
+                '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (p.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+          _scheduleRender();
+          step = 2;
+        } else {
+          final policyError = _passphrasePolicyError(p);
+          if (policyError != null) {
+            session.messages.add(_systemMessage(session, policyError));
+            _scheduleRender();
+          } else {
+            passphrase = p;
+            step = 4; // 问答链完成
+          }
+        }
     }
   }
-  // 我的性别（本地记录；Multiverse create 暂不提交——服务端不收 gender）。
-  // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
-  while (myGender == null) {
-    final g = (await _prompt(session, '❓ 我的性别是\n  1: 男\n  2: 女',
-            required: true))
-        .trim();
-    if (!_state!.running) return;
-    if (g == '1') {
-      myGender = '男';
-      session.messages.add(_systemMessage(session, '✅ 男'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    } else if (g == '2') {
-      myGender = '女';
-      session.messages.add(_systemMessage(session, '✅ 女'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    } else {
-      session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
-      _scheduleRender();
-    }
-  }
-  // 秘境类型（2026-10-08 对齐 App 向导第 2 步）：duo/group **创建时定死、之后
-  // 不可改**（老板拍板：不支持升格）。此前 TUI 从不询问——ApiClient 缺省 'duo'
-  // 把 TUI 的创建入口悄悄锁死双人（能加入 group 却不能创建）。
-  // 只接受数字 1/2（与性别问答同风格：不接受文字输入）
-  String spaceMode;
-  while (true) {
-    final k = (await _prompt(session, '❓ 秘境类型（创建后不可更改）\n  1: 双人秘境：仅限两人，永远没有其他人。\n  2: 群组秘境：多人群组，每个成员都可以添加新人。）',
-            required: true))
-        .trim();
-    if (!_state!.running) return;
-    if (k == '1') {
-      spaceMode = 'duo';
-      session.messages.add(_systemMessage(session, '✅ 双人秘境（2 人）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-      break;
-    }
-    if (k == '2') {
-      spaceMode = 'group';
-      session.messages.add(_systemMessage(session, '✅ 群组秘境（多人）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-      break;
-    }
-    session.messages
-        .add(_systemMessage(session, '⚠️ 请输入 1（双人）或 2（群组）'));
-    _scheduleRender();
-  }
-  // 群聊一期（2026-10-03，v3）：create **不再预置同伴**——只录创建者自己。
-  // 同伴（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
-  // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
-  // ② 群空间里"对方"不止一人，预置两人身份的协议本身就不成立。
-  // 原"同伴的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
-  // 留着就是白问 + 顶部条显示一个服务端根本不存在的名字）。
-  // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让同伴无法
-  // 凭口令加入、本机也没有口令密保箱可用）
-  String passphrase;
-  while (true) {
-    if (!_state!.running) return; // 口令阶段 /exit：不继续创建
-    passphrase = (await _prompt(session,
-            '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）:',
-            required: true))
-        .trim();
-    if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
-    final policyError = _passphrasePolicyError(passphrase);
-    if (policyError != null) {
-      session.messages.add(_systemMessage(session, policyError));
-      _scheduleRender();
-      continue;
-    }
-    break;
-  }
+  if (!_state!.running) return; // 问答链中退出（Ctrl+C/EOF）：不继续创建
   try {
     final s = await sodium();
     final spaceKeyB64 = base64Encode(s.randombytes.buf(32));
@@ -1168,82 +1172,113 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     session.messages.add(_systemMessage(session, '----------------'));
     String? myName;
     String? myGender;
-    if (isInvite) {
-      // 新成员自填名字（与 create 里"我的名字"同一条白名单）
-      while (true) {
-        myName = (await _prompt(session, '❓ 你的名字（后期可改）:', required: true)).trim();
-        if (!_state!.running) return;
-        if (myName.isEmpty) continue; // 防御：required 已拦空回车
-        final nameViolation = checkMemberNamePolicy(myName);
-        if (nameViolation != null) {
-          session.messages.add(_systemMessage(session, _memberNameRuleHint(nameViolation)));
-          _scheduleRender();
-          continue;
-        }
-        break;
-      }
-      // 性别（只接受 1/2，与 create 同口径——气泡配色用）
-      while (true) {
-        final g = (await _prompt(session, '❓ 你的性别是\n  1: 男\n  2: 女', required: true)).trim();
-        if (!_state!.running) return;
-        if (g == '1') {
-          myGender = '男';
-          break;
-        }
-        if (g == '2') {
-          myGender = '女';
-          break;
-        }
-        session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
-        _scheduleRender();
-      }
-      session.messages.add(_systemMessage(session, '✅ ${myName}'));
-      session.messages.add(_systemMessage(session, '----------------'));
-    }
-    // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
-    // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
-    // 被踢回「输入通道码」。改为用 preflight 已拿到的 spaceId 先调
-    // /spaces/{id}/key-escrow 验口令（不消费 token），错了就停在口令环节重输，
-    // 直到正确或 /exit（老板 2026-09-12）。
+    // 加入问答链（老板 2026-10-13 回退模型）：invite 时 名字 → 性别 → 验证口令；
+    // attach 时直接验证口令。无效输入原地重问；**空回车 = 退回上一问**（链首步
+    // 空回车 = 回到通道码提问，由 _runGuide 重问）。
+    final firstStep = isInvite ? 0 : 2; // 0=名字 1=性别 2=验证口令
+    var step = firstStep;
     EscrowPayload? verified;
-    while (true) {
-      if (!_state!.running) return;
-      final input =
-          (await _prompt(session, '❓ 验证共享口令:', hidden: false, required: true))
+    while (_state!.running && step < 3) {
+      switch (step) {
+        case 0:
+          // 新成员自填名字（与 create 里"我的名字"同一条白名单）
+          final n = (await _prompt(session,
+                  '❓ 你的名字（后期可改）（直接回车返回上一步）:'))
               .trim();
-      // 留空（含 /exit 中止）→ 重问；输入循环 required 已拦截留空回车
-      if (input.isEmpty) continue;
-      try {
-        final file = await _busy(session, '⏳ 核对口令中......',
-            () => api.fetchSpaceEscrow(pre.spaceId, input));
-        if (file == null) {
-          session.messages.add(_systemMessage(
-              session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
-          return;
-        }
-        // 连同解包一起验：口令对但包不匹配也按口令错误处理，避免白烧 token
-        verified =
-            await KeyEscrowService(api).openPackage(passphrase: input, envelope: file);
-        break;
-      } on ApiException catch (e) {
-        if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
-        // 404 = 该空间根本没有托管口令密保箱（不是口令输错，重输也没用）→ 明确提示后
-        // 退出；401 才是口令错 → 停在口令环节重输（老板 2026-09-12）
-        if (e.httpStatus == 404) {
-          session.messages.add(_systemMessage(
-              session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
-          return;
-        }
-        session.messages.add(
-            _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
-        _scheduleRender();
-      } on FormatException {
-        session.messages.add(
-            _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
-        _scheduleRender();
+          if (!_state!.running) return;
+          if (n.isEmpty) {
+            session.messages.add(_systemMessage(session, '↩️ 已返回上一步（通道码）'));
+            _scheduleRender();
+            return; // 回到通道码提问（_runGuide 的加入循环重问）
+          }
+          final nameViolation = checkMemberNamePolicy(n);
+          if (nameViolation != null) {
+            session.messages.add(_systemMessage(session, _memberNameRuleHint(nameViolation)));
+            _scheduleRender();
+          } else {
+            myName = n;
+            step = 1;
+          }
+        break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+        case 1:
+          // 性别（只接受 1/2，与 create 同口径——气泡配色用）
+          final g = (await _prompt(session,
+                  '❓ 你的性别是\n  1: 男\n  2: 女\n（直接回车返回上一步）:'))
+              .trim();
+          if (!_state!.running) return;
+          if (g.isEmpty) {
+            session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+            _scheduleRender();
+            step = 0;
+          } else if (g == '1') {
+            myGender = '男';
+            session.messages.add(_systemMessage(session, '✅ ${myName}'));
+            session.messages.add(_systemMessage(session, '----------------'));
+            step = 2;
+          } else if (g == '2') {
+            myGender = '女';
+            session.messages.add(_systemMessage(session, '✅ ${myName}'));
+            session.messages.add(_systemMessage(session, '----------------'));
+            step = 2;
+          } else {
+            session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
+            _scheduleRender();
+          }
+        break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+        case 2:
+          // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
+          // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
+          // 被踢回「输入通道码」。改为用 preflight 已拿到的 spaceId 先调
+          // /spaces/{id}/key-escrow 验口令（不消耗 token），错了就停在口令环节重输。
+          final entered = (await _prompt(session,
+                  '❓ 验证共享口令（直接回车返回上一步）:', hidden: false))
+              .trim();
+          if (!_state!.running) return;
+          if (entered.isEmpty) {
+            session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+            _scheduleRender();
+            if (firstStep == 0) {
+              step = 1;
+            } else {
+              return; // attach 流：口令是链首步，回退 = 回到通道码提问
+            }
+          } else {
+            try {
+              final file = await _busy(session, '⏳ 核对口令中......',
+                  () => api.fetchSpaceEscrow(pre.spaceId, entered));
+              if (file == null) {
+                session.messages.add(_systemMessage(
+                    session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
+                return;
+              }
+              // 连同解包一起验：口令对但包不匹配也按口令错误处理，避免白烧 token
+              verified = await KeyEscrowService(api)
+                  .openPackage(passphrase: entered, envelope: file);
+              step = 3; // 口令验证通过
+            } on ApiException catch (e) {
+              if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
+              // 404 = 该空间根本没有托管口令密保箱（不是口令输错，重输也没用）→ 明确提示后
+              // 退出；401 才是口令错 → 停在口令环节重输（老板 2026-09-12）
+              if (e.httpStatus == 404) {
+                session.messages.add(_systemMessage(
+                    session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
+                return;
+              }
+              session.messages.add(_systemMessage(
+                  session, '⚠️ 口令错误，请重新输入（直接回车返回上一步）'));
+              _scheduleRender();
+            } on FormatException {
+              session.messages.add(_systemMessage(
+                  session, '⚠️ 口令错误，请重新输入（直接回车返回上一步）'));
+              _scheduleRender();
+            }
+          }
       }
     }
-    final payload = verified; // 循环内 break 前必已赋值（分析期已提升为非空）
+    if (!_state!.running) return;
+    // verified 在口令步验证通过时赋值；走到这里 step 已 =3（必已赋值）
+    final payload = verified;
+    if (payload == null) return; // 防御：理论不可达（问答链未完成就退出）
     // 口令已通过 → 此时才真正 join（消费 token，只做一次）
     final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
@@ -1588,8 +1623,8 @@ Future<void> _execSwitch(_TuiState s, String path) async {
     var ok = false;
     while (_state!.running) {
       final pin =
-          await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true, secret: true);
-      if (!_state!.running) return; // /exit：中止一切
+          await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true);
+      if (!_state!.running) return; // 退出（Ctrl+C/EOF）：中止一切
       if (pin.trim().isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '✅ 已取消切换（未做任何改动）'));
         _scheduleRender();
@@ -2744,7 +2779,7 @@ Future<void> _runInputLoop() async {
   // 终端转义序列缓冲：raw 模式下方向键等到达为 ESC [ A 等多个字节（可能跨 chunk），
   // 需在此拼合完整后再解释，避免 '[' 与字母被当成普通字符打进输入（曾显示 [D[C[A[B）。
   var esc = '';
-  // 退出序列（Ctrl+C / 引导中 /exit / 解锁空回车 / 命令处理后 !running 五处共用）：
+  // 退出序列（Ctrl+C / 无上一问的问答空回车 / 命令处理后 !running 三处共用）：
   // 置退出标志 → 释放引导/解锁问答等待（否则 _runGuide/_unlockPin 的 await 挂起）
   // → 恢复终端（必须在 sub.cancel 之前，否则 fd 失效设不了 echoMode）→ 取消监听
   // → 结束主流程（否则 await 永远挂起）→ 兜底 2 秒强退（main 收尾在部分场景如
@@ -2835,50 +2870,23 @@ Future<void> _runInputLoop() async {
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
           final answer = _state!.input.toString().trim();
-          // 启动解锁问答的空回车 = 退出整个 TUI（老板 2026-10-13：这一步只认
-          // "输内容验 PIN"与"空回车退出"两种；区别于普通问答的空回车=跳过/取消）
-          if (answer.isEmpty && _state!.pendingUnlock) {
+          // 没有上一问可回退的"门"（启动锁屏码、向导首问 c/j）：空回车 = 退出
+          // 整个 TUI（老板 2026-10-13：这一步只认"输内容"与"空回车退出"两种）
+          if (answer.isEmpty && _state!.pendingExitOnEmpty) {
             _state!.input.clear();
             _state!.cursor = 0;
             exitNow();
             return;
           }
-          if (answer.startsWith('/') && !_state!.pendingSecretVerify) {
-            // / 开头的输入按命令处理，不当作口令/通道码回答提交（用户：要求
-            // 输入口令时 /exit 被当口令发送核对进"口令对接中"——应直接退出）。
-            // **机密验证问答例外**（pendingSecretVerify：锁屏码/共享口令验证）：
-            // 那里不认 /exit——按一次错误尝试提交，由校验失败提示引导回车取消
-            // （老板 2026-10-13：验证机密时唯一的"退出"就是直接回车）
-            _state!.input.clear();
-            _state!.cursor = 0; // 同步复位光标：否则下个字符 _insertAtCursor 越界崩溃
-            if (answer == '/exit' || answer == '/quit') {
-              // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
-              // 用户困在通道码/口令重试循环无法退出
-              exitNow();
-              return;
-            }
-            final cur = _state!.session; // 用当前的（/reset 会换掉 _state）
-            cur.messages.add(_systemMessage(cur, '⚠️ 引导中仅支持 /exit 退出（输入未提交）'));
-            _scheduleRender();
-            inputChanged = true;
-            continue;
-          }
-          if (answer.isEmpty && (_state?.pendingGuideRequired ?? false)) {
-            // 必填问答留空回车：**静默拒绝**——不提交，也**不往消息流里加提示**。
-            // 老板 2026-09-23：早先会打一条"⚠️ 请输入内容"，每按一次回车就把提问往上顶
-            // 一行、屏幕跟着跳；其实提示还在上面、光标还在输入行，用户自然知道要继续输。
-            _state!.input.clear();
-            _state!.cursor = 0; // 同步复位光标，避免越界崩溃
-            inputChanged = true; // 只重绘输入行（清掉可能输入过的全角空格时可见）
-            continue;
-          }
+          // 提交回答（含留空）。**任何输入都不再当命令解析**（老板 2026-10-13：
+          // TUI 里所有"要求输入"的地方都不认 /exit 等命令——输入只是输入，唯一的
+          // "退出"就是直接回车；空回车交给调用方解释：回退上一步 / 跳过 / 取消动作）
           _state!.input.clear();
           _state!.cursor = 0;
-          // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
+          // 引导问答回答：提交（含留空——调用方自行判定回退/跳过/取消）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
-          _state!.pendingSecretVerify = false;
-          _state!.pendingUnlock = false;
+          _state!.pendingExitOnEmpty = false;
           if (!gc.isCompleted) gc.complete(answer);
           try {
             _render(); // complete 后立即全量渲染（界面即时响应，不等 _runGuide continuation）
@@ -2909,10 +2917,8 @@ Future<void> _runInputLoop() async {
         final line = _state!.input.toString().trim();
         _state!.input.clear();
         _state!.cursor = 0;
-        // 输入历史（↑↓ 浏览复用）：口令/通道码等机密输入不进历史
+        // 输入历史（↑↓ 浏览复用）：隐藏回显的机密输入不进历史
         if (!_state!.hiddenInput &&
-            !_state!.pendingJoinToken &&
-            !_state!.pendingSpaceKey &&
             line.isNotEmpty &&
             (_state!.inputHistory.isEmpty || _state!.inputHistory.last != line)) {
           _state!.inputHistory.add(line);
@@ -2927,21 +2933,15 @@ Future<void> _runInputLoop() async {
         busy = true;
         // 命令回显（老板 2026-10-08）：聊天态输入的 /xxx 也按"我的消息"入列——
         // 纯本地展示（不加密/不入队/不上服务器/重启不留痕），结果消息紧随其后。
-        // 口令/通道码输入分支不回显（机密输入不留痕）；引导期问答不经此处
-        if (line.startsWith('/') &&
-            !_state!.pendingJoinToken &&
-            !_state!.pendingSpaceKey) {
+        // 引导期问答不经此处（隐藏输入不回显）
+        if (line.startsWith('/')) {
           _state!.session.addCommandEcho(line);
         }
-        final future = (_state!.pendingJoinToken)
-            ? (line.startsWith('/') ? _execCommand(line) : _handleJoinTokenInput(line)) // / 开头按命令（/exit 退出），否则按邀请链接
-            : (_state!.pendingSpaceKey)
-                ? (line.startsWith('/') ? _execCommand(line) : _handleSpaceKeyInput(line)) // / 开头按命令（/exit 退出），否则按口令
-                : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
+        final future = line.startsWith('/') ? _execCommand(line) : _sendText(line);
         future.whenComplete(() {
           busy = false;
           if (!(_state?.running ?? false)) {
-            // /exit 或 /quit：exitNow（先恢复终端——必须在 sub.cancel 之前，
+            // 命令触发退出：exitNow（先恢复终端——必须在 sub.cancel 之前，
             // 否则 fd 失效设不了 echoMode——再取消监听并结束主流程）
             exitNow();
           } else {
@@ -3194,7 +3194,7 @@ Future<void> _execReset(String storePath) async {
   final pinHash = session.store.pinHash;
   if (pinHash != null) {
     final pin = await _promptAction(session, '❓ 输入本机锁屏码，或直接回车取消:',
-        hidden: true, secret: true);
+        hidden: true);
     if (!s.running) return;
     if (pin == null) {
       session.messages.add(_systemMessage(session, '✅ 已取消，未做任何改动'));
@@ -3249,7 +3249,7 @@ Future<void> _execCommand(String line) async {
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
       const helpEntries = <(String, String)>[
         ('/attach <文件路径>', '上传文件'),
-        ('/auth', '激活/续期当前服务器的机密线路（换服务器用 /server）'),
+        ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -3309,24 +3309,28 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/auth':
-      // 未绑定（entranceId null，如引导时跳过/加入失败）→ 引导加入秘境后再认证
+      // 未绑定（entranceId null，如引导时跳过/加入失败）→ 带参直接加入：
+      // /auth <通道码或邀请链接>（老板 2026-10-13：不再有"下一行输入"的子模式——
+      // TUI 里所有要求输入的地方都不认 /exit 命令，统一用命令自带参数）
       if (s.session.store.entranceId == null) {
-        // 提示作为 system 消息进消息流；邀请链接由输入循环接管输入——
-        // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
-        s.pendingJoinToken = true;
+        if (arg.trim().isNotEmpty) {
+          await _spaceJoin(s.session, s.session.store, s.storePath, arg.trim());
+          break;
+        }
         s.session.messages.add(_systemMessage(
             s.session,
             '❓ 本通道尚未绑定秘境\n'
-            '   输入通道码（或邀请链接）加入同伴的秘境；\n'
-            '   新建秘境请先 /space create'));
-        s.status = '⌛️ 等待通道码输入…';
+            '   /auth <通道码或邀请链接> 👉 加入同伴的秘境\n'
+            '   /space create 👉 新建秘境'));
+        s.status = '';
         break;
       }
-      // 已经带了地址 = 想换服务器——那不是 /auth 的活（换服务器用 /server）
+      // 已绑定：带参不是 /auth 的活（加入别的秘境用 /space join，换服务器用 /server）
       if (arg.isNotEmpty) {
         s.session.messages.add(_systemMessage(
             s.session,
             'ℹ️ /auth 是对**当前**服务器激活/续期（不带参数）。\n'
+            '   加入其他秘境请用: /space join <通道码或邀请链接>\n'
             '   换服务器请用: /server $arg'));
         s.status = '';
         break;
@@ -3406,7 +3410,7 @@ Future<void> _execCommand(String line) async {
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前通道尚未绑定秘境'));
         }
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间'));
+        s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
         break;
       }
       {
@@ -3497,7 +3501,7 @@ Future<void> _execCommand(String line) async {
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
       // 选通道（序号/通道名）→ **抄一遍目标通道名** → 输入口令。任一步取消都不做任何改动。
       // **任一步留空回车即取消**（老板 2026-09-23：此前 required 拦空回车，用户被困，
-      // 只剩"输乱码报无效"和 /exit 两条别扭的路）。
+      // 只剩"输乱码报无效"一条别扭的路——空回车取消是 2026-09-23 补的）。
       // 第二步由 `yes` 改成抄名字（老板 2026-09-26）：`yes` 太机械、闭着眼也能敲过去，
       // 抄名字逼人看清"撤的是哪一台"。
       try {
@@ -3585,7 +3589,7 @@ Future<void> _execCommand(String line) async {
         // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权
         final passphrase = await _promptAction(
             s.session, '❓ 输入共享口令以确认操作，或直接回车取消:',
-            hidden: true, secret: true);
+            hidden: true);
         if (!s.running) break;
         if (passphrase == null) {
           s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
@@ -3901,7 +3905,7 @@ Future<void> _reinvite(_TuiState s) async {
   // （GET /key-escrow 拉密保箱 + openPackage 解封），失败不出码、不发签发请求——
   // 与 /revoke 同一口径。取消/留空 = 放弃签发。
   final entered = await _promptAction(s.session,
-      '❓ 输入共享口令以授权签发，或直接回车取消:', hidden: true, secret: true);
+      '❓ 输入共享口令以授权签发，或直接回车取消:', hidden: true);
   if (!s.running) return;
   if (entered == null) {
     s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未签发任何通道码）'));
@@ -4050,52 +4054,6 @@ Future<void> _execOpen(List<String> parts) async {
   }
 }
 
-/// 输入循环接管的"邀请链接加入"（/auth 未绑定时的引导）。
-///
-/// 走 `/space join` 的同一条路径（`_spaceJoin`）：preflight 校验 → 口令取钥 →
-/// joinSpace 登记通道 + 签发空间会话 + 取 Space Key。**v1 的通道码登记已随
-/// Multiverse 收敛删除**（2026-09-15 P1）：通道登记不再有单独的入口。
-Future<void> _handleJoinTokenInput(String token) async {
-  final s = _state!;
-  s.pendingJoinToken = false;
-  if (token.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供通道码，无法绑定到秘境'));
-    return;
-  }
-  s.status = '';
-  await _spaceJoin(s.session, s.session.store, s.session.storePath, token);
-}
-
-/// 输入循环接管的共享口令接入（/space 未接入引导）：口令 → accessByEscrow。
-Future<void> _handleSpaceKeyInput(String passphrase) async {
-  final s = _state!;
-  s.pendingSpaceKey = false;
-  if (passphrase.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法存取秘境内容'));
-    return;
-  }
-  if (passphrase.startsWith('/')) {
-    // / 开头的输入：/exit、/quit 按退出处理；其他 / 不当口令发送核对
-    if (passphrase == '/exit' || passphrase == '/quit') {
-      _state!.running = false;
-      return;
-    }
-    s.session.messages.add(_systemMessage(s.session, '共享口令不能以 / 开头，接入取消（可再输 /space 重试）'));
-    return;
-  }
-  try {
-    await s.session.accessByEscrow(passphrase);
-    s.session.messages.add(_systemMessage(
-        s.session,
-        '✅ 口令核对成功，本通道能够访问秘境内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
-    s.session.store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
-    s.session.store.save(s.session.storePath);
-  } catch (e) {
-    // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？秘境已有口令密保箱？）'));
-  }
-}
-
 /// 退出兜底：立即清屏（不留 TUI 残骸），2 秒后强制退出。
 /// main 收尾（farewell→exit(0)）在部分场景（WS/同步挂起）到不了，统一走这里。
 void _scheduleExitWithWipe() {
@@ -4115,7 +4073,7 @@ void _wipeScreen() {
 }
 
 void _printFarewell(ChatSession session) {
-  // /exit 后 stdout 流可能已关闭（pty 下 stdin/stdout 共享 fd，退出流程副作用），
+  // 退出后 stdout 流可能已关闭（pty 下 stdin/stdout 共享 fd，退出流程副作用），
   // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃。
   // 写 stderr（pty 实测 stdout 在清屏后已不可写，farewell 会被静默吞掉；
   // stderr 独立 sink 必达——与 _wipeScreen / _exitRevoked 同口径）
@@ -4296,7 +4254,6 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
   }
 }
 
-/// 设置托管口令（单次输入：口令不在消息流回显，留空回车由输入循环拦截不提交、
 /// 服务端是否已有本空间的口令密保箱（只问有没有，不解包）。
 /// 返回 `true`=确认有箱、`false`=确认无箱、**`null`=查不到**（网络/会话失效）。
 ///
@@ -4315,16 +4272,19 @@ Future<bool?> _serverHasEscrow(EntranceStore store, String server) async {
   }
 }
 
-/// 继续输入；成功标记 store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
+/// 设置托管口令（创建者引导中断后的恢复步，单问链）：口令不在消息流回显，
+/// **空回车 = 退出整个 TUI**（首问即末问，没有上一问可回退——老板 2026-10-13；
+/// 与 2026-09-23"口令必须给值"旧规则的区别：那时唯一的出路是 /exit，现在 /exit
+/// 不识别，空回车成为统一的退出/取消手段）。中断（Ctrl+C）后重启会再进此引导。
 Future<void> _setupEscrowPassphrase(EntranceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    // 向导里的一步（不是"动作"）：**只有锁屏码可以空回车跳过**（老板 2026-09-23 定），
-    // 共享口令必须给值 → required（留空回车被输入循环静默拒绝，停在原地继续等）
     final p1 = await _prompt(
-        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）:',
-        required: true);
+        session,
+        '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）（直接回车退出）:',
+        exitOnEmpty: true);
     if (!_state!.running) break;
+    if (p1.isEmpty) break; // 防御：空串（_abortPendingGuide 的 complete('')）不发送
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
       session.messages.add(_systemMessage(session, policyError));
@@ -4517,29 +4477,29 @@ ChatMessage _systemMessage(ChatSession session, String text) {
   );
 }
 
-/// 引导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
+/// 引导/向导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
 ///
-/// **选哪个提示函数**（2026-09-23 定的规则）：
-/// - **向导必填**（秘境入口 c/j、名字、性别、通道码、身份选择、共享口令、口令接入）
-///   → 用本函数 + `required: true`：留空回车**静默拒绝**（不提交、也不打提示，原地继续等）。
-///   向导里**唯一允许空回车跳过的是锁屏码**（`_askSetPin` 不带 `required`）。
-///   这里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit` / Ctrl+C。
-/// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase` 这类可从聊天里放弃的操作）
-///   → 用 [_promptAction]：留空回车 = 放弃这个动作。
-/// - **机密验证**（启动解锁 `_unlockPin`、`/switch` 目标 PIN、`/reset` PIN、
-///   `/revoke` 与 `/entoken reinvite` 的共享口令授权）→ `hidden: true, secret: true`：
-///   不明文回显；`/` 开头**不当命令**（按一次错误尝试提交，不退出）；直接回车 =
-///   取消/退出（老板 2026-10-13 策略：验证机密时唯一的"退出"就是回车——相当于
-///   App 弹窗里按取消按钮）。设置机密（`/pin`、入网口令）不在此列：那些明文
-///   回显、随时可 /exit。
+/// **空回车语义由调用方决定**（老板 2026-10-13 统一规则：TUI 里所有"要求输入"
+/// 的地方都**不识别 /exit 等命令**——输入只是输入；唯一的"退出"就是直接回车）：
+/// - `exitOnEmpty: true`（没有上一问可回退的门：启动锁屏码、向导首问 c/j）
+///   → 空回车 = 退出整个 TUI（输入循环落地退出序列，本函数不会返回）；
+/// - 其余（向导中间步骤）→ 空回车把空串交还给调用方，由步骤机**回退上一问**；
+/// - 动作内一步（[_promptAction]）→ 空回车 = 放弃当前动作（返回 null）。
+///
+/// **选哪个提示函数**：
+/// - **向导问答**（建/加空间的问答链、口令接入）→ 本函数，按上文决定空回车语义；
+/// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase`、`/switch`、`/entoken`
+///   这类可从聊天里放弃的操作）→ 用 [_promptAction]；
+/// - **机密验证**（启动解锁、/switch、/reset、/revoke、/entoken 的 PIN/口令授权）
+///   → `hidden: true`：不明文回显。设置机密（`/pin`、`_askSetPin`、入网口令）
+///   不隐藏：那些明文回显（老板 2026-09-14：隐藏时连自己敲了什么都看不见）。
 Future<String> _prompt(ChatSession session, String message,
-    {bool hidden = false, bool required = false, bool secret = false}) {
+    {bool hidden = false, bool exitOnEmpty = false}) {
   final s = _state!;
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
-  s.pendingGuideRequired = required; // 必填问答：留空回车由输入循环拦截不提交
-  s.pendingSecretVerify = secret; // 机密验证问答：/ 开头按错误尝试提交，不当命令
+  s.pendingExitOnEmpty = exitOnEmpty; // 空回车 = 退出整个 TUI（无上一问可回退的门）
   session.messages.add(_systemMessage(session, message));
   _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
   final completer = Completer<String>();
@@ -4555,13 +4515,12 @@ Future<String> _prompt(ChatSession session, String message,
 /// 重试循环，提示语自己写着"（或 /exit 退出）"。
 ///
 /// 与 [_prompt] 的差别只在意图：调用方拿到 null 就"已取消 + 不做任何改动"，无需再判空串。
-/// 退出（`/exit`）时 [_abortPendingGuide] 也会 complete 空回答 → 这里同样返回 null，
-/// 故调用方**必须先判 `running`**，否则退出时会多打一条"已取消"。
-/// 机密验证（`secret: true`，见 [_prompt]）时不认 /exit——空回车即取消，返回 null。
+/// 退出（Ctrl+C / EOF）时 [_abortPendingGuide] 也会 complete 空回答 → 这里同样返回
+/// null，故调用方**必须先判 `running`**，否则退出时会多打一条"已取消"。
+/// 2026-10-13 起这里同样不认 /exit——空回车即取消，返回 null。
 Future<String?> _promptAction(ChatSession session, String message,
-    {bool hidden = false, bool secret = false}) async {
-  final answer =
-      (await _prompt(session, message, hidden: hidden, secret: secret)).trim();
+    {bool hidden = false}) async {
+  final answer = (await _prompt(session, message, hidden: hidden)).trim();
   return answer.isEmpty ? null : answer;
 }
 
@@ -4571,8 +4530,7 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
-  _state?.pendingSecretVerify = false;
-  _state?.pendingUnlock = false;
+  _state?.pendingExitOnEmpty = false;
 }
 
 /// 新通道的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如
