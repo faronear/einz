@@ -144,7 +144,8 @@ void main() {
       });
 
       var hookCalls = <String>[];
-      onDnsPoisonDetected = (host, ip) => hookCalls.add('$host@$ip');
+      onDnsPoisonDetected = (host, ip, poisonedIp) =>
+          hookCalls.add('$host@$ip@$poisonedIp');
       addTearDown(() => onDnsPoisonDetected = null);
 
       // attempt 走钉扎工厂：无 pin 时假域名解析失败 → false
@@ -174,9 +175,11 @@ void main() {
       expect(pinnedServerIps['poisoned.einz.test'],
           InternetAddress.loopbackIPv4.address);
       await Future<void>.delayed(Duration.zero); // 上报/钩子是 fire-and-forget
+      // 第三段是假 IP：poisoned.einz.test 是保留测试域，系统解析当场查不到
+      // （NXDOMAIN）→ null（展示层降级为"未知"）；有注入时这里是假 IP。
       expect(hookCalls, [
-        'poisoned.einz.test@${InternetAddress.loopbackIPv4.address}'
-      ], reason: 'DoH 与系统解析分歧（= 污染）必须触发警报钩子');
+        'poisoned.einz.test@${InternetAddress.loopbackIPv4.address}@null'
+      ], reason: 'DoH 与系统解析分歧（= 污染）必须触发警报钩子（带假 IP 通道）');
     });
 
     test('DoH 失败（null）→ 返回原始失败结果，不钉扎', () async {

@@ -1365,9 +1365,12 @@ Future<void> main(List<String> args) async {
   // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。启动探测期（进 TUI 前）先
   // 缓冲、聊天态就绪后作为系统消息补显；会话期触发直接进消息流（不再打 stderr
   // ——raw 模式下那会花屏，且一闪而过没有持久提示，老板 2026-10-13）。
-  onDnsPoisonDetected = (host, ip) {
-    final text =
-        '⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip（已上报服务器）';
+  // **真 IP 不展示**（老板 2026-10-13：要保护）：只说"DoH 已自动修复"；假 IP
+  // （系统解析被注入成的地址）展示，让用户看清污染是什么样。
+  onDnsPoisonDetected = (host, pinnedIp, poisonedIp) {
+    final fake = poisonedIp == null ? '' : '（假 IP $poisonedIp）';
+    final text = '⚠️ DNS 污染：$host 系统解析被注入$fake，'
+        'DoH 已自动修复（已上报服务器）';
     final s = _state;
     if (_tuiReady && s != null && s.running) {
       s.session.messages.add(_systemMessage(s.session, text));

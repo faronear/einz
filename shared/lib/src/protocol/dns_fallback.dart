@@ -25,8 +25,11 @@ final Map<String, String> pinnedServerIps = <String, String>{};
 
 /// DNS 污染事件钩子：DoH 解析与系统解析**分歧**（= 链路被注入）并成功拿到
 /// 真 IP 时触发。App/CLI 用它把"此刻这个网络在被污染"变成可见警报。
-/// 全局单槽（本工程单服务器，无需多订阅）；回调异常被吞，绝不影响主流程。
-void Function(String host, String pinnedIp)? onDnsPoisonDetected;
+/// [poisonedIp] = 系统解析此刻返回的**假 IP**（现场再解析一次捕获，纯展示；
+/// 查不到/超时 = null）。全局单槽（本工程单服务器，无需多订阅）；回调异常被吞，
+/// 绝不影响主流程。
+void Function(String host, String pinnedIp, String? poisonedIp)?
+    onDnsPoisonDetected;
 
 void setServerPin(String host, String ip) => pinnedServerIps[host] = ip;
 void clearServerPin(String host) => pinnedServerIps.remove(host);
@@ -185,16 +188,35 @@ Future<T> probeWithDohFallback<T>(
   final ip = await (dohResolver ?? dohResolveHost)(host);
   if (ip == null) return first;
   setServerPin(host, ip);
-  _onPoisonDetected(server, host, ip);
+  // 系统解析此刻返回的就是被注入的假 IP（DoH 刚证明它与真 IP 分歧）——现场
+  // 再解析一次拿它，纯展示用（让用户看清"假的是什么、真的是什么"）；查不到
+  // /超时 = null（假 IP 未知，展示层降级）。2s 超时：这是失败重试路径，
+  // 不值得为它多等。
+  final poisonedIp = await _systemResolveForDisplay(host);
+  _onPoisonDetected(server, host, ip, poisonedIp);
   return attempt();
 }
 
-/// 污染事件落地：① 可见警报钩子；② 向被污染入口的服务端 fire-and-forget 上报
-/// 一条（走刚建立的钉扎连接，此时它是唯一保证可达的路径）。失败静默——
-/// 上报是尽力而为的遥测，绝不能反过来影响连接主流程。
-void _onPoisonDetected(String server, String host, String ip) {
+/// 系统解析（明文 DNS）当场查一次，取第一个地址——污染场景下它就是注入的假 IP。
+Future<String?> _systemResolveForDisplay(String host) async {
   try {
-    onDnsPoisonDetected?.call(host, ip);
+    final addrs =
+        await InternetAddress.lookup(host).timeout(const Duration(seconds: 2));
+    return addrs.isNotEmpty ? addrs.first.address : null;
+  } on Object {
+    return null;
+  }
+}
+
+/// 污染事件落地：① 可见警报钩子（带假 IP）；② 向被污染入口的服务端
+/// fire-and-forget 上报一条（走刚建立的钉扎连接，此时它是唯一保证可达的路径）。
+/// 失败静默——上报是尽力而为的遥测，绝不能反过来影响连接主流程。
+/// 上报载荷维持 {domain, doh_ip} 不变（服务端表结构就这两列；假 IP 是展示向的，
+/// 要入库需先做迁移，另开任务）。
+void _onPoisonDetected(
+    String server, String host, String ip, String? poisonedIp) {
+  try {
+    onDnsPoisonDetected?.call(host, ip, poisonedIp);
   } on Object {
     // 钩子是纯观测，异常不追责
   }

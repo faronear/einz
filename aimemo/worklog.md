@@ -14652,3 +14652,22 @@ loadHistory 后——它开头 clear messages）；`_tuiReady` 就绪后（含 W
 标记——`_startVoice` 入口置 true；`_stopVoice` 在非录音态时清标记而非直接 return；
 `start()` 完成后发现标记已被清则立即 `recorder.stop()` 丢弃本次启动。flutter
 analyze 通过。
+
+**（2026-10-13T08:55:00Z / 2026-10-13 16:55）**：DNS 污染警报补全——**假 IP 展示、
+真 IP 保护**（老板 2026-10-13 追问：被注入的 IP 是多少）。三处联动：
+- shared `dns_fallback.dart`：钩子改 3 参 `(host, pinnedIp, poisonedIp)`；
+  DoH 成功后当场再解析一次系统 DNS 捕获**假 IP**（2s 超时、查不到=null），
+  纯展示用；服务端上报载荷维持 {domain, doh_ip} 不变（假 IP 入库需先做
+  schema 迁移，另开任务）
+- TUI：系统消息改「$host 系统解析被注入（假 IP X），DoH 已自动修复（已上报
+  服务器）」——**真 IP 一律不展示**（老板：要保护）
+- App：`data/dns_poison_notice.dart` 新件（只存域名+假 IP，真 IP 不落展示层）；
+  main 挂钩子（正式包也挂，不再只 debug）；About 页「连接状态」下方增一行
+  「DNS 污染｜{host} 被注入为 {假 IP}」+ note（自动修复/已上报/真地址不展示），
+  假 IP 没能捕获时降级"未知"
+
+回归：shared 83 测全过（dns_fallback 钩子断言改 3 参）；app about_sheet 10 测
+（新增 3 个污染行用例：展示/降级/无事件不占位）+ server_config 3 测全过；
+TUI 端到端仪器验证：聊天态可见「⚠️ DNS 污染：einz.tic.cc 系统解析被注入
+（假 IP 198.51.100.7），DoH 已自动修复（已上报服务器）」，真 IP 不出现，
+仪器已还原；dart/flutter analyze 无问题。

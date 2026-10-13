@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../brand_logo.dart';
+import '../data/dns_poison_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
 import 'clickable.dart';
@@ -154,10 +155,45 @@ class _AboutSheetState extends State<AboutSheet> {
                             value = l10n.aboutStatusUnreachable;
                             valueColor = Theme.of(context).colorScheme.error;
                           }
-                          return _InfoRow(
-                            label: l10n.aboutStatusLabel,
-                            value: value,
-                            valueColor: valueColor,
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _InfoRow(
+                                label: l10n.aboutStatusLabel,
+                                value: value,
+                                valueColor: valueColor,
+                              ),
+                              // DNS 污染提示（老板 2026-10-13）：紧贴连接状态
+                              // 下方——本次会话若发生过 DoH 兜底（系统解析被
+                              // 注入、已钉扎真 IP），让用户知道"已连接"是自动
+                              // 修好的结果。无事件不占位。
+                              ValueListenableBuilder<DnsPoisonNotice?>(
+                                valueListenable: dnsPoisonNotice,
+                                builder: (context, notice, _) {
+                                  if (notice == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 14),
+                                    child: _InfoRow(
+                                      label: l10n.aboutDnsPoisonLabel,
+                                      // 假 IP 展示、真 IP 不展示（老板 2026-10-13：
+                                      // 要保护）——只说被注入成什么、已自动修复。
+                                      // 假 IP 没能当场捕获（系统解析此刻查不到）
+                                      // 时降级"未知"。
+                                      value: l10n.aboutDnsPoisonValue(
+                                          notice.host,
+                                          notice.poisonedIp ??
+                                              l10n.aboutDnsPoisonUnknownIp),
+                                      note: l10n.aboutDnsPoisonNote,
+                                      valueColor: Theme.of(context)
+                                          .colorScheme
+                                          .error,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           );
                         },
                       ),

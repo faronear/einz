@@ -2090,6 +2090,30 @@ abstract class AppLocalizations {
   /// **'Unreachable'**
   String get aboutStatusUnreachable;
 
+  /// No description provided for @aboutDnsPoisonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS poisoning'**
+  String get aboutDnsPoisonLabel;
+
+  /// No description provided for @aboutDnsPoisonValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{host} poisoned as {ip}'**
+  String aboutDnsPoisonValue(String host, String ip);
+
+  /// No description provided for @aboutDnsPoisonUnknownIp.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get aboutDnsPoisonUnknownIp;
+
+  /// No description provided for @aboutDnsPoisonNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your network is injecting fake answers for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown'**
+  String get aboutDnsPoisonNote;
+
   /// No description provided for @advancedMenuTitle.
   ///
   /// In en, this message translates to:

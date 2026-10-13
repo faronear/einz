@@ -7,6 +7,7 @@ import 'package:einz_shared/einz_shared.dart' show onDnsPoisonDetected;
 import 'brand_logo.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
+import 'data/dns_poison_notice.dart';
 import 'data/launch_args.dart';
 import 'data/local_database.dart';
 import 'data/local_reset.dart';
@@ -31,13 +32,17 @@ Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
   WidgetsFlutterBinding.ensureInitialized();
-  // DNS 污染警报（debug 可见）：DoH 兜底触发 = 当前网络在被注入。
-  // 正式包走静默上报（dns_fallback 内 fire-and-forget），不需要打扰用户。
-  assert(() {
-    onDnsPoisonDetected = (host, ip) =>
-        debugPrint('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip');
-    return true;
-  }());
+  // DNS 污染记录（2026-10-13 老板需求）：DoH 兜底触发 = 当前网络在被注入。
+  // 写进 dnsPoisonNotice（About 页「连接状态」下方展示）；debug 另打一份日志。
+  // 正式包也挂——静默上报之外，用户该知道「连接是被自动修好的」。
+  // 上报本身在 shared 的 dns_fallback 内 fire-and-forget，不依赖这里。
+  // 真 IP（pinnedIp）不记不展示（老板：要保护），只留域名与假 IP。
+  onDnsPoisonDetected = (host, pinnedIp, poisonedIp) {
+    debugPrint('⚠️ DNS 污染：$host 系统解析被注入'
+        '${poisonedIp == null ? '' : '（假 IP $poisonedIp）'}，DoH 已自动修复');
+    dnsPoisonNotice.value = DnsPoisonNotice(
+        host: host, poisonedIp: poisonedIp, at: DateTime.now());
+  };
   // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
   effectiveServer = await resolveServer(parseServerArg(await readLaunchArgs()));
   runApp(const EinzApp());

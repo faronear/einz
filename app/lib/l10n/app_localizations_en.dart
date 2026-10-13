@@ -1213,6 +1213,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutStatusUnreachable => 'Unreachable';
 
   @override
+  String get aboutDnsPoisonLabel => 'DNS poisoning';
+
+  @override
+  String aboutDnsPoisonValue(String host, String ip) {
+    return '$host poisoned as $ip';
+  }
+
+  @override
+  String get aboutDnsPoisonUnknownIp => 'unknown';
+
+  @override
+  String get aboutDnsPoisonNote =>
+      'Your network is injecting fake answers for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown';
+
+  @override
   String get advancedMenuTitle => 'Advanced security';
 
   @override
