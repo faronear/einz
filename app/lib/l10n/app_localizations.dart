@@ -1748,11 +1748,11 @@ abstract class AppLocalizations {
   /// **'Tap to resend'**
   String get chatPageMsgFailedTap;
 
-  /// No description provided for @chatPageOfflineUnsent.
+  /// No description provided for @chatPageMsgsUnsent.
   ///
   /// In en, this message translates to:
-  /// **'Offline · {count} unsent'**
-  String chatPageOfflineUnsent(int count);
+  /// **'Auto-retries when back online · {count} unsent, local messages only'**
+  String chatPageMsgsUnsent(int count);
 
   /// No description provided for @chatPageEntranceUnrecognized.
   ///
@@ -1760,17 +1760,11 @@ abstract class AppLocalizations {
   /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
   String get chatPageEntranceUnrecognized;
 
-  /// No description provided for @chatPageOfflineLocalOnly.
+  /// No description provided for @chatPageMsgsSyncing.
   ///
   /// In en, this message translates to:
-  /// **'Offline · local messages only, cannot send or receive'**
-  String get chatPageOfflineLocalOnly;
-
-  /// No description provided for @chatPageSyncingLocalOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'Syncing… send/receive temporarily unavailable · local messages only'**
-  String get chatPageSyncingLocalOnly;
+  /// **'Auto-syncs when back online · send/receive temporarily unavailable, local messages only'**
+  String get chatPageMsgsSyncing;
 
   /// No description provided for @chatPageMsgResending.
   ///

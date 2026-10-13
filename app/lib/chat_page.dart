@@ -595,10 +595,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 三档优先级：
   /// - 服务器不认本通道（库被重置）→ 淡红：明确"数据没被清除"，用户可继续读本地消息；
   /// - 有 pending 消息 + 连接异常 → 淡琥珀（原有：解释"小飞机停了很久"）；
-  /// - 仅连续同步失败（无 pending）→ 淡琥珀：措辞按 WS 态分两种（老板 2026-10-12：
-  ///   绿灯时再喊"离线·无法收发"自相矛盾——WS 连着说明实时链路是通的，只是 HTTP
-  ///   同步这一轮没成）：WS 在线 →「同步中… 暂时无法收发，仅可查看本地消息」；
-  ///   WS 不在线 →「离线 · 仅可查看本地消息，无法收发」（那时"离线"是准的）。
+  /// - 仅连续同步失败（无 pending）→ 淡琥珀：只讲后果与自动恢复，**不诊断网络**
+  ///   （2026-10-13 合并：原先按 WS 态分「同步中… / 离线」两种措辞，但网络诊断由
+  ///   状态条红绿灯承担，条里复述"离线"在绿灯时自相矛盾、复述"同步中"在红灯深退避
+  ///   时名不副实——统一成状态中性的一句，灯管灯、条管条）。
   /// 判定用 `_consecutiveSyncFailures > 0` 而不是 `!_ws.connected`，避免普通重连闪条。
   Widget _buildOfflineHint() {
     final l10n = AppLocalizations.of(context)!;
@@ -613,17 +613,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _consecutiveSyncFailures > 0 || (_ws != null && !_ws!.connected.value);
     if (_unsentCount > 0 && troubled) {
       return _hintBanner(
-        l10n.chatPageOfflineUnsent(_unsentCount),
+        l10n.chatPageMsgsUnsent(_unsentCount),
         bg: const Color(0xFFFFF3E0), // 淡琥珀：提示而非报错
         fg: const Color(0xFF8A5300),
       );
     }
     if (_consecutiveSyncFailures == 0) return const SizedBox.shrink();
-    final wsOnline = _ws?.connected.value ?? false;
     return _hintBanner(
-      wsOnline
-          ? l10n.chatPageSyncingLocalOnly
-          : l10n.chatPageOfflineLocalOnly,
+      l10n.chatPageMsgsSyncing,
       bg: const Color(0xFFFFF3E0),
       fg: const Color(0xFF8A5300),
     );

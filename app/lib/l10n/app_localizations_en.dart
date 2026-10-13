@@ -1014,8 +1014,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
-  String chatPageOfflineUnsent(int count) {
-    return 'Offline · $count unsent';
+  String chatPageMsgsUnsent(int count) {
+    return 'Auto-retries when back online · $count unsent, local messages only';
   }
 
   @override
@@ -1023,12 +1023,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
 
   @override
-  String get chatPageOfflineLocalOnly =>
-      'Offline · local messages only, cannot send or receive';
-
-  @override
-  String get chatPageSyncingLocalOnly =>
-      'Syncing… send/receive temporarily unavailable · local messages only';
+  String get chatPageMsgsSyncing =>
+      'Auto-syncs when back online · send/receive temporarily unavailable, local messages only';
 
   @override
   String get chatPageMsgResending => 'Resending…';

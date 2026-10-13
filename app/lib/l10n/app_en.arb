@@ -504,8 +504,8 @@
   "chatPageMsgDelivered": "Delivered",
   "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageMsgFailedTap": "Tap to resend",
-  "chatPageOfflineUnsent": "Offline · {count} unsent",
-  "@chatPageOfflineUnsent": {
+  "chatPageMsgsUnsent": "Auto-retries when back online · {count} unsent, local messages only",
+  "@chatPageMsgsUnsent": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -513,8 +513,7 @@
     }
   },
   "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
-  "chatPageOfflineLocalOnly": "Offline · local messages only, cannot send or receive",
-  "chatPageSyncingLocalOnly": "Syncing… send/receive temporarily unavailable · local messages only",
+  "chatPageMsgsSyncing": "Auto-syncs when back online · send/receive temporarily unavailable, local messages only",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
