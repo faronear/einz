@@ -3047,21 +3047,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
-                  // 标题下备注行（老板 2026-10-06）：式样同「我的秘境」「通道列表」
-                  // 弹层标题下的说明——淡色小字、居中。duo **对方尚未加入**时不显示
-                  // （那时按钮是「邀请」新同伴，与备注说的「重新邀请」不符；对方
-                  // 加入后 duo 按钮也是「重新邀请」，同样适用这条备注）。
-                  if (!(!_isGroup && _peerJoined == false))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Center(
-                        child: Text(l10n.chatPageMembersHint,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(ctx).colorScheme.outline)),
-                      ),
-                    ),
                   // 群空间：成员列表前放「群名称」标题行（老板 2026-10-11）：
                   // **不用卡片**——白底上的标题文字（同弹层标题字号/字重），
                   // 未设置 → 淡色占位词「群空间名称/Group space name」；

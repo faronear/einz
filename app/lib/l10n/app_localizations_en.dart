@@ -260,7 +260,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
+      'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -750,9 +750,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageMembersHint => '';
-
-  @override
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
@@ -1189,7 +1186,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
+      'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';
