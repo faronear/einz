@@ -14680,3 +14680,5 @@ TUI 端到端仪器验证：聊天态可见「⚠️ DNS 污染：einz.tic.cc �
 行 value（`{host} 被劫持到 {ip}`）与 note；英文同步 hijack 口径（poisoned as
 → hijacked to）。技术注释里的“注入”保留（对开发者是准确术语）。回归：
 about_sheet 10 测全过、TUI analyze 无问题。
+
+**（2026-10-13T09:20:33Z / 2026-10-13 17:20）**：dart-docker.sh 启动慢根因与修复。老板在 cn1 上有时 root 直接运行、有时 sudo 运行：脚本挂载 `$HOME/.pub-cache`，sudo 下 HOME=/var/root、root 下 HOME=/root，都是与普通用户各异的空缓存目录 → 每次启动 pub 全量重新下载 + 全量编译，慢 30-60s；残留容器是强杀时 --rm 未清理，与慢无直接关系。修复：检测 SUDO_USER 自动切回真实用户的 HOME/uid/gid（容器本就无需特权）；直接 root 运行时警告缓存分裂并提示固定方式，另加 DART_PUB_CACHE_HOME 环境变量可让 root 与普通用户共用一份缓存。bash -n 与 sudo/非 sudo 两条路径 sourcing 验证通过；cn1 上待老板实测首次后第二次启动应秒级（pub get 秒回、dart run 走快照缓存）。

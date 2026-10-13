@@ -20,13 +20,34 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # 本脚本目录 = cli/
 ROOT="$(cd "$DIR/.." && pwd)"                        # 仓库根
 IMG="${DART_IMAGE:-dart-sodium}"
 
+# sudo 下运行时自动回退到真实用户身份（2026-10-13 老板实测：sudo ./dart-docker.sh
+# 会让 $HOME=/var/root，挂载的 pub 缓存/身份目录变成 root 的空目录——每次启动都
+# 重新下载全部 pub 包并全量编译，慢 30-60s；容器无需特权，直接用真实用户跑即可）。
+if [ -n "${SUDO_USER:-}" ] && [ "$(id -u)" = "0" ]; then
+  REAL_HOME="$(eval echo "~$SUDO_USER")"
+  REAL_UID="$(id -u "$SUDO_USER")"
+  REAL_GID="$(id -g "$SUDO_USER")"
+  echo "ℹ️  检测到 sudo 运行——已切回真实用户 $SUDO_USER（无需 sudo；否则 pub 缓存挂到 root 空目录，每次全量下载）"
+else
+  REAL_HOME="${DART_PUB_CACHE_HOME:-$HOME}"
+  REAL_UID="$(id -u)"
+  REAL_GID="$(id -g)"
+  # 直接 root 登录运行（无 SUDO_USER）：缓存落在 /root，与普通用户的缓存是两份，
+  # 两种方式混用必有一方反复全量下载（cn1 实测 2026-10-13）。提示保持一致，或用
+  # DART_PUB_CACHE_HOME 指定共享目录（如 /opt/einz-home）让 root 与普通用户共用一份。
+  if [ "$(id -u)" = "0" ] && [ -z "${DART_PUB_CACHE_HOME:-}" ]; then
+    echo "⚠️  以 root 运行：pub 缓存/身份目录使用 /root（与普通用户各自一份）。"
+    echo "    建议固定同一种运行方式；或在 root 下导出 DART_PUB_CACHE_HOME=<普通用户家目录> 共用缓存。"
+  fi
+fi
+
 run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
   local tty="$1"
   shift
   docker run --rm "$tty" \
-    -u "$(id -u):$(id -g)" -e HOME=/tmp \
-    -v "$HOME/.pub-cache":/tmp/.pub-cache \
-    -v "$HOME/.einz":/tmp/.einz \
+    -u "$REAL_UID:$REAL_GID" -e HOME=/tmp \
+    -v "$REAL_HOME/.pub-cache":/tmp/.pub-cache \
+    -v "$REAL_HOME/.einz":/tmp/.einz \
     -v "$ROOT":/app -w /app/cli \
     "$IMG" "$@"
 }
