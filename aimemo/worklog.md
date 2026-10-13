@@ -14713,3 +14713,21 @@ server_config+about_sheet 13 测全过；**真实环境实测**（本机 hosts �
 tic.cc 指向 127.0.0.1）：四个入口域名全部不钉扎不报警；TUI analyze 无问题。
 
 **（2026-10-13T11:00:12Z / 2026-10-13 19:00）**：dart-docker.sh local 报错修复 + 提交历史整理。cn1 实测 `local: can only be used in a function`——dill 缓存逻辑写进了 case 分支（非函数作用域），local 在 bash 中仅函数内合法；改为普通变量（dd790b53），cn1 已同步验证正常走到 pub get。此前应老板要求把 7 个未推送提交重排为 3 个干净提交（b7badc97 脚本最终版 / feaa558b DNS 修复 / 464d0d09 worklog）。教训：bash 脚本里 case 分支体不是函数体，local/declare 不能用；shell 语法校验（bash -n）不查 local 作用域，须实际运行验证。
+
+**（2026-10-13T12:40:35Z / 2026-10-13 20:40）**：修 GitHub CI macOS 产物版本号不一致
+（老板报：`einz-app-macos-dist.zip` 与 `.version.txt` 版本不符，如 2610.1310.17 vs
+2610.1310.22，导致 updateMacosApp.js 总是重复下载）。根因与老板猜测一致：
+`appVersion.js` 是 `new Date()` 现算，Build step（flutter build 前 eval，10:17）与
+Zip step（又跑一次 `appVersion.js --build-name`，10:22）之间隔着签名 + 公证
+（Apple 扫描 2–10 分钟），两次调用跨分钟就不一致；version.txt 永远比 zip 内
+Info.plist 大 → 更新脚本装完本地版本仍小于远程，每次都重下几百 MB 且不收敛。
+workflow 里"同一构建内两次调用结果一致"的注释是错的。本地 buildMacos.sh 无此问题
+（单次 eval 单一来源）。
+
+修复（buildMultiPlatform.yml Zip app bundle step）：version.txt 改为**从产物自己的
+Info.plist 读**（`plutil -extract CFBundleShortVersionString raw`，iOS job 已有同款
+用法）——Info.plist 是产物 ground truth，旁车文件与 zip 内容逐字一致，从构造上消除
+不一致；并加 `yymm.ddhh.mm` 格式断言，flutter 没吃到 --build-name 时当场失败，
+不做"绿但坏"。docs/CI.md 补同一说明。验证：ruby psych 解析 workflow YAML 通过；
+临时 plist 实测 plutil 读取与格式断言（好版本通过 / 1.0.0 被拦截）。CI 下次构建
+起 version.txt 与 zip 一致；存量已装旧包的用户下一次检查即可正常收敛。
