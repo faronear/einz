@@ -14711,3 +14711,5 @@ DoH 的结果**——连接失败可能只是服务没起来，与 DNS 无关。
 回归：shared 87 测全过（+4 新用例：一致/回环/内网/无答案）；app
 server_config+about_sheet 13 测全过；**真实环境实测**（本机 hosts 同样把
 tic.cc 指向 127.0.0.1）：四个入口域名全部不钉扎不报警；TUI analyze 无问题。
+
+**（2026-10-13T11:00:12Z / 2026-10-13 19:00）**：dart-docker.sh local 报错修复 + 提交历史整理。cn1 实测 `local: can only be used in a function`——dill 缓存逻辑写进了 case 分支（非函数作用域），local 在 bash 中仅函数内合法；改为普通变量（dd790b53），cn1 已同步验证正常走到 pub get。此前应老板要求把 7 个未推送提交重排为 3 个干净提交（b7badc97 脚本最终版 / feaa558b DNS 修复 / 464d0d09 worklog）。教训：bash 脚本里 case 分支体不是函数体，local/declare 不能用；shell 语法校验（bash -n）不查 local 作用域，须实际运行验证。
