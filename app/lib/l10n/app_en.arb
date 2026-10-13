@@ -704,7 +704,7 @@
   "aboutStatusConnected": "Connected",
   "aboutStatusUnreachable": "Unreachable",
   "aboutDnsPoisonLabel": "DNS poisoning",
-  "aboutDnsPoisonValue": "{host} poisoned as {ip}",
+  "aboutDnsPoisonValue": "{host} hijacked to {ip}",
   "@aboutDnsPoisonValue": {
     "placeholders": {
       "host": {
@@ -716,7 +716,7 @@
     }
   },
   "aboutDnsPoisonUnknownIp": "unknown",
-  "aboutDnsPoisonNote": "Your network is injecting fake answers for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown",
+  "aboutDnsPoisonNote": "Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown",
   "advancedMenuTitle": "Advanced security",
   "advancedDestroyEntrance": "Destroy this entrance",
   "advancedClearMessages": "Delete all messages",

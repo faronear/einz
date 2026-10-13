@@ -2099,7 +2099,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutDnsPoisonValue.
   ///
   /// In en, this message translates to:
-  /// **'{host} poisoned as {ip}'**
+  /// **'{host} hijacked to {ip}'**
   String aboutDnsPoisonValue(String host, String ip);
 
   /// No description provided for @aboutDnsPoisonUnknownIp.
@@ -2111,7 +2111,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutDnsPoisonNote.
   ///
   /// In en, this message translates to:
-  /// **'Your network is injecting fake answers for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown'**
+  /// **'Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown'**
   String get aboutDnsPoisonNote;
 
   /// No description provided for @advancedMenuTitle.

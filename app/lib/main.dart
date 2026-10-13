@@ -38,7 +38,7 @@ Future<void> main() async {
   // 上报本身在 shared 的 dns_fallback 内 fire-and-forget，不依赖这里。
   // 真 IP（pinnedIp）不记不展示（老板：要保护），只留域名与假 IP。
   onDnsPoisonDetected = (host, pinnedIp, poisonedIp) {
-    debugPrint('⚠️ DNS 污染：$host 系统解析被注入'
+    debugPrint('⚠️ DNS 污染：$host 域名解析被劫持'
         '${poisonedIp == null ? '' : '（假 IP $poisonedIp）'}，DoH 已自动修复');
     dnsPoisonNotice.value = DnsPoisonNotice(
         host: host, poisonedIp: poisonedIp, at: DateTime.now());

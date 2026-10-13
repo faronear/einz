@@ -14671,3 +14671,12 @@ analyze 通过。
 TUI 端到端仪器验证：聊天态可见「⚠️ DNS 污染：einz.tic.cc 系统解析被注入
 （假 IP 198.51.100.7），DoH 已自动修复（已上报服务器）」，真 IP 不出现，
 仪器已还原；dart/flutter analyze 无问题。
+
+**（2026-10-13T09:03:54Z / 2026-10-13 17:03）**：TUI 锁屏期身份泄露修复。老板实测：设了 PIN 的空间刚启动、验证 PIN 期间，标题栏右侧「我」显示「成员」、左侧显示对方真名。归因：①「成员」来自 attach/口令接入流程 `store.memberName = myName ?? '成员'`（attach 流不问名字，myName 为 null）的兜底，远端名称表查不到我时标题栏落到该兜底；②对方真名来自 GET /space 落盘的成员名称表缓存（store.memberNames/peerName），启动渲染早于 PIN 解锁。修复：加 `_identityHidden` 标志——`_unlockPin` 进入时置 true、验证通过置 false，渲染期间两侧一律显示中性占位「?」（duo 左段、group 名单、右段我的名字三处都拦），解锁后才恢复真名。dart analyze 无问题，cli 22 测试全过。
+
+**（2026-10-13T09:05:00Z / 2026-10-13 17:05）**：DNS 警报文案小白化（老板：注入
+是中性的，小白不知道是坏事）。用户可见处「系统解析被注入 / 抢答注入」统一改
+「域名解析被劫持 / 在劫持该域名的解析」：TUI 系统消息、App debugPrint、About
+行 value（`{host} 被劫持到 {ip}`）与 note；英文同步 hijack 口径（poisoned as
+→ hijacked to）。技术注释里的“注入”保留（对开发者是准确术语）。回归：
+about_sheet 10 测全过、TUI analyze 无问题。

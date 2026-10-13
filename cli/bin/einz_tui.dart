@@ -1374,10 +1374,10 @@ Future<void> main(List<String> args) async {
   // 缓冲、聊天态就绪后作为系统消息补显；会话期触发直接进消息流（不再打 stderr
   // ——raw 模式下那会花屏，且一闪而过没有持久提示，老板 2026-10-13）。
   // **真 IP 不展示**（老板 2026-10-13：要保护）：只说"DoH 已自动修复"；假 IP
-  // （系统解析被注入成的地址）展示，让用户看清污染是什么样。
+  // （被劫持成的假地址）展示，让用户看清污染是什么样。
   onDnsPoisonDetected = (host, pinnedIp, poisonedIp) {
     final fake = poisonedIp == null ? '' : '（假 IP $poisonedIp）';
-    final text = '⚠️ DNS 污染：$host 系统解析被注入$fake，'
+    final text = '⚠️ DNS 污染：$host 域名解析被劫持$fake，'
         'DoH 已自动修复（已上报服务器）';
     final s = _state;
     if (_tuiReady && s != null && s.running) {

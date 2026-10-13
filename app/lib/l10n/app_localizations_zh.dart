@@ -1147,7 +1147,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String aboutDnsPoisonValue(String host, String ip) {
-    return '$host 被注入为 $ip';
+    return '$host 被劫持到 $ip';
   }
 
   @override
@@ -1155,7 +1155,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutDnsPoisonNote =>
-      '当前网络在对该域名抢答注入（上面是它给出的假地址）；连接已由加密解析（DoH）自动修复，事件已上报服务器。真地址已保护不展示';
+      '当前网络在劫持该域名的解析（上面是它给出的假地址）；连接已由加密解析（DoH）自动修复，事件已上报服务器。真地址已保护不展示';
 
   @override
   String get advancedMenuTitle => '高级安全';
