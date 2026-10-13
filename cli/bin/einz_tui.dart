@@ -198,10 +198,12 @@ const String _kPrimaryServer = 'https://einz.tic.cc';
 
 /// 启动探测期（进 TUI 前）缓冲的 DNS 污染警报文本。
 ///
-/// 污染发生在启动探测阶段（`_defaultServer`/`_probeRevoked`），那时全屏 TUI 还没
-/// 起来，stderr 打一行会被随后的清屏渲染冲掉——老板 2026-10-13 反馈「一闪而过
-/// 等于没提示」。改为：启动期先缓冲，进聊天态后作为系统消息补显（main 里
-/// loadHistory 之后统一 flush）；会话期（WS 重连再触发）直接进消息流。
+/// 污染判定在启动探测阶段（`_defaultServer`/`_probeRevoked`，见 shared 的
+/// `probeWithDohFallback`：**只有系统解析与 DoH 分歧才算**——一致/回环/内网
+/// 都是本机正确配置，不报警），那时全屏 TUI 还没起来，stderr 打一行会被随后
+/// 的清屏渲染冲掉——老板 2026-10-13 反馈「一闪而过等于没提示」。改为：启动期
+/// 先缓冲，进聊天态后作为系统消息补显（main 里 loadHistory 之后统一 flush）；
+/// 会话期（WS 重连再触发）直接进消息流。
 final List<String> _dnsPoisonNotes = [];
 
 /// TUI 聊天态是否就绪（loadHistory 之后）：就绪后污染警报直接进消息流；
@@ -1370,7 +1372,8 @@ Future<void> main(List<String> args) async {
   if (Platform.environment['EINZ_UNITTEST'] == '1') return;
   await sodium();
 
-  // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。启动探测期（进 TUI 前）先
+  // DNS 污染警报：系统解析与 DoH 分歧（= 真·劫持，判定见 shared）。启动探测期
+  // （进 TUI 前）先
   // 缓冲、聊天态就绪后作为系统消息补显；会话期触发直接进消息流（不再打 stderr
   // ——raw 模式下那会花屏，且一闪而过没有持久提示，老板 2026-10-13）。
   // **真 IP 不展示**（老板 2026-10-13：要保护）：只说"DoH 已自动修复"；假 IP
