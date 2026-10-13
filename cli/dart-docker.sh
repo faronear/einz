@@ -89,8 +89,8 @@ case "${1:-setup}" in
     # 内核快照缓存（cn1 实测 2026-10-13）：dart run 每次 JIT 编译整个 TUI ~15s
     # （cn1 CPU 慢，dart run 不落内核缓存）——改为 compile kernel 一次（~2s，源码
     # 未变则跳过重编）后 dart 直跑 dill（~2s）。dill 放 cli/.dart_tool/，随仓库走。
-    local dill=".dart_tool/einz_tui.dill"
-    local stale=1
+    dill=".dart_tool/einz_tui.dill"
+    stale=1
     if [ -f "$ROOT/cli/$dill" ]; then
       # 任一源文件（bin/lib + pubspec）比 dill 新即过期 → 重编
       if [ -z "$(find "$ROOT/cli/bin" "$ROOT/cli/lib" "$ROOT/cli/pubspec.yaml" -newer "$ROOT/cli/$dill" -print -quit 2>/dev/null)" ]; then
