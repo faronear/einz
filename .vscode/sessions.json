@@ -73,10 +73,10 @@
         ]
       },
       {
-        "name": "tui-oddsgame--远端",
+        "name": "tui--远端",
         "autoExecuteCommands": true,
         "commands": [
-          "cd ~/einz/cli && dart bin/einz_tui.dart --store ~/.einz/oddsgame.json"
+          "cd ~/einz/cli && dart bin/einz_tui.dart"
         ]
       }
     ]
