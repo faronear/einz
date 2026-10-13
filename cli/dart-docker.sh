@@ -20,25 +20,23 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # 本脚本目录 = cli/
 ROOT="$(cd "$DIR/.." && pwd)"                        # 仓库根
 IMG="${DART_IMAGE:-dart-sodium}"
 
-# sudo 下运行时自动回退到真实用户身份（2026-10-13 老板实测：sudo ./dart-docker.sh
-# 会让 $HOME=/var/root，挂载的 pub 缓存/身份目录变成 root 的空目录——每次启动都
-# 重新下载全部 pub 包并全量编译，慢 30-60s；容器无需特权，直接用真实用户跑即可）。
-if [ -n "${SUDO_USER:-}" ] && [ "$(id -u)" = "0" ]; then
-  REAL_HOME="$(eval echo "~$SUDO_USER")"
-  REAL_UID="$(id -u "$SUDO_USER")"
-  REAL_GID="$(id -g "$SUDO_USER")"
-  echo "ℹ️  检测到 sudo 运行——已切回真实用户 $SUDO_USER（无需 sudo；否则 pub 缓存挂到 root 空目录，每次全量下载）"
+# 身份策略（老板 2026-10-13 修订）：/root/.einz 是真正的身份仓库——sudo 运行的
+# 目的就是用它，因此 sudo 视同 root（挂 /root 的 pub 缓存与 .einz），直接 root
+# 登录同样放行；普通用户运行才提示身份差异（用的是自家 ~/.einz）。
+if [ "$(id -u)" = "0" ]; then
+  REAL_HOME="/root"
+  REAL_UID=0
+  REAL_GID=0
+elif [ -n "${SUDO_USER:-}" ]; then
+  echo "❌ 不支持的调用方式：sudo 身份不完整（SUDO_USER=$SUDO_USER 但 uid 非 0）。"
+  echo "   请直接 sudo ./dart-docker.sh，或以 root 登录后运行。"
+  exit 1
 else
   REAL_HOME="${DART_PUB_CACHE_HOME:-$HOME}"
   REAL_UID="$(id -u)"
   REAL_GID="$(id -g)"
-  # 直接 root 登录运行（无 SUDO_USER）：缓存落在 /root，与普通用户的缓存是两份，
-  # 两种方式混用必有一方反复全量下载（cn1 实测 2026-10-13）。提示保持一致，或用
-  # DART_PUB_CACHE_HOME 指定共享目录（如 /opt/einz-home）让 root 与普通用户共用一份。
-  if [ "$(id -u)" = "0" ] && [ -z "${DART_PUB_CACHE_HOME:-}" ]; then
-    echo "⚠️  以 root 运行：pub 缓存/身份目录使用 /root（与普通用户各自一份）。"
-    echo "    建议固定同一种运行方式；或在 root 下导出 DART_PUB_CACHE_HOME=<普通用户家目录> 共用缓存。"
-  fi
+  # 普通用户运行：真仓库就是他自己的 ~/.einz、缓存就是他自己的 ~/.pub-cache，
+  # 与 root 身份互不相通，各自独立成套（不提示、不干预——老板 2026-10-13）。
 fi
 
 run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
@@ -88,7 +86,22 @@ case "${1:-setup}" in
     # 按入库 lockfile 强制解析：lockfile 与 pubspec 不符或缓存残留旧包时直接报错，
     # 避免静默解析出不兼容版本（曾致首次安装时报 SodiumSumoInit 旧 API 编译错）
     run_container -i dart pub get --enforce-lockfile
-    run_container -it dart run bin/einz_tui.dart "$@"
+    # 内核快照缓存（cn1 实测 2026-10-13）：dart run 每次 JIT 编译整个 TUI ~15s
+    # （cn1 CPU 慢，dart run 不落内核缓存）——改为 compile kernel 一次（~2s，源码
+    # 未变则跳过重编）后 dart 直跑 dill（~2s）。dill 放 cli/.dart_tool/，随仓库走。
+    local dill=".dart_tool/einz_tui.dill"
+    local stale=1
+    if [ -f "$ROOT/cli/$dill" ]; then
+      # 任一源文件（bin/lib + pubspec）比 dill 新即过期 → 重编
+      if [ -z "$(find "$ROOT/cli/bin" "$ROOT/cli/lib" "$ROOT/cli/pubspec.yaml" -newer "$ROOT/cli/$dill" -print -quit 2>/dev/null)" ]; then
+        stale=0
+      fi
+    fi
+    if [ "$stale" = 1 ]; then
+      echo "==> 编译内核快照（源码有改动或首次启动；之后启动免编译）…"
+      run_container -i dart compile kernel -o "$dill" bin/einz_tui.dart
+    fi
+    run_container -it dart "$dill" "$@"
     ;;
   dartc)
     shift
