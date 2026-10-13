@@ -14713,3 +14713,16 @@ server_config+about_sheet 13 测全过；**真实环境实测**（本机 hosts �
 tic.cc 指向 127.0.0.1）：四个入口域名全部不钉扎不报警；TUI analyze 无问题。
 
 **（2026-10-13T11:00:12Z / 2026-10-13 19:00）**：dart-docker.sh local 报错修复 + 提交历史整理。cn1 实测 `local: can only be used in a function`——dill 缓存逻辑写进了 case 分支（非函数作用域），local 在 bash 中仅函数内合法；改为普通变量（dd790b53），cn1 已同步验证正常走到 pub get。此前应老板要求把 7 个未推送提交重排为 3 个干净提交（b7badc97 脚本最终版 / feaa558b DNS 修复 / 464d0d09 worklog）。教训：bash 脚本里 case 分支体不是函数体，local/declare 不能用；shell 语法校验（bash -n）不查 local 作用域，须实际运行验证。
+
+**（2026-10-13T14:07:00Z / 2026-10-13 22:07）**：TUI 锁屏码验证前**身份零泄露**
+（老板 2026-10-13：验证通过前完全不要显示对方/我的名字、通道、状态等信息，
+状态栏只显示中间的产品名）。此前并行提交只把标题栏两侧换成占位「?」——老板
+要求更彻底：解锁前**标题栏左右两段整个置空**（连 ? 都不要），只留居中产品名
+Einz；底部状态行同步只显示居中 Einz（命令提示、瞬时 status、历史浏览提示
+一并压制）；_unlockPin 里不会显示的解锁 status 设置删除（提示语本就在消息流）。
+消息流本就干净（loadHistory 在解锁后才跑——上一轮 bug 修复的结构性保证）。
+测试（unlock_flow_check 场景 G，新基建）：store 预置可辨名字/通道名，pty 按
+清屏序列切「当前稳定帧」断言——解锁提示态与错误重试态帧内只有 Einz（名字、
+通道名、entrance_id、?、状态灯 ●○↻✗⊘、底部命令提示、🔒 全部不出现），
+解锁成功后名字与命令提示恢复。回归：unlock_flow 6 场景全过、guide 三件套、
+revoke、dart analyze 全过。
