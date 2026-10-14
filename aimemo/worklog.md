@@ -14726,3 +14726,13 @@ Einz；底部状态行同步只显示居中 Einz（命令提示、瞬时 status�
 通道名、entrance_id、?、状态灯 ●○↻✗⊘、底部命令提示、🔒 全部不出现），
 解锁成功后名字与命令提示恢复。回归：unlock_flow 6 场景全过、guide 三件套、
 revoke、dart analyze 全过。
+
+**（2026-10-14T01:04:27Z / 2026-10-14 09:04）**：两处 UI 文案/字号微调（老板
+2026-10-14 要求）：
+1. 气泡顶栏时间戳字号 12 → 11（chat_page.dart 气泡时间行 Text）——与同行
+   「加速中…/重发中…」「点击重发」文字、沙漏后焚毁时长标签（_burnTagLabel）、
+   群聊送达人数数字统一为 11 号（此前仅时间戳是 12，其余均已是 11）。
+2. 「我的通道」→「我的设备通道」（app_zh.arb + app_localizations_zh.dart 的
+   chatPageMenuEntranceList）——菜单项（PopupMenuItem）、通道弹层标题、状态条
+   devices 箭头 tooltip 三处共用该 key，一并生效；英文经老板确认保持
+   'My entrances' 不变。代码注释里的旧称「我的通道」未动（非用户可见文案）。
