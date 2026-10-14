@@ -810,6 +810,18 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
     }
   }
 
+  // 客户端信息上报（POST /entrances/client，幂等）：TUI 只报**类型标记**——
+  // AOT 二进制拿不到自身版本（buildTui.sh 的时间戳只写进产物文件名，没注入
+  // 编译期常量），报不了 yymm.ddhh.mm。「我的设备通道」/本命令的通道列表据此
+  // 把本机显示为 TUI 而不是 App。best-effort：老服务端没这个端点也不影响启动。
+  if (store.sessionToken != null && server.isNotEmpty) {
+    try {
+      await ApiClient(server).reportClientInfo('tui', store.sessionToken!);
+    } catch (_) {
+      // 忽略：纯展示字段
+    }
+  }
+
   // 启动前增量同步：补齐启动前错过的消息（本地历史只含上次落盘内容，WS 只推连接
   // 建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
   // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。
@@ -2324,6 +2336,7 @@ class _EntranceRow {
     required this.when,
     required this.isMe,
     required this.revoked,
+    this.clientLabel,
   });
 
   final int no; // 1 基序号（与 /entrances 输出一致；/revoke 按它选通道）
@@ -2337,11 +2350,18 @@ class _EntranceRow {
   final bool isMe;
   final bool revoked;
 
+  /// 客户端段（2026-10-14）：App → `v2610.1409.00`；TUI → `TUI`；存量行/旧
+  /// 客户端（没上报过）→ null（不显示）。与 App 卡片第二行同一 shared 判定。
+  final String? clientLabel;
+
   /// 列表行文本（/entrances 与 /revoke 的列表、确认提示共用，保证逐字一致）。
   /// 圈标三态（与标题栏灯同语义，老板 2026-10-08）：🟢=在线 ⊘=已撤销（独立态，
   /// 区别于离线）⚪=离线。消息流是纯文本（不渲染 ANSI），故此处只用符号不带颜色。
-  String get line =>
-      '\n  $no) ${online ? '🟢' : (revoked ? '⊘' : '⚪')} $label [$memberName] $tag$when';
+  /// 客户端段接在时间后面（与 App 卡片第二行「时间 · 版本」同序）。
+  String get line {
+    final client = clientLabel != null ? ' · $clientLabel' : '';
+    return '\n  $no) ${online ? '🟢' : (revoked ? '⊘' : '⚪')} $label [$memberName] $tag$when$client';
+  }
 }
 
 /// 拉取**同空间全部通道**（我 + 对方，不只是自己的通道）并格式化为带序号的行。
@@ -2391,6 +2411,8 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
       when: when,
       isMe: isMe,
       revoked: revoked,
+      // 客户端段（App 版本/TUI）：与 App 卡片第二行同一 shared 判定
+      clientLabel: entranceClientLabel(d),
     ));
   }
   return rows;

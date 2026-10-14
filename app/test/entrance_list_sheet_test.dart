@@ -4,7 +4,8 @@
 //
 // 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + 时间。
 // 时间**不带 "since" 前缀**（老板 2026-09-26：太占地方），且所有卡片等高
-// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。
+// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。第二行还带**客户端段**
+// （老板 2026-10-14：App 版本 `v2610.1409.00` / TUI 类型标记 / 存量行没有）。
 // 右上角固定角标（老板 2026-09-26）：本机 = 绿勾（原先紧贴名称，位置随名字跑）、
 // 已撤销 = 阻止图标 + 整卡蒙版；两者互斥，共用一个角标位。
 // 离线时刻 = max(last_seen, offline_since)：服务端干净断开时 last_seen 归零，
@@ -12,6 +13,7 @@
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
@@ -32,10 +34,20 @@ class _FakeEntranceApi extends ApiClient {
   /// 所以测试里比的是**增量**，不是绝对值）。
   int listCalls = 0;
 
+  /// reportClientInfo（启动上报）收到的（client, appVersion）——本机卡片版本段/
+  /// 上报行为断言用。
+  final List<({String client, String? appVersion})> clientReports = [];
+
   @override
   Future<List<Map<String, dynamic>>> listEntrances(String token) async {
     listCalls++;
     return entranceRows;
+  }
+
+  @override
+  Future<void> reportClientInfo(String client, String token,
+      {String? appVersion}) async {
+    clientReports.add((client: client, appVersion: appVersion));
   }
 
   @override
@@ -172,13 +184,14 @@ Finder sheetRevokedMark() => find.descendant(
     );
 
 /// 弹层内的**时间文本**（卡片第二行；无 "since" 前缀，故按时间格式匹配）：
-/// 当天 `HH:MM` / 当年 `MM-DD HH:MM` / 跨年 `YYYY-MM-DD HH:MM`。
+/// 当天 `HH:MM` / 当年 `MM-DD HH:MM` / 跨年 `YYYY-MM-DD HH:MM`；
+/// 可带客户端段后缀（2026-10-14 起：` · v2610.1409.00` / ` · TUI`）。
 Finder sheetTimeText() => find.descendant(
       of: find.byType(BottomSheet),
       matching: find.byWidgetPredicate((w) =>
           w is Text &&
           w.data != null &&
-          RegExp(r'^(\d{2}-\d{2} |\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}$')
+          RegExp(r'^(\d{2}-\d{2} |\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}( · .+)?$')
               .hasMatch(w.data!)),
     );
 
@@ -234,6 +247,130 @@ void main() {
 
   // 会话注册表是进程级静态的：逐用例复位，别让上一个用例的会话（含旧 token）串进来
   setUp(() => SpaceSessions.clear());
+
+  // ┓ 客户端段（老板 2026-10-14：App 版本 / TUI 类型标记） ┓
+  // 本机版本用例必须排在**本文件第一个**：appVersionString() 的版本缓存是进程级
+  // 静态（version_gate.dart 的 _cachedAppVersion），谁先调用谁落值——这里第一个
+  // 跑，package_info 的 mock 才吃得进缓存（后续用例的本机卡也因此都带版本段，
+  // sheetTimeText 的匹配已兼容该后缀）。
+  testWidgets('本机卡片第二行显示 App 版本；启动时上报 client=app+版本',
+      (tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const channel = MethodChannel('dev.fluttercommunity.plus/package_info');
+    messenger.setMockMethodCallHandler(channel,
+        (call) async => call.method == 'getAll'
+            ? {
+                'appName': 'Einz',
+                'packageName': 'cc.tic.einz',
+                'version': '2610.1409.00',
+                'buildNumber': '1',
+              }
+            : null);
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    // 启动上报：client='app' + 本机版本（升级后下次启动自动跟上）
+    expect(api.clientReports, isNotEmpty, reason: '进聊天页应上报客户端信息');
+    expect(api.clientReports.last.client, 'app');
+    expect(api.clientReports.last.appVersion, '2610.1409.00');
+    // 本机卡片第二行 = 时间 · v版本
+    expect(sheetTextContaining('v2610.1409.00'), findsOneWidget,
+        reason: '本机卡片应显示 App 版本段');
+  });
+
+  testWidgets('其他设备的卡片按上报显示客户端段：App 版本 / TUI / 存量无',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      // 当前通道（dev-a，本机）——服务端行被排除，本机卡另建
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      // 我的另一台设备：App 报了版本
+      {
+        'entrance_id': 'dev-b2',
+        'entrance_name': 'iPad',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+        'client': 'app',
+        'app_version': '2610.1409.00',
+      },
+      // 我的另一台设备：TUI（只报类型，二进制拿不到自身版本）
+      {
+        'entrance_id': 'dev-tui',
+        'entrance_name': 'Terminal',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': now - 3600 * 1000,
+        'status': 'active',
+        'client': 'tui',
+      },
+      // 存量行：没上报过客户端信息 → 不显示该段
+      {
+        'entrance_id': 'dev-legacy',
+        'entrance_name': '旧Mac',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': now - 2 * 3600 * 1000,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    Finder cardFinder(String name) => find
+        .ancestor(of: sheetText(name), matching: find.byType(Container))
+        .first;
+    // iPad：App 版本段
+    expect(
+        find.descendant(
+            of: cardFinder('iPad'),
+            matching: find.textContaining('v2610.1409.00')),
+        findsOneWidget,
+        reason: 'App 设备的卡片应显示版本段');
+    // Terminal：TUI 类型段
+    expect(
+        find.descendant(
+            of: cardFinder('Terminal'), matching: find.textContaining('TUI')),
+        findsOneWidget,
+        reason: 'TUI 设备的卡片应显示类型段（拿不到版本）');
+    // 旧Mac：存量行，两字段都没有 → 不显示客户端段
+    expect(
+        find.descendant(
+            of: cardFinder('旧Mac'), matching: find.textContaining('TUI')),
+        findsNothing);
+    expect(
+        find.descendant(
+            of: cardFinder('旧Mac'), matching: find.textContaining('v2610')),
+        findsNothing);
+  });
 
   testWidgets('只列本人其他通道：对方的通道不列、当前通道不列', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());

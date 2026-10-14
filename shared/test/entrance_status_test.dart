@@ -206,4 +206,49 @@ void main() {
       expect(s.myOtherTotal, 0);
     });
   });
+
+  group('entranceClientLabel', () {
+    // 客户端段（老板 2026-10-14）：「我的设备通道」卡片第二行 / TUI 通道行共用。
+    test('App 报了版本 → v<版本>', () {
+      expect(
+        entranceClientLabel({
+          'entrance_id': 'e1',
+          'client': 'app',
+          'app_version': '2610.1409.00',
+        }),
+        'v2610.1409.00',
+      );
+    });
+
+    test('TUI 只报类型 → TUI（二进制拿不到自身版本）', () {
+      expect(
+        entranceClientLabel({'entrance_id': 'e1', 'client': 'tui'}),
+        'TUI',
+      );
+    });
+
+    test('存量行/旧客户端（两字段都无）→ null（不显示该段）', () {
+      expect(entranceClientLabel({'entrance_id': 'e1'}), isNull);
+      expect(
+        entranceClientLabel(
+            {'entrance_id': 'e1', 'client': null, 'app_version': null}),
+        isNull,
+      );
+      // App 没读到版本（client 在、版本空）→ 也不显示（带版本的就是 App，
+      // 裸「App」字样没有信息量）
+      expect(
+        entranceClientLabel(
+            {'entrance_id': 'e1', 'client': 'app', 'app_version': ''}),
+        isNull,
+      );
+    });
+
+    test('未知 client 值 → null（防御：不渲染陌生字符串）', () {
+      expect(
+        entranceClientLabel(
+            {'entrance_id': 'e1', 'client': 'web', 'app_version': '1.0'}),
+        isNull,
+      );
+    });
+  });
 }

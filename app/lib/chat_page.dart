@@ -24,6 +24,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
+import 'widgets/version_gate.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
@@ -419,6 +420,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   VoiceCallService? _voiceCall; // 语音通话（前台通话；信令走 WS，PROTOCOL.md §8.4）
   late String _myMemberName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
+  /// 本机 App 版本号（`yymm.ddhh.mm`；_registerClientInfo 启动时读一次）——
+  /// 「我的设备通道」本机卡片的版本段用。读不到（包信息不可用）为空串 →
+  /// 不显示该段。**不在弹层里现读**：PackageInfo 是平台调用，测试环境无 mock
+  /// 时 future 永不完成，会把弹层的打开整个卡死（2026-10-14 回归教训）。
+  String _myAppVersion = '';
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
   int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
@@ -933,6 +939,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(_tickerInterval);
     _registerPushToken();
     _registerInstallUid();
+    _registerClientInfo(); // 客户端信息（App + 版本）：设备通道卡片显示用
     _startRealtime();
     // 其它空间的未读：30s 问一次（WS 只管当前空间，别的收不到实时事件）
     _unreadTimer = Timer.periodic(
@@ -3361,6 +3368,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               'connected_at': DateTime.now().millisecondsSinceEpoch,
               'status': 'active',
               '_local': true,
+              // 本机的客户端信息：App + 本机版本号（读不到版本 → 客户端段不显示）
+              'client': 'app',
+              'app_version': _myAppVersion,
             },
             if (loaded != null)
               for (final d in loaded)
@@ -3469,6 +3479,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 } else {
                                   stamp = rowSince(d, online: online);
                                 }
+                                // 第二行文本 = 时间 · 客户端段（App 版本/TUI，
+                                // 老板 2026-10-14）。客户端段放第二行而非名称行：
+                                // 名称可能很长，第二行才有稳定空间。两者都没有时
+                                // 给一个空格（不是空串——空串在部分平台量出 0 高），
+                                // 否则这张卡会比别的矮一截（老板 2026-09-26 实测）。
+                                final clientLabel = entranceClientLabel(d);
+                                final rowParts = <String>[
+                                  if (stamp > 0) _timeStampLabel(stamp),
+                                  ?clientLabel,
+                                ];
+                                final rowText =
+                                    rowParts.isEmpty ? ' ' : rowParts.join(' · ');
                                 // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
                                 // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
                                 final hasBadge = isLocal || revoked;
@@ -3522,11 +3544,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
-                                                // 第二行：状态红绿灯 + 时间（绿在线/红离线/
-                                                // 灰已撤销）。时间**恒定占一行**：没有时间可显示
+                                                // 第二行：状态红绿灯 + 时间
+                                                // （绿在线/红离线/灰已撤销）。
+                                                // 时间**恒定占一行**：没有时间可显示
                                                 // 时给一个空格（不是空串——空串在部分平台量出 0
                                                 // 高），否则这张卡会比别的矮一截
-                                                // （老板 2026-09-26 实测：离线卡没有文字时矮一截）
+                                                // （老板 2026-09-26 实测：离线卡没有文字时矮一截）。
+                                                // 客户端段（App 版本/TUI）接在时间后
+                                                // 面同款 11px 淡色（老板 2026-10-14）
                                                 Row(
                                                   children: [
                                                     Icon(Icons.circle, size: 8,
@@ -3542,9 +3567,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                       // 直接写时间，不带 "since" 前缀
                                                       // （老板 2026-09-26：太占地方）
                                                       child: Text(
-                                                          stamp > 0
-                                                              ? _timeStampLabel(stamp)
-                                                              : ' ',
+                                                          rowText,
                                                           maxLines: 1,
                                                           overflow: TextOverflow
                                                               .ellipsis,
@@ -4625,6 +4648,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     try {
       final uid = await AppLockService(widget.db ?? LocalDatabase.shared).installUid();
       await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer)).registerInstallUid(uid, t));
+    } catch (_) {
+      // 忽略
+    }
+  }
+
+  /// 上报本通道客户端信息（POST /entrances/client，幂等）：client='app' + 本机
+  /// 版本号（`yymm.ddhh.mm`，读不到就不带）。每次进聊天页调一次——升级后下次
+  /// 启动自动跟上，「我的设备通道」卡片据此显示各设备跑的版本。纯展示字段，
+  /// 离线/老服务端静默降级（同 _registerInstallUid）。
+  ///
+  /// 读到的版本顺带存进 [_myAppVersion]（本机卡片的版本段用）——**只在这里读
+  /// 一次**，弹层里直接用字段，不现读平台调用（见字段注释）。
+  Future<void> _registerClientInfo() async {
+    if (_session.token.isEmpty) return;
+    try {
+      final version = await appVersionString();
+      _myAppVersion = version;
+      await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer))
+          .reportClientInfo('app', t, appVersion: version));
     } catch (_) {
       // 忽略
     }

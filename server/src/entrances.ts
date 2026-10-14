@@ -20,7 +20,10 @@ import { broadcastProfileUpdated, forgetEntranceConnection, getConnectedAt, getO
  *  此前直出全局 entrances 表，跨空间泄漏 member/公钥/在线状态（2026-09-15 评审 C2）。
  *  刻意**不返回 public_key**（2026-09-15 评审 C5）：通道公钥是密码学标识，
  *  列表接口没有使用它的场景（challenge 由服务端用公钥密封，客户端用不到对端公钥），
- *  少一个可被批量采集的字段就少一分元数据面。 */
+ *  少一个可被批量采集的字段就少一分元数据面。
+ *  `client`/`app_version`（客户端信息，POST /entrances/client 上报）：**对端可见**
+ *  ——这正是用途（「我的设备通道」里看每台设备跑的 App 还是 TUI、什么版本）。
+ *  存量行/旧客户端为 null（显示层不显示该段）。 */
 export function listEntrances (
   token: string
 ): { entrances: unknown[] } {
@@ -29,7 +32,7 @@ export function listEntrances (
   const scope = entranceScopeClause(space_id)
   const rows = getDb()
     .prepare(
-      `SELECT d.entrance_id, d.member_id, d.status, d.last_seen, d.offline_since, d.entrance_name
+      `SELECT d.entrance_id, d.member_id, d.status, d.last_seen, d.offline_since, d.entrance_name, d.client, d.app_version
          FROM entrances d
         WHERE ${scope.sql}
         ORDER BY d.created_at`
@@ -41,6 +44,8 @@ export function listEntrances (
     last_seen: number | null
     offline_since: number | null
     entrance_name: string
+    client: string | null
+    app_version: string | null
   }[]
   return {
     entrances: rows.map(r => ({
@@ -161,6 +166,47 @@ export function setInstallUid (token: string, body: unknown): { ok: true } {
   const b = (body ?? {}) as { install_uid?: unknown }
   const uid = assertInstallUid(b.install_uid)
   getDb().prepare(`UPDATE entrances SET install_uid = ? WHERE entrance_id = ?`).run(uid, entrance_id)
+  return { ok: true }
+}
+
+/// 客户端类型白名单（纯展示，不参与任何授权/范围判断——同 install_uid 的口径）。
+const kClientTypes = ['app', 'tui']
+
+/// app_version 格式（`yymm.ddhh.mm`，与 scripts/appVersion.js 生成的一致）。
+const kAppVersionRe = /^\d{4}\.\d{4}\.\d{2}$/
+
+/** POST /entrances/client：上报本通道的客户端信息（client + app_version，幂等）。
+ *
+ * 每次冷启动调一次：App 报 `{client:'app', app_version:'2610.1409.00'}`（升级后
+ * 下次启动自动跟上）；TUI 报 `{client:'tui'}`（AOT 二进制拿不到自身版本——
+ * buildTui.sh 的时间戳只写进产物文件名，只报类型标记）。
+ *
+ * 只写本会话那一行。app_version **只在带值时才写**（客户端偶发读不到包信息时
+ * 不清掉已存的值——版本只向前进，旧值比空值信息量大）。存量行/旧客户端不调 →
+ * 两列 NULL，/entrances 照常返回（显示层不显示该段）。
+ *
+ * 纯展示字段：绝不参与授权、不做范围判断（同 install_uid，见 installUid.ts 头注）。 */
+export function setClientInfo (token: string, body: unknown): { ok: true } {
+  const { entrance_id } = requireSession(token)
+  const b = (body ?? {}) as { client?: unknown; app_version?: unknown }
+  const client = b.client
+  if (typeof client !== 'string' || !kClientTypes.includes(client)) {
+    throw new ApiError('INVALID_REQUEST', 'client 必须是 app 或 tui', 400)
+  }
+  let version: string | null = null
+  if (b.app_version != null) {
+    if (typeof b.app_version !== 'string' || !kAppVersionRe.test(b.app_version)) {
+      throw new ApiError('INVALID_REQUEST', 'app_version 格式应为 yymm.ddhh.mm', 400)
+    }
+    version = b.app_version
+  }
+  if (version != null) {
+    getDb().prepare(`UPDATE entrances SET client = ?, app_version = ? WHERE entrance_id = ?`)
+      .run(client, version, entrance_id)
+  } else {
+    getDb().prepare(`UPDATE entrances SET client = ? WHERE entrance_id = ?`)
+      .run(client, entrance_id)
+  }
   return { ok: true }
 }
 

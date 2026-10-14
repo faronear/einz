@@ -14770,3 +14770,27 @@ test/chat_quote_jump_gone_test.dart 三用例（引用不存在 id→弹通知 /
 messageId→弹通知 / 原消息在列表→正常跳转不误报）。回归：flutter analyze
 干净；quote×3 + 菜单 + 初始滚动 + 发送状态 + 气泡性别 + 群聊署名共 8 文件
 57 测全过。
+
+**（2026-10-14T09:02:26Z / 2026-10-14 17:02）**：「我的设备通道」卡片/TUI 通道行
+显示各 entrance 的** App 版本号**（老板 2026-10-14；per-entrance 版本号）。中途
+纠过一个方向性误读：最初想显示 key_version——但密钥轮换不做（2026-09-14 决策），
+同空间所有通道恒同一版本，没有区分度；老板点破真正想要的是**各设备跑的 App
+版本**（yymm.ddhh.mm）。四端改动：
+- 服务端：entrances 加 `client`/`app_version` 两列（install_uid 迁移先例）；
+  新端点 `POST /entrances/client`（幂等，client 白名单 + 版本格式校验，
+  app_version 只在带值时写——读不到包信息不清已存值）；listEntrances 带出
+  两字段（对端可见——这正是用途）；PROTOCOL.md §7.1 同步。
+- shared：`reportClientInfo` api 方法；`entranceClientLabel` 三态 helper
+  （App→v版本 / TUI→TUI / 存量→null），App 卡片与 TUI 行共用。
+- App：进聊天页上报（搭 _registerInstallUid 同一点）；卡片第二行（状态灯+时间
+  后）合成「时间 · v版本/TUI」——放第二行不放名称行（名称可能很长）。
+- TUI：启动时（通道名同步点）只报 `client='tui'`——AOT 二进制拿不到自身版本
+  （buildTui.sh 时间戳只写文件名），报类型标记；/entrances 行尾同构加客户端段。
+**回归教训（重要）**：曾把 `await appVersionString()` 写进弹层 load()——widget
+测试环境无 mock 时 `PackageInfo.fromPlatform()` 的 future **永不完成**，把弹层
+打开整个卡死，连累 chat_page_menu/invite_dialog_layout 三个用例挂掉（sheet 测试
+因静态版本缓存被首个 mock 用例焐热而侥幸全过，险些漏网）。修复：版本只在
+initState 上报流程里读一次存 state 字段，弹层只读字段。**平台调用永远不要
+await 在交互路径上**。验证：四端 analyze 干净；server client_info 3/3 +
+install_uid 6/6、tsc 干净；app 全量 315 过 1 跳；cli dart 22/22；shared 除
+2 个 DNS 污染测试（干净树上同样失败，沙箱 DNS 拦截环境预存，与本次无关）。
