@@ -14794,3 +14794,18 @@ initState 上报流程里读一次存 state 字段，弹层只读字段。**平�
 await 在交互路径上**。验证：四端 analyze 干净；server client_info 3/3 +
 install_uid 6/6、tsc 干净；app 全量 315 过 1 跳；cli dart 22/22；shared 除
 2 个 DNS 污染测试（干净树上同样失败，沙箱 DNS 拦截环境预存，与本次无关）。
+
+**（2026-10-14T10:08:15Z / 2026-10-14 18:08）**：npm run testAll 全量排查与修复
+（老板要求，CI 红线）。修掉一个真 bug：`chat_quote_video_test` 在 full-suite 下
+~50% 率 `pumpAndSettle timed out`。根因两层：① CircularProgressIndicator 是
+**无限动画且不理会 disableAnimations**（progress_indicator.dart 无相关分支，
+实测确认）——settleRealAsync 的 12 轮（≈1.2s）预算在 46 文件并发 isolate 的 CPU
+争抢下偶发不够，循环耗尽时 spinner 还在，随后的 pumpAndSettle 挂在它上面超时；
+单独跑/小组并发从不复现（时序竞品，与业务代码无关）。② pending 消息的
+_SendingPlane 也是无限动画（次要隐患）。修复：settleRealAsync 轮询上限 12→40
+（≈4s，无附件测试第一轮即退出不受影响）+ 视频测试开 disableAnimationsInTests
+双保险。验证：全量 app 套件连跑 2 次 316 过 0 败；testAll 复跑 app/cli/server
+全绿。**仍失败的仅 shared 2 个 DNS 污染测试——沙箱环境问题，非代码问题**：本沙箱
+把一切域名（含 RFC 6761 保留域 .invalid）解析到 sinkhole 198.18.0.20，测试期望的
+SocketException 变成 HttpException；干净树上同样失败（stash 对照过）；GitHub CI
+runner 无此 sinkhole，应正常通过（该测试文件头自称"无外网依赖"，本为 CI 设计）。
