@@ -678,6 +678,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => 'Attachment storage';
 
   @override
+  String get chatPageAttachmentStorageNote =>
+      'Where are attachments — images, videos, audio, files — stored?';
+
+  @override
   String get chatPageAttachmentStorageSecured => 'Remote only';
 
   @override

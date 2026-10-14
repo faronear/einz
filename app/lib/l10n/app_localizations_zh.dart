@@ -626,6 +626,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => '附件存储';
 
   @override
+  String get chatPageAttachmentStorageNote => '图片、视频、音频、文件等附件存放在哪里？';
+
+  @override
   String get chatPageAttachmentStorageSecured => '远程托管';
 
   @override

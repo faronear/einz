@@ -325,6 +325,7 @@
   "chatPageEscrowRotatedNotice": "同伴已重设共享口令，以后必须使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
+  "chatPageAttachmentStorageNote": "图片、视频、音频、文件等附件存放在哪里？",
   "chatPageAttachmentStorageSecured": "远程托管",
   "chatPageAttachmentStorageSecuredDesc": "每次打开都重新下载并解密，本机不留明文副本，更私密。",
   "chatPageAttachmentStorageStored": "本地保存",

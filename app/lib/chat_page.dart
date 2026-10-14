@@ -1500,6 +1500,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageMenuAttachmentStorage,
+        note: l10n.chatPageAttachmentStorageNote,
         selected: _attachmentStorage,
         submitLabel: l10n.chatPageAttachmentStorageSubmit,
         // 只在"准备切回远程托管、且当前不是它"时提示（真要删数据）

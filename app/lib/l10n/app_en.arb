@@ -360,6 +360,7 @@
   },
   "chatPageMenuLocaleLabel": "Language",
   "chatPageMenuAttachmentStorage": "Attachment storage",
+  "chatPageAttachmentStorageNote": "Where are attachments — images, videos, audio, files — stored?",
   "chatPageAttachmentStorageSecured": "Remote only",
   "chatPageAttachmentStorageSecuredDesc": "Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.",
   "chatPageAttachmentStorageStored": "Keep locally",

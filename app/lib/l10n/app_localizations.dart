@@ -1220,6 +1220,12 @@ abstract class AppLocalizations {
   /// **'Attachment storage'**
   String get chatPageMenuAttachmentStorage;
 
+  /// No description provided for @chatPageAttachmentStorageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Where are attachments — images, videos, audio, files — stored?'**
+  String get chatPageAttachmentStorageNote;
+
   /// No description provided for @chatPageAttachmentStorageSecured.
   ///
   /// In en, this message translates to:
