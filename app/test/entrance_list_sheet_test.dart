@@ -4,8 +4,9 @@
 //
 // 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + 时间。
 // 时间**不带 "since" 前缀**（老板 2026-09-26：太占地方），且所有卡片等高
-// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。第二行还带**客户端段**
-// （老板 2026-10-14：App 版本 `v2610.1409.00` / TUI 类型标记 / 存量行没有）。
+// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。第二行还有**客户端段**
+// （老板 2026-10-14：App 版本 `v2610.1409.00` / TUI 类型标记 / 存量行没有，
+// **靠右对齐**——老板同日要求）。
 // 右上角固定角标（老板 2026-09-26）：本机 = 绿勾（原先紧贴名称，位置随名字跑）、
 // 已撤销 = 阻止图标 + 整卡蒙版；两者互斥，共用一个角标位。
 // 离线时刻 = max(last_seen, offline_since)：服务端干净断开时 last_seen 归零，
@@ -184,14 +185,14 @@ Finder sheetRevokedMark() => find.descendant(
     );
 
 /// 弹层内的**时间文本**（卡片第二行；无 "since" 前缀，故按时间格式匹配）：
-/// 当天 `HH:MM` / 当年 `MM-DD HH:MM` / 跨年 `YYYY-MM-DD HH:MM`；
-/// 可带客户端段后缀（2026-10-14 起：` · v2610.1409.00` / ` · TUI`）。
+/// 当天 `HH:MM` / 当年 `MM-DD HH:MM` / 跨年 `YYYY-MM-DD HH:MM`。
+/// （客户端段 2026-10-14 起是**独立的靠右 Text**，不并进时间文本。）
 Finder sheetTimeText() => find.descendant(
       of: find.byType(BottomSheet),
       matching: find.byWidgetPredicate((w) =>
           w is Text &&
           w.data != null &&
-          RegExp(r'^(\d{2}-\d{2} |\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}( · .+)?$')
+          RegExp(r'^(\d{2}-\d{2} |\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}$')
               .hasMatch(w.data!)),
     );
 
@@ -289,9 +290,18 @@ void main() {
     expect(api.clientReports, isNotEmpty, reason: '进聊天页应上报客户端信息');
     expect(api.clientReports.last.client, 'app');
     expect(api.clientReports.last.appVersion, '2610.1409.00');
-    // 本机卡片第二行 = 时间 · v版本
-    expect(sheetTextContaining('v2610.1409.00'), findsOneWidget,
+    // 本机卡片第二行：时间靠左、版本段**靠右**（老板 2026-10-14 要求右对齐）
+    expect(find.text('v2610.1409.00'), findsOneWidget,
         reason: '本机卡片应显示 App 版本段');
+    final cardRect = cardOf(tester, 'iPhone');
+    final versionRect = tester.getRect(find.text('v2610.1409.00'));
+    expect(
+      versionRect.right,
+      closeTo(cardRect.right - 8, 2),
+      reason: '版本段应靠右（卡片右内边距 8）',
+    );
+    // 时间是独立 Text（左），不并进版本文本
+    expect(sheetTimeText(), findsOneWidget);
   });
 
   testWidgets('其他设备的卡片按上报显示客户端段：App 版本 / TUI / 存量无',

@@ -3479,18 +3479,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 } else {
                                   stamp = rowSince(d, online: online);
                                 }
-                                // 第二行文本 = 时间 · 客户端段（App 版本/TUI，
-                                // 老板 2026-10-14）。客户端段放第二行而非名称行：
-                                // 名称可能很长，第二行才有稳定空间。两者都没有时
-                                // 给一个空格（不是空串——空串在部分平台量出 0 高），
-                                // 否则这张卡会比别的矮一截（老板 2026-09-26 实测）。
+                                // 第二行：时间靠左、客户端段（App 版本/TUI，
+                                // 老板 2026-10-14）**靠右**（老板同日要求右对齐）。
+                                // 客户端段放第二行而非名称行：名称可能很长，第二行
+                                // 才有稳定空间。时间没有可显示的值时给一个空格
+                                // （不是空串——空串在部分平台量出 0 高），否则这张卡
+                                // 会比别的矮一截（老板 2026-09-26 实测）。
                                 final clientLabel = entranceClientLabel(d);
-                                final rowParts = <String>[
-                                  if (stamp > 0) _timeStampLabel(stamp),
-                                  ?clientLabel,
-                                ];
-                                final rowText =
-                                    rowParts.isEmpty ? ' ' : rowParts.join(' · ');
+                                final timeText =
+                                    stamp > 0 ? _timeStampLabel(stamp) : ' ';
                                 // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
                                 // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
                                 final hasBadge = isLocal || revoked;
@@ -3550,8 +3547,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 // 时给一个空格（不是空串——空串在部分平台量出 0
                                                 // 高），否则这张卡会比别的矮一截
                                                 // （老板 2026-09-26 实测：离线卡没有文字时矮一截）。
-                                                // 客户端段（App 版本/TUI）接在时间后
-                                                // 面同款 11px 淡色（老板 2026-10-14）
+                                                // 客户端段（App 版本/TUI）**靠右**，
+                                                // 与时间同款 11px 淡色（老板 2026-10-14）
                                                 Row(
                                                   children: [
                                                     Icon(Icons.circle, size: 8,
@@ -3567,7 +3564,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                       // 直接写时间，不带 "since" 前缀
                                                       // （老板 2026-09-26：太占地方）
                                                       child: Text(
-                                                          rowText,
+                                                          timeText,
                                                           maxLines: 1,
                                                           overflow: TextOverflow
                                                               .ellipsis,
@@ -3576,6 +3573,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                               color:
                                                                   scheme.outline)),
                                                     ),
+                                                    // 客户端段靠右：没有可显示的值
+                                                    // （存量行/旧客户端/读不到版本）
+                                                    // 时整段不占位
+                                                    if (clientLabel != null) ...[
+                                                      const SizedBox(width: 6),
+                                                      Text(
+                                                          clientLabel,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: scheme
+                                                                  .outline)),
+                                                    ],
                                                   ],
                                                 ),
                                               ],
