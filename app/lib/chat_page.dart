@@ -4987,12 +4987,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 触发目标附近构建 → 目标项 GlobalKey ensureVisible 精确校正」两步（懒构建
   /// 下远处 item 无元素，直接 ensureVisible 会找不到）。
   Future<void> _jumpToMessage(String messageId) async {
-    if (messageId.isEmpty || !mounted) return;
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    // 引用快照缺 messageId（异常数据）：也按"原消息不存在"给反馈——点引用卡
+    // 必须有回响，不能静默无操作（老板 2026-10-14）。
+    if (messageId.isEmpty) {
+      _notice(context, l10n.chatPageQuoteGoneNotice);
+      return;
+    }
     var index = _messages.indexWhere((m) => m.env.messageId == messageId);
     if (index < 0) {
       // 目标未加载：往前分页补载直到覆盖目标（或历史已到顶）
       final targetSeq = await _repo.sequenceOfMessage(messageId);
-      if (targetSeq == null) return; // 原消息不存在（非本空间/已清理）
+      // 原消息不存在（非本空间/本机已清屏）：通知用户，不再静默返回
+      // （老板 2026-10-14）。墓碑消息保持显示的最初动因就是"跳转要有东西
+      // 可落"；真落不了时，至少把结果说清楚。
+      if (targetSeq == null) {
+        if (!mounted) return;
+        _notice(context, l10n.chatPageQuoteGoneNotice);
+        return;
+      }
       while (index < 0 && mounted) {
         final first = _messages.isEmpty ? null : _messages.first.env.serverSequence;
         if (first == null || first <= targetSeq) break;
@@ -5005,7 +5019,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         });
         index = _messages.indexWhere((m) => m.env.messageId == messageId);
       }
-      if (index < 0) return;
+      // 分页到顶仍未覆盖目标（极端：seq 在、行不在）——同样给反馈
+      if (index < 0) {
+        if (!mounted) return;
+        _notice(context, l10n.chatPageQuoteGoneNotice);
+        return;
+      }
     }
     if (!mounted) return;
     setState(() => _jumpTargetId = messageId);
@@ -5558,7 +5577,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        AppLocalizations.of(context)!.chatPageDeletedMessage,
+        AppLocalizations.of(context)!.chatPageTombMessage,
         style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

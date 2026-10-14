@@ -855,7 +855,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRecallFailed => '撤回失败，请稍后重试';
 
   @override
-  String get chatPageDeletedMessage => '（该消息已不存在）';
+  String get chatPageTombMessage => '（该消息已不存在）';
+
+  @override
+  String get chatPageQuoteGoneNotice => '被引用消息已不存在';
 
   @override
   String get chatPageActionQuote => '引用';

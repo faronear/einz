@@ -14754,3 +14754,19 @@ revoke、dart analyze 全过。
    chatPageMenuEntranceList）——菜单项（PopupMenuItem）、通道弹层标题、状态条
    devices 箭头 tooltip 三处共用该 key，一并生效；英文经老板确认保持
    'My entrances' 不变。代码注释里的旧称「我的通道」未动（非用户可见文案）。
+
+**（2026-10-14T03:31:50Z / 2026-10-14 11:31）**：点击被引用消息跳转失败时弹
+通知「被引用消息已不存在」（老板 2026-10-14，墓碑显示开关评估后第一个落地
+的小功能）。_jumpToMessage 此前三条失败路径全部静默 return：引用快照缺
+messageId、原消息行不存在（sequenceOfMessage 返 null=非本空间/本机已清屏）、
+往前分页到顶仍未覆盖目标——用户点了引用卡什么都不会发生。现三条统一弹
+showTopNotice。背景：墓碑消息保持显示的最初动因就是"跳转要有东西可落"，
+真落不了时至少把结果说清楚。l10n 新增 chatPageQuoteGoneNotice（zh「被引用
+消息已不存在」/ en "The quoted message is no longer available"）。同时按老板
+要求把 chatPageDeletedMessage 更名 **chatPageTombMessage**——墓碑占位（长按
+菜单顶部 _tombstoneMenuPlaceholder）覆盖删除/焚毁/撤回三种墓碑，Deleted 名字
+太窄；arb 双文件 + gen-l10n 重新生成 + 使用点一并改。测试：新增
+test/chat_quote_jump_gone_test.dart 三用例（引用不存在 id→弹通知 / 快照缺
+messageId→弹通知 / 原消息在列表→正常跳转不误报）。回归：flutter analyze
+干净；quote×3 + 菜单 + 初始滚动 + 发送状态 + 气泡性别 + 群聊署名共 8 文件
+57 测全过。

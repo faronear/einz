@@ -1616,11 +1616,17 @@ abstract class AppLocalizations {
   /// **'Recall failed, try again later'**
   String get chatPageRecallFailed;
 
-  /// No description provided for @chatPageDeletedMessage.
+  /// No description provided for @chatPageTombMessage.
   ///
   /// In en, this message translates to:
   /// **'(This message is no longer available)'**
-  String get chatPageDeletedMessage;
+  String get chatPageTombMessage;
+
+  /// No description provided for @chatPageQuoteGoneNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The quoted message is no longer available'**
+  String get chatPageQuoteGoneNotice;
 
   /// No description provided for @chatPageActionQuote.
   ///

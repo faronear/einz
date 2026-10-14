@@ -919,7 +919,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRecallFailed => 'Recall failed, try again later';
 
   @override
-  String get chatPageDeletedMessage => '(This message is no longer available)';
+  String get chatPageTombMessage => '(This message is no longer available)';
+
+  @override
+  String get chatPageQuoteGoneNotice =>
+      'The quoted message is no longer available';
 
   @override
   String get chatPageActionQuote => 'Quote';
