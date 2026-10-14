@@ -3488,9 +3488,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 final clientLabel = entranceClientLabel(d);
                                 final timeText =
                                     stamp > 0 ? _timeStampLabel(stamp) : ' ';
-                                // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
-                                // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
-                                final hasBadge = isLocal || revoked;
+                                // 右上角固定角标：已撤销 = 阻止图标（本机的编辑
+                                // 入口不在角标位——见下面第一行的可点击胶囊）
+                                // 撤销卡的名称行让出角标宽度，长名字不会钻到图标底下
+                                final hasCornerBadge = revoked;
                                 return SizedBox(
                                   // 一卡占满整行（老板 2026-10-11）；高度仍由
                                   // 内容（名称 + 状态行）自然撑出
@@ -3522,23 +3523,128 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
-                                                // 第一行：名称（角标位由右上角预留）
+                                                // 第一行：名称。**本机卡 = 名字 +
+                                                // 编辑图标组成的可点击胶囊**（老板
+                                                // 2026-10-14：图标跟在名字后，不再
+                                                // 固定卡片最右；点整颗胶囊进改名）。
+                                                // 已撤销卡的角标位由右上角预留
+                                                // （阻止图标仍固定右上角）
                                                 Padding(
-                                                  // 有角标的卡让出角标宽度，长名字不会钻到
-                                                  // 图标底下
                                                   padding: EdgeInsets.only(
-                                                      right: hasBadge ? 18 : 0),
-                                                  child: Text(
-                                                    name.isNotEmpty
-                                                        ? name
-                                                        : entranceId,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
+                                                      right: hasCornerBadge
+                                                          ? 18
+                                                          : 0),
+                                                  child: isLocal
+                                                      ? Tooltip(
+                                                          message:
+                                                              l10n.chatPageEdit,
+                                                          child: Material(
+                                                            // 胶囊底：淡灰圆角
+                                                            // （同卡片蒙版/占位那一档
+                                                            // 灰），悬浮/点击有反馈
+                                                            color: Colors.black
+                                                                .withValues(
+                                                                    alpha: 0.05),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10),
+                                                            clipBehavior:
+                                                                Clip.antiAlias,
+                                                            child: InkWell(
+                                                              mouseCursor:
+                                                                  SystemMouseCursors
+                                                                      .click,
+                                                              hoverColor: Colors
+                                                                  .black
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.05),
+                                                              highlightColor: Colors
+                                                                  .black
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.08),
+                                                              onTap: () {
+                                                                // 先收起弹层再开
+                                                                // 弹窗（与「新建
+                                                                // 通道」同款错峰，
+                                                                // 避免 Overlay
+                                                                // 交叉卸载断言）
+                                                                Navigator.of(
+                                                                        ctx)
+                                                                    .pop();
+                                                                _menuAction(
+                                                                    _showRenameEntranceDialog);
+                                                              },
+                                                              child: Padding(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal:
+                                                                            6,
+                                                                        vertical:
+                                                                            3),
+                                                                child: Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Flexible(
+                                                                      child: Text(
+                                                                        name.isNotEmpty
+                                                                            ? name
+                                                                            : entranceId,
+                                                                        maxLines: 1,
+                                                                        overflow: TextOverflow
+                                                                            .ellipsis,
+                                                                        style: const TextStyle(
+                                                                            fontSize: 13,
+                                                                            fontWeight: FontWeight.w500),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            4),
+                                                                    const Icon(
+                                                                        Icons
+                                                                            .edit,
+                                                                        size:
+                                                                            14),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        )
+                                                      : Padding(
+                                                          // 纯名字卡补上与本机
+                                                          // 胶囊相同的纵向
+                                                          // 3px：否则本机卡
+                                                          // 比别的卡高 6px
+                                                          // （老板 2026-09-26
+                                                          // 的等高要求）
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  vertical: 3),
+                                                          child: Text(
+                                                            name.isNotEmpty
+                                                                ? name
+                                                                : entranceId,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style:
+                                                                const TextStyle(
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500),
+                                                          ),
+                                                        ),
                                                 ),
                                                 const SizedBox(height: 4),
                                                 // 第二行：状态红绿灯 + 时间
@@ -3594,52 +3700,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             ),
                                           ),
                                         ),
-                                        if (hasBadge)
+                                        if (hasCornerBadge)
                                           Positioned(
                                             top: 6,
                                             right: 6,
-                                            // 本机 = 编辑图标（老板 2026-10-02：当前通道
-                                            // 改名从这张卡进——点击关掉弹层，错峰弹改名
-                                            // 弹窗）；已撤销 = 阻止图标。编辑角标**显式**
-                                            // Material 圆形底 + 6 内边距（老板 2026-10-02：
-                                            // IconButton 默认底衬是圆角矩形不是纯圆，
-                                            // padding 0 时图标贴边更难看）。
-                                            child: isLocal
-                                                ? Tooltip(
-                                                    message: l10n.chatPageEdit,
-                                                    child: Material(
-                                                      color:
-                                                          Colors.transparent,
-                                                      shape: const CircleBorder(),
-                                                      clipBehavior:
-                                                          Clip.antiAlias,
-                                                      child: InkWell(
-                                                        customBorder:
-                                                            const CircleBorder(),
-                                                        onTap: () {
-                                                          // 先收起弹层再开弹窗（与
-                                                          // 「新建通道」同款错峰，避免
-                                                          // Overlay 交叉卸载断言）
-                                                          Navigator.of(ctx).pop();
-                                                          _menuAction(
-                                                              _showRenameEntranceDialog);
-                                                        },
-                                                        child: const Padding(
-                                                          padding:
-                                                              EdgeInsets.all(6),
-                                                          child: Icon(
-                                                              Icons.edit,
-                                                              size: 14),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  )
-                                                : Icon(
-                                                    Icons.block,
-                                                    size: 14,
-                                                    color: Colors.black
-                                                        .withValues(alpha: 0.45),
-                                                  ),
+                                            // 已撤销 = 阻止图标（本机的编辑入口
+                                            // 2026-10-14 起搬到第一行名字后面的
+                                            // 可点击胶囊，不再占角标位）
+                                            child: Icon(
+                                              Icons.block,
+                                              size: 14,
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.45),
+                                            ),
                                           ),
                                       ],
                                     ),

@@ -7,8 +7,8 @@
 // （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。第二行还有**客户端段**
 // （老板 2026-10-14：App 版本 `v2610.1409.00` / TUI 类型标记 / 存量行没有，
 // **靠右对齐**——老板同日要求）。
-// 右上角固定角标（老板 2026-09-26）：本机 = 绿勾（原先紧贴名称，位置随名字跑）、
-// 已撤销 = 阻止图标 + 整卡蒙版；两者互斥，共用一个角标位。
+// 右上角固定角标（老板 2026-09-26）：已撤销 = 阻止图标 + 整卡蒙版（本机的改名
+// 入口 2026-10-14 起搬到第一行名字后面的可点击胶囊，不再占角标位）。
 // 离线时刻 = max(last_seen, offline_since)：服务端干净断开时 last_seen 归零，
 // 断线时刻只落在 offline_since —— 见 `chat_page._showEntranceListSheet`。
 
@@ -171,8 +171,8 @@ Finder sheetDot(Color color) => find.descendant(
           w is Icon && w.icon == Icons.circle && w.color == color),
     );
 
-/// 弹层内的**本机角标**（Icons.edit，2026-10-02 起「本机」那张卡右上角是"改名"入口；
-/// 与状态灯的实心圆是两个图标，不会撞）。
+/// 弹层内的**本机编辑胶囊**里的编辑图标（Icons.edit；2026-10-14 起「本机」那张卡
+/// 的改名入口是名字后面的可点击胶囊，不再占右上角角标位）。
 Finder sheetLocalCheck() => find.descendant(
       of: find.byType(BottomSheet),
       matching: find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.edit),
@@ -446,7 +446,7 @@ void main() {
     expect(sheetText('iPad'), findsOneWidget);
     expect(sheetText('MacBook'), findsOneWidget);
     expect(sheetText('旧手机'), findsOneWidget);
-    // 本机绿勾只在当前通道那张卡上（恒列第一位）
+    // 本机的编辑胶囊（图标）只在当前通道那张卡上（恒列第一位）
     expect(sheetLocalCheck(), findsOneWidget);
     // 第一张卡就是本机那张（老板 2026-09-25：恒列首位，作为区分依据之一）。
     // 一卡占满整行（老板 2026-10-11）→ 排序体现在**纵向**：本机卡在 iPad 上方
@@ -478,39 +478,29 @@ void main() {
         .right;
     expect(cardOf(tester, 'MacBook').right, closeTo(contentRight, 3),
         reason: '一行 3 张应铺满弹层内容宽度（最多差向下取整的那 2px）');
-    // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：右上角绿勾、不蒙版
+    // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：名字后带编辑胶囊、不蒙版
     expect(sheetRevokedMark(), findsOneWidget);
     expect(dimmedCardOf('旧手机'), findsOneWidget, reason: '已撤销卡应有蒙版（整卡降透明度）');
     expect(dimmedCardOf('iPad'), findsNothing, reason: '正常卡不该蒙版');
-    // 角标**固定在卡片右上角**（与名称长短无关；老板 2026-09-26：绿勾原先紧贴
-    // 名称，位置随名字跑）。
-    //
-    // 注：两种角标的**图标**到卡边距离天然差 6px——本机那个是可点的"改名"按钮
-    // （2026-10-02 起，Material 圆底 + 6px 内边距，图标因此内缩 6），已撤销那个
-    // 是裸图标。两者**锚点**（Positioned 6,6）一致，差的是按钮自身的 padding。
-    // 所以这里放宽到 7 兜住这 6px；仍能拦住"角标跟着名字跑"的回归（那样差值会是
-    // 几十像素，因为两张卡的名字长短不同：'iPhone' vs '旧手机'）。
-    final checkRect = tester.getRect(sheetLocalCheck());
-    final markRect = tester.getRect(sheetRevokedMark());
+    // 本机卡的编辑入口 = 名字后面的**可点击胶囊**（老板 2026-10-14：图标跟在
+    // 名字后，不再固定卡片最右）；已撤销卡的阻止图标仍固定右上角（Positioned 6,6）。
+    final editRect = tester.getRect(sheetLocalCheck());
+    final nameRect = tester.getRect(sheetText('iPhone'));
     final phoneCard = cardOf(tester, 'iPhone');
+    // 图标在名字右侧、同一行（纵向中心对齐）
+    expect(editRect.left, greaterThan(nameRect.right),
+        reason: '编辑图标应跟在名字后面');
+    expect((editRect.center.dy - nameRect.center.dy).abs(), lessThan(4),
+        reason: '图标与名字同一行');
+    // 不再固定卡片最右：图标右缘离卡片右缘远大于角标位的 6px
+    expect(phoneCard.right - editRect.right, greaterThan(20),
+        reason: '编辑图标不该再固定在卡片最右角');
+    // 已撤销卡的阻止图标仍在右上角
+    final markRect = tester.getRect(sheetRevokedMark());
     final oldCard = cardOf(tester, '旧手机');
-    double insetRight(double cardRight, Rect badge) => cardRight - badge.right;
-    double insetTop(double cardTop, Rect badge) => badge.top - cardTop;
-    expect(
-      insetRight(phoneCard.right, checkRect),
-      closeTo(insetRight(oldCard.right, markRect), 7),
-      reason: '两种角标都固定在右上角（差 6px = 改名按钮自带的内边距，不是跟着名字跑）',
-    );
-    expect(
-      insetTop(phoneCard.top, checkRect),
-      closeTo(insetTop(oldCard.top, markRect), 7),
-      reason: '同上：两种角标都固定在右上角',
-    );
-    // 角标该在右上角：位于卡片右上象限，且在名称右侧
-    expect(checkRect.right, greaterThan(phoneCard.center.dx));
-    expect(checkRect.top, lessThan(phoneCard.center.dy));
-    expect(checkRect.right, greaterThan(tester.getRect(sheetText('iPhone')).right),
-        reason: '本机角标不该再贴名称右缘');
+    expect(oldCard.right - markRect.right, closeTo(6, 1),
+        reason: '阻止图标应固定在已撤销卡右上角');
+    expect(markRect.top - oldCard.top, closeTo(6, 1));
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
     // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
@@ -540,7 +530,7 @@ void main() {
 
     await _openEntranceListSheet(tester, db, api);
 
-    // 只有一张卡：当前通道 + 绿勾 + 绿灯 + 时间
+    // 只有一张卡：当前通道 + 编辑胶囊 + 绿灯 + 时间
     expect(sheetText(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetLocalCheck(), findsOneWidget);
@@ -549,6 +539,37 @@ void main() {
     expect(sheetTimeText(), findsOneWidget);
     // 「新建通道」按钮在
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
+  });
+
+  testWidgets('本机卡：点名字+编辑图标胶囊 → 开通道改名弹窗（老板 2026-10-14）',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    // 点胶囊里的**名字**（整颗胶囊可点，不止图标）→ 弹层收起、错峰后开改名弹窗
+    await tester.tap(sheetText('iPhone'));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget,
+        reason: '点名字胶囊应开通道改名弹窗');
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.byType(TextField)),
+        findsWidgets,
+        reason: '改名弹窗应有名称输入框');
   });
 
   testWidgets('没有时间可显示的卡片也与别的等高（时间行恒占一行，老板 2026-09-26）',
