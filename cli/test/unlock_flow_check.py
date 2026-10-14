@@ -8,6 +8,9 @@
 #   ④ bug 根因：中止（空回车/EOF）后**绝不**加载或渲染历史——旧实现中止后 main
 #      不检查 running，把没验证的历史全屏渲染出来，再因输入循环吞掉所有按键挂死，
 #      只能强杀进程。本用例断言"退出必须真的发生（进程消失、退出码 0）"。
+#   ⑤ 身份零泄露（老板 2026-10-13 追加）：锁屏码验证通过前，标题栏/状态栏**只显示
+#      产品名 Einz**——对方/我的名字、通道、WS 状态灯、命令提示一概不上屏；
+#      解锁成功后恢复正常（场景 G）。
 #
 # 环境说明（断言口径的来源，改断言前先读）：
 #   - 无需服务端（用不可达端口，走离线路径）；store 用 demo/store-a.json 的副本
@@ -21,7 +24,7 @@
 #     输入循环吞按键——与 cliMultiverseE2E 的 send_when_ready 同一契约）。
 #
 # 运行：python3 cli/test/unlock_flow_check.py
-import fcntl, os, pty, re, select, shutil, socket, struct, subprocess, sys, tempfile, termios, time
+import fcntl, json, os, pty, re, select, shutil, socket, struct, subprocess, sys, tempfile, termios, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CLI = f'{ROOT}/cli'
@@ -34,9 +37,15 @@ UNLOCK_PROMPT = '输入锁屏码'
 UNLOCK_ERROR = '锁屏码验证错误'
 PIN_SET = '锁屏码已设置'
 PIN_OK = '锁屏码验证成功'
+# 场景 G：可辨身份信息（setup 预置进 store）与状态灯字符（解锁前一个都不能出现）
+FAKE_NAME = 'Alice'
+FAKE_ENTRANCE = '本机通道'
+STATUS_DOTS = '●○↻✗⊘'
+CHAT_HINT = '/help 查看命令'
 
 WORK = tempfile.mkdtemp(prefix='einz-unlock-')
-OUT = ''  # 当前场景的累积输出（ANSI 剥离）
+OUT = ''   # 当前场景的累积输出（ANSI 剥离）
+RAW = b''  # 当前场景的累积原始输出（按清屏序列切帧用）
 
 
 def free_port():
@@ -74,13 +83,23 @@ def send(master, s):
         pass  # 进程已退出：写 master 无意义
 
 
+def consume(master, seconds=1.0):
+    """读一段输出，同时累积进 OUT（剥离 ANSI）与 RAW（原始，切帧用）。"""
+    global OUT, RAW
+    raw = drain(master, seconds)
+    RAW += raw
+    seg = strip_ansi(raw.decode('utf-8', errors='replace'))
+    OUT += seg
+    return seg
+
+
 def wait_text(master, text, timeout=40):
     """读输出直到 text 出现（累积进 OUT）；返回 OUT。
     先读一轮再判断——即使 text 已在 OUT 中也会消费新输出（调用方依赖这一点）。"""
     global OUT
     deadline = time.time() + timeout
     while True:
-        OUT += strip_ansi(drain(master, 0.8).decode('utf-8', errors='replace'))
+        consume(master, 0.8)
         if text in OUT or time.time() >= deadline:
             return OUT
 
@@ -90,7 +109,7 @@ def wait_count_grow(master, expect, base, timeout=15):
     global OUT
     deadline = time.time() + timeout
     while time.time() < deadline and OUT.count(expect) <= base:
-        OUT += strip_ansi(drain(master, 0.4).decode('utf-8', errors='replace'))
+        consume(master, 0.4)
     return OUT.count(expect) > base
 
 
@@ -112,7 +131,7 @@ def send_until(master, line, expect, tries=10, per_try=4):
         send(master, f'{line}\r')
         deadline = time.time() + per_try
         while time.time() < deadline and OUT.count(expect) <= base:
-            OUT += strip_ansi(drain(master, 0.4).decode('utf-8', errors='replace'))
+            consume(master, 0.4)
         if OUT.count(expect) > base:
             return True
     return OUT.count(expect) > base
@@ -158,9 +177,33 @@ def answer_server_prompt(master):
     send(master, '\r')
 
 
+def grab_frame(master, seconds=1.0):
+    """取**当前稳定帧**（最近一次全量重绘的整屏内容，ANSI 剥离）。
+    无输入/无消息时 TUI 不重绘——不能靠"新输出"取帧；改为从累积原始输出
+    RAW 里按清屏序列（\x1b[2J，见 _clearHome）切最后一帧。返回帧文本
+    （OUT 早已累积过这些字节，这里不重复加）。"""
+    consume(master, seconds)
+    parts = RAW.split(b'\x1b[2J')
+    return strip_ansi(parts[-1].decode('utf-8', errors='replace'))
+
+
 def make_store():
     path = f'{WORK}/pin-store.json'
     shutil.copy(DEMO_STORE, path)
+    return path
+
+
+def make_named_store():
+    """带可辨身份的 store（场景 G）：预置我的名字 + 通道名 + entrance_id——
+    解锁前这些一个字节都不能上屏；解锁后我的名字应恢复显示。"""
+    path = f'{WORK}/named-store.json'
+    shutil.copy(DEMO_STORE, path)
+    with open(path) as f:
+        data = json.load(f)
+    data['member_name'] = FAKE_NAME
+    data['entrance_name'] = FAKE_ENTRANCE
+    with open(path, 'w') as f:
+        json.dump(data, f)
     return path
 
 
@@ -168,6 +211,7 @@ def setup_pin_store(port):
     """首启（无 PIN）：/pin 123456 设置锁屏码，再 /exit——供后续解锁场景复用。"""
     global OUT
     OUT = ''
+    RAW = b''
     store = make_store()
     master, p = start_tui(store, port)
     try:
@@ -202,6 +246,7 @@ def scenario_wrong_and_exit_command(store, port):
     """错码重试 → /exit 只是错码（不退出）→ 正确 PIN → 进聊天态 → /exit。"""
     global OUT
     OUT = ''
+    RAW = b''
     master, p = start_tui(store, port)
     try:
         answer_server_prompt(master)
@@ -280,6 +325,7 @@ def scenario_empty_enter_exits(store, port):
     """解锁提示直接回车 → 退出整个 TUI（必须真的退出，不挂死、不渲染历史）。"""
     global OUT
     OUT = ''
+    RAW = b''
     master, p = start_tui(store, port)
     try:
         answer_server_prompt(master)
@@ -312,6 +358,7 @@ def scenario_eof_exits(store, port):
     """解锁提示期 stdin EOF（关 master）→ 退出（onDone 释放问答等待，不挂死）。"""
     global OUT
     OUT = ''
+    RAW = b''
     master, p = start_tui(store, port)
     try:
         answer_server_prompt(master)
@@ -344,6 +391,7 @@ def scenario_switch_gate(pin_store, port):
     """会话内 /switch 到有 PIN 的目标：错码重试、空回车取消、/exit 不退出（统一策略）。"""
     global OUT
     OUT = ''
+    RAW = b''
     plain_store = f'{WORK}/plain-store.json'  # 无 PIN 的运行中会话（当前空间）
     shutil.copy(DEMO_STORE, plain_store)
     master, p = start_tui(plain_store, port)
@@ -419,6 +467,7 @@ def scenario_reset_gate(pin_store, port):
     """/reset 的本机锁屏码闸门：错码 → 拒绝且不做任何改动；/exit 也不退出（统一策略）。"""
     global OUT
     OUT = ''
+    RAW = b''
     master, p = start_tui(pin_store, port)
     try:
         answer_server_prompt(master)
@@ -481,6 +530,116 @@ def scenario_reset_gate(pin_store, port):
             pass
 
 
+def assert_no_identity(frame, stage):
+    """解锁前帧的身份零泄露断言（老板 2026-10-13）：只许有产品名 Einz。"""
+    if 'Einz' not in frame:
+        print(f'❌ 场景 G[{stage}]：产品名 Einz 没显示')
+        return False
+    if frame.count('Einz') < 2:
+        print(f'❌ 场景 G[{stage}]：Einz 应同时在标题栏与状态栏（实见 {frame.count("Einz")} 次）')
+        return False
+    leaks = [
+        ('我的名字', FAKE_NAME in frame),
+        ('通道名', FAKE_ENTRANCE in frame),
+        ('entrance_id', 'dev-a1' in frame),
+        ('占位 ?', '?' in frame),
+        ('WS/对方状态灯', any(d in frame for d in STATUS_DOTS)),
+        ('底部命令提示', CHAT_HINT in frame),
+        ('旧解锁 status', '🔒' in frame),
+    ]
+    bad = [name for name, hit in leaks if hit]
+    if bad:
+        print(f'❌ 场景 G[{stage}]：解锁前泄露了 {bad}')
+        print(frame[-600:])
+        return False
+    return True
+
+
+def scenario_identity_hidden_until_unlock(port):
+    """场景 G（老板 2026-10-13）：验证通过前标题栏/状态栏只显示产品名——
+    对方/我的名字、通道、WS 状态灯、命令提示一概不上屏；解锁成功后恢复。"""
+    global OUT
+    OUT = ''
+    RAW = b''
+    store = make_named_store()
+
+    # setup：无 PIN 的 named store → /pin 设置 → /exit（供解锁场景复用）
+    master, p = start_tui(store, port)
+    try:
+        answer_server_prompt(master)
+        wait_text(master, CHAT_READY, timeout=90)
+        if not send_until(master, '/pin 123456', PIN_SET):
+            print('❌ 场景 G：/pin 设置失败')
+            print(OUT[-800:])
+            return False
+        send_until_exit(master, p, '/exit')
+        if wait_exit(p, master) is None:
+            print('❌ 场景 G：setup /exit 后进程未退出')
+            return False
+    finally:
+        if p.poll() is None:
+            p.kill()
+        try:
+            os.close(master)
+        except OSError:
+            pass
+    print('✅ 场景 G：准备完成（named store + PIN）')
+
+    # 正式验证：启动 → 解锁提示出现后的**稳定帧**必须零身份信息
+    OUT = ''
+    RAW = b''
+    master, p = start_tui(store, port)
+    try:
+        answer_server_prompt(master)
+        wait_text(master, UNLOCK_PROMPT, timeout=90)
+        if UNLOCK_PROMPT not in OUT:
+            print('❌ 场景 G：未出现锁屏码解锁提示')
+            print(OUT[-800:])
+            return False
+        if not assert_no_identity(grab_frame(master), '解锁提示态'):
+            return False
+        print('✅ 场景 G：解锁提示态只显示产品名（名字/通道/状态灯/命令提示均不上屏）')
+
+        # 输错 PIN 后的帧同样干净（错误提示可以显示，身份不行）
+        type_line(master, WRONG_PIN)
+        if not wait_count_grow(master, UNLOCK_ERROR, OUT.count(UNLOCK_ERROR)):
+            print('❌ 场景 G：错误 PIN 未见重试提示')
+            return False
+        if not assert_no_identity(grab_frame(master), '错误重试态'):
+            return False
+        print('✅ 场景 G：错误重试态同样零泄露')
+
+        # 正确 PIN → 进聊天态 → 身份恢复（名字 + 命令提示回到屏上）
+        type_line(master, PIN)
+        if not wait_count_grow(master, PIN_OK, 0):
+            print('❌ 场景 G：正确 PIN 未见验证成功')
+            print(OUT[-800:])
+            return False
+        frame = grab_frame(master, seconds=2.0)
+        if FAKE_NAME not in frame:
+            print('❌ 场景 G：解锁后我的名字没恢复显示')
+            print(frame[-600:])
+            return False
+        if CHAT_HINT not in frame:
+            print('❌ 场景 G：解锁后状态栏命令提示没恢复')
+            print(frame[-600:])
+            return False
+        print('✅ 场景 G：解锁成功 → 名字/状态栏恢复正常')
+
+        send_until_exit(master, p, '/exit')
+        if wait_exit(p, master) is None:
+            print('❌ 场景 G：最终 /exit 未退出')
+            return False
+        return True
+    finally:
+        if p.poll() is None:
+            p.kill()
+        try:
+            os.close(master)
+        except OSError:
+            pass
+
+
 def main():
     port = free_port()
     store = setup_pin_store(port)
@@ -490,6 +649,7 @@ def main():
         scenario_eof_exits(store, port),
         scenario_switch_gate(store, port),
         scenario_reset_gate(store, port),
+        scenario_identity_hidden_until_unlock(port),
     ]
     shutil.rmtree(WORK, ignore_errors=True)
     if all(results):

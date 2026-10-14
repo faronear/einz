@@ -566,10 +566,10 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
 Future<bool> _unlockPin(ChatSession session) async {
   final hash = session.store.pinHash;
   if (hash == null) return true; // 未设置：直接进入
-  // 身份未揭示：解锁前标题栏两侧显示「?」，不泄本地缓存的真名（见 _identityHidden）
+  // 身份未揭示：解锁前标题栏两侧、状态栏一律只显示产品名——名字/通道/WS
+  // 状态/命令提示一概不上屏（老板 2026-10-13：验证通过前屏幕上一个身份
+  // 字节都不该出现）。提示语只在消息流里（下面的 _prompt），不占状态栏。
   _identityHidden = true;
-  // 状态条给提示：否则底部仍广告 "/exit 退出系统"——这一步并不认 /exit
-  _state!.status = '🔒 输入锁屏码解锁（直接回车退出）';
   while (_state!.running) {
     _state!.pendingExitOnEmpty = true;
     final pin = await _prompt(session, '❓ 输入锁屏码（直接回车退出）:',
@@ -591,8 +591,7 @@ Future<bool> _unlockPin(ChatSession session) async {
     }
     _state!.processing = false;
     if (ok) {
-      _identityHidden = false; // 解锁成功：恢复真实名字显示
-      _state!.status = ''; // 解锁提示退场，状态条交还常用命令提示
+      _identityHidden = false; // 解锁成功：标题栏/状态栏恢复真实身份显示
       return true; // 成功消息由 main 在 loadHistory 之后补（见函数文档）
     }
     session.messages.add(
@@ -1886,6 +1885,14 @@ String _titleBarThree(String left, String center, String right, int cols) {
   return _barLine(_bgBlack, content, cols);
 }
 
+/// 纯文本按显示宽度居中（两侧补空格）——解锁前状态栏的产品名定位用。
+/// 超宽（w >= cols）原样返回（调用方 _barLine 会截齐）。
+String _centerText(String text, int cols) {
+  final w = _displayWidth(text);
+  if (w >= cols) return text;
+  return '${' ' * ((cols - w) ~/ 2)}$text';
+}
+
 /// 终端行数（非终端/pty 下 terminalLines 可能抛异常，兜底 24）。
 /// 终端行数：stty size 优先（真实终端尺寸最可靠，raw 模式/stdout.terminalLines
 /// 失效时仍准确——此前兜底 24 与用户实际行数不符时渲染定位超出屏幕导致滚动、
@@ -1994,26 +2001,39 @@ void _render() {
     WsStatus.reconnecting => '$_red✗$_white',
     WsStatus.stopped => '$_gray○$_white',
   };
-  final peerName = _identityHidden ? '?' : _peerNameOf(s);
-  // 对方灯三态（老板 2026-10-08：撤销是独立状态，绝不同于离线）：
-  // 绿●=有在线通道 灰⊘=通道全被撤销 红○=离线（含对方未加入）
-  final peerDot = s.peerOnline
-      ? '$_green●$_white'
-      : (s.peerAllRevoked ? '$_gray⊘$_white' : '$_red○$_white');
-  // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
-  // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
-  // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
-  // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
-  // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
+  // 解锁前（老板 2026-10-13）：标题栏**只显示中间的产品名**——两侧的对方/我的
+  // 名字、通道列表、WS 状态灯一概不渲染（连占位的「?」都不要：验证通过前，
+  // 屏幕上一个身份字节都不该出现）。左右两段留空即可，_titleBarThree 自然
+  // 把品牌名摆在正中。
   final String leftSeg;
+  final String rightSeg;
   if (_identityHidden) {
-    leftSeg = '?'; // 解锁前 group 名单同样不得上屏
-  } else if (s.isGroupSpace) {
-    leftSeg = _groupMemberListLabel(s);
+    leftSeg = '';
+    rightSeg = '';
   } else {
-    final peerEntrances = _peerEntranceLabel(s);
-    leftSeg = '$peerDot $peerName'
-        '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}$peerEntrances';
+    final peerName = _peerNameOf(s);
+    // 对方灯三态（老板 2026-10-08：撤销是独立状态，绝不同于离线）：
+    // 绿●=有在线通道 灰⊘=通道全被撤销 红○=离线（含对方未加入）
+    final peerDot = s.peerOnline
+        ? '$_green●$_white'
+        : (s.peerAllRevoked ? '$_gray⊘$_white' : '$_red○$_white');
+    // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
+    // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
+    // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
+    // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
+    // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
+    leftSeg = s.isGroupSpace
+        ? _groupMemberListLabel(s)
+        : '$peerDot $peerName'
+            '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}'
+            '${_peerEntranceLabel(s)}';
+    // 右段（我）：`灯 名字 @本机名 #n/m#其它在线通道…`（老板 2026-09-16）——
+    // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
+    // 后面的 #n/m 与通道列表**扣除本机**，两者严格一一对应。
+    rightSeg = '$myDot ${_memberLabel(s.session.store, s.memberNames)}'
+        '${_myEntranceTag(s)}'
+        '${_entranceCountLabel(s.myOtherOnlineSince.length, s.myOtherEntranceTotal)}'
+        '${_myOtherEntrancesLabel(s)}';
   }
   // 三段式标题栏：对方状态贴左缘、我的状态贴右缘（与消息左右分栏一致——
   // 对方消息在左、我的消息在右）、品牌名 "Einz" 居中。
@@ -2025,13 +2045,7 @@ void _render() {
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
     '${_bold}Einz\x1B[22m$_white',
-    // 右段（我）：`灯 名字 @本机名 #n/m#其它在线通道…`（老板 2026-09-16）——
-    // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
-    // 后面的 #n/m 与通道列表**扣除本机**，两者严格一一对应。
-    '$myDot ${_identityHidden ? '?' : _memberLabel(s.session.store, s.memberNames)}'
-        '${_myEntranceTag(s)}'
-        '${_entranceCountLabel(s.myOtherOnlineSince.length, s.myOtherEntranceTotal)}'
-        '${_myOtherEntrancesLabel(s)}',
+    rightSeg,
     cols,
   );
   buf.write(titleText);
@@ -2099,7 +2113,12 @@ void _render() {
   // 滚动通知（发送结果/同步进度/下载进度等瞬时状态）独占整行显示；
   // 空状态显示常用命令提示。
   buf.write('\x1B[$rows;1H\x1B[K');
-  if (s.scrollTop < s.lastMaxStart) {
+  if (_identityHidden) {
+    // 解锁前（老板 2026-10-13）：状态栏同样只显示产品名——命令提示、瞬时
+    // status、历史浏览提示在验证通过前一律不上屏（与标题栏同一策略：
+    // 屏幕上一个身份/状态字节都不出现）。
+    buf.write(_barLine(_bgBlack, _centerText('Einz', cols), cols));
+  } else if (s.scrollTop < s.lastMaxStart) {
     // 历史浏览模式：正在看更早的消息（未贴底），提示翻页键；到底后自动回正常状态
     buf.write(_barLine(_bgBlack, '📜 历史浏览（PgUp/PgDn, Shift+↑/↓ 或鼠标滚轮；翻到底自动回到最新）', cols));
   } else if (s.status.isNotEmpty) {

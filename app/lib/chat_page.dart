@@ -8384,7 +8384,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           ],
                                           Text(_messageTimeLabel(m),
                                               style: TextStyle(
-                                                  fontSize: 12,
+                                                  fontSize: 11,
                                                   color: _uiStyle == 'gradient'
                                                       ? Colors.white70
                                                       : Colors.grey)),

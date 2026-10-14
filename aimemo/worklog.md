@@ -14731,3 +14731,26 @@ Info.plist 读**（`plutil -extract CFBundleShortVersionString raw`，iOS job �
 不做"绿但坏"。docs/CI.md 补同一说明。验证：ruby psych 解析 workflow YAML 通过；
 临时 plist 实测 plutil 读取与格式断言（好版本通过 / 1.0.0 被拦截）。CI 下次构建
 起 version.txt 与 zip 一致；存量已装旧包的用户下一次检查即可正常收敛。
+
+**（2026-10-13T14:07:00Z / 2026-10-13 22:07）**：TUI 锁屏码验证前**身份零泄露**
+（老板 2026-10-13：验证通过前完全不要显示对方/我的名字、通道、状态等信息，
+状态栏只显示中间的产品名）。此前并行提交只把标题栏两侧换成占位「?」——老板
+要求更彻底：解锁前**标题栏左右两段整个置空**（连 ? 都不要），只留居中产品名
+Einz；底部状态行同步只显示居中 Einz（命令提示、瞬时 status、历史浏览提示
+一并压制）；_unlockPin 里不会显示的解锁 status 设置删除（提示语本就在消息流）。
+消息流本就干净（loadHistory 在解锁后才跑——上一轮 bug 修复的结构性保证）。
+测试（unlock_flow_check 场景 G，新基建）：store 预置可辨名字/通道名，pty 按
+清屏序列切「当前稳定帧」断言——解锁提示态与错误重试态帧内只有 Einz（名字、
+通道名、entrance_id、?、状态灯 ●○↻✗⊘、底部命令提示、🔒 全部不出现），
+解锁成功后名字与命令提示恢复。回归：unlock_flow 6 场景全过、guide 三件套、
+revoke、dart analyze 全过。
+
+**（2026-10-14T01:04:27Z / 2026-10-14 09:04）**：两处 UI 文案/字号微调（老板
+2026-10-14 要求）：
+1. 气泡顶栏时间戳字号 12 → 11（chat_page.dart 气泡时间行 Text）——与同行
+   「加速中…/重发中…」「点击重发」文字、沙漏后焚毁时长标签（_burnTagLabel）、
+   群聊送达人数数字统一为 11 号（此前仅时间戳是 12，其余均已是 11）。
+2. 「我的通道」→「我的设备通道」（app_zh.arb + app_localizations_zh.dart 的
+   chatPageMenuEntranceList）——菜单项（PopupMenuItem）、通道弹层标题、状态条
+   devices 箭头 tooltip 三处共用该 key，一并生效；英文经老板确认保持
+   'My entrances' 不变。代码注释里的旧称「我的通道」未动（非用户可见文案）。
