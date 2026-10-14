@@ -667,7 +667,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
-  String get chatPageMenuEntranceList => '我的通道';
+  String get chatPageMenuEntranceList => '我的设备通道';
 
   @override
   String wizardJoinInviteHint(String name, int count) {
