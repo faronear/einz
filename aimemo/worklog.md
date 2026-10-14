@@ -14809,3 +14809,6 @@ _SendingPlane 也是无限动画（次要隐患）。修复：settleRealAsync �
 把一切域名（含 RFC 6761 保留域 .invalid）解析到 sinkhole 198.18.0.20，测试期望的
 SocketException 变成 HttpException；干净树上同样失败（stash 对照过）；GitHub CI
 runner 无此 sinkhole，应正常通过（该测试文件头自称"无外网依赖"，本为 CI 设计）。
+**归因确认（老板 2026-10-14 当天补充）**：sinkhole 来自本机 Clash Verge Rev 的
+fake-ip 池（198.18.0.0/15）——开着 Clash 时一切域名都被劫到假 IP，DNS 失败语义的
+测试必挂；关闭 Clash 后 testAll 全绿通过。**以后本机测试异常先问 Clash 状态**。
