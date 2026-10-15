@@ -42,6 +42,14 @@
         ]
       },
       {
+        "name": "MacOS--本机",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz",
+          "npm run app-mac-run-local"
+        ]
+      },
+      {
         "name": "安卓--本机",
         "autoExecuteCommands": true,
         "commands": [
@@ -55,14 +63,6 @@
         "commands": [
           "cd ~/einz",
           "if [ $(hostname) = 'DoomBase' ]; then npm run app-ios-boot && npm run app-ios-run-local; else exit; fi;"
-        ]
-      },
-      {
-        "name": "MacOS--本机",
-        "autoExecuteCommands": true,
-        "commands": [
-          "cd ~/einz",
-          "npm run app-mac-run-local"
         ]
       },
       {

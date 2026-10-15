@@ -1583,7 +1583,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnNote.
   ///
   /// In en, this message translates to:
-  /// **'New messages are deleted on a countdown once read'**
+  /// **'New messages are deleted on a countdown once read (Applies to this entrance only)'**
   String get chatPageBurnNote;
 
   /// No description provided for @chatPageTombstoneHeading.

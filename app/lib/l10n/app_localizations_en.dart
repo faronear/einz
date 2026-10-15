@@ -898,7 +898,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageBurnNote =>
-      'New messages are deleted on a countdown once read';
+      'New messages are deleted on a countdown once read (Applies to this entrance only)';
 
   @override
   String get chatPageTombstoneHeading => 'Tombstone messages';
