@@ -664,7 +664,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachmentStorageSubmit => '提交';
 
   @override
-  String get chatPageAttachmentStorageWarnClear => '切到“远程托管”会立即删除本机已留存的附件明文';
+  String get chatPageAttachmentStorageWarnClear =>
+      '切到“远程托管”会立即删除本机已留存的附件明文。真的要切换吗？';
 
   @override
   String get chatPageMenuStyleLabel => '界面主题';

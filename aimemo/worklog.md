@@ -14948,3 +14948,20 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
 全文件，一度产生 4934 行 diff 且覆盖了未提交改动）。恢复：`git checkout` 回 HEAD 后
 按精确 old/new 串重放 5 处改动（Edit 工具），git diff 核对只含预期 hunk。教训入
 记忆：本仓库不要跑 dart format；试探用 `dart format --output=none --set-exit-if-changed`。
+
+**（2026-10-15T08:40:19Z / 2026-10-15 16:40）**：「我的身份」「当前通道」弹窗加
+「应用于本机所有秘境」范围选择（老板 2026-10-15：「也加上范围选择 实现相关逻辑」）。
+- UI：两个弹窗各加 LabeledCheckbox(settingsScopeAll)，放在输入框/性别框下方，
+  每次开弹窗默认不勾选（与邮件通知同策略——扇出是每次显式 opt-in，不持久化）。
+- 逻辑：抽 `_fanoutOtherSpaces(action)`（原 _fanoutNotifyEmail 的循环升级为通用，
+  邮件通知改委托）；新增 `_rewriteOtherSpacesProfile({memberName, entranceName})`
+  ——逐空间 loadProfile→只替换目标字段→saveProfile 整份写回（mode/otherMembers/
+  groupName 传 null 保持原值；Spaces 行名字由 saveProfile 一并更新）。勾选时
+  服务端（各空间会话 updateMemberName/updateEntranceName）+ 本地 profile 两路
+  一起扇出，best-effort；不勾＝只当前空间（原行为）。
+- 测试补 3 例：我的身份勾选（两空间服务端都改名 + space-b 只换 memberName
+  其余字段保留）、我的身份不勾（仅当前空间）、当前通道勾选（entranceName 扇出
+  + memberName 保留）。_FakeApi 增加改名调用记录（name+token）与 listEntrances
+  stub。回归：全量 app 330 过 1 跳 0 败。
+- 顺带：老板并行手改 app_zh.arb（远程托管警示文案加「真的要切换吗？」），按
+  arb→gen-l10n 惯例补生成（app_localizations_zh.dart 同步）。

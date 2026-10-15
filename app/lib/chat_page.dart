@@ -2845,14 +2845,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 把邮箱通知设置**扇出到本机所有空间**（老板 2026-10-01 定：通知按设备共享，
-  /// 不按空间各设各的）。逐空间走它自己的会话调 [action]（PUT/DELETE），
-  /// 全部 best-effort：某个空间会话过期/离线拉不到就跳过，不影响其它空间，
-  /// 也不打扰用户（与 _refreshNotifyEmail 同一条"装饰性功能不弹错"原则）。
-  ///
-  /// 服务端按**地址**聚合验证状态（notify_emails.verified_at），同一地址在别的
-  /// 空间已验证过时 PUT 直接返回 verified、不重发确认信——扇出因此是便宜的。
-  Future<void> _fanoutNotifyEmail(Future<void> Function(String token) action) async {
+  /// 把某个操作**扇出到本机其它空间**（2026-10-01 起的"按设备共享"一族共用：
+  /// 邮箱通知、身份/通道改名）。逐空间走它自己的会话调 [action]，全部
+  /// best-effort——某个空间会话过期/离线就跳过，不影响其它空间，也不打扰用户
+  /// （与 _refreshNotifyEmail 同一条"装饰性功能不弹错"原则）。当前空间由调用方
+  /// 自己处理，这里跳过。
+  Future<void> _fanoutOtherSpaces(Future<void> Function(String token) action) async {
     final vault = VaultSession.current;
     final spaces = vault?.spaces ?? const <AppLockPayload>[];
     if (spaces.length < 2) return;
@@ -2862,6 +2860,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       try {
         // 走各空间的会话（同 _refreshOtherUnread）：直接用 Vault 里的旧 token 会 401
         await SpaceSessions.ofPayload(space, db: widget.db).call(action);
+      } catch (_) {
+        // 单个空间失败不阻塞其余空间
+      }
+    }
+  }
+
+  /// 把本机其它空间的**本地 profile** 里某个字段改写（扇出改名用：服务端改了，
+  /// 本地各空间的 profile 也得跟着改，否则切过去/重启后还是旧名）。逐空间
+  /// loadProfile → 只替换 [memberName]/[entranceName] 之一 → saveProfile 整份
+  /// 写回——saveProfile 是覆盖写，必须把原值带回去；mode/otherMembers/
+  /// groupName 传 null = 保持原值（它们的"不知道就别抹掉"语义）。best-effort，
+  /// 单个空间失败静默。Spaces 行的名字也由 saveProfile 一并更新（切空间卡片
+  /// 显示的就是它）。
+  Future<void> _rewriteOtherSpacesProfile(
+      {String? memberName, String? entranceName}) async {
+    final vault = VaultSession.current;
+    final spaces = vault?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) return;
+    final db = widget.db ?? LocalDatabase.shared;
+    final lock = AppLockService(db);
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue; // 当前空间已由调用方处理
+      try {
+        final p = await lock.loadProfile(spaceId: space.spaceId);
+        await lock.saveProfile(
+          spaceId: space.spaceId,
+          memberName: memberName ?? (p['memberName'] as String?) ?? '',
+          peerName: (p['peerName'] as String?) ?? '',
+          entranceName: entranceName ?? (p['entranceName'] as String?) ?? '',
+          myGender: (p['myGender'] as String?) ?? '',
+          peerGender: (p['peerGender'] as String?) ?? '',
+          mySlot: (p['mySlot'] as int?),
+          peerSlot: (p['peerSlot'] as int?),
+          groupName: (p['groupName'] as String?) ?? '',
+        );
       } catch (_) {
         // 单个空间失败不阻塞其余空间
       }
@@ -3005,7 +3038,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
                             // 不勾＝只停当前秘境，其它秘境的绑定原样保留
                             if (allSpaces.value) {
-                              unawaited(_fanoutNotifyEmail(
+                              unawaited(_fanoutOtherSpaces(
                                   (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
                             }
                             await _refreshNotifyEmail();
@@ -3060,7 +3093,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
                             // 不勾＝只绑当前秘境，其它秘境不动
                             if (allSpaces.value) {
-                              unawaited(_fanoutNotifyEmail(
+                              unawaited(_fanoutOtherSpaces(
                                   (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
                             }
                             await _refreshNotifyEmail();
@@ -4426,7 +4459,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 保存通道名（改名弹窗与「我的通道」弹层共用）：校验白名单 → PUT → 更新本地
   /// profile。返回 null = 成功；否则返回已本地化的错误文案（调用方自行展示——
   /// 弹窗走红字、弹层走顶部通知）。
-  Future<String?> _applyEntranceName(String rawName, AppLocalizations l10n) async {
+  ///
+  /// [allSpaces]（老板 2026-10-15）：勾了「应用于本机所有秘境」时，除当前空间外
+  /// 还把名字扇出到本机其它空间（服务端各空间会话 + 本地各空间 profile 一起改），
+  /// best-effort——单个空间失败不阻塞其余，也不打扰用户。
+  Future<String?> _applyEntranceName(String rawName, AppLocalizations l10n,
+      {bool allSpaces = false}) async {
     final name = rawName.trim();
     if (name.isEmpty) return l10n.chatPageRenameEntranceEmptyError;
     // 通道名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、数字、
@@ -4445,6 +4483,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
       // app 菜单改名后退出重进回到 memberB）
       await _saveProfile();
+      if (allSpaces) {
+        // 扇出：其它秘境的服务端通道名 + 本地 profile 一起改（best-effort）
+        unawaited(_fanoutOtherSpaces((t) => api.updateEntranceName(name, t)));
+        unawaited(_rewriteOtherSpacesProfile(entranceName: name));
+      }
       return null;
     } on ApiException catch (e) {
       return backendError(l10n, l10n.chatPageRenameFailed(e.message));
@@ -4466,6 +4509,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final editing = ValueNotifier<bool>(false);
     // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
     final nameFocus = FocusNode();
+    // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
+    // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
+    // 默认不勾选（与邮件通知/我的身份弹窗同策略）
+    final allSpaces = ValueNotifier<bool>(false);
     final saved = await showDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
@@ -4543,13 +4590,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                       ),
               ),
+              // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
+              // 不勾＝只改当前秘境。每次开弹窗默认不勾选
+              ValueListenableBuilder<bool>(
+                valueListenable: allSpaces,
+                builder: (_, all, _) => LabeledCheckbox(
+                  value: all,
+                  label: l10n.settingsScopeAll,
+                  onChanged: (v) => allSpaces.value = v,
+                ),
+              ),
             ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
             FilledButton(
               onPressed: () async {
-                final err = await _applyEntranceName(ctrl.text, l10n);
+                final err = await _applyEntranceName(ctrl.text, l10n,
+                    allSpaces: allSpaces.value);
                 if (err != null) {
                   // 错误**就地显示**：红字挂在输入框下方（与 PIN 修改弹窗同款），
                   // 不再弹弹窗外的顶部通知条（老板 2026-10-02）
@@ -4571,6 +4629,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       nameError.dispose();
       editing.dispose();
       nameFocus.dispose();
+      allSpaces.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新弹层/菜单显示的新名字
   }
@@ -4689,6 +4748,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final editing = ValueNotifier<bool>(false);
     // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
     final nameFocus = FocusNode();
+    // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
+    // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
+    // 默认不勾选（与邮件通知弹窗同策略——扇出必须是每次显式 opt-in）
+    final allSpaces = ValueNotifier<bool>(false);
     final saved = await showDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
@@ -4779,6 +4842,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           : null,
                 ),
               ),
+              // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
+              // 不勾＝只改当前秘境。每次开弹窗默认不勾选
+              ValueListenableBuilder<bool>(
+                valueListenable: allSpaces,
+                builder: (_, all, _) => LabeledCheckbox(
+                  value: all,
+                  label: l10n.settingsScopeAll,
+                  onChanged: (v) => allSpaces.value = v,
+                ),
+              ),
             ],
           ),
           actions: [
@@ -4812,6 +4885,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
                   // app 菜单改名后退出重进回到 memberB）
                   await _saveProfile();
+                  if (allSpaces.value) {
+                    // 扇出：其它秘境的服务端成员名 + 本地 profile 一起改
+                    // （best-effort，单个空间失败不阻塞其余）
+                    unawaited(_fanoutOtherSpaces((t) => api.updateMemberName(name, t)));
+                    unawaited(_rewriteOtherSpacesProfile(memberName: name));
+                  }
                   if (ctx.mounted) Navigator.of(ctx).pop(true);
                 } on ApiException catch (e) {
                   if (ctx.mounted) {
@@ -4837,6 +4916,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       nameError.dispose();
       editing.dispose();
       nameFocus.dispose();
+      allSpaces.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }
