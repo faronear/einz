@@ -55,6 +55,7 @@ import 'widgets/emoji_panel.dart';
 import 'widgets/immersive_fullscreen.dart';
 import 'widgets/passphrase_field.dart';
 import 'widgets/option_picker_sheet.dart';
+import 'widgets/labeled_checkbox.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
 import 'widgets/clickable.dart';
@@ -2909,29 +2910,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
             // 应用范围勾选（老板 2026-10-02）：默认勾选＝保存/停用同步到本机所有秘境
             // （原静态文案「保存后应用于本机所有秘境。」升级为可选项）。
-            // 放在 Email 输入框下方（老板 2026-10-02）
+            // 放在 Email 输入框下方（老板 2026-10-02）。
+            // 2026-10-15：复用 LabeledCheckbox——与设置弹层的「应用于本机所有秘境」
+            // 同模块、同居中式样，文案也收敛到共享键 settingsScopeAll
             ValueListenableBuilder<bool>(
               valueListenable: allSpaces,
-              builder: (_, all, _) => CheckboxListTile(
+              builder: (_, all, _) => LabeledCheckbox(
                 value: all,
+                label: l10n.settingsScopeAll,
                 onChanged: (v) {
-                  final next = v ?? true;
-                  allSpaces.value = next;
+                  allSpaces.value = v;
                   // 勾选即落盘：它是设备级默认策略（新空间继承钩子也读它），
                   // 不等点保存——关掉弹窗也应该记住
                   unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
-                      .save(next));
+                      .save(v));
                 },
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(
-                  l10n.chatPageNotifyAllSpaces,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(ctx).colorScheme.outline,
-                  ),
-                ),
               ),
             ),
             // 已填但还没点链接：这一档不点明，用户会以为已经生效

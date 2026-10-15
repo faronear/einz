@@ -473,7 +473,6 @@
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
   "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification will be sent to your email address.",
-  "chatPageNotifyAllSpaces": "Apply this setting to all spaces on this device.",
   "chatPageNotifyEmailLabel": "Email",
   "chatPageNotifyEmptyError": "Enter an email address first",
   "chatPageNotifyInvalidError": "That doesn't look like an email address",

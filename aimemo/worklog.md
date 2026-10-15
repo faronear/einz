@@ -14894,3 +14894,11 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
   弹层内联红色警示（warningFor）撤掉——被确认弹窗取代，同一句子不出现两遍。
 - 测试：附件 scope 三个用例——当前空间确认执行 / 全空间确认执行 / **取消无
   变化**（含 dialog 标题与内容断言）。回归：全量 app 325 过 1 跳 0 败。
+
+**（2026-10-15T05:34:38Z / 2026-10-15 13:34）**：邮件通知弹窗复用 LabeledCheckbox
+（老板 2026-10-15：「也复用这个模块，也居中」）。原 CheckboxListTile（leading、
+12px、左对齐）换成共享组件 LabeledCheckbox（居中、整行可点），文案从
+chatPageNotifyAllSpaces 收敛到共享键 settingsScopeAll（语义相同，就多个句号；
+旧键删除）。行为不变：勾选仍即刻落盘 NotifyAllSpacesPref（设备级默认策略，
+不等保存）。测试：chat_page_menu_test 补 1 例（弹窗渲染共享文案 + 切换即落盘）。
+回归：全量 app 326 过 1 跳 0 败。

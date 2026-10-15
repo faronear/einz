@@ -428,7 +428,6 @@
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
   "chatPageNotifyHint": "你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。",
-  "chatPageNotifyAllSpaces": "应用于本机所有秘境。",
   "chatPageNotifyEmailLabel": "邮箱",
   "chatPageNotifyEmptyError": "先填一个邮箱地址",
   "chatPageNotifyInvalidError": "邮箱地址格式不对",

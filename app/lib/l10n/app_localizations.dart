@@ -1508,12 +1508,6 @@ abstract class AppLocalizations {
   /// **'If you have new messages and haven\'t been online for a while, a notification will be sent to your email address.'**
   String get chatPageNotifyHint;
 
-  /// No description provided for @chatPageNotifyAllSpaces.
-  ///
-  /// In en, this message translates to:
-  /// **'Apply this setting to all spaces on this device.'**
-  String get chatPageNotifyAllSpaces;
-
   /// No description provided for @chatPageNotifyEmailLabel.
   ///
   /// In en, this message translates to:

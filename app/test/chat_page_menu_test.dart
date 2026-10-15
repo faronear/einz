@@ -15,6 +15,7 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/notify_settings.dart';
 import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
@@ -1742,5 +1743,53 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull, reason: '菜单：长名字不应溢出行宽');
+  });
+
+  testWidgets('邮件通知弹窗：应用范围勾选复用 LabeledCheckbox（共享文案、切换即落盘）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 邮件通知（_menuAction 有 300ms 错峰延迟）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageNotifyLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageNotifyLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 勾选框在，文案 = 共享键 settingsScopeAll（与设置弹层的「应用于本机所有
+    // 秘境」同模块、同居中式样——老板 2026-10-15）
+    expect(find.text(_zh.settingsScopeAll), findsOneWidget);
+
+    // 默认勾选（true=全局）；点一下取消 → **即刻落盘**（设备级默认策略，
+    // 不等点保存——关掉弹窗也应记住）
+    final pref = NotifyAllSpacesPref(db);
+    await tester.runAsync(() async {
+      expect(await pref.load(), isTrue);
+    });
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      expect(await pref.load(), isFalse);
+    });
   });
 }

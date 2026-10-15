@@ -852,10 +852,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'If you have new messages and haven\'t been online for a while, a notification will be sent to your email address.';
 
   @override
-  String get chatPageNotifyAllSpaces =>
-      'Apply this setting to all spaces on this device.';
-
-  @override
   String get chatPageNotifyEmailLabel => 'Email';
 
   @override
