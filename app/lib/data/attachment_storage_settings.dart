@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'local_database.dart';
+import 'space_scoped_setting.dart';
 
 /// 附件存储模式：**本设备**设置（存 app_state，不同步到空间——一台设备一个选择，
 /// 伴侣那台可以跟你不一样）。它是"安全 vs 体验"的取舍开关：
@@ -21,22 +22,26 @@ final ValueNotifier<String> attachmentStorageNotifier =
 /// 附件存储模式设置（存本设备 app_state，key='attachment_storage'）。
 ///
 /// 多空间：给 [spaceId] 时键为 `space.<spaceId>.attachment_storage`；读不到时回退
-/// 旧全局键（存量设置没有空间维度）。
-class AttachmentStorageSettings {
+/// 旧全局键（存量设置没有空间维度）。「应用于本机所有秘境」的全局保存走 mixin 的
+/// [saveAll]（见 [SpaceScopedSetting]）。
+class AttachmentStorageSettings with SpaceScopedSetting {
   AttachmentStorageSettings(this.db, {this.spaceId});
 
+  @override
   final LocalDatabase db;
 
   /// 归属空间；null = 用旧全局键。
+  @override
   final String? spaceId;
 
   static const _kKey = 'attachment_storage';
 
-  String get _key => spaceId == null ? _kKey : spaceScopedKey(spaceId!, _kKey);
+  @override
+  String get settingKey => _kKey;
 
   /// 当前模式（默认 'stored' = 长期保存，老板 2026-09-15；老版本升上来也是它）。
   Future<String> load() async {
-    final row = await (db.select(db.appState)..where((s) => s.key.equals(_key)))
+    final row = await (db.select(db.appState)..where((s) => s.key.equals(scopedKey)))
         .getSingleOrNull();
     final v = row?.value ?? (spaceId == null
         ? null
@@ -44,13 +49,22 @@ class AttachmentStorageSettings {
     return (v == null || !kAttachmentStorageOptions.contains(v)) ? 'stored' : v;
   }
 
-  /// 保存模式并通知即时生效。**切回 secured 时由调用方负责清空已存明文**
-  /// （[AttachmentStore.clearSpace]——只清**本空间**那一份：模式是 per-space
+  /// 保存模式（只写当前空间）并通知即时生效。**切回 secured 时由调用方负责清空
+  /// 已存明文**（[AttachmentStore.clearSpace]——只清本空间那一份：模式是 per-space
   /// 设置，别空间的明文缓存不该被误删）——否则"安全"名不副实（老板 2026-09-14 定）。
+  /// 勾了"所有秘境"时调用方走 [saveAll] + 全局 clear。
   Future<void> save(String mode) async {
     assert(kAttachmentStorageOptions.contains(mode), '非法附件存储模式: $mode');
-    await (db.into(db.appState))
-        .insertOnConflictUpdate(AppStateCompanion.insert(key: _key, value: mode));
+    await writeSetting(scopedKey, mode);
+    attachmentStorageNotifier.value = mode;
+  }
+
+  /// 全局保存（mixin 的 saveAll）+ 补一次即时生效通知——saveAll 不走 [save]，
+  /// 不补的话菜单当前值/附件渲染要等重启才更新（当前空间的模式其实已变）。
+  @override
+  Future<void> saveAll(String mode) async {
+    assert(kAttachmentStorageOptions.contains(mode), '非法附件存储模式: $mode');
+    await super.saveAll(mode);
     attachmentStorageNotifier.value = mode;
   }
 }

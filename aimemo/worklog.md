@@ -14879,3 +14879,18 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
 - 测试：picker 补 3 例（点选即生效位置+交出、提交模式位置+只勾范围可提交、
   不传不渲染）；墓碑补 scope 用例（勾选后两空间都变、覆盖被清除、确认通知）。
   回归：全量 app 325 过 1 跳 0 败。
+
+**（2026-10-15T05:23:41Z / 2026-10-15 13:23）**：附件存储接入「应用于本机所有
+秘境」勾选框 + 切远程托管加确认弹窗（老板 2026-10-15；勾选框基础设施见上一笔）。
+- 附件存储弹层加 scope 勾选框（提交模式 → 提交按钮上方，居中）：勾选 →
+  AttachmentStorageSettings.saveAll（mixin：全局键+清 per-space 覆盖），且切
+  secured 时清**全部空间**留存明文（全局 AttachmentStore.clear）；不勾 → 原
+  per-space 路径 + 只清当前空间（老板 2026-10-14 修的作用域对齐）。saveAll
+  不走 save，override 里补发 notifier（否则菜单当前值/渲染要等重启才更新）。
+- **切「远程托管」提交后先弹确认 dialog**（老板 2026-10-15 最后一点改进）：标题
+  = 选项名「远程托管」（复用 chatPageAttachmentStorageSecured 键）、内容 = 原红色
+  警示（error 色）、取消/确认标准按钮组；onApply 里 secured 只记录意图不落地，
+  弹层关闭后错峰 300ms 开 dialog，确认才 save + 清明文，取消则什么都不做。
+  弹层内联红色警示（warningFor）撤掉——被确认弹窗取代，同一句子不出现两遍。
+- 测试：附件 scope 三个用例——当前空间确认执行 / 全空间确认执行 / **取消无
+  变化**（含 dialog 标题与内容断言）。回归：全量 app 325 过 1 跳 0 败。

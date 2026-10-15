@@ -1524,9 +1524,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
   /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
   /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
-  /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
+  /// 会立刻删掉已留存的明文，是有害操作。提交后还要过一道**确认弹窗**（标题=选项名
+  /// 「远程托管」、内容=删除警示，老板 2026-10-15）：用户确认才真正执行。
+  ///
+  /// 「远程托管」在 onApply 里**只记录意图、不落地**——弹层关后才错峰弹确认窗；
+  /// 确认 → 保存 + 清明文（勾了"所有秘境"= saveAll + 全局 clear；否则 save +
+  /// clearSpace）；取消 → 什么都不做。内联红色警示随之撤掉（被确认弹窗取代）。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
+    var pendingSecured = false; // 选了远程托管、等确认
+    var pendingScopeAll = false;
     await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => OptionPickerSheet(
@@ -1534,10 +1541,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         note: l10n.chatPageAttachmentStorageNote,
         selected: _attachmentStorage,
         submitLabel: l10n.chatPageAttachmentStorageSubmit,
-        // 只在"准备切回远程托管、且当前不是它"时提示（真要删数据）
-        warningFor: (v) => (v == 'secured' && _attachmentStorage != 'secured')
-            ? l10n.chatPageAttachmentStorageWarnClear
-            : null,
+        // 「应用于本机所有秘境」勾选框（老板 2026-10-15；提交按钮上方）
+        scopeAllLabel: l10n.settingsScopeAll,
         options: [
           for (final mode in kAttachmentStorageOptions)
             OptionPickerItem(
@@ -1547,17 +1552,66 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
         ],
         onApply: (mode, {bool scopeAll = false}) async {
-          await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId).save(mode);
           if (mode == 'secured') {
-            // 切回远程托管：清掉**本空间**已留存的明文。只清当前秘境——存储
-            // 模式是 per-space 设置（space.<spaceId>.attachment_storage），别的
-            // 空间各有各的选择；全局 clear 会把它们的明文缓存一并误删，与其
-            // 设置矛盾（老板 2026-10-14 指出）。撤销/删空间走的也是 clearSpace。
-            await AttachmentStore.clearSpace(widget.spaceId);
+            // 有害操作：不在这里落地，等确认弹窗（见方法尾）
+            pendingSecured = true;
+            pendingScopeAll = scopeAll;
+            return;
+          }
+          final settings = AttachmentStorageSettings(
+              widget.db ?? LocalDatabase.shared,
+              spaceId: widget.spaceId);
+          if (scopeAll) {
+            // 所有秘境：写全局键 + 清除各空间 per-space 覆盖
+            await settings.saveAll(mode);
+          } else {
+            await settings.save(mode);
           }
         },
       ),
     );
+    if (!pendingSecured || !mounted) return;
+    // 与弹层关闭动画错开再开 dialog（Overlay 交叉卸载断言，同 _menuAction）
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        // 标题 = 选项名「远程托管」（复用同一个 l10n 键，老板 2026-10-15）
+        title: Center(child: Text(l10n.chatPageAttachmentStorageSecured)),
+        // 内容 = 原弹层里那条红色警示（撤掉内联版后搬到这里）
+        content: Text(
+          l10n.chatPageAttachmentStorageWarnClear,
+          style: TextStyle(
+              fontSize: 12, color: Theme.of(ctx).colorScheme.error),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    // 确认：保存 + 清明文。作用域与勾选框对齐——勾了"所有秘境"就清**全部空间**
+    // 的留存明文（全局 clear），否则只清当前空间（全局 clear 会把别的空间的明文
+    // 缓存一并误删，与其设置矛盾——老板 2026-10-14 指出；撤销/删空间也走
+    // clearSpace）。
+    final settings = AttachmentStorageSettings(
+        widget.db ?? LocalDatabase.shared,
+        spaceId: widget.spaceId);
+    if (pendingScopeAll) {
+      await settings.saveAll('secured');
+      await AttachmentStore.clear();
+    } else {
+      await settings.save('secured');
+      await AttachmentStore.clearSpace(widget.spaceId);
+    }
   }
 
   /// 「更多设置」弹层（老板 2026-10-15）：把原先顶层菜单的「附件存储」与新的

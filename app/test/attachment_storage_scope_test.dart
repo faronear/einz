@@ -96,6 +96,33 @@ Future<void> _openStorageSheet(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// 提交「远程托管」后应弹出确认弹窗（老板 2026-10-15）：标题=选项名「远程托管」、
+/// 内容=删除警示；点确认才放行。返回前把弹窗点掉。
+Future<void> _confirmSecuredDialog(WidgetTester tester) async {
+  // 弹层关闭后有 300ms 错峰才开 dialog——pumpAndSettle 推不到定时器，显式推过去
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+  expect(find.text(_zh.chatPageAttachmentStorageSecured), findsOneWidget,
+      reason: '确认弹窗标题应为选项名「远程托管」');
+  expect(find.text(_zh.chatPageAttachmentStorageWarnClear), findsOneWidget,
+      reason: '确认弹窗内容应为删除警示');
+  await tester.tap(find.text(_zh.confirm));
+  await tester.pumpAndSettle();
+}
+
+/// onApply 的 clearSpace 是**在 fake 区发起的真实文件 I/O**——完成量要靠
+/// runAsync（真实事件 loop，I/O 在此交付）与 pump（fake 微任务，续体在此
+/// 运行）交替几轮才能推回来。不能直接用 settleRealAsync：它见没有转圈就
+/// 第一轮 break，窗口不够（2026-10-15 实测：onApply 永远完不成、弹层不关）。
+Future<void> _settleFileIo(WidgetTester tester) async {
+  for (var round = 0; round < 5; round++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)));
+  }
+  await tester.pumpAndSettle();
+}
+
 void main() {
   disableAnimationsInTests();
   setUpAll(() async {
@@ -160,20 +187,12 @@ void main() {
     });
 
     await _openStorageSheet(tester);
-    // 选「远程托管」→ 提交（单选+提交模式：提交按钮在选择变化后才可用）
+    // 选「远程托管」→ 提交 → **确认弹窗**（标题=选项名、内容=警示）→ 确认
     await tester.tap(find.text(_zh.chatPageAttachmentStorageSecured));
     await tester.pumpAndSettle();
     await tester.tap(find.text(_zh.chatPageAttachmentStorageSubmit));
-    // onApply 的 clearSpace 是**在 fake 区发起的真实文件 I/O**——完成量要靠
-    // runAsync（真实事件 loop，I/O 在此交付）与 pump（fake 微任务，续体在此
-    // 运行）交替几轮才能推回来。不能直接用 settleRealAsync：它见没有转圈就
-    // 第一轮 break，窗口不够（2026-10-15 实测：onApply 永远完不成、弹层不关）。
-    for (var round = 0; round < 5; round++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 50)));
-    }
-    await tester.pumpAndSettle();
+    await _confirmSecuredDialog(tester);
+    await _settleFileIo(tester);
 
     await tester.runAsync(() async {
       // ① 当前空间（space-a）的明文被清、设置变 secured
@@ -187,5 +206,115 @@ void main() {
       expect(await AttachmentStorageSettings(db, spaceId: 'space-b').load(),
           'stored');
     });
+  });
+
+  testWidgets('勾选「应用于本机所有秘境」：所有空间的明文都被清、设置都变',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-a',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+        memberId: 'member-a',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 两个空间都选「本地保存」，并各留一份明文
+    late File fileA;
+    late File fileB;
+    await tester.runAsync(() async {
+      await AttachmentStorageSettings(db, spaceId: 'space-a').save('stored');
+      await AttachmentStorageSettings(db, spaceId: 'space-b').save('stored');
+      fileA = (await AttachmentStore.pathFor('space-a', 'msg-a', 'jpg'))!;
+      fileB = (await AttachmentStore.pathFor('space-b', 'msg-b', 'jpg'))!;
+      await fileA.writeAsString('plaintext-a');
+      await fileB.writeAsString('plaintext-b');
+    });
+
+    await _openStorageSheet(tester);
+    // 勾「应用于本机所有秘境」→ 选「远程托管」→ 提交 → 确认弹窗 → 确认
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSecured));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSubmit));
+    await _confirmSecuredDialog(tester);
+    // onApply 里清的是**全部空间**的真实文件 I/O（同上一用例）
+    await _settleFileIo(tester);
+
+    await tester.runAsync(() async {
+      // 两端明文都被清、设置都变 secured（b 的 per-space 覆盖被清除，读全局）
+      expect(await fileA.exists(), isFalse, reason: '当前空间明文应被清');
+      expect(await fileB.exists(), isFalse,
+          reason: '勾选所有秘境后其它空间的明文也应被清（全局 clear）');
+      expect(await AttachmentStorageSettings(db, spaceId: 'space-a').load(),
+          'secured');
+      expect(await AttachmentStorageSettings(db, spaceId: 'space-b').load(),
+          'secured');
+    });
+  });
+
+  testWidgets('确认弹窗点取消：什么都不做（设置与明文原样）', (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-a',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+        memberId: 'member-a',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    late File fileA;
+    await tester.runAsync(() async {
+      await AttachmentStorageSettings(db, spaceId: 'space-a').save('stored');
+      fileA = (await AttachmentStore.pathFor('space-a', 'msg-a', 'jpg'))!;
+      await fileA.writeAsString('plaintext-a');
+    });
+
+    await _openStorageSheet(tester);
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSecured));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSubmit));
+    // 确认弹窗出现 → 点**取消**
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageAttachmentStorageSecured), findsOneWidget,
+        reason: '应弹出确认弹窗');
+    await tester.tap(find.text(_zh.cancel));
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      // 取消 = 什么都没做：设置仍是 stored、明文还在
+      expect(await AttachmentStorageSettings(db, spaceId: 'space-a').load(),
+          'stored');
+      expect(await fileA.exists(), isTrue, reason: '取消后明文不应被清');
+    });
+    expect(find.byType(AlertDialog), findsNothing, reason: '弹窗应已关闭');
   });
 }
