@@ -1220,10 +1220,34 @@ abstract class AppLocalizations {
   /// **'Attachment storage'**
   String get chatPageMenuAttachmentStorage;
 
+  /// No description provided for @chatPageMenuMoreSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'More settings'**
+  String get chatPageMenuMoreSettings;
+
+  /// No description provided for @chatPageMoreSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'More settings'**
+  String get chatPageMoreSettingsTitle;
+
+  /// No description provided for @chatPageMoreSettingsStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment storage'**
+  String get chatPageMoreSettingsStorage;
+
+  /// No description provided for @chatPageMoreSettingsTombstone.
+  ///
+  /// In en, this message translates to:
+  /// **'Tombstone messages'**
+  String get chatPageMoreSettingsTombstone;
+
   /// No description provided for @chatPageAttachmentStorageNote.
   ///
   /// In en, this message translates to:
-  /// **'Where are attachments — images, videos, audio, files — stored?'**
+  /// **'Where are attachments — images, videos, audio, files — stored?t Applies to the current entrance only.'**
   String get chatPageAttachmentStorageNote;
 
   /// No description provided for @chatPageAttachmentStorageSecured.
@@ -1561,6 +1585,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New messages are deleted on a countdown once read'**
   String get chatPageBurnNote;
+
+  /// No description provided for @chatPageTombstoneHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Tombstone messages'**
+  String get chatPageTombstoneHeading;
+
+  /// No description provided for @chatPageTombstoneNote.
+  ///
+  /// In en, this message translates to:
+  /// **'How deleted and burned messages appear'**
+  String get chatPageTombstoneNote;
+
+  /// No description provided for @chatPageTombstoneKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep message status'**
+  String get chatPageTombstoneKeep;
+
+  /// No description provided for @chatPageTombstoneKeepDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a placeholder: content hidden, time and record kept, message flow unbroken'**
+  String get chatPageTombstoneKeepDesc;
+
+  /// No description provided for @chatPageTombstoneHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide completely'**
+  String get chatPageTombstoneHide;
+
+  /// No description provided for @chatPageTombstoneHideDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Tombstones disappear from the message flow entirely (this device only)'**
+  String get chatPageTombstoneHideDesc;
 
   /// No description provided for @chatPageBurnOff.
   ///

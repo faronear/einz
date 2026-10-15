@@ -678,8 +678,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => 'Attachment storage';
 
   @override
+  String get chatPageMenuMoreSettings => 'More settings';
+
+  @override
+  String get chatPageMoreSettingsTitle => 'More settings';
+
+  @override
+  String get chatPageMoreSettingsStorage => 'Attachment storage';
+
+  @override
+  String get chatPageMoreSettingsTombstone => 'Tombstone messages';
+
+  @override
   String get chatPageAttachmentStorageNote =>
-      'Where are attachments — images, videos, audio, files — stored?';
+      'Where are attachments — images, videos, audio, files — stored?t Applies to the current entrance only.';
 
   @override
   String get chatPageAttachmentStorageSecured => 'Remote only';
@@ -887,6 +899,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatPageBurnNote =>
       'New messages are deleted on a countdown once read';
+
+  @override
+  String get chatPageTombstoneHeading => 'Tombstone messages';
+
+  @override
+  String get chatPageTombstoneNote => 'How deleted and burned messages appear';
+
+  @override
+  String get chatPageTombstoneKeep => 'Keep message status';
+
+  @override
+  String get chatPageTombstoneKeepDesc =>
+      'Show a placeholder: content hidden, time and record kept, message flow unbroken';
+
+  @override
+  String get chatPageTombstoneHide => 'Hide completely';
+
+  @override
+  String get chatPageTombstoneHideDesc =>
+      'Tombstones disappear from the message flow entirely (this device only)';
 
   @override
   String get chatPageBurnOff =>

@@ -81,13 +81,17 @@ class _FakeApi extends ApiClient {
 
 final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 
-/// 打开「附件存储」弹层（菜单顶层项；_menuAction 有 300ms 错峰延迟）。
+/// 打开「附件存储」选择器：菜单 → 更多设置 → 附件存储行（老板 2026-10-15 起
+/// 附件存储从顶层菜单迁进「更多设置」二级弹层；两段都有错峰延迟）。
 Future<void> _openStorageSheet(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.text(_zh.chatPageMenuAttachmentStorage));
+  await tester.ensureVisible(find.text(_zh.chatPageMenuMoreSettings));
   await tester.pumpAndSettle();
-  await tester.tap(find.text(_zh.chatPageMenuAttachmentStorage));
+  await tester.tap(find.text(_zh.chatPageMenuMoreSettings));
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(_zh.chatPageMoreSettingsStorage));
   await tester.pump(const Duration(milliseconds: 350));
   await tester.pumpAndSettle();
 }

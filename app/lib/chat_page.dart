@@ -26,6 +26,7 @@ import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
 import 'widgets/version_gate.dart';
 import 'data/attachment_storage_settings.dart';
+import 'data/tombstone_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/notify_settings.dart';
@@ -258,6 +259,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 视频首帧缩略图缓存（messageId → Future<bytes>）：长按菜单/引用块/引用条共用。
   final Map<String, Future<Uint8List>> _videoThumbCache = {};
   List<HistoryMessage> _messages = [];
+
+  /// 消息流**显示**用的列表：[_tombstoneDisplay] = 'hide'（彻底隐藏）时滤掉
+  /// 墓碑（已删除/已焚毁）行——它们整条不显示；'keep'（保留消息状态，默认）
+  /// 时原样返回。数据层的 [_messages] 不动（墓碑行仍是 recall/跳转/在途补发
+  /// 的判断依据），只影响 ListView 的渲染。
+  List<HistoryMessage> get _displayMessages =>
+      _tombstoneDisplay == 'hide'
+          ? [for (final m in _messages) if (!m.deleted) m]
+          : _messages;
+
   Timer? _ticker;
   // 分页加载（UI 懒渲染）：上滑到顶部加载更早历史；ticker 只增量追加新增
   final ScrollController _scrollController = ScrollController();
@@ -395,6 +406,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // （老板要求 2026-09-13：菜单里也能播/停并看到波形进度）。
   final ValueNotifier<int> _audioPlaybackVersion = ValueNotifier(0);
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+  /// 墓碑消息显示模式（'keep'=保留消息状态 / 'hide'=彻底隐藏；默认 keep）。
+  /// 只影响消息流里墓碑（已删除/已焚毁）的呈现，数据行为不变。
+  String _tombstoneDisplay = 'keep';
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
@@ -924,6 +938,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _scrollController.addListener(_onScrollForRead);
     _inputFocusNode.addListener(_onInputFocusChanged);
     _loadBurnLabel();
+    _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
     _refreshPinStatus();
     _refreshNotifyEmail(); // 菜单项「邮件通知」的当前值（拉不到就保持 null，不显示）
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
@@ -1427,6 +1442,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _burnSeconds = seconds);
   }
 
+  /// 加载墓碑消息显示模式（每设备、每空间独立，纯本地）。
+  Future<void> _loadTombstoneDisplay() async {
+    final s = TombstoneSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
+    final mode = await s.load();
+    if (mounted) setState(() => _tombstoneDisplay = mode);
+  }
+
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
   Future<void> _showLocalePicker() async {
     final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
@@ -1534,6 +1556,104 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         },
       ),
     );
+  }
+
+  /// 「更多设置」弹层（老板 2026-10-15）：把原先顶层菜单的「附件存储」与新的
+  /// 「墓碑消息」收到一个二级弹层里（顶层菜单只留一个带设置图标的入口）。
+  /// 行式样仿「高级安全」弹层（ListTile + pop 值），尾部带当前值。
+  Future<void> _showMoreSettingsSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      // 允许用满窗高（与「高级安全」「我的设备通道」等弹层同口径）
+      isScrollControlled: true,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final valueStyle = TextStyle(fontSize: 12, color: scheme.outline);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 标题居中（与其它选项弹层口径一致）
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Center(
+                  child: Text(l10n.chatPageMoreSettingsTitle,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.attach_file_outlined),
+                title: Text(l10n.chatPageMoreSettingsStorage),
+                trailing: Text(
+                    _attachmentStorageLabel(_attachmentStorage, l10n),
+                    style: valueStyle),
+                onTap: () => Navigator.of(ctx).pop('storage'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: Text(l10n.chatPageMoreSettingsTombstone),
+                trailing: Text(_tombstoneDisplayLabel(l10n), style: valueStyle),
+                onTap: () => Navigator.of(ctx).pop('tombstone'),
+              ),
+              // 底部留白（同「高级安全」弹层：末行不贴屏幕底边）
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    // 与弹层关闭动画错开再开下一个弹层（Overlay 交叉卸载断言，同 _menuAction）
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    if (picked == 'storage') {
+      await _showAttachmentStoragePicker();
+    } else if (picked == 'tombstone') {
+      await _showTombstonePicker();
+    }
+  }
+
+  /// 墓碑消息显示模式当前值的展示文案（与选择器选项同名）。
+  String _tombstoneDisplayLabel(AppLocalizations l10n) =>
+      _tombstoneDisplay == 'hide'
+          ? l10n.chatPageTombstoneHide
+          : l10n.chatPageTombstoneKeep;
+
+  /// 墓碑消息显示模式：**点选即生效**（无提交按钮——纯显示开关，无副作用数据
+  /// 操作；同阅后即焚档位弹层）。选完即存即重建消息流。
+  Future<void> _showTombstonePicker() async {
+    final l10n = AppLocalizations.of(context)!;
+    var picked = _tombstoneDisplay;
+    await showOptionPickerSheet<void>(
+      context: context,
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageTombstoneHeading,
+        note: l10n.chatPageTombstoneNote,
+        selected: _tombstoneDisplay,
+        options: [
+          OptionPickerItem(
+            value: 'keep',
+            label: l10n.chatPageTombstoneKeep,
+            description: l10n.chatPageTombstoneKeepDesc,
+          ),
+          OptionPickerItem(
+            value: 'hide',
+            label: l10n.chatPageTombstoneHide,
+            description: l10n.chatPageTombstoneHideDesc,
+          ),
+        ],
+        onApply: (mode) async {
+          picked = mode;
+          await TombstoneSettings(widget.db ?? LocalDatabase.shared,
+                  spaceId: widget.spaceId)
+              .save(mode);
+        },
+      ),
+    );
+    if (!mounted || picked == _tombstoneDisplay) return;
+    setState(() => _tombstoneDisplay = picked);
   }
 
   /// 菜单行右侧「当前值」：超过 [kMenuValueMaxWidth] 即省略号、右对齐。
@@ -7899,10 +8019,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showLocalePicker);
                 case 'style':
                   _menuAction(_showStylePicker);
-                case 'storage':
-                  _menuAction(_showAttachmentStoragePicker);
                 case 'burn':
                   _menuAction(_showBurnPicker);
+                case 'more':
+                  _menuAction(_showMoreSettingsSheet);
                 case 'advanced':
                   _menuAction(_showAdvancedSheet);
                 case 'notify':
@@ -8111,14 +8231,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                // 更多设置（二级弹层：附件存储 + 墓碑消息；老板 2026-10-15）
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
-                  value: 'storage',
+                  value: 'more',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuAttachmentStorage, style: captionStyle),
+                      Text(l10n.chatPageMenuMoreSettings, style: captionStyle),
                       const Spacer(),
-                      _menuValue(_attachmentStorageLabel(_attachmentStorage, l10n), valueStyle),
+                      // 通用设置图标（18 = 与 burn 沙漏/devices 图标同尺寸）
+                      Icon(Icons.settings_outlined, size: 18, color: labelStyle.color),
                     ],
                   ),
                 ),
@@ -8387,12 +8509,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 时出现——正常发送时 pending 只存在百毫秒，不会闪。
           _buildOfflineHint(),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(12),
-              itemCount: _messages.length,
-              itemBuilder: (context, i) {
-                final m = _messages[i];
+            // Builder：_displayMessages 只算一次给 itemCount/itemBuilder 共用
+            // （getter 每次访问都重建过滤列表，逐项调用会 O(n²)）
+            child: Builder(
+              builder: (context) {
+                final displayMessages = _displayMessages;
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: displayMessages.length,
+                  itemBuilder: (context, i) {
+                    final m = displayMessages[i];
                 final mine = m.sender == 'me';
                 // 发送者 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底。
                 // 群聊一期：group 空间的**气泡配色**与**发送者名字**都要它，不能只在
@@ -8753,6 +8880,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 );
+              },
+            );
               },
             ),
           ),

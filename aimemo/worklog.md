@@ -14827,3 +14827,24 @@ FakeAsync 区里 MethodChannel 响应不流动——任何 pump 之前的 channe
 ② 提交后 onApply 的 clearSpace 是 fake 区里发起的真实文件 I/O，完成量要靠
 pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首轮即 break，
 窗口不够，onApply 永远完不成、弹层不关。回归：56 测全过。
+
+**（2026-10-15T01:48:54Z / 2026-10-15 09:48）**：「更多设置」菜单 + 墓碑消息
+显示开关（老板 2026-10-15）。三层结构：
+- 顶层菜单「附件存储」项替换为「更多设置」（右侧 Icons.settings_outlined 通用
+  设置图标，18px 与 burn 沙漏同尺寸）；
+- 「更多设置」二级弹层（仿「高级安全」ListTile 式样，行尾带当前值）两项：
+  附件存储（原顶层项迁移而来）、墓碑消息；
+- 墓碑消息选择器（OptionPickerSheet **点选即生效、无提交按钮**——纯显示开关
+  无数据副作用，同阅后即焚档位列）：保留消息状态（默认=现行行为，占位墓碑
+  正文隐藏、时间记录仍在，2026-09-09 定的语义）/ 彻底隐藏（墓碑整条从消息流
+  消失）。设置存 per-space 键 space.<spaceId>.tombstone_display（TombstoneSettings
+  仿 BurnAfterSettings，默认 keep，存量回退旧全局键），**只影响显示**：数据层
+  墓碑语义（打标记不打行、附件保留、pending 仍补发）两种模式下一模一样。
+  消息流经 _displayMessages getter 过滤（Builder 包一层只算一次，避免 getter
+  被 itemBuilder 逐项重复构建），_messages 数据层不动（recall/跳转判断仍用它）。
+- l10n：9 个新键 zh/en（chatPageMenuMoreSettings / chatPageMoreSettingsTitle /
+  chatPageMoreSettingsStorage / chatPageMoreSettingsTombstone / chatPageTombstone
+  Heading/Note/Keep(+Desc)/Hide(+Desc)）。
+- 测试：新增 tombstone_display_test（默认保留→彻底隐藏墓碑消失、正常消息不受
+  影响→可切回；墓碑用 delete_outline 图标作探针）；attachment_storage_scope_test
+  导航更新为 菜单→更多设置→附件存储。回归：全量 app 319 过 1 跳 0 败。
