@@ -14848,3 +14848,14 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
 - 测试：新增 tombstone_display_test（默认保留→彻底隐藏墓碑消失、正常消息不受
   影响→可切回；墓碑用 delete_outline 图标作探针）；attachment_storage_scope_test
   导航更新为 菜单→更多设置→附件存储。回归：全量 app 319 过 1 跳 0 败。
+
+**（2026-10-15T02:35:18Z / 2026-10-15 10:35）**：dialog 间距统一 + 菜单图标
+去红（老板 2026-10-15）。两件事：
+- 「高级安全」菜单项的警告图标**去红**（改 labelStyle.color）——菜单里红色太
+  引人注意，红色保留在弹层内部那行销毁操作上；
+- 带备注行的 dialog 间距参考弹层节奏重调：M3 AlertDialog 默认标题→内容 16
+  （来自 content 的 top padding），备注行离下面输入框只有 10~12——现统一为
+  **标题→备注 4 / 备注→内容 14**（做法：contentPadding 覆写为
+  fromLTRB(24,4,24,24) + 备注后 SizedBox 10/12→14）。涉及 7 处：chat_page 的
+  邮件通知 / 口令输入 / 通道改名 / 通道码 / 设锁屏码 / 改口令 + widgets 的
+  pin_prompt。无备注行的 dialog（群名/改名）不动，保持默认 16。

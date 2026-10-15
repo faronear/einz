@@ -2530,6 +2530,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中，不居左）——
             // 与底部弹层的标题口径一致（Center；正文/字段仍靠左）
             title: Center(child: Text(title)),
+            // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+            contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2540,7 +2542,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: Text(hint,
                       style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
                 // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
                 Center(child: _InviteQrCode(data: r.link)),
@@ -2799,6 +2801,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Center(child: Text(l10n.chatPageNotifyTitle)),
+        // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；M3 默认标题→内容 16
+        // 对"标题+备注"的弹窗偏大，备注贴内容又偏近——老板 2026-10-15）
+        contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2810,7 +2815,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 color: Theme.of(ctx).colorScheme.outline,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             // 已设置 → 只读（停用后由 active 切回可编辑）；未设置 → 正常输入
             ValueListenableBuilder<bool>(
               valueListenable: active,
@@ -3095,12 +3100,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
           title: Center(child: Text(title)),
+          // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+          contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextField(
                 controller: ctrl,
                 autofocus: true,
@@ -4350,6 +4357,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (ctx) => AlertDialog(
         // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
         title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
+        // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+        contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4362,7 +4371,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 color: Theme.of(ctx).colorScheme.outline,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
             // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
             ValueListenableBuilder<bool>(
@@ -8256,10 +8265,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.advancedMenuTitle, style: labelStyle),
                       const Spacer(),
                       // 危险/警告图标（老板 2026-10-15）：弹层里是改口令/删全部
-                      // 消息/销毁通道这类破坏性操作，入口先给一个红色警示，再跟
-                      // 二级入口的 >（与「更多设置」同款）
+                      // 消息/销毁通道这类破坏性操作，入口先给一个警示标识。**菜单里
+                      // 不用红色**——太引人注意，红色留给弹层内部那一行
                       Icon(Icons.warning_amber_rounded,
-                          size: 18, color: Theme.of(context).colorScheme.error),
+                          size: 18, color: labelStyle.color),
                       const SizedBox(width: 2),
                       Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
@@ -9304,6 +9313,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Center(child: Text(l10n.chatPageSetLockTitle)),
+      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
@@ -9317,7 +9328,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               color: Theme.of(context).colorScheme.outline,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           // 已设锁屏码：先输当前锁屏码（修改/清空都要验证）
           if (_hasPin) ...[
             TextField(
@@ -9536,6 +9547,8 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Center(child: Text(l10n.chatPageChangePassphraseTitle)),
+      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -9549,7 +9562,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
               color: Theme.of(context).colorScheme.outline,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           // 旧口令/新口令可临时查看明文（点眼睛，3 秒后自动回暗码）；
           // **确认新口令不给眼睛**——确认框是用来复核的，给"看一眼"反而容易顺手点开
           // （老板 2026-09-15）。

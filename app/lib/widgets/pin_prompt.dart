@@ -97,6 +97,8 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
     return AlertDialog(
       // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
       title: Center(child: Text(widget.title)),
+      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +107,7 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
             widget.hint,
             style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           TextField(
             controller: _ctrl,
             obscureText: true,
