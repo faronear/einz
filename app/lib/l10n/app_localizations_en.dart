@@ -697,7 +697,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachmentStorageNote =>
-      'Where are attachments — images, videos, audio, files — stored? (Applies to this entrance only)';
+      'Where are attachments — images, videos, audio, files — stored?';
 
   @override
   String get chatPageAttachmentStorageSecured => 'Remote only';
@@ -900,7 +900,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageBurnNote =>
-      'Delete new messages automatically once read on a countdown (Applies to this entrance only)';
+      'Delete new messages automatically once read on a countdown';
 
   @override
   String get chatPageTombstoneHeading => 'Tombstone messages';

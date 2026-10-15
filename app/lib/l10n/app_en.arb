@@ -366,7 +366,7 @@
   "chatPageMoreSettingsTitle": "More settings",
   "chatPageMoreSettingsStorage": "Attachment storage",
   "chatPageMoreSettingsTombstone": "Tombstone messages",
-  "chatPageAttachmentStorageNote": "Where are attachments — images, videos, audio, files — stored? (Applies to this entrance only)",
+  "chatPageAttachmentStorageNote": "Where are attachments — images, videos, audio, files — stored?",
   "chatPageAttachmentStorageSecured": "Remote only",
   "chatPageAttachmentStorageSecuredDesc": "Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.",
   "chatPageAttachmentStorageStored": "Keep locally",
@@ -514,7 +514,7 @@
     }
   },
   "chatPageBurnHeading": "Burn-after-read",
-  "chatPageBurnNote": "Delete new messages automatically once read on a countdown (Applies to this entrance only)",
+  "chatPageBurnNote": "Delete new messages automatically once read on a countdown",
   "chatPageTombstoneHeading": "Tombstone messages",
   "chatPageTombstoneNote": "How deleted/burned/recalled messages appear?",
   "chatPageTombstoneKeep": "Keep message status",

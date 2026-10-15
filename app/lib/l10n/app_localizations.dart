@@ -1259,7 +1259,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageNote.
   ///
   /// In en, this message translates to:
-  /// **'Where are attachments — images, videos, audio, files — stored? (Applies to this entrance only)'**
+  /// **'Where are attachments — images, videos, audio, files — stored?'**
   String get chatPageAttachmentStorageNote;
 
   /// No description provided for @chatPageAttachmentStorageSecured.
@@ -1589,7 +1589,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnNote.
   ///
   /// In en, this message translates to:
-  /// **'Delete new messages automatically once read on a countdown (Applies to this entrance only)'**
+  /// **'Delete new messages automatically once read on a countdown'**
   String get chatPageBurnNote;
 
   /// No description provided for @chatPageTombstoneHeading.
