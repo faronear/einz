@@ -691,7 +691,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachmentStorageNote =>
-      'Where are attachments — images, videos, audio, files — stored?t Applies to the current entrance only.';
+      'Where are attachments — images, videos, audio, files — stored? (Applies to this entrance only)';
 
   @override
   String get chatPageAttachmentStorageSecured => 'Remote only';
@@ -904,7 +904,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageTombstoneHeading => 'Tombstone messages';
 
   @override
-  String get chatPageTombstoneNote => 'How deleted and burned messages appear';
+  String get chatPageTombstoneNote =>
+      'How deleted/burned/recalled messages appear? (Applies to this entrance only)';
 
   @override
   String get chatPageTombstoneKeep => 'Keep message status';
@@ -918,7 +919,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageTombstoneHideDesc =>
-      'Tombstones disappear from the message flow entirely (this device only)';
+      'Tombstones disappear from the message flow entirely';
 
   @override
   String get chatPageBurnOff =>
@@ -955,7 +956,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRecallFailed => 'Recall failed, try again later';
 
   @override
-  String get chatPageTombMessage => '(This message is no longer available)';
+  String get chatPageQuotedTombMessage =>
+      '(This message is no longer available)';
 
   @override
   String get chatPageQuoteGoneNotice =>

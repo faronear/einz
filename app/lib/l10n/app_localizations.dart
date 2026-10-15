@@ -1247,7 +1247,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageNote.
   ///
   /// In en, this message translates to:
-  /// **'Where are attachments — images, videos, audio, files — stored?t Applies to the current entrance only.'**
+  /// **'Where are attachments — images, videos, audio, files — stored? (Applies to this entrance only)'**
   String get chatPageAttachmentStorageNote;
 
   /// No description provided for @chatPageAttachmentStorageSecured.
@@ -1595,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneNote.
   ///
   /// In en, this message translates to:
-  /// **'How deleted and burned messages appear'**
+  /// **'How deleted/burned/recalled messages appear? (Applies to this entrance only)'**
   String get chatPageTombstoneNote;
 
   /// No description provided for @chatPageTombstoneKeep.
@@ -1619,7 +1619,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHideDesc.
   ///
   /// In en, this message translates to:
-  /// **'Tombstones disappear from the message flow entirely (this device only)'**
+  /// **'Tombstones disappear from the message flow entirely'**
   String get chatPageTombstoneHideDesc;
 
   /// No description provided for @chatPageBurnOff.
@@ -1682,11 +1682,11 @@ abstract class AppLocalizations {
   /// **'Recall failed, try again later'**
   String get chatPageRecallFailed;
 
-  /// No description provided for @chatPageTombMessage.
+  /// No description provided for @chatPageQuotedTombMessage.
   ///
   /// In en, this message translates to:
   /// **'(This message is no longer available)'**
-  String get chatPageTombMessage;
+  String get chatPageQuotedTombMessage;
 
   /// No description provided for @chatPageQuoteGoneNotice.
   ///

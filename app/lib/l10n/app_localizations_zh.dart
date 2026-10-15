@@ -638,7 +638,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMoreSettingsTombstone => '墓碑消息';
 
   @override
-  String get chatPageAttachmentStorageNote => '图片、视频、音频、文件等附件存放在哪里？仅对当前通道生效。';
+  String get chatPageAttachmentStorageNote => '图片、视频、音频、文件等附件存放在哪里？（仅对当前通道生效）';
 
   @override
   String get chatPageAttachmentStorageSecured => '远程托管';
@@ -835,25 +835,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageBurnHeading => '阅后即焚';
 
   @override
-  String get chatPageBurnNote => '倒计时删除已阅读的新消息';
+  String get chatPageBurnNote => '倒计时删除已阅读的新消息（仅对本通道生效）';
 
   @override
   String get chatPageTombstoneHeading => '墓碑消息';
 
   @override
-  String get chatPageTombstoneNote => '已删除、已焚毁的消息如何显示';
+  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息如何显示？（仅对本通道生效）';
 
   @override
-  String get chatPageTombstoneKeep => '保留消息状态';
+  String get chatPageTombstoneKeep => '保留占位';
 
   @override
   String get chatPageTombstoneKeepDesc => '显示为占位墓碑：正文隐藏，时间与记录仍在，不打破消息流水';
 
   @override
-  String get chatPageTombstoneHide => '彻底隐藏';
+  String get chatPageTombstoneHide => '彻底消失';
 
   @override
-  String get chatPageTombstoneHideDesc => '墓碑不再显示，从消息流中彻底消失（仅本机生效）';
+  String get chatPageTombstoneHideDesc => '墓碑不再显示，从消息流中彻底消失';
 
   @override
   String get chatPageBurnOff => '阅后即焚已关闭（这一消息将会保留）';
@@ -888,7 +888,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRecallFailed => '撤回失败，请稍后重试';
 
   @override
-  String get chatPageTombMessage => '（该消息已不存在）';
+  String get chatPageQuotedTombMessage => '（该消息已不存在）';
 
   @override
   String get chatPageQuoteGoneNotice => '被引用消息已不存在';

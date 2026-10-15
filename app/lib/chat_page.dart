@@ -5828,7 +5828,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        AppLocalizations.of(context)!.chatPageTombMessage,
+        AppLocalizations.of(context)!.chatPageQuotedTombMessage,
         style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -8241,6 +8241,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       const Spacer(),
                       // 通用设置图标（18 = 与 burn 沙漏/devices 图标同尺寸）
                       Icon(Icons.settings_outlined, size: 18, color: labelStyle.color),
+                      // 右侧 > ：与「高级安全」同款二级入口标识（老板 2026-10-15）
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
                   ),
                 ),
@@ -8252,6 +8255,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.advancedMenuTitle, style: labelStyle),
                       const Spacer(),
+                      // 危险/警告图标（老板 2026-10-15）：弹层里是改口令/删全部
+                      // 消息/销毁通道这类破坏性操作，入口先给一个红色警示，再跟
+                      // 二级入口的 >（与「更多设置」同款）
+                      Icon(Icons.warning_amber_rounded,
+                          size: 18, color: Theme.of(context).colorScheme.error),
+                      const SizedBox(width: 2),
                       Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
                   ),
