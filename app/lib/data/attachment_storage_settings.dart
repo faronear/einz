@@ -45,7 +45,8 @@ class AttachmentStorageSettings {
   }
 
   /// 保存模式并通知即时生效。**切回 secured 时由调用方负责清空已存明文**
-  /// （[AttachmentStore.clear]）——否则"安全"名不副实（老板 2026-09-14 定）。
+  /// （[AttachmentStore.clearSpace]——只清**本空间**那一份：模式是 per-space
+  /// 设置，别空间的明文缓存不该被误删）——否则"安全"名不副实（老板 2026-09-14 定）。
   Future<void> save(String mode) async {
     assert(kAttachmentStorageOptions.contains(mode), '非法附件存储模式: $mode');
     await (db.into(db.appState))

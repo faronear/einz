@@ -70,6 +70,21 @@ void main() {
     expect(await b.exists(), isFalse, reason: 'space-2 子目录里的留存明文应被删掉');
   });
 
+  test('AttachmentStore.clearSpace 只删指定空间，其它空间的明文不动', () async {
+    // 切回「远程托管」走的是 clearSpace（老板 2026-10-14）：存储模式是 per-space
+    // 设置，只该清当前空间那一份——此前误用全局 clear，把别的空间的明文缓存
+    // 也一并删了，与那些空间自己的「本地保存」设置矛盾。
+    final a = (await AttachmentStore.pathFor('space-1', 'msg-1', 'mp3'))!;
+    final b = (await AttachmentStore.pathFor('space-2', 'msg-2', 'mp4'))!;
+    await a.writeAsBytes(const [1, 2, 3]);
+    await b.writeAsBytes(const [4, 5, 6]);
+
+    await AttachmentStore.clearSpace('space-1');
+
+    expect(await a.exists(), isFalse, reason: '指定空间的留存明文应被删掉');
+    expect(await b.exists(), isTrue, reason: '其它空间的明文不应被误删');
+  });
+
   test('只删本类文件：目录里无关文件不动', () async {
     final a = (await AttachmentStore.pathFor('space-1', 'msg-1', 'mp3'))!;
     await a.writeAsBytes(const [1, 2, 3]);

@@ -1525,8 +1525,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         onApply: (mode) async {
           await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId).save(mode);
           if (mode == 'secured') {
-            // 切回远程托管：把本机留存的明文附件全部清除
-            await AttachmentStore.clear();
+            // 切回远程托管：清掉**本空间**已留存的明文。只清当前秘境——存储
+            // 模式是 per-space 设置（space.<spaceId>.attachment_storage），别的
+            // 空间各有各的选择；全局 clear 会把它们的明文缓存一并误删，与其
+            // 设置矛盾（老板 2026-10-14 指出）。撤销/删空间走的也是 clearSpace。
+            await AttachmentStore.clearSpace(widget.spaceId);
           }
         },
       ),
