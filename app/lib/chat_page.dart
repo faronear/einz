@@ -29,7 +29,6 @@ import 'data/attachment_storage_settings.dart';
 import 'data/tombstone_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
-import 'data/notify_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/server_config.dart';
@@ -1577,25 +1576,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题 = 选项名「远程托管」（复用同一个 l10n 键，老板 2026-10-15）
-        title: Center(child: Text(l10n.chatPageAttachmentStorageSecured)),
-        // 内容 = 原弹层里那条红色警示（撤掉内联版后搬到这里）
-        content: Text(
-          l10n.chatPageAttachmentStorageWarnClear,
-          style: TextStyle(
-              fontSize: 12, color: Theme.of(ctx).colorScheme.error),
+      // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题 = 选项名「远程托管」（复用同一个 l10n 键，老板 2026-10-15）
+          title: Center(child: Text(l10n.chatPageAttachmentStorageSecured)),
+          // 内容 = 原弹层里那条红色警示（撤掉内联版后搬到这里）
+          content: Text(
+            l10n.chatPageAttachmentStorageWarnClear,
+            style: TextStyle(
+                fontSize: 12, color: Theme.of(ctx).colorScheme.error),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.confirm),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.confirm),
-          ),
-        ],
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -1640,18 +1644,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
               ),
+              // 行尾当前值 + >：> 与顶层菜单的二级入口标识同款（老板 2026-10-15），
+              // 暗示点进去还有下一级（各自的选择器）
               ListTile(
                 leading: const Icon(Icons.attach_file_outlined),
                 title: Text(l10n.chatPageMoreSettingsStorage),
-                trailing: Text(
-                    _attachmentStorageLabel(_attachmentStorage, l10n),
-                    style: valueStyle),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                        _attachmentStorageLabel(_attachmentStorage, l10n),
+                        style: valueStyle),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
                 onTap: () => Navigator.of(ctx).pop('storage'),
               ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: Text(l10n.chatPageMoreSettingsTombstone),
-                trailing: Text(_tombstoneDisplayLabel(l10n), style: valueStyle),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_tombstoneDisplayLabel(l10n), style: valueStyle),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
                 onTap: () => Navigator.of(ctx).pop('tombstone'),
               ),
               // 底部留白（同「高级安全」弹层：末行不贴屏幕底边）
@@ -2754,10 +2774,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => _SetLockDialog(
-        payload: payload,
-        db: db,
-        hasPin: hasPin,
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _SetLockDialog(
+          payload: payload,
+          db: db,
+          hasPin: hasPin,
+        ),
       ),
     );
     if (ok == true && mounted) {
@@ -2846,7 +2871,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 邮件通知设置（菜单项，2026-10-01）：填邮箱 → 服务端发一封确认信 → 点信里链接生效。
   ///
   /// **必须把"已填但没确认"这一档显示出来**：否则用户填完以为已经开了，其实一封也收不到。
-  /// 已设置时额外给一个「停用」（DELETE），不给"改地址"以外的第二入口（改地址＝重填再保存）。
+  /// 已设置时额外给一个「停用」（DELETE）：停用即关弹窗、顶部发一条通知（老板 2026-10-15，
+  /// 原地切回输入界面让人混淆）；改地址＝重开弹窗重填再保存。
   Future<void> _showNotifyDialog() async {
     final l10n = AppLocalizations.of(context)!;
     // 开弹窗前先拉一次最新状态：它可能已经在 App 外面被翻转（确认邮件点过了），
@@ -2859,45 +2885,55 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 红字警示（空/格式不对/后台失败）与提交中标记，都只在弹窗内有效
     final error = ValueNotifier<String?>(null);
     final busy = ValueNotifier<bool>(false);
-    // 「已设置 ↔ 未设置」两阶段（老板 2026-10-02）：已设置时输入框只读、只给「停用」；
-    // 停用成功不关弹窗，原地切成空白可编辑输入框 + 「保存」。初始值取开弹窗时的状态。
-    final active = ValueNotifier<bool>(!(before?.isNone ?? true));
-    // 应用范围勾选（老板 2026-10-02）：回显上次勾选的持久化偏好（默认勾选＝
-    // 保存/停用同步扇出到本机所有秘境，2026-10-01 起的既有行为）；不勾＝只作用于
-    // 当前秘境，且新建空间不再自动继承（_inheritNotifyEmail 读同一份偏好）。
+    // 「已设置 ↔ 未设置」两阶段（老板 2026-10-02）：已设置时输入框只读、只给「停用」。
+    // 初始值取开弹窗时的状态；停用成功后弹窗直接关闭（老板 2026-10-15），不再原地切态。
+    final active = !(before?.isNone ?? true);
+    // 邮箱输入框的焦点节点（随弹窗释放）：只读态靠 TextField 的 canRequestFocus
+    // 拦住聚焦——注意 TextField.initState 会用**自己的** canRequestFocus 覆写节点
+    // 上的同名属性，所以两个都要给，只给节点会被重置掉（老板 2026-10-15）
+    final emailFocus = FocusNode();
+    // 应用范围勾选（老板 2026-10-02）：勾选＝本次保存/停用同步扇出到本机所有
+    // 秘境；不勾＝只作用于当前秘境。**每次开弹窗都默认不勾选**（老板 2026-10-15）：
+    // 纯一次性开关，不持久化——新空间自动继承邮箱的功能已取消（服务端地址级验证，
+    // 老地址重填直接 verified、不再发确认信），扇出必须是每次显式 opt-in。
     // 服务端本来就是地址级验证 + 空间级绑定，扇不扇出纯客户端决定，不冲突。
-    final allSpaces = ValueNotifier<bool>(true);
-    unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
-        .load()
-        .then((v) => allSpaces.value = v));
+    final allSpaces = ValueNotifier<bool>(false);
     // 正文语言：服务端不知道收件人读哪种语言，按本机界面语言上报（zh / 其它一律 en）
     final lang = Localizations.localeOf(context).languageCode == 'zh' ? 'zh' : 'en';
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageNotifyTitle)),
-        // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；M3 默认标题→内容 16
-        // 对"标题+备注"的弹窗偏大，备注贴内容又偏近——老板 2026-10-15）
-        contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              l10n.chatPageNotifyHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(ctx).colorScheme.outline,
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Center(child: Text(l10n.chatPageNotifyTitle)),
+          // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；M3 默认标题→内容 16
+          // 对"标题+备注"的弹窗偏大，备注贴内容又偏近——老板 2026-10-15）
+          contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.chatPageNotifyHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.outline,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            // 已设置 → 只读（停用后由 active 切回可编辑）；未设置 → 正常输入
-            ValueListenableBuilder<bool>(
-              valueListenable: active,
-              builder: (_, isActive, _) => TextField(
+              const SizedBox(height: 14),
+              // 已设置 → 只读；未设置 → 正常输入
+              TextField(
                 controller: ctrl,
-                readOnly: isActive,
+                focusNode: emailFocus,
+                readOnly: active,
+                // 只读态**不许聚焦**（老板 2026-10-15）：readOnly 只挡键盘，不挡
+                // 聚焦——默认点一下边框就变蓝，像能改其实不能。必须传给 TextField
+                // 本身：它 initState 时会用自己的这个值覆写 focusNode 上的
+                // canRequestFocus（只设节点会被重置掉）
+                canRequestFocus: !active,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: l10n.chatPageNotifyEmailLabel,
@@ -2907,174 +2943,169 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   if (error.value != null) error.value = null;
                 },
               ),
-            ),
-            // 应用范围勾选（老板 2026-10-02）：默认勾选＝保存/停用同步到本机所有秘境
-            // （原静态文案「保存后应用于本机所有秘境。」升级为可选项）。
-            // 放在 Email 输入框下方（老板 2026-10-02）。
-            // 2026-10-15：复用 LabeledCheckbox——与设置弹层的「应用于本机所有秘境」
-            // 同模块、同居中式样，文案也收敛到共享键 settingsScopeAll
-            ValueListenableBuilder<bool>(
-              valueListenable: allSpaces,
-              builder: (_, all, _) => LabeledCheckbox(
-                value: all,
-                label: l10n.settingsScopeAll,
-                onChanged: (v) {
-                  allSpaces.value = v;
-                  // 勾选即落盘：它是设备级默认策略（新空间继承钩子也读它），
-                  // 不等点保存——关掉弹窗也应该记住
-                  unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
-                      .save(v));
-                },
-              ),
-            ),
-            // 已填但还没点链接：这一档不点明，用户会以为已经生效
-            if (before?.isPending ?? false) ...[
-              const SizedBox(height: 10),
-              Text(
-                l10n.chatPageNotifyStatePending,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(ctx).colorScheme.outline,
+              // 应用范围勾选（老板 2026-10-02）：勾选＝本次保存/停用同步到本机
+              // 所有秘境（原静态文案「保存后应用于本机所有秘境。」升级为可选项）。
+              // 放在 Email 输入框下方（老板 2026-10-02）。
+              // 2026-10-15：复用 LabeledCheckbox——与设置弹层的「应用于本机所有
+              // 秘境」同模块、同居中式样，文案也收敛到共享键 settingsScopeAll。
+              // **纯一次性开关**：不持久化、每次开弹窗默认不勾选（老板 2026-10-15；
+              // 新空间自动继承邮箱的功能已一并取消）——扇出必须是每次显式 opt-in。
+              ValueListenableBuilder<bool>(
+                valueListenable: allSpaces,
+                builder: (_, all, _) => LabeledCheckbox(
+                  value: all,
+                  label: l10n.settingsScopeAll,
+                  onChanged: (v) => allSpaces.value = v,
                 ),
               ),
-            ],
-            ValueListenableBuilder<String?>(
-              valueListenable: error,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              // 已填但还没点链接：这一档不点明，用户会以为已经生效
+              if (before?.isPending ?? false) ...[
+                const SizedBox(height: 10),
+                Text(
+                  l10n.chatPageNotifyStatePending,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(ctx).colorScheme.outline,
+                  ),
+                ),
+              ],
+              ValueListenableBuilder<String?>(
+                valueListenable: error,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-            ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
+            if (active)
+              ValueListenableBuilder<bool>(
+                valueListenable: busy,
+                builder: (_, isBusy, _) => TextButton(
+                  onPressed: isBusy
+                      ? null
+                      : () async {
+                          busy.value = true;
+                          try {
+                            final api = widget.api ?? ApiClient(effectiveServer);
+                            await _withAuth((t) => api.deleteNotifyEmail(t));
+                            if (!mounted) return;
+                            // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
+                            // 不勾＝只停当前秘境，其它秘境的绑定原样保留
+                            if (allSpaces.value) {
+                              unawaited(_fanoutNotifyEmail(
+                                  (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
+                            }
+                            await _refreshNotifyEmail();
+                            // 停用即关弹窗 + 顶部通知一句，与保存成功后的反馈一致
+                            // （老板 2026-10-15；原地切回输入界面只会让人混淆）
+                            if (ctx.mounted) Navigator.of(ctx).pop(true);
+                            if (mounted) _notice(context, l10n.chatPageNotifyRemoved);
+                          } on ApiException catch (e) {
+                            if (ctx.mounted) {
+                              error.value =
+                                  backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                            }
+                          } catch (e) {
+                            if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                          } finally {
+                            busy.value = false;
+                          }
+                        },
+                  // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
+                  child: isBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        )
+                      : Text(l10n.chatPageNotifyStop),
+                ),
+              )
+            else
+              ValueListenableBuilder<bool>(
+                valueListenable: busy,
+                builder: (_, isBusy, _) => FilledButton(
+                  onPressed: isBusy
+                      ? null
+                      : () async {
+                          final email = ctrl.text.trim();
+                          if (email.isEmpty) {
+                            error.value = l10n.chatPageNotifyEmptyError;
+                            return;
+                          }
+                          // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
+                          if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                            error.value = l10n.chatPageNotifyInvalidError;
+                            return;
+                          }
+                          busy.value = true;
+                          try {
+                            final api = widget.api ?? ApiClient(effectiveServer);
+                            final status =
+                                await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
+                            if (!mounted) return;
+                            // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
+                            // 不勾＝只绑当前秘境，其它秘境不动
+                            if (allSpaces.value) {
+                              unawaited(_fanoutNotifyEmail(
+                                  (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
+                            }
+                            await _refreshNotifyEmail();
+                            if (ctx.mounted) Navigator.of(ctx).pop(true);
+                            if (mounted) {
+                              _notice(
+                                context,
+                                status.isVerified
+                                    ? l10n.chatPageNotifyDone(email)
+                                    : l10n.chatPageNotifySent(email),
+                              );
+                            }
+                          } on ApiException catch (e) {
+                            if (ctx.mounted) {
+                              error.value =
+                                  backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                            }
+                          } catch (e) {
+                            if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                          } finally {
+                            busy.value = false;
+                          }
+                        },
+                  // busy 期间请求要好几秒才回（服务端要发确认信），换成旋转图标，
+                  // 否则按钮灰着没动静，用户会以为没点上（老板 2026-10-01）
+                  child: isBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        )
+                      : Text(l10n.chatPageEmailSubmit),
+                ),
+              ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
-          ValueListenableBuilder<bool>(
-            valueListenable: active,
-            builder: (_, isActive, _) => isActive
-                ? ValueListenableBuilder<bool>(
-                    valueListenable: busy,
-                    builder: (_, isBusy, _) => TextButton(
-                      onPressed: isBusy
-                          ? null
-                          : () async {
-                              busy.value = true;
-                              try {
-                                final api = widget.api ?? ApiClient(effectiveServer);
-                                await _withAuth((t) => api.deleteNotifyEmail(t));
-                                if (!mounted) return;
-                                // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
-                                // 不勾＝只停当前秘境，其它秘境的绑定原样保留
-                                if (allSpaces.value) {
-                                  unawaited(_fanoutNotifyEmail(
-                                      (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
-                                }
-                                await _refreshNotifyEmail();
-                                // 不关弹窗：原地切回"未设置"态（空白可编辑 + 保存）
-                                ctrl.clear();
-                                active.value = false;
-                              } on ApiException catch (e) {
-                                if (ctx.mounted) {
-                                  error.value =
-                                      backendError(l10n, l10n.chatPageNotifyFailed(e.message));
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
-                              } finally {
-                                busy.value = false;
-                              }
-                            },
-                      // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
-                      child: isBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.4),
-                            )
-                          : Text(l10n.chatPageNotifyStop),
-                    ),
-                  )
-                : ValueListenableBuilder<bool>(
-                    valueListenable: busy,
-                    builder: (_, isBusy, _) => FilledButton(
-                      onPressed: isBusy
-                          ? null
-                          : () async {
-                              final email = ctrl.text.trim();
-                              if (email.isEmpty) {
-                                error.value = l10n.chatPageNotifyEmptyError;
-                                return;
-                              }
-                              // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
-                              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-                                error.value = l10n.chatPageNotifyInvalidError;
-                                return;
-                              }
-                              busy.value = true;
-                              try {
-                                final api = widget.api ?? ApiClient(effectiveServer);
-                                final status =
-                                    await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
-                                if (!mounted) return;
-                                // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
-                                // 不勾＝只绑当前秘境，其它秘境不动
-                                if (allSpaces.value) {
-                                  unawaited(_fanoutNotifyEmail(
-                                      (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
-                                }
-                                await _refreshNotifyEmail();
-                                if (ctx.mounted) Navigator.of(ctx).pop(true);
-                                if (mounted) {
-                                  _notice(
-                                    context,
-                                    status.isVerified
-                                        ? l10n.chatPageNotifyDone(email)
-                                        : l10n.chatPageNotifySent(email),
-                                  );
-                                }
-                              } on ApiException catch (e) {
-                                if (ctx.mounted) {
-                                  error.value =
-                                      backendError(l10n, l10n.chatPageNotifyFailed(e.message));
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
-                              } finally {
-                                busy.value = false;
-                              }
-                            },
-                      // busy 期间请求要好几秒才回（服务端要发确认信），换成旋转图标，
-                      // 否则按钮灰着没动静，用户会以为没点上（老板 2026-10-01）
-                      child: isBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.4),
-                            )
-                          : Text(l10n.chatPageEmailSubmit),
-                    ),
-                  ),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（与改名弹窗同款：立刻 dispose 会触发
     // TextField 卸载后向已销毁 controller 加 listener 的红屏断言）
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
+      emailFocus.dispose();
       error.dispose();
       busy.dispose();
-      active.dispose();
       allSpaces.dispose();
     });
     if (saved == true && mounted) await _refreshNotifyEmail();
@@ -3085,17 +3116,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showChangePassphraseDialog() async {
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => _ChangePassphraseDialog(
-        server: effectiveServer,
-        spaceKeyB64: base64Encode(widget.spaceKey),
-        spaceId: widget.spaceId,
-        keyVersion: widget.keyVersion,
-        spaceMode: _isGroup ? 'group' : 'duo',
-        session: _session,
-        api: widget.api,
-        onPassphraseUpdated: (updatedAt) {
-          if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
-        },
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _ChangePassphraseDialog(
+          server: effectiveServer,
+          spaceKeyB64: base64Encode(widget.spaceKey),
+          spaceId: widget.spaceId,
+          keyVersion: widget.keyVersion,
+          spaceMode: _isGroup ? 'group' : 'duo',
+          session: _session,
+          api: widget.api,
+          onPassphraseUpdated: (updatedAt) {
+            if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
+          },
+        ),
       ),
     );
     if (changed == true && mounted) {
@@ -3165,46 +3201,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     var obscure = true;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Center(child: Text(title)),
-          // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
-          contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 14),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                obscureText: obscure,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  hintText: l10n.chatPagePassphraseFieldHint,
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                    tooltip: obscure
-                        ? l10n.chatPagePassphraseShow
-                        : l10n.chatPagePassphraseHide,
-                    onPressed: () => setLocal(() => obscure = !obscure),
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: Center(child: Text(title)),
+            // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+            contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    hintText: l10n.chatPagePassphraseFieldHint,
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                      tooltip: obscure
+                          ? l10n.chatPagePassphraseShow
+                          : l10n.chatPagePassphraseHide,
+                      onPressed: () => setLocal(() => obscure = !obscure),
+                    ),
                   ),
+                  onSubmitted: (_) => Navigator.of(ctx).pop(true),
                 ),
-                onSubmitted: (_) => Navigator.of(ctx).pop(true),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-            ),
-          ],
         ),
       ),
     );
@@ -3997,9 +4038,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
               ),
+              // 每行行尾 > ：与顶层菜单的二级入口标识同款（老板 2026-10-15）——
+              // 三条点进去都还有下一级弹窗，行尾给出"可进入"的暗示
               ListTile(
                 leading: const Icon(Icons.key_outlined),
                 title: Text(l10n.chatPageMenuChangePassphrase),
+                trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => Navigator.of(ctx).pop('passphrase'),
               ),
               // 「删除所有消息」（老板 2026-10-02）：清本通道的消息+附件，通道保留。
@@ -4007,11 +4051,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ListTile(
                 leading: const Icon(Icons.delete_sweep_outlined),
                 title: Text(l10n.advancedClearMessages),
+                trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => Navigator.of(ctx).pop('clear'),
               ),
               ListTile(
                 leading: Icon(Icons.warning_amber_rounded, color: red),
                 title: Text(l10n.advancedDestroyEntrance),
+                trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => Navigator.of(ctx).pop('leave'),
               ),
               // 底部留白：与「切换我的秘境」弹层一致（那边是外层 Padding 的 bottom 16），
@@ -4422,95 +4468,100 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final nameFocus = FocusNode();
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
-        // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
-        contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 大标题下的备注（老板 2026-10-02）：点明这里改的是什么、上限多少
-            Text(
-              l10n.chatPageRenameEntranceHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(ctx).colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 14),
-            // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-            // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
-            ValueListenableBuilder<bool>(
-              valueListenable: editing,
-              builder: (_, isEditing, _) => TextField(
-                controller: ctrl,
-                focusNode: nameFocus,
-                readOnly: !isEditing,
-                onTap: () {
-                  if (editing.value) return;
-                  editing.value = true;
-                  nameFocus.requestFocus();
-                },
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageEntranceListThisDevice,
-                  border: const OutlineInputBorder(),
-                  filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                  fillColor: Colors.white,
-                  counterText: '',
-                  suffixIcon: isEditing
-                      ? null
-                      : IconButton(
-                          tooltip: l10n.chatPageEdit,
-                          icon: const Icon(Icons.edit, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => editing.value = true,
-                        ),
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+          title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
+          // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+          contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 大标题下的备注（老板 2026-10-02）：点明这里改的是什么、上限多少
+              Text(
+                l10n.chatPageRenameEntranceHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.outline,
                 ),
-                // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
-                // 同一个常量（这里的拦截不替代提交时的白名单校验）
-                maxLength: kEntranceNameMaxLength,
-                // 开始填写即清除警示（与向导输入框一致）
-                onChanged: (_) {
-                  if (nameError.value != null) nameError.value = null;
-                },
               ),
-            ),
-            ValueListenableBuilder<String?>(
-              valueListenable: nameError,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              const SizedBox(height: 14),
+              // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+              // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
+              ValueListenableBuilder<bool>(
+                valueListenable: editing,
+                builder: (_, isEditing, _) => TextField(
+                  controller: ctrl,
+                  focusNode: nameFocus,
+                  readOnly: !isEditing,
+                  onTap: () {
+                    if (editing.value) return;
+                    editing.value = true;
+                    nameFocus.requestFocus();
+                  },
+                  decoration: InputDecoration(
+                    labelText: l10n.chatPageEntranceListThisDevice,
+                    border: const OutlineInputBorder(),
+                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
+                    fillColor: Colors.white,
+                    counterText: '',
+                    suffixIcon: isEditing
+                        ? null
+                        : IconButton(
+                            tooltip: l10n.chatPageEdit,
+                            icon: const Icon(Icons.edit, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => editing.value = true,
+                          ),
+                  ),
+                  // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
+                  // 同一个常量（这里的拦截不替代提交时的白名单校验）
+                  maxLength: kEntranceNameMaxLength,
+                  // 开始填写即清除警示（与向导输入框一致）
+                  onChanged: (_) {
+                    if (nameError.value != null) nameError.value = null;
+                  },
+                ),
+              ),
+              ValueListenableBuilder<String?>(
+                valueListenable: nameError,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            FilledButton(
+              onPressed: () async {
+                final err = await _applyEntranceName(ctrl.text, l10n);
+                if (err != null) {
+                  // 错误**就地显示**：红字挂在输入框下方（与 PIN 修改弹窗同款），
+                  // 不再弹弹窗外的顶部通知条（老板 2026-10-02）
+                  nameError.value = err;
+                  return; // 校验/保存失败：留在弹窗里改
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              },
+              child: Text(l10n.chatPageRenamingSubmit),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () async {
-              final err = await _applyEntranceName(ctrl.text, l10n);
-              if (err != null) {
-                // 错误**就地显示**：红字挂在输入框下方（与 PIN 修改弹窗同款），
-                // 不再弹弹窗外的顶部通知条（老板 2026-10-02）
-                nameError.value = err;
-                return; // 校验/保存失败：留在弹窗里改
-              }
-              if (ctx.mounted) Navigator.of(ctx).pop(true);
-            },
-            child: Text(l10n.chatPageRenamingSubmit),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
@@ -4536,69 +4587,74 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final nameError = ValueNotifier<String?>(null);
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（与菜单下其它弹窗一致）
-        title: Center(child: Text(l10n.chatPageGroupNameTitle)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: l10n.chatPageGroupNameLabel,
-                border: const OutlineInputBorder(),
-                // 不显示 "3/32" 计数器（同改名弹窗：上限只是防超长）
-                counterText: '',
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（与菜单下其它弹窗一致）
+          title: Center(child: Text(l10n.chatPageGroupNameTitle)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageGroupNameLabel,
+                  border: const OutlineInputBorder(),
+                  // 不显示 "3/32" 计数器（同改名弹窗：上限只是防超长）
+                  counterText: '',
+                ),
+                // 输入框里直接拦住超长（同改名弹窗）
+                maxLength: kMemberNameMaxLength,
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
-              // 输入框里直接拦住超长（同改名弹窗）
-              maxLength: kMemberNameMaxLength,
-              onChanged: (_) {
-                if (nameError.value != null) nameError.value = null;
-              },
-            ),
-            ValueListenableBuilder<String?>(
-              valueListenable: nameError,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              ValueListenableBuilder<String?>(
+                valueListenable: nameError,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(l10n.cancel)),
+            FilledButton(
+              onPressed: () {
+                final name = ctrl.text.trim();
+                // 允许清空：空 = 回到"没有名字"（状态条第一行显示编辑图标）
+                if (name.isNotEmpty) {
+                  // 用户名称白名单（与改名同源）：非空才校验
+                  final violation = checkMemberNamePolicy(name);
+                  if (violation != null) {
+                    nameError.value = violation == MemberNameViolation.tooLong
+                        ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
+                        : l10n.chatPageRenameNameInvalidError;
+                    return;
+                  }
+                }
+                Navigator.of(ctx).pop(true);
+              },
+              child: Text(l10n.chatPageRenamingSubmit),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () {
-              final name = ctrl.text.trim();
-              // 允许清空：空 = 回到"没有名字"（状态条第一行显示编辑图标）
-              if (name.isNotEmpty) {
-                // 用户名称白名单（与改名同源）：非空才校验
-                final violation = checkMemberNamePolicy(name);
-                if (violation != null) {
-                  nameError.value = violation == MemberNameViolation.tooLong
-                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
-                      : l10n.chatPageRenameNameInvalidError;
-                  return;
-                }
-              }
-              Navigator.of(ctx).pop(true);
-            },
-            child: Text(l10n.chatPageRenamingSubmit),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（同 _showRenameDialog：立即 dispose
@@ -4635,137 +4691,142 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final nameFocus = FocusNode();
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageRenameNameTitle)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-            // 白底可编辑、按钮消失（老板要求 2026-09-09）。
-            // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
-            // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
-            ValueListenableBuilder<bool>(
-              valueListenable: editing,
-              builder: (_, isEditing, _) => TextField(
-                controller: ctrl,
-                focusNode: nameFocus,
-                readOnly: !isEditing,
-                onTap: () {
-                  if (editing.value) return;
-                  editing.value = true;
-                  nameFocus.requestFocus();
-                },
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageRenameNameLabel,
-                  border: const OutlineInputBorder(),
-                  filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                  fillColor: Colors.white,
-                  // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
-                  // 弹窗里不必多一行；下面 maxLength 才是硬拦
-                  counterText: '',
-                  suffixIcon: isEditing
-                      ? null
-                      : IconButton(
-                          tooltip: l10n.chatPageEdit,
-                          icon: const Icon(Icons.edit, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => editing.value = true,
-                        ),
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+          title: Center(child: Text(l10n.chatPageRenameNameTitle)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+              // 白底可编辑、按钮消失（老板要求 2026-09-09）。
+              // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
+              // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
+              ValueListenableBuilder<bool>(
+                valueListenable: editing,
+                builder: (_, isEditing, _) => TextField(
+                  controller: ctrl,
+                  focusNode: nameFocus,
+                  readOnly: !isEditing,
+                  onTap: () {
+                    if (editing.value) return;
+                    editing.value = true;
+                    nameFocus.requestFocus();
+                  },
+                  decoration: InputDecoration(
+                    labelText: l10n.chatPageRenameNameLabel,
+                    border: const OutlineInputBorder(),
+                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
+                    fillColor: Colors.white,
+                    // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
+                    // 弹窗里不必多一行；下面 maxLength 才是硬拦
+                    counterText: '',
+                    suffixIcon: isEditing
+                        ? null
+                        : IconButton(
+                            tooltip: l10n.chatPageEdit,
+                            icon: const Icon(Icons.edit, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => editing.value = true,
+                          ),
+                  ),
+                  // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
+                  // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
+                  // （这里的拦截不替代提交时的白名单校验）。
+                  maxLength: kMemberNameMaxLength,
+                  // 开始填写即清除空名警示（与向导输入框一致）
+                  onChanged: (_) {
+                    if (nameError.value != null) nameError.value = null;
+                  },
                 ),
-                // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
-                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
-                // （这里的拦截不替代提交时的白名单校验）。
-                maxLength: kMemberNameMaxLength,
-                // 开始填写即清除空名警示（与向导输入框一致）
-                onChanged: (_) {
-                  if (nameError.value != null) nameError.value = null;
-                },
               ),
-            ),
-            ValueListenableBuilder<String?>(
-              valueListenable: nameError,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              ValueListenableBuilder<String?>(
+                valueListenable: nameError,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-            ),
-            // 性别用与名字输入框同款组件（只读）——「性别」标签
-            // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
-            // （老板要求 2026-09-09）
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: genderCtrl,
-              readOnly: true,
-              style: const TextStyle(fontSize: 16),
-              decoration: InputDecoration(
-                labelText: l10n.chatPageGenderLabel,
-                border: const OutlineInputBorder(), // 与名字输入框同款边框
-                // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
-                suffixIcon: _myGender == 'male'
-                    ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
-                    : _myGender == 'female'
-                        ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
-                        : null,
               ),
+              // 性别用与名字输入框同款组件（只读）——「性别」标签
+              // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
+              // （老板要求 2026-09-09）
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: genderCtrl,
+                readOnly: true,
+                style: const TextStyle(fontSize: 16),
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageGenderLabel,
+                  border: const OutlineInputBorder(), // 与名字输入框同款边框
+                  // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
+                  suffixIcon: _myGender == 'male'
+                      ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
+                      : _myGender == 'female'
+                          ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
+                          : null,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            FilledButton(
+              onPressed: () async {
+                final name = ctrl.text.trim();
+                if (name.isEmpty) {
+                  // 空/全空格：红字警示并停留（不再静默跳过）
+                  nameError.value = l10n.chatPageRenameMyselfEmptyError;
+                  return;
+                }
+                // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
+                final violation = checkMemberNamePolicy(name);
+                if (violation != null) {
+                  nameError.value = violation == MemberNameViolation.tooLong
+                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
+                      : l10n.chatPageRenameNameInvalidError;
+                  return;
+                }
+                // 不允许改成与对方相同的名字（老板 2026-09-10）
+                if (widget.peerName != null && name == widget.peerName) {
+                  nameError.value = l10n.chatPageRenameSameAsPeerError;
+                  return;
+                }
+                try {
+                  final api = widget.api ?? ApiClient(effectiveServer);
+                  await _withAuth((t) => api.updateMemberName(name, t));
+                  _myMemberName = name;
+                  // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
+                  // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
+                  // app 菜单改名后退出重进回到 memberB）
+                  await _saveProfile();
+                  if (ctx.mounted) Navigator.of(ctx).pop(true);
+                } on ApiException catch (e) {
+                  if (ctx.mounted) {
+                    _notice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    _notice(ctx, l10n.chatPageRenameFailed('$e'));
+                  }
+                }
+              },
+              child: Text(l10n.chatPageRenamingSubmit),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () async {
-              final name = ctrl.text.trim();
-              if (name.isEmpty) {
-                // 空/全空格：红字警示并停留（不再静默跳过）
-                nameError.value = l10n.chatPageRenameMyselfEmptyError;
-                return;
-              }
-              // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
-              final violation = checkMemberNamePolicy(name);
-              if (violation != null) {
-                nameError.value = violation == MemberNameViolation.tooLong
-                    ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
-                    : l10n.chatPageRenameNameInvalidError;
-                return;
-              }
-              // 不允许改成与对方相同的名字（老板 2026-09-10）
-              if (widget.peerName != null && name == widget.peerName) {
-                nameError.value = l10n.chatPageRenameSameAsPeerError;
-                return;
-              }
-              try {
-                final api = widget.api ?? ApiClient(effectiveServer);
-                await _withAuth((t) => api.updateMemberName(name, t));
-                _myMemberName = name;
-                // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
-                // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
-                // app 菜单改名后退出重进回到 memberB）
-                await _saveProfile();
-                if (ctx.mounted) Navigator.of(ctx).pop(true);
-              } on ApiException catch (e) {
-                if (ctx.mounted) {
-                  _notice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
-                }
-              } catch (e) {
-                if (ctx.mounted) {
-                  _notice(ctx, l10n.chatPageRenameFailed('$e'));
-                }
-              }
-            },
-            child: Text(l10n.chatPageRenamingSubmit),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
@@ -4805,14 +4866,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final shouldExit = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageExitTitle)),
-        content: Text(l10n.chatPageExitMessage),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
-        ],
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+          title: Center(child: Text(l10n.chatPageExitTitle)),
+          content: Text(l10n.chatPageExitMessage),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+          ],
+        ),
       ),
     );
     if (shouldExit == true) {
@@ -6030,25 +6094,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
-        content: Text(l10n.chatPageDeleteConfirmMessage),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.chatPageDeleteCancel),
-          ),
-          // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
-          // 用实体样式，不再是纯文字）
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              foregroundColor: Colors.white,
+      // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
+          content: Text(l10n.chatPageDeleteConfirmMessage),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.chatPageDeleteCancel),
             ),
-            child: Text(l10n.chatPageDeleteConfirmOk),
-          ),
-        ],
+            // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
+            // 用实体样式，不再是纯文字）
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.chatPageDeleteConfirmOk),
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -6073,23 +6142,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 不做二次确认容易误触
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
-        content: Text(l10n.chatPageRecallConfirmBody),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              foregroundColor: Colors.white,
+      // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
+          content: Text(l10n.chatPageRecallConfirmBody),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.cancel),
             ),
-            child: Text(l10n.chatPageRecallConfirmOk),
-          ),
-        ],
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.chatPageRecallConfirmOk),
+            ),
+          ],
+        ),
       ),
     );
     if (ok != true) return;
@@ -7109,51 +7183,57 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final files = payload.files;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
-        // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"
-        title: Text(switch (payload.kind) {
-          'image' => l10n.chatPagePasteSendImageTitle,
-          'video' => l10n.chatPagePasteSendVideoTitle(files!.length),
-          'audio' => l10n.chatPagePasteSendAudioTitle(files!.length),
-          _ => l10n.chatPagePasteSendFilesTitle(files!.length),
-        }),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
-          child: bytes != null
-              ? Image.memory(bytes, fit: BoxFit.contain)
-              // 名单用 SingleChildScrollView + Column(min)：对话框要算内容
-              // 固有宽度，ListView(shrinkWrap) 会抛 intrinsic dimensions 异常
-              : SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final f in files!)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          // 图标也按类型：视频/音频不该挂个通用文件图标
-                          leading: Icon(switch (payload.kind) {
-                            'video' => Icons.movie,
-                            'audio' => Icons.music_note,
-                            _ => Icons.insert_drive_file,
-                          }),
-                          title: Text(f.name,
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ),
-                    ],
+      // 破坏性确认（粘贴发送不可轻点）：禁误触关闭（点外面/系统返回都不行），
+      // 必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
+          // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"
+          title: Text(switch (payload.kind) {
+            'image' => l10n.chatPagePasteSendImageTitle,
+            'video' => l10n.chatPagePasteSendVideoTitle(files!.length),
+            'audio' => l10n.chatPagePasteSendAudioTitle(files!.length),
+            _ => l10n.chatPagePasteSendFilesTitle(files!.length),
+          }),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
+            child: bytes != null
+                ? Image.memory(bytes, fit: BoxFit.contain)
+                // 名单用 SingleChildScrollView + Column(min)：对话框要算内容
+                // 固有宽度，ListView(shrinkWrap) 会抛 intrinsic dimensions 异常
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final f in files!)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            // 图标也按类型：视频/音频不该挂个通用文件图标
+                            leading: Icon(switch (payload.kind) {
+                              'video' => Icons.movie,
+                              'audio' => Icons.music_note,
+                              _ => Icons.insert_drive_file,
+                            }),
+                            title: Text(f.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.send),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.send),
-          ),
-        ],
       ),
     );
     return confirmed ?? false;
@@ -9322,13 +9402,16 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: Center(child: Text(l10n.chatPageClearLockTitle)),
-          content: Text(l10n.chatPageClearLockMessage),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
-          ],
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: Center(child: Text(l10n.chatPageClearLockTitle)),
+            content: Text(l10n.chatPageClearLockMessage),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
+            ],
+          ),
         ),
       );
       if (confirmed != true) return; // 取消：留在本弹窗（不执行清除）

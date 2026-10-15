@@ -15,7 +15,6 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
-import 'package:einz/data/notify_settings.dart';
 import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
@@ -1780,16 +1779,78 @@ void main() {
     // 秘境」同模块、同居中式样——老板 2026-10-15）
     expect(find.text(_zh.settingsScopeAll), findsOneWidget);
 
-    // 默认勾选（true=全局）；点一下取消 → **即刻落盘**（设备级默认策略，
-    // 不等点保存——关掉弹窗也应记住）
-    final pref = NotifyAllSpacesPref(db);
-    await tester.runAsync(() async {
-      expect(await pref.load(), isTrue);
-    });
+    // 每次开弹窗都默认**不勾选**（老板 2026-10-15）：扇出必须是每次显式 opt-in
+    // （纯一次性开关，不持久化；新空间自动继承已取消）
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+
+    // 点一下勾上 → 勾选框翻成 true（仅本次保存生效，不落任何设备偏好）
     await tester.tap(find.text(_zh.settingsScopeAll));
     await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      expect(await pref.load(), isFalse);
-    });
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+  });
+
+  testWidgets('邮件通知：已设邮箱时点停用 → 关弹窗 + 顶部通知一句（老板 2026-10-15）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    api.notifyEmailStatus = NotifyEmailStatus(email: 'me@tic.cc', state: 'verified');
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 邮件通知（_menuAction 有 300ms 错峰延迟）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageNotifyLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageNotifyLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 已设置：邮箱只读回显、只给「停用」不给「保存」
+    expect(find.text('me@tic.cc'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, _zh.chatPageNotifyStop), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, _zh.chatPageEmailSubmit), findsNothing);
+
+    // 只读输入框**不许聚焦**：点它边框也不该变蓝（TextField canRequestFocus:false，
+    // 老板 2026-10-15）——否则像能改其实不能，误导。
+    // 限定在弹窗内找输入框：聊天页底部还有个输入框，全局找会命中两个
+    final emailField = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(TextField));
+    final field = tester.widget<TextField>(emailField);
+    expect(field.canRequestFocus, isFalse);
+    expect(field.focusNode!.canRequestFocus, isFalse);
+    expect(field.focusNode!.hasFocus, isFalse); // 开弹窗时不该自带焦点
+    await tester.tap(emailField);
+    await tester.pumpAndSettle();
+    expect(field.focusNode!.hasFocus, isFalse); // 点了也不该获得焦点
+
+    // 点停用 → DELETE 已发、弹窗关闭、通知一句（不再原地切回输入界面）
+    await tester.tap(find.widgetWithText(TextButton, _zh.chatPageNotifyStop));
+    await tester.pumpAndSettle();
+
+    expect(api.notifyEmailDeleted, isTrue);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text(_zh.chatPageNotifyRemoved), findsOneWidget);
+
+    // 弹窗关闭后还有 400ms 的延迟 dispose（Future.delayed）——不等等它跑完就结束
+    // 测试，会栽在"pending timer"断言上
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
   });
 }

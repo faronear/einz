@@ -14902,3 +14902,49 @@ chatPageNotifyAllSpaces 收敛到共享键 settingsScopeAll（语义相同，就
 旧键删除）。行为不变：勾选仍即刻落盘 NotifyAllSpacesPref（设备级默认策略，
 不等保存）。测试：chat_page_menu_test 补 1 例（弹窗渲染共享文案 + 切换即落盘）。
 回归：全量 app 326 过 1 跳 0 败。
+
+**（2026-10-15T06:52:10Z / 2026-10-15 14:52）**：邮件通知「停用」交互改造（老板
+2026-10-15：点停用后应关弹窗并发通知，原地切回输入界面让人混淆）。停用成功 →
+`Navigator.pop(true)` + 顶部通知 chatPageNotifyRemoved（既有未用键「已停止邮件
+提醒。」），与保存成功反馈一致；弹窗内「已设置↔未设置」两阶段状态机（active
+ValueNotifier）退役为普通 bool，少一层无用的响应式包装。测试补 1 例（已设邮箱
+→ 只读回显+只给停用 → DELETE 已发/弹窗关闭/通知出现）。
+
+**（2026-10-15T07:05:33Z / 2026-10-15 15:05）**：弹窗退出策略全面落地（老板
+2026-10-15 定：有输入框的弹窗必须点按钮退出；追问后确认破坏性确认也锁死）。
+- 输入类 9 处（设锁 PIN/邮件通知/改口令/索要口令/通道改名/群组名/我的名字 +
+  pin_prompt/reset_entrance）与破坏性确认 4 处（删除消息/撤回/粘贴发送/远程托管
+  警示）：`barrierDismissible: false` + builder 外包 `PopScope(canPop: false)`。
+- **关键机制**（SDK 源码核实）：barrierDismissible 只挡点遮罩；系统返回/Esc 走
+  `Navigator.maybePop → route.popDisposition`，须 PopScope 拦（dialog route 内注册
+  PopEntry）；代码里 `Navigator.pop()`（取消/保存按钮）不走这条路，照常关。先例：
+  version_gate frozen 窗。
+- 已锁死但缺 PopScope 的 7 处补齐（退出应用×4/清空锁屏码/通话界面/向导欢迎窗）。
+- 不锁：12 个底部弹层（无输入、平台惯例下滑关闭）、4 个全屏大图/视频/头像
+  （barrierDismissible:true 是老板明确要求）、version_gate cooling（可忽略提醒）。
+
+**（2026-10-15T07:31:47Z / 2026-10-15 15:31）**：邮件通知勾选框默认不勾选 + 取消
+新空间继承（老板 2026-10-15：默认值应不被勾选，每次新开弹窗都默认不勾选；随后
+拍板「干脆取消继承，思路实现都更简单」）。勾选框退化为纯一次性开关：不持久化、
+不读 NotifyAllSpacesPref；继承整条链拆净——space_switcher 的 onCompleted 钩子、
+_notifyEmailSourceSpaces/_inheritNotifyEmail、notify_settings.dart（删文件，老板
+确认）。代价（新空间要手填一次邮箱）被服务端地址级验证抵消：老地址重填直接
+verified、不再发确认信。回归：全量 app 327 过 1 跳 0 败。
+
+**（2026-10-15T07:44:12Z / 2026-10-15 15:44）**：已设邮箱的只读输入框点击不再变
+蓝（老板 2026-10-15 实测）。根因不在 readOnly：`TextField.initState` 会用
+**TextField 自己的 canRequestFocus 参数**（默认 true）覆写传入 FocusNode 的同名
+属性（text_field.dart:1282，didChangeDependencies 再刷一次）——所以给 FocusNode 设
+canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 TextField
+本身 + 显式焦点节点（供测试断言 hasFocus）。测试：开弹窗无焦点、点击后仍无焦点。
+
+**（2026-10-15T07:52:40Z / 2026-10-15 15:52）**：「更多设置」「高级」两个二级弹层
+的待选条目行尾加 `>`（Icons.chevron_right size 18，老板 2026-10-15）：更多设置
+2 行 = 当前值 + > 横排（trailing 改 Row）；高级 3 行 = 纯 >。与顶层菜单的二级入口
+标识同款。
+
+**（2026-10-15T07:58:05Z / 2026-10-15 15:58）**：事故记录——对 chat_page.dart 误跑
+`dart format`（该文件非 format 干净：仓库用旧式 80 列+尾随逗号，tall style 会重排
+全文件，一度产生 4934 行 diff 且覆盖了未提交改动）。恢复：`git checkout` 回 HEAD 后
+按精确 old/new 串重放 5 处改动（Edit 工具），git diff 核对只含预期 hunk。教训入
+记忆：本仓库不要跑 dart format；试探用 `dart format --output=none --set-exit-if-changed`。

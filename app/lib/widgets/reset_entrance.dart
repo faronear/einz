@@ -45,12 +45,16 @@ Future<bool> _confirmDestructive(
       entranceName.trim().isEmpty ? l10n.resetEntranceConfirmWord : entranceName.trim();
   final ok = await showDialog<bool>(
     context: context,
+    // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
     barrierDismissible: false,
-    builder: (ctx) => _ConfirmDestructiveDialog(
-      db: db,
-      entranceName: expected,
-      hasPin: hasPin,
-      copy: copy,
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: _ConfirmDestructiveDialog(
+        db: db,
+        entranceName: expected,
+        hasPin: hasPin,
+        copy: copy,
+      ),
     ),
   );
   return ok ?? false;

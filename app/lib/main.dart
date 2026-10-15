@@ -258,23 +258,26 @@ class _StartupGateState extends State<StartupGate> {
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
-        title: Center(child: Text(l10n.startupInitClearDataTitle)),
-        content: Text(l10n.startupInitClearDataMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+          title: Center(child: Text(l10n.startupInitClearDataTitle)),
+          content: Text(l10n.startupInitClearDataMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.cancel),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.startupInitClearData),
-          ),
-        ],
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.startupInitClearData),
+            ),
+          ],
+        ),
       ),
     );
     if (ok != true || !mounted) return;

@@ -8,8 +8,8 @@ import 'l10n/app_localizations.dart';
 /// 语音通话界面：振铃（来电/去电）与通话中的全屏层。
 ///
 /// 用一个 Dialog 覆盖在当前页面之上（barrierDismissible: false——通话中不允许
-/// 误触返回键把界面关掉，只能挂断）。状态全部来自 [VoiceCallService.state]，
-/// 本文件只负责显示与转发按钮动作。
+/// 误触返回键把界面关掉，只能挂断；PopScope 把系统返回/Esc 一并挡掉）。
+/// 状态全部来自 [VoiceCallService.state]，本文件只负责显示与转发按钮动作。
 Future<void> showVoiceCallDialog(
   BuildContext context, {
   required VoiceCallService call,
@@ -19,7 +19,10 @@ Future<void> showVoiceCallDialog(
     context: context,
     barrierDismissible: false,
     useSafeArea: false,
-    builder: (ctx) => _VoiceCallDialog(call: call, peerName: peerName),
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: _VoiceCallDialog(call: call, peerName: peerName),
+    ),
   );
 }
 

@@ -23,11 +23,15 @@ Future<String?> promptLockCode(
   final l10n = AppLocalizations.of(context)!;
   return showDialog<String>(
     context: context,
+    // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
     barrierDismissible: false,
-    builder: (ctx) => _LockCodeDialog(
-      db: db,
-      title: title ?? l10n.promptLockCodeTitle,
-      hint: hint ?? l10n.promptLockCodeHint,
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: _LockCodeDialog(
+        db: db,
+        title: title ?? l10n.promptLockCodeTitle,
+        hint: hint ?? l10n.promptLockCodeHint,
+      ),
     ),
   );
 }
