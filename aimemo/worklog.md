@@ -14812,3 +14812,18 @@ runner 无此 sinkhole，应正常通过（该测试文件头自称"无外网依
 **归因确认（老板 2026-10-14 当天补充）**：sinkhole 来自本机 Clash Verge Rev 的
 fake-ip 池（198.18.0.0/15）——开着 Clash 时一切域名都被劫到假 IP，DNS 失败语义的
 测试必挂；关闭 Clash 后 testAll 全绿通过。**以后本机测试异常先问 Clash 状态**。
+
+**（2026-10-15T00:51:57Z / 2026-10-15 08:51）**：修附件存储切换的作用域 bug
+（老板 2026-10-14 提问引出）。先回答问题：**存储模式只对当前秘境生效**——键是
+per-space 的 `space.<spaceId>.attachment_storage`（存量回退旧全局键），且是
+**纯本设备设置，不上传秘境服务器**（服务端无任何相关端点，PROTOCOL.md 无此
+接口），一台设备一个选择。但发现真 bug：切回「远程托管」时误用全局
+`AttachmentStore.clear()`，把**所有空间**的留存明文一并清掉，与别的空间自己的
+「本地保存」设置矛盾。改用 `clearSpace(widget.spaceId)`（与撤销/删空间的空间
+粒度对齐）。测试：新增全流程 scope 测试（已用临时改回全局 clear 验证能抓住
+回归）+ clearSpace 单测。**测试基建踩坑（重要经验）**：① testWidgets 的
+FakeAsync 区里 MethodChannel 响应不流动——任何 pump 之前的 channel await 会
+**永久死锁**（表现是 10 分钟超时无输出），种子落盘必须包 `tester.runAsync`；
+② 提交后 onApply 的 clearSpace 是 fake 区里发起的真实文件 I/O，完成量要靠
+pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首轮即 break，
+窗口不够，onApply 永远完不成、弹层不关。回归：56 测全过。
