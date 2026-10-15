@@ -1465,7 +1465,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           for (final option in kLocaleOptions)
             OptionPickerItem(value: option, label: kLocaleLabels[option]!),
         ],
-        onApply: (value) async {
+        onApply: (value, {bool scopeAll = false}) async {
           picked = value;
           await settings.save(value);
         },
@@ -1523,6 +1523,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
   /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
+  /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
+  /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
     await showOptionPickerSheet<void>(
@@ -1544,7 +1546,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               description: _attachmentStorageDesc(mode, l10n),
             ),
         ],
-        onApply: (mode) async {
+        onApply: (mode, {bool scopeAll = false}) async {
           await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId).save(mode);
           if (mode == 'secured') {
             // 切回远程托管：清掉**本空间**已留存的明文。只清当前秘境——存储
@@ -1626,12 +1628,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showTombstonePicker() async {
     final l10n = AppLocalizations.of(context)!;
     var picked = _tombstoneDisplay;
+    var appliedToAll = false;
     await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageTombstoneHeading,
         note: l10n.chatPageTombstoneNote,
         selected: _tombstoneDisplay,
+        // 单选 + 提交（老板 2026-10-15：与附件存储同构——勾选框配提交按钮才
+        // 防呆：提交前统一确认"选什么 + 作用域"）
+        submitLabel: l10n.chatPageTombstoneSubmit,
+        // 「应用于本机所有秘境」勾选框（提交按钮上方，提交时随 onApply 交出）
+        scopeAllLabel: l10n.settingsScopeAll,
         options: [
           OptionPickerItem(
             value: 'keep',
@@ -1644,16 +1652,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             description: l10n.chatPageTombstoneHideDesc,
           ),
         ],
-        onApply: (mode) async {
+        onApply: (mode, {bool scopeAll = false}) async {
           picked = mode;
-          await TombstoneSettings(widget.db ?? LocalDatabase.shared,
-                  spaceId: widget.spaceId)
-              .save(mode);
+          appliedToAll = scopeAll;
+          final settings = TombstoneSettings(widget.db ?? LocalDatabase.shared,
+              spaceId: widget.spaceId);
+          if (scopeAll) {
+            // 勾了"所有秘境"：写全局键 + 清除各空间 per-space 覆盖
+            await settings.saveAll(mode);
+          } else {
+            await settings.save(mode);
+          }
         },
       ),
     );
-    if (!mounted || picked == _tombstoneDisplay) return;
-    setState(() => _tombstoneDisplay = picked);
+    if (!mounted) return;
+    // 模式没变就不重建（点着玩）；但"所有秘境"的确认照给——作用域落地本身
+    // 就是效果，哪怕模式没变（勾选后点了同一个档位）
+    if (picked != _tombstoneDisplay) {
+      setState(() => _tombstoneDisplay = picked);
+    }
+    if (appliedToAll) {
+      _notice(context, l10n.settingsScopeAllDone);
+    }
   }
 
   /// 菜单行右侧「当前值」：超过 [kMenuValueMaxWidth] 即省略号、右对齐。
@@ -4772,7 +4793,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               label: _burnOptionLabel(entry.value, l10n),
             ),
         ],
-        onApply: (value) async => picked = value,
+        onApply: (value, {bool scopeAll = false}) async => picked = value,
       ),
     );
     return picked == null ? null : int.parse(picked!);

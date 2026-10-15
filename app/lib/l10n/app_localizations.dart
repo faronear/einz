@@ -134,6 +134,18 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// No description provided for @settingsScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to all spaces on this device'**
+  String get settingsScopeAll;
+
+  /// No description provided for @settingsScopeAllDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to all spaces on this device'**
+  String get settingsScopeAllDone;
+
   /// No description provided for @skip.
   ///
   /// In en, this message translates to:
@@ -1583,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnNote.
   ///
   /// In en, this message translates to:
-  /// **'New messages are deleted on a countdown once read (Applies to this entrance only)'**
+  /// **'Delete new messages automatically once read on a countdown (Applies to this entrance only)'**
   String get chatPageBurnNote;
 
   /// No description provided for @chatPageTombstoneHeading.
@@ -1595,7 +1607,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneNote.
   ///
   /// In en, this message translates to:
-  /// **'How deleted/burned/recalled messages appear? (Applies to this entrance only)'**
+  /// **'How deleted/burned/recalled messages appear?'**
   String get chatPageTombstoneNote;
 
   /// No description provided for @chatPageTombstoneKeep.
@@ -1621,6 +1633,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tombstones disappear from the message flow entirely'**
   String get chatPageTombstoneHideDesc;
+
+  /// No description provided for @chatPageTombstoneSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get chatPageTombstoneSubmit;
 
   /// No description provided for @chatPageBurnOff.
   ///

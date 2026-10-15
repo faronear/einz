@@ -14859,3 +14859,23 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
   fromLTRB(24,4,24,24) + 备注后 SizedBox 10/12→14）。涉及 7 处：chat_page 的
   邮件通知 / 口令输入 / 通道改名 / 通道码 / 设锁屏码 / 改口令 + widgets 的
   pin_prompt。无备注行的 dialog（群名/改名）不动，保持默认 16。
+
+**（2026-10-15T05:15:14Z / 2026-10-15 13:15）**：墓碑消息弹层改提交制 +
+「应用于本机所有秘境」可复用勾选框（老板 2026-10-15 连续几轮体验迭代的合并落地）。
+- 墓碑弹层 → **单选+提交**（与附件存储同构）：勾选框配提交按钮才防呆；l10n 补
+  chatPageTombstoneSubmit。
+- **可复用组件 LabeledCheckbox**（widgets/labeled_checkbox.dart）：勾框+标签、
+  整行可点，内容**整体居中**（与全宽提交按钮成一系）。
+- **OptionPickerSheet 扩展**：scopeAllLabel 参数。勾选框位置按模式分化——提交
+  模式放**提交按钮上方**（提交前统一确认"选什么+作用域"）；点选即生效放选项区
+  上方（选项即提交，放下方没机会改范围）。提交使能条件：选项**或勾选框**有变动
+  即可提交（只勾范围不改选项同样是有效操作）。
+- **SpaceScopedSetting mixin**（data/space_scoped_setting.dart）：scopedKey +
+  saveAll（写全局键+清除各空间 per-space 覆盖）+ clearSpaceOverrides——"几乎每个
+  配置项都要加" rollout 前先收敛重复实现（清除用 Dart 侧精确匹配键名，不用 SQL
+  LIKE——键名里的 `_` 是通配符）。
+- l10n 收敛为共享键 settingsScopeAll / settingsScopeAllDone（先例：
+  wizardPassphraseHint）。
+- 测试：picker 补 3 例（点选即生效位置+交出、提交模式位置+只勾范围可提交、
+  不传不渲染）；墓碑补 scope 用例（勾选后两空间都变、覆盖被清除、确认通知）。
+  回归：全量 app 325 过 1 跳 0 败。

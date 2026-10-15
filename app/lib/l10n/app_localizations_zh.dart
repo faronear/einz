@@ -28,6 +28,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
+  String get settingsScopeAll => '应用于本机所有秘境';
+
+  @override
+  String get settingsScopeAllDone => '已应用到本机所有秘境';
+
+  @override
   String get skip => '跳过';
 
   @override
@@ -835,13 +841,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageBurnHeading => '阅后即焚';
 
   @override
-  String get chatPageBurnNote => '倒计时删除已阅读的新消息（仅对本通道生效）';
+  String get chatPageBurnNote => '倒计时自动删除已阅读的新消息（仅对本通道生效）';
 
   @override
   String get chatPageTombstoneHeading => '墓碑消息';
 
   @override
-  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息如何显示？（仅对本通道生效）';
+  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息如何显示？';
 
   @override
   String get chatPageTombstoneKeep => '保留占位';
@@ -854,6 +860,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageTombstoneHideDesc => '墓碑不再显示，从消息流中彻底消失';
+
+  @override
+  String get chatPageTombstoneSubmit => '提交';
 
   @override
   String get chatPageBurnOff => '阅后即焚已关闭（这一消息将会保留）';

@@ -28,6 +28,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get settingsScopeAll => 'Apply to all spaces on this device';
+
+  @override
+  String get settingsScopeAllDone => 'Applied to all spaces on this device';
+
+  @override
   String get skip => 'Skip';
 
   @override
@@ -898,14 +904,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageBurnNote =>
-      'New messages are deleted on a countdown once read (Applies to this entrance only)';
+      'Delete new messages automatically once read on a countdown (Applies to this entrance only)';
 
   @override
   String get chatPageTombstoneHeading => 'Tombstone messages';
 
   @override
   String get chatPageTombstoneNote =>
-      'How deleted/burned/recalled messages appear? (Applies to this entrance only)';
+      'How deleted/burned/recalled messages appear?';
 
   @override
   String get chatPageTombstoneKeep => 'Keep message status';
@@ -920,6 +926,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatPageTombstoneHideDesc =>
       'Tombstones disappear from the message flow entirely';
+
+  @override
+  String get chatPageTombstoneSubmit => 'Submit';
 
   @override
   String get chatPageBurnOff =>

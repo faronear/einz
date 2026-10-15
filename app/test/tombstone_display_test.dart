@@ -142,19 +142,24 @@ void main() {
       expect(await TombstoneSettings(db, spaceId: 'space-a').load(), 'keep');
     });
 
-    // ② 彻底隐藏：墓碑整条从消息流消失，正常消息不受影响
+    // ② 彻底隐藏：选「彻底消失」→ 提交（单选+提交制，老板 2026-10-15），
+    // 墓碑整条从消息流消失，正常消息不受影响
     await _openTombstonePicker(tester);
     expect(find.text(_zh.chatPageTombstoneHeading), findsOneWidget,
         reason: '应弹出墓碑消息选择器');
     await tester.tap(find.text(_zh.chatPageTombstoneHide));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageTombstoneSubmit));
+    await tester.pumpAndSettle();
     expect(find.text('正常消息'), findsOneWidget, reason: '正常消息不该被隐藏');
     expect(find.byIcon(Icons.delete_outline), findsNothing,
         reason: '彻底隐藏：墓碑应从消息流消失');
 
-    // ③ 切回保留消息状态：墓碑占位回来
+    // ③ 切回保留消息状态：选「保留占位」→ 提交，墓碑占位回来
     await _openTombstonePicker(tester);
     await tester.tap(find.text(_zh.chatPageTombstoneKeep));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageTombstoneSubmit));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.delete_outline), findsOneWidget,
         reason: '切回保留消息状态：墓碑占位应恢复');
@@ -162,5 +167,55 @@ void main() {
     await tester.runAsync(() async {
       expect(await TombstoneSettings(db, spaceId: 'space-a').load(), 'keep');
     });
+  });
+
+  testWidgets('勾选「应用于本机所有秘境」：选中模式对本机所有空间生效',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    // 两个空间各自持有 per-space 设置：a=keep（当前空间）、b=hide（与 a 不同，
+    // 便于观察"应用到所有"是否真的够到了 b）
+    await tester.runAsync(() async {
+      await TombstoneSettings(db, spaceId: 'space-a').save('keep');
+      await TombstoneSettings(db, spaceId: 'space-b').save('hide');
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-a',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+        memberId: 'member-a',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await _openTombstonePicker(tester);
+    // 只勾「应用于本机所有秘境」、**不改选项**就提交——作用域本身是有效操作
+    // （把当前模式推广到所有空间），提交按钮此时必须可用（防呆的另一面：
+    // 不能因为"选项没动"就把人堵死）
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageTombstoneSubmit));
+    await tester.pumpAndSettle();
+
+    // 两端都变成 keep；b 的 per-space 覆盖被清除（读全局值）
+    await tester.runAsync(() async {
+      expect(await TombstoneSettings(db, spaceId: 'space-a').load(), 'keep');
+      expect(await TombstoneSettings(db, spaceId: 'space-b').load(), 'keep',
+          reason: '勾选所有秘境后 b 也应变为 keep（其 per-space 覆盖被清除，回退全局）');
+    });
+    // 确认通知（这个操作越过了当前空间， Silent 落地心里没底）
+    expect(find.text(_zh.settingsScopeAllDone), findsOneWidget);
   });
 }
