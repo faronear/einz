@@ -1,4 +1,5 @@
 {
-  "_about": "flutter run/build --dart-define-from-file=<configFileName.json>, 可覆盖掉 server_config.dart 里的 String.fromEnvironment('kEinzServer', defaultValue: 'https://einz.tic.cc')",
-  "kEinzServer": "http://localhost:3000"
+  "_about": "debug 本地配置文件：flutter run/build -d <ios/android/macos> --dart-define-from-file=localConfig.<ios/android/macos>.json 这份文件是 gitignore 的本地文件（模板见 localConfig.example.json）。正式版打包绝不带 --dart-define-from-file，见 docs/SERVER_SETTINGS.md §6。",
+  "kEinzServer": "http://localhost:3000",
+  "kEinzServer_about": "覆盖掉 server_config.dart 里的 String.fromEnvironment('kEinzServer', defaultValue: 'https://einz.tic.cc')"
 }
