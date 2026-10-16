@@ -237,14 +237,15 @@ jobs:
           Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll app/build/windows/x64/runner/Release/
       - name: Zip release folder + 旁车 version.txt
         # version.txt 与 macos 同款：版本号从产物自己读。Windows GUI 的版本在
-        # runner.exe 的 PE 资源里（--build-name 写入 FILEVERSION），用 PowerShell
-        # 读（Get-Item).VersionInfo。Build step 传的是完整 --build-name（三段），
-        # 所以版本就是 yymm.ddhh.mm，校验规则与 macos 一致。
+        # einz.exe 的 PE 资源里（--build-name 写入 FILEVERSION；二进制名跟
+        # app/windows/CMakeLists.txt 的 BINARY_NAME，不是默认的 runner.exe），
+        # 用 PowerShell 读（Get-Item).VersionInfo。Build step 传的是完整
+        # --build-name（三段），所以版本就是 yymm.ddhh.mm，校验规则与 macos 一致。
         shell: pwsh
         run: |
-          $name = (Get-Item app/build/windows/x64/runner/Release/runner.exe).VersionInfo.FileVersion
+          $name = (Get-Item app/build/windows/x64/runner/Release/einz.exe).VersionInfo.FileVersion
           if ($name -notmatch '^\d{4}\.\d{4}\.\d{2}$') {
-            throw "❌ runner.exe 版本是「$name」，不是 yymm.ddhh.mm——flutter 没吃到 --build-name？"
+            throw "❌ einz.exe 版本是「$name」，不是 yymm.ddhh.mm——flutter 没吃到 --build-name？"
           }
           Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-app-windows.zip
           Set-Content -Path einz-app-windows.version.txt -Value $name
@@ -558,19 +559,22 @@ jobs:
         run: |
           eval "$(node ../scripts/appVersion.js)"
           flutter build linux --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+          # Flutter 的 Linux 构建不接受把版本写进产物：--build-name 只是被公共参数
+          # 收下，linux 侧无人消费（对比 Windows 写 PE FILEVERSION / macOS 写
+          # Info.plist），二进制里 strings 也找不到版本串。所以旁车 version.txt
+          # 只能在构建步当场落：与 appVersion.js 同一次 eval、同一时刻取号，
+          # 打包步只读不重算（重算会因分钟边界比产物大几分钟）。
+          echo "$APP_BUILD_NAME" > ../einz-app-linux-x64.version.txt
       - name: 打包（tar.gz + 运行说明 + 旁车 version.txt）
-        # version.txt 与 macos 同款：版本号从产物自己读（bundle 里的可执行文件
-        # einz 同样带 --build-name 写入的版本字符串）。用 strings 抓 yymm.ddhh.mm
-        # 格式的行（产物内没有别的东西长这样）。
+        # Linux 的版本号不在产物里（见 Build step 注释），读构建步落的旁车文件。
         run: |
-          mkdir -p _release.gitomit/einz
-          cp -r app/build/linux/x64/release/bundle/. _release.gitomit/einz/
-          NAME="$(strings _release.gitomit/einz/einz | grep -oE '^[0-9]{4}\.[0-9]{4}\.[0-9]{2}$' | head -1)"
-          [[ -n "$NAME" ]] || {
-            echo "❌ 产物 einz 里找不到 yymm.ddhh.mm 版本串——flutter 没吃到 --build-name？" >&2
+          NAME="$(cat einz-app-linux-x64.version.txt 2>/dev/null || true)"
+          [[ "$NAME" =~ ^[0-9]{4}\.[0-9]{4}\.[0-9]{2}$ ]] || {
+            echo "❌ einz-app-linux-x64.version.txt 缺失或不是 yymm.ddhh.mm（实际：「$NAME」）——Build step 没落盘？" >&2
             exit 1
           }
-          echo "$NAME" > einz-app-linux-x64.version.txt
+          mkdir -p _release.gitomit/einz
+          cp -r app/build/linux/x64/release/bundle/. _release.gitomit/einz/
           cat > _release.gitomit/einz/README-linux-gui.txt <<'TXT'
           einz（Linux x64 GUI）
 
