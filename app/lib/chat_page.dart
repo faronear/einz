@@ -1101,6 +1101,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方改名/换头像（Server 广播 profile.updated）：立即更新顶部条对方名；
   /// 头像则让缓存失效重拉（广播由改名或 POST /avatar 触发）。
   void _onProfileUpdated(WsProfileUpdatedEvent event) {
+    // 自己触发的广播要排除：改名/换头像会广播给同空间全部在线通道（含我自己的
+    // 其它通道），广播里是"我的"新资料，落进 _peerName/_peerGender 就是错的。
+    // （注：切空间卡片错显我的名字的主犯是 saveProfile 覆盖写抹掉 peerJoined——
+    // 见 app_lock.dart；这里是同一症状的另一条污染路径，一并堵上。）
+    // 两条判据：memberId 比对（权威，但重启路径 _myMemberId 要等首次 /space 才
+    // 回填，可能还是 null）；名字比对兜底（改名 UI 禁止与对方同名
+    // `chatPageRenameSameAsPeerError` → 空间内名字唯一，等名必是自己）。
+    final isSelf = (event.memberId != null && event.memberId == _myMemberId) ||
+        ((event.memberName ?? '').isNotEmpty && event.memberName == _myMemberName);
+    if (isSelf) return;
     // 头像：无论改名还是换头像都刷一次（同一 per-member 头像文件可能已变）
     _MessageAvatarState.invalidate(event.memberId);
     unawaited(_loadPeerAvatar()); // 状态条那份（自己存 bytes，不走上面那个缓存）
