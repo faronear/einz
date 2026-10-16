@@ -170,20 +170,38 @@ jobs:
             echo "❌ 产物是 debug 签名——release keystore 没生效（查 secrets 与 EINZ_ANDROID_KEY_PROPERTIES）" >&2
             exit 1
           fi
-      - name: Rename APK
+      - name: Rename APK + 旁车 version.txt
         working-directory: app
-        run: mv build/app/outputs/flutter-apk/app-release.apk einz-app-android.apk
+        # version.txt 与 macos 同款（2026-10-13 定的规矩）：版本号**从产物自己读**
+        # （aapt2 读 APK 的 versionName），不重跑 appVersion.js——那是 new Date() 现算的，
+        # 生成 txt 的时刻 ≠ 打包时刻，跨分钟就不一致。
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk einz-app-android.apk
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+          AAPT2="$(ls -d "$SDK"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)"
+          [[ -x "$AAPT2" ]] || { echo "❌ 找不到 aapt2（SDK=$SDK）" >&2; exit 1; }
+          NAME="$("$AAPT2" dump badging einz-app-android.apk | grep -o "versionName='[^']*'" | head -1 | cut -d"'" -f2)"
+          [[ "$NAME" =~ ^[0-9]{4}\.[0-9]{4}\.[0-9]{2}$ ]] || {
+            echo "❌ APK versionName 是「$NAME」，不是 yymm.ddhh.mm——flutter 没吃到 --build-name？" >&2
+            exit 1
+          }
+          echo "$NAME" > "$GITHUB_WORKSPACE/einz-app-android.version.txt"
+          echo "APK 版本：$NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: einz-android
-          path: app/einz-app-android.apk
+          path: |
+            app/einz-app-android.apk
+            einz-app-android.version.txt
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest Build
           make_latest: true
-          files: app/einz-app-android.apk
+          files: |
+            app/einz-app-android.apk
+            einz-app-android.version.txt
 
   windows:
     needs: [test]
@@ -217,8 +235,20 @@ jobs:
           Expand-Archive libsodium-msvc.zip -DestinationPath libsodium-msvc
           # 实际包内路径：libsodium/x64/Release/v142/dynamic/libsodium.dll（顶层还有 libsodium/ 目录 + dynamic 子目录）
           Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll app/build/windows/x64/runner/Release/
-      - name: Zip release folder
-        run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-app-windows.zip
+      - name: Zip release folder + 旁车 version.txt
+        # version.txt 与 macos 同款：版本号从产物自己读。Windows GUI 的版本在
+        # runner.exe 的 PE 资源里（--build-name 写入 FILEVERSION），用 PowerShell
+        # 读（Get-Item).VersionInfo。Build step 传的是完整 --build-name（三段），
+        # 所以版本就是 yymm.ddhh.mm，校验规则与 macos 一致。
+        shell: pwsh
+        run: |
+          $name = (Get-Item app/build/windows/x64/runner/Release/runner.exe).VersionInfo.FileVersion
+          if ($name -notmatch '^\d{4}\.\d{4}\.\d{2}$') {
+            throw "❌ runner.exe 版本是「$name」，不是 yymm.ddhh.mm——flutter 没吃到 --build-name？"
+          }
+          Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-app-windows.zip
+          Set-Content -Path einz-app-windows.version.txt -Value $name
+          Write-Output "Windows GUI 版本：$name"
       - name: Build CLI
         working-directory: cli
         # Windows 默认 shell 是 PowerShell：mkdir 是 New-Item 的别名，-p 会被解析成
@@ -236,6 +266,7 @@ jobs:
           name: einz-windows
           path: |
             einz-app-windows.zip
+            einz-app-windows.version.txt
             einz-tui-windows.zip
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
@@ -246,6 +277,7 @@ jobs:
           make_latest: true
           files: |
             einz-app-windows.zip
+            einz-app-windows.version.txt
             einz-tui-windows.zip
 
   macos:
@@ -526,10 +558,19 @@ jobs:
         run: |
           eval "$(node ../scripts/appVersion.js)"
           flutter build linux --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
-      - name: 打包（tar.gz + 运行说明）
+      - name: 打包（tar.gz + 运行说明 + 旁车 version.txt）
+        # version.txt 与 macos 同款：版本号从产物自己读（bundle 里的可执行文件
+        # einz 同样带 --build-name 写入的版本字符串）。用 strings 抓 yymm.ddhh.mm
+        # 格式的行（产物内没有别的东西长这样）。
         run: |
           mkdir -p _release.gitomit/einz
           cp -r app/build/linux/x64/release/bundle/. _release.gitomit/einz/
+          NAME="$(strings _release.gitomit/einz/einz | grep -oE '^[0-9]{4}\.[0-9]{4}\.[0-9]{2}$' | head -1)"
+          [[ -n "$NAME" ]] || {
+            echo "❌ 产物 einz 里找不到 yymm.ddhh.mm 版本串——flutter 没吃到 --build-name？" >&2
+            exit 1
+          }
+          echo "$NAME" > einz-app-linux-x64.version.txt
           cat > _release.gitomit/einz/README-linux-gui.txt <<'TXT'
           einz（Linux x64 GUI）
 
@@ -549,18 +590,22 @@ jobs:
           开发切换服务器（正式包不需要）：./einz --server http://localhost:3000
           TXT
           tar -czf einz-app-linux-x64.tar.gz -C _release.gitomit einz
-          ls -lh einz-app-linux-x64.tar.gz
+          ls -lh einz-app-linux-x64.tar.gz einz-app-linux-x64.version.txt
       - uses: actions/upload-artifact@v4
         with:
           name: einz-linux-x64
-          path: einz-app-linux-x64.tar.gz
+          path: |
+            einz-app-linux-x64.tar.gz
+            einz-app-linux-x64.version.txt
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest Build
           make_latest: true
-          files: einz-app-linux-x64.tar.gz
+          files: |
+            einz-app-linux-x64.tar.gz
+            einz-app-linux-x64.version.txt
 
   ios:
     needs: [test]
@@ -719,12 +764,25 @@ jobs:
           mkdir -p /tmp/einz-out
           # 固定文件名：Release 资产列表里一眼能认出来（与 einz-app-android.apk 同风格）
           cp build/ios/ipa/*.ipa /tmp/einz-out/einz-app-ios-appstore.ipa
+          # 旁车 version.txt（与 macos/android 同款规矩）：从 .ipa 自己的
+          # Payload/Runner.app/Info.plist 读版本号，不重跑 appVersion.js
+          rm -rf /tmp/einz-ipa-check && mkdir -p /tmp/einz-ipa-check
+          unzip -q /tmp/einz-out/einz-app-ios-appstore.ipa -d /tmp/einz-ipa-check
+          NAME="$(/usr/bin/plutil -extract CFBundleShortVersionString raw /tmp/einz-ipa-check/Payload/Runner.app/Info.plist)"
+          [[ "$NAME" =~ ^[0-9]{4}\.[0-9]{4}\.[0-9]{2}$ ]] || {
+            echo "❌ IPA 版本号是「$NAME」，不是 yymm.ddhh.mm——flutter 没吃到 --build-name？" >&2
+            exit 1
+          }
+          echo "$NAME" > /tmp/einz-out/einz-app-ios-appstore.version.txt
+          rm -rf /tmp/einz-ipa-check
           ls -lh /tmp/einz-out
       - uses: actions/upload-artifact@v4
         if: steps.secrets.outputs.configured == 'true' # 没构建就没产物，别去 warn 空目录
         with:
           name: einz-ios-appstore
-          path: /tmp/einz-out/einz-app-ios-appstore.ipa
+          path: |
+            /tmp/einz-out/einz-app-ios-appstore.ipa
+            /tmp/einz-out/einz-app-ios-appstore.version.txt
       # App Store 包进 Releases 的 latest 页（与 android/macos 同款）
       - name: Upload to Release
         if: steps.secrets.outputs.configured == 'true'
@@ -733,7 +791,9 @@ jobs:
           tag_name: latest
           name: Latest Build
           make_latest: true
-          files: /tmp/einz-out/einz-app-ios-appstore.ipa
+          files: |
+            /tmp/einz-out/einz-app-ios-appstore.ipa
+            /tmp/einz-out/einz-app-ios-appstore.version.txt
       # TestFlight：构建成功即自动上传（老板 2026-09-21 定），push 与手动触发一视同仁
       - name: Upload to TestFlight
         if: steps.secrets.outputs.configured == 'true'

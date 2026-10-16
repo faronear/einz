@@ -73,6 +73,11 @@ job 内的做法：keystore 解码到 `$RUNNER_TEMP`、properties 只写 keystor
   appVersion.js——版本号是 `new Date()` 现算的，构建与打包之间隔着签名 + 公证（2–10 分钟），
   两次调用跨分钟就不一致，version.txt 比 zip 内版本大会让 `updateMacosApp.js` 每次重下
   几百 MB 且装完仍不收敛（2026-10-13 修）。
+- **旁车版本文件已推广到全部 app 产物**（2026-10-16）：Android 用 aapt2 读 APK 的
+  versionName、Windows 读 runner.exe 的 PE VersionInfo、Linux 用 strings 从 bundle 可执行
+  文件里抓版本串、iOS 解开 .ipa 读 Payload/Runner.app 的 Info.plist——一律**产物自己
+  当 ground truth**，谁都不现算；并各自带 yymm.ddhh.mm 格式断言（flutter 没吃到
+  --build-name 时当场红）。TUI/CLI（dart compile exe）产物自身不含版本号，没有旁车文件。
 - **Android 内存**：公共 runner 仅 7GB，job 里用 `GRADLE_OPTS=-Xmx3G` 覆盖 gradle.properties 的 `-Xmx8G`，否则 Gradle 跑约 16 分钟被 OOM killer 杀掉（exit 143）。
 - **macOS GUI**：CI 无开发证书，构建前用 sed 临时把 pbxproj 改成 Manual + `-` 签名（不改仓库文件）。
 - **macOS CLI**：Dart 不支持 macOS 跨架构编译，`macos-cli` 用 matrix 在 Intel（macos-15-intel）与 Apple Silicon 两个 runner 上各编一份，**分架构直接提供下载**（曾用 lipo 合成通用二进制，但 CI 合成产物运行异常，已取消）。

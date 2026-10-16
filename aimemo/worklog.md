@@ -14991,3 +14991,17 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
 ## 2026-10-16
 
 **（2026-10-16T04:57:21Z / 2026-10-16 12:57）**：阅后即焚弹窗迭代并提交 5eb62125。① 上限 30→36→60 天（对数轴上时长刻度离「关闭」顶点太近防手抖误触，老板逐档看效果后定 60）；② 按钮文案「提交」→「启用」/ en "Apply"（本地生效设置，老板改 arb、我同步生成文件，顺带把 setPinDialogSetPin、chatPageAttachmentStorageSubmit 的测试断言对齐「启用」）；③ 轴下可点标注默认加淡背景（primary 6% / 关闭 error 8%）提示可点；④ 清理死代码：kBurnAfterOptions 档位 Map、burnOption1Minute/5Minutes/1Hour/1Day/7Days 五个 l10n 键，_burnOptionLabel 简化为 formatBurnDuration 透传。测试修了老板改 zh 预览文案（burnPreviewDelay→纯 "{duration}"）造成的 3 个断言失配，burn_duration_sheet_test 11/11、chat_page_menu_test 41/41。未提交遗留：package.json + localConfig.example.json（老板自己的运行脚本改动）。记忆已更新：热重启 pid 按平台分 /tmp/einz_flutter_<平台>.pid（android/ios/macos）。
+
+**（2026-10-16T05:09:49Z / 2026-10-16 13:09）**：version.txt 旁车文件推广到全部 app 产物。
+此前只有 macOS 有（2026-10-13 修的那次）。原则不变：**产物自己当 ground truth**，
+绝不重跑 appVersion.js（new Date() 现算，txt 生成时刻≠打包时刻就会错位）。各平台读法：
+Android 用 aapt2 dump badging 读 APK versionName（复用 Verify step 的 SDK 探测）；
+Windows 读 runner.exe 的 PE VersionInfo（PowerShell Get-Item，flutter --build-name
+会写入 FILEVERSION）；Linux 用 strings 从 bundle 的可执行文件 einz 里抓
+yymm.ddhh.mm 格式串；iOS 解开 .ipa 读 Payload/Runner.app/Info.plist。每个都带
+yymm.ddhh.mm 格式断言（flutter 没吃到 --build-name 当场红，不流坏版本到 Release）。
+文件命名：einz-app-{android,macos-$SUFFIX,ios-appstore,linux-x64}.version.txt，
+artifact 与 latest Release 都随主产物一起上传。TUI/CLI（dart compile exe）产物
+自身不含版本号，没有旁车文件——若将来需要，得让 cli 的 pubspec 版本带进去或接受
+独立方案，本次不展开。docs/CI.md 已同步。验证：ruby psych 解析 YAML 通过；aapt2/
+plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下次全平台构建实测。
