@@ -209,7 +209,7 @@
   "setPinDialogPinHint": "At least 6 digits",
   "setPinDialogConfirmLabel": "Confirm new PIN",
   "setPinDialogConfirmHint": "Type it again to confirm",
-  "setPinDialogSetPin": "Submit",
+  "setPinDialogSetPin": "Apply",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
   "setPinDialogPinMismatch": "PINs do not match",
@@ -371,7 +371,7 @@
   "chatPageAttachmentStorageSecuredDesc": "Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.",
   "chatPageAttachmentStorageStored": "Keep locally",
   "chatPageAttachmentStorageStoredDesc": "Keeps a plaintext copy after the first download, so you can open it directly on this device. More convenient.",
-  "chatPageAttachmentStorageSubmit": "Submit",
+  "chatPageAttachmentStorageSubmit": "Apply",
   "chatPageAttachmentStorageWarnClear": "Switching to “Remote only” immediately deletes locally stored attachments",
   "chatPageMenuStyleLabel": "Theme",
   "chatPageUiStylePlain": "Plain",
@@ -521,7 +521,7 @@
   "chatPageTombstoneKeepDesc": "Show a placeholder: content hidden, time and record kept, message flow unbroken",
   "chatPageTombstoneHide": "Hide completely",
   "chatPageTombstoneHideDesc": "Tombstones disappear from the message flow entirely",
-  "chatPageTombstoneSubmit": "Submit",
+  "chatPageTombstoneSubmit": "Apply",
   "chatPageBurnOff": "Burn-after-read is off (this message will be kept)",
   "chatPageBurnFailed": "Failed to set burn-after-read",
   "chatPageBurnWillDelete": "New messages auto-delete after {duration}",
@@ -672,12 +672,49 @@
     }
   },
   "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
-  "burnOptionOff": "Off (Do not burn anymore)",
-  "burnOption1Minute": "1 minute",
-  "burnOption5Minutes": "5 minutes",
-  "burnOption1Hour": "1 hour",
-  "burnOption1Day": "1 day",
-  "burnOption7Days": "7 days",
+  "burnOptionOff": "Off (Do not auto-burn)",
+  "burnSubmit": "Apply",
+  "burnPreviewDelay": "{duration}",
+  "@burnPreviewDelay": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "burnUnitDays": "{count}d",
+  "@burnUnitDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitHours": "{count}h",
+  "@burnUnitHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitMinutes": "{count}m",
+  "@burnUnitMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitSeconds": "{count}s",
+  "@burnUnitSeconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnAxisOffLabel": "Off",
   "lockPageTitle": "My Einz",
   "lockPagePinPrompt": "Enter PIN to unlock",
   "lockPageLockedSeconds": "Locked for {seconds}s",

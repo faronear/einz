@@ -389,7 +389,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogConfirmHint => 'Type it again to confirm';
 
   @override
-  String get setPinDialogSetPin => 'Submit';
+  String get setPinDialogSetPin => 'Apply';
 
   @override
   String get setPinDialogPinTooShort => 'PIN must be at least 6 digits';
@@ -714,7 +714,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keeps a plaintext copy after the first download, so you can open it directly on this device. More convenient.';
 
   @override
-  String get chatPageAttachmentStorageSubmit => 'Submit';
+  String get chatPageAttachmentStorageSubmit => 'Apply';
 
   @override
   String get chatPageAttachmentStorageWarnClear =>
@@ -924,7 +924,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tombstones disappear from the message flow entirely';
 
   @override
-  String get chatPageTombstoneSubmit => 'Submit';
+  String get chatPageTombstoneSubmit => 'Apply';
 
   @override
   String get chatPageBurnOff =>
@@ -1183,19 +1183,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get burnOptionOff => 'Off (Do not burn anymore)';
 
   @override
-  String get burnOption1Minute => '1 minute';
+  String get burnSubmit => 'Apply';
 
   @override
-  String get burnOption5Minutes => '5 minutes';
+  String burnPreviewDelay(String duration) {
+    return '$duration';
+  }
 
   @override
-  String get burnOption1Hour => '1 hour';
+  String burnUnitDays(int count) {
+    return '${count}d';
+  }
 
   @override
-  String get burnOption1Day => '1 day';
+  String burnUnitHours(int count) {
+    return '${count}h';
+  }
 
   @override
-  String get burnOption7Days => '7 days';
+  String burnUnitMinutes(int count) {
+    return '${count}m';
+  }
+
+  @override
+  String burnUnitSeconds(int count) {
+    return '${count}s';
+  }
+
+  @override
+  String get burnAxisOffLabel => 'Off';
 
   @override
   String get lockPageTitle => 'My Einz';

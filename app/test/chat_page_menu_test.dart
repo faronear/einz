@@ -423,7 +423,7 @@ void main() {
     await tester.enterText(pinFields.at(0), '123456');
     await tester.enterText(pinFields.at(1), '123456');
     // 点"提交"→ 直接设置（不再有二次确认弹窗——老板 2026-09-14 删除）
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
 
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
@@ -473,14 +473,14 @@ void main() {
     expect(fields.evaluate().length, 3);
 
     // 1) 旧码留空 → 红字要求先输入旧码，不动锁
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('请先输入当前锁屏码'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
 
     // 2) 旧码填错 → 红字"当前锁屏码错误"，不动锁
     await tester.enterText(fields.at(0), '000000');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('当前锁屏码错误'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
@@ -489,7 +489,7 @@ void main() {
     await tester.enterText(fields.at(0), '123456');
     await tester.enterText(fields.at(1), '123456');
     await tester.enterText(fields.at(2), '123456');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('新锁屏码与当前锁屏码相同，未作修改'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
@@ -497,7 +497,7 @@ void main() {
     // 4) 旧码正确 + 新码留空 → 才进清空确认；点取消不动锁
     await tester.enterText(fields.at(1), '');
     await tester.enterText(fields.at(2), '');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('删除锁屏码？'), findsOneWidget);
     final confirmDialog = find.byType(AlertDialog).last;
@@ -546,7 +546,7 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     // 旧码正确 + 新码两栏留空 → 清空确认 → 确认
     await tester.enterText(fields.at(0), '123456');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
@@ -827,7 +827,7 @@ void main() {
     expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget); // 弹窗标题
     // 两空点「提交」：本来就没设 PIN → 直接返回（老板 2026-09-14）——不弹清空确认、
     // 不调后台、不做任何写盘，只在顶部通知里说一句
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('删除锁屏码？'), findsNothing);
     expect(find.text('锁屏码仍然为空，下次启动应用可直接进入秘境。'), findsOneWidget); // 顶部通知
@@ -2121,6 +2121,105 @@ void main() {
       expect(other['peerName'], 'PeerB');
     });
     await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('阅后即焚：勾「应用于本机所有秘境」提交 → 本机所有空间都落盘',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 阅后即焚（全局设置入口 → 弹层带范围勾选框）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 当前未设置 → 轴停在「关闭」顶点；点「1 天」标注跳到 1 天
+    expect(find.text(_zh.settingsScopeAll), findsOneWidget);
+    await tester.tap(find.text('1 天'));
+    await tester.pumpAndSettle();
+    // 勾上「应用于本机所有秘境」→ 提交
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.burnSubmit));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 两个空间的 per-space 键都写成 1 天
+    await tester.runAsync(() async {
+      expect(await BurnAfterSettings(db, spaceId: 'space-demo').load(), 86400);
+      expect(await BurnAfterSettings(db, spaceId: 'space-b').load(), 86400,
+          reason: '勾了所有秘境：其它空间也应落盘');
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('阅后即焚：不勾范围 → 只写当前空间', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 不碰勾选框（默认不勾选）：点「1 天」标注 → 提交
+    await tester.tap(find.text('1 天'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.burnSubmit));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      expect(await BurnAfterSettings(db, spaceId: 'space-demo').load(), 86400);
+      expect(await BurnAfterSettings(db, spaceId: 'space-b').load(), 0,
+          reason: '不勾选不应扇出到其它空间');
+    });
     expect(tester.takeException(), isNull);
   });
 }

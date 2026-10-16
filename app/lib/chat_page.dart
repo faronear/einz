@@ -24,6 +24,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
+import 'widgets/burn_duration_sheet.dart';
 import 'widgets/version_gate.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/tombstone_settings.dart';
@@ -538,25 +539,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
-  /// 阅后即焚档位文案（l10n 映射）。
-  String _burnOptionLabel(int seconds, AppLocalizations l10n) {
-    switch (seconds) {
-      case 0:
-        return l10n.burnOptionOff;
-      case 60:
-        return l10n.burnOption1Minute;
-      case 300:
-        return l10n.burnOption5Minutes;
-      case 3600:
-        return l10n.burnOption1Hour;
-      case 86400:
-        return l10n.burnOption1Day;
-      case 604800:
-        return l10n.burnOption7Days;
-      default:
-        return '$seconds s';
-    }
-  }
+  /// 阅后即焚时长文案：天/时/分可读组合（0 = 关闭）。老版本的固定档位映射
+  /// 已删——2026-10-16 起任意时长，formatBurnDuration 对整点值输出相同的干净文案。
+  String _burnOptionLabel(int seconds, AppLocalizations l10n) =>
+      formatBurnDuration(seconds, l10n);
 
   /// 顶栏阅后即焚标记的档位文字：**只用量纲单位** d/h/m/s（老板 2026-09-24：
   /// 不用中文单位——横向更省，也不随界面语言变化）。取能整除的最大单位。
@@ -5010,57 +4996,76 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 阅后即焚档位选择弹窗（右上角菜单全局 / 长按菜单单条消息共用）：
-  /// 返回选中秒数（null=取消）；[current] 为当前值（右侧勾选标记）。
-  Future<int?> _pickBurnSeconds({required int current}) async {
-    final l10n = AppLocalizations.of(context)!;
-    String? picked;
-    await showOptionPickerSheet<void>(
+  /// 阅后即焚时长选择弹层（右上角菜单全局 / 长按菜单单条消息共用）：
+  /// 返回 (秒数, 是否应用到所有秘境)；null=取消。[current] 为当前值。
+  /// 2026-10-16 起改为任意时长（对数滑动轴 1 分钟 ~ 60 天，右端「关闭」顶点，
+  /// 粒度随时长升档），见 [BurnDurationSheet]。
+  ///
+  /// [scopeAllLabel] 非空（全局设置入口）= 弹层里显示「应用于本机所有秘境」
+  /// 勾选框；逐条消息的燃焚没有空间维度，传 null。
+  Future<({int seconds, bool scopeAll})?> _pickBurnSeconds({
+    required int current,
+    String? scopeAllLabel,
+  }) async {
+    return showBurnDurationSheet(
       context: context,
-      builder: (ctx) => OptionPickerSheet(
-        title: l10n.chatPageBurnHeading,
-        // 标题下居中一行说明这层是干什么的（老板 2026-09-25）
-        note: l10n.chatPageBurnNote,
-        selected: '$current',
-        options: [
-          for (final entry in kBurnAfterOptions.entries)
-            OptionPickerItem(
-              value: '${entry.value}',
-              label: _burnOptionLabel(entry.value, l10n),
-            ),
-        ],
-        onApply: (value, {bool scopeAll = false}) async => picked = value,
-      ),
+      current: current,
+      scopeAllLabel: scopeAllLabel,
     );
-    return picked == null ? null : int.parse(picked!);
   }
 
-  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置，发送新消息时生效）。
+  /// 把阅后即焚设置写到本机**所有空间**（勾了「应用于本机所有秘境」时）：
+  /// 燃焚是纯本地设置（无服务端参与），逐空间写各自的 per-space 键。当前空间
+  /// 先落（Vault 取不到也不丢它），其余 best-effort——单个空间失败不阻塞其余。
+  Future<void> _saveBurnAllSpaces(int seconds) async {
+    final db = widget.db ?? LocalDatabase.shared;
+    await BurnAfterSettings(db, spaceId: widget.spaceId).save(seconds);
+    final spaces = VaultSession.current?.spaces ?? const <AppLockPayload>[];
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue;
+      try {
+        await BurnAfterSettings(db, spaceId: space.spaceId).save(seconds);
+      } catch (_) {
+        // 单个空间失败不阻塞其余
+      }
+    }
+  }
+
+  /// 顶栏 ⏱：选择阅后即焚时长（保存到本设备设置，发送新消息时生效）。
   Future<void> _showBurnPicker() async {
     final settings = BurnAfterSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
     final current = await settings.load();
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
-    final seconds = await _pickBurnSeconds(current: current);
-    if (seconds == null || !mounted) return;
-    await settings.save(seconds);
+    final picked = await _pickBurnSeconds(
+      current: current,
+      scopeAllLabel: l10n.settingsScopeAll, // 全局设置才有"所有秘境"一说
+    );
+    if (picked == null || !mounted) return;
+    if (picked.scopeAll) {
+      await _saveBurnAllSpaces(picked.seconds);
+    } else {
+      await settings.save(picked.seconds);
+    }
     if (!mounted) return;
-    setState(() => _burnSeconds = seconds);
+    setState(() => _burnSeconds = picked.seconds);
     _notice(
       context,
-      seconds == 0
+      picked.seconds == 0
           ? l10n.chatPageBurnOff
-          : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n)),
+          : l10n.chatPageBurnWillDelete(_burnOptionLabel(picked.seconds, l10n)),
     );
   }
 
-  /// 长按菜单「阅后即焚」：选择档位后应用到被点击的这条消息（本机生效，
-  /// 纯本地；老板要求 2026-09-10）。可选「无限」取消已有阅后即焚、选档位
+  /// 长按菜单「阅后即焚」：选择时长后应用到被点击的这条消息（本机生效，
+  /// 纯本地；老板要求 2026-09-10）。可选「关闭」取消已有阅后即焚、选时长
   /// 新设或调整；到期由 repo.tombstoneExpired 统一打墓碑。
   Future<void> _setMessageBurn(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
-    final seconds = await _pickBurnSeconds(current: m.burnAfterSeconds);
-    if (seconds == null || !mounted) return;
+    // 不传 scopeAllLabel：单条消息的燃焚没有"所有秘境"维度
+    final picked = await _pickBurnSeconds(current: m.burnAfterSeconds);
+    if (picked == null || !mounted) return;
+    final seconds = picked.seconds;
     final ok = await _repo.setMessageBurn(m.env.messageId, seconds);
     if (!mounted) return;
     if (!ok) {

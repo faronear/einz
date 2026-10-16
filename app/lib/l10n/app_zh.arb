@@ -188,7 +188,7 @@
   "setPinDialogPinHint": "至少 6 位数字",
   "setPinDialogConfirmLabel": "确认新 PIN",
   "setPinDialogConfirmHint": "再输一次以确认",
-  "setPinDialogSetPin": "提交",
+  "setPinDialogSetPin": "启用",
   "setPinDialogPinTooShort": "PIN 至少 6 位数字",
   "setPinDialogPinDigitsOnly": "PIN 只能是数字",
   "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
@@ -336,7 +336,7 @@
   "chatPageAttachmentStorageSecuredDesc": "每次打开都重新下载并解密，本机不留明文副本，更私密。",
   "chatPageAttachmentStorageStored": "本地保存",
   "chatPageAttachmentStorageStoredDesc": "第一次下载时保存明文副本，以后本机可直接打开，更方便。",
-  "chatPageAttachmentStorageSubmit": "提交",
+  "chatPageAttachmentStorageSubmit": "启用",
   "chatPageAttachmentStorageWarnClear": "切到“远程托管”会立即删除本机已留存的附件明文。真的要切换吗？",
   "chatPageMenuStyleLabel": "界面主题",
   "chatPageUiStylePlain": "素雅纯色",
@@ -476,7 +476,7 @@
   "chatPageTombstoneKeepDesc": "显示为占位墓碑：正文隐藏，时间与记录仍在，不打破消息流水",
   "chatPageTombstoneHide": "彻底消失",
   "chatPageTombstoneHideDesc": "墓碑不再显示，从消息流中彻底消失",
-  "chatPageTombstoneSubmit": "提交",
+  "chatPageTombstoneSubmit": "启用",
   "chatPageBurnOff": "阅后即焚已关闭（这一消息将会保留）",
   "chatPageBurnFailed": "设置阅后即焚失败",
   "chatPageBurnWillDelete": "新的消息将在 {duration} 后自动删除",
@@ -628,11 +628,48 @@
   },
   "chatPageEntranceRevoked": "这条通道已被撤销，本地数据已清除，请重新配置",
   "burnOptionOff": "关闭（不再自动焚毁）",
-  "burnOption1Minute": "1 分钟",
-  "burnOption5Minutes": "5 分钟",
-  "burnOption1Hour": "1 小时",
-  "burnOption1Day": "1 天",
-  "burnOption7Days": "7 天",
+  "burnSubmit": "启用",
+  "burnPreviewDelay": "{duration}",
+  "@burnPreviewDelay": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "burnUnitDays": "{count} 天",
+  "@burnUnitDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitHours": "{count} 小时",
+  "@burnUnitHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitMinutes": "{count} 分钟",
+  "@burnUnitMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitSeconds": "{count} 秒",
+  "@burnUnitSeconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnAxisOffLabel": "关闭",
   "lockPageTitle": "我的秘境",
   "lockPagePinPrompt": "输入锁屏码",
   "lockPageLockedSeconds": "已锁定 {seconds} 秒",

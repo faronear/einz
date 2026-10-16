@@ -357,7 +357,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
-  String get setPinDialogSetPin => '提交';
+  String get setPinDialogSetPin => '启用';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 6 位数字';
@@ -661,7 +661,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '第一次下载时保存明文副本，以后本机可直接打开，更方便。';
 
   @override
-  String get chatPageAttachmentStorageSubmit => '提交';
+  String get chatPageAttachmentStorageSubmit => '启用';
 
   @override
   String get chatPageAttachmentStorageWarnClear =>
@@ -860,7 +860,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTombstoneHideDesc => '墓碑不再显示，从消息流中彻底消失';
 
   @override
-  String get chatPageTombstoneSubmit => '提交';
+  String get chatPageTombstoneSubmit => '启用';
 
   @override
   String get chatPageBurnOff => '阅后即焚已关闭（这一消息将会保留）';
@@ -1110,19 +1110,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get burnOptionOff => '关闭（不再自动焚毁）';
 
   @override
-  String get burnOption1Minute => '1 分钟';
+  String get burnSubmit => '启用';
 
   @override
-  String get burnOption5Minutes => '5 分钟';
+  String burnPreviewDelay(String duration) {
+    return '$duration';
+  }
 
   @override
-  String get burnOption1Hour => '1 小时';
+  String burnUnitDays(int count) {
+    return '$count 天';
+  }
 
   @override
-  String get burnOption1Day => '1 天';
+  String burnUnitHours(int count) {
+    return '$count 小时';
+  }
 
   @override
-  String get burnOption7Days => '7 天';
+  String burnUnitMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String burnUnitSeconds(int count) {
+    return '$count 秒';
+  }
+
+  @override
+  String get burnAxisOffLabel => '关闭';
 
   @override
   String get lockPageTitle => '我的秘境';

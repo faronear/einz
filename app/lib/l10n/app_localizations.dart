@@ -737,7 +737,7 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogSetPin.
   ///
   /// In en, this message translates to:
-  /// **'Submit'**
+  /// **'Apply'**
   String get setPinDialogSetPin;
 
   /// No description provided for @setPinDialogPinTooShort.
@@ -1289,7 +1289,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageSubmit.
   ///
   /// In en, this message translates to:
-  /// **'Submit'**
+  /// **'Apply'**
   String get chatPageAttachmentStorageSubmit;
 
   /// No description provided for @chatPageAttachmentStorageWarnClear.
@@ -1631,7 +1631,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneSubmit.
   ///
   /// In en, this message translates to:
-  /// **'Submit'**
+  /// **'Apply'**
   String get chatPageTombstoneSubmit;
 
   /// No description provided for @chatPageBurnOff.
@@ -2036,35 +2036,47 @@ abstract class AppLocalizations {
   /// **'Off (Do not burn anymore)'**
   String get burnOptionOff;
 
-  /// No description provided for @burnOption1Minute.
+  /// No description provided for @burnSubmit.
   ///
   /// In en, this message translates to:
-  /// **'1 minute'**
-  String get burnOption1Minute;
+  /// **'Apply'**
+  String get burnSubmit;
 
-  /// No description provided for @burnOption5Minutes.
+  /// No description provided for @burnPreviewDelay.
   ///
   /// In en, this message translates to:
-  /// **'5 minutes'**
-  String get burnOption5Minutes;
+  /// **'{duration}'**
+  String burnPreviewDelay(String duration);
 
-  /// No description provided for @burnOption1Hour.
+  /// No description provided for @burnUnitDays.
   ///
   /// In en, this message translates to:
-  /// **'1 hour'**
-  String get burnOption1Hour;
+  /// **'{count}d'**
+  String burnUnitDays(int count);
 
-  /// No description provided for @burnOption1Day.
+  /// No description provided for @burnUnitHours.
   ///
   /// In en, this message translates to:
-  /// **'1 day'**
-  String get burnOption1Day;
+  /// **'{count}h'**
+  String burnUnitHours(int count);
 
-  /// No description provided for @burnOption7Days.
+  /// No description provided for @burnUnitMinutes.
   ///
   /// In en, this message translates to:
-  /// **'7 days'**
-  String get burnOption7Days;
+  /// **'{count}m'**
+  String burnUnitMinutes(int count);
+
+  /// No description provided for @burnUnitSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}s'**
+  String burnUnitSeconds(int count);
+
+  /// No description provided for @burnAxisOffLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get burnAxisOffLabel;
 
   /// No description provided for @lockPageTitle.
   ///
