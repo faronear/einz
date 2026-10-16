@@ -620,9 +620,8 @@ class AppLockService {
       'groupName': effectiveGroupName ?? '',
       // 「对方是否已加入」的结论透传：null = 旧记录本来就没记过（savePeerPresence
       // 下次刷新会落下来），有值就原样带回，别在覆盖写里丢掉
-      if (effectivePeerJoined != null) 'peerJoined': effectivePeerJoined,
-      if (effectivePeerMemberId != null)
-        'peerMemberId': effectivePeerMemberId,
+      'peerJoined': ?effectivePeerJoined,
+      'peerMemberId': ?effectivePeerMemberId,
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(

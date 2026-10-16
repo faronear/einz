@@ -15013,3 +15013,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 - 本地 `scripts/emu{BootIos.sh,ResolveIos.js,UdidIos.sh}` 是 wo_scripts 的分叉副本（einz 侧演进后已回同步至 wo_scripts 仓库 75ae4e9），现统一改从 `node_modules/wo_scripts/` 引用，package.json 三个脚本路径已改，本地拷贝删除。
 - `npm update wo_scripts` 后裸跑 `app-ios-boot` 实测成功（Booted 优先/最新系统 iPhone 自适应）。commit 22110194，未推送。
 - 维护约定：emu 脚本唯一源头 = git.tic.cc/opx/wo_scripts；改动先在该仓库提交，einz/pex 升级依赖即生效。
+
+## 20261016 CI 修复：app analyze 两条 use_null_aware_elements
+
+- **（2026-10-16T14:43:29Z / 2026-10-16 22:43）**：push 后 GitHub CI（Multi Platform Build run 38914357345，commit 6ecf6db9）test job 红：`app · flutter analyze` 报 2 条 info `use_null_aware_elements`（app/lib/data/app_lock.dart:623/624，saveProfile 透传 peerJoined/peerMemberId 的 `if (x != null) 'key': x,` 写法）。`flutter analyze` 见任何 issue（含 info）即退非 0，testAll.sh 判红，needs 的全部出包 job 被跳过。根因是 analyzer 版本差：本地 analyzer 14.1.0 无此 lint，CI stable 已是 14.3.0 新增 lint——与 17:34 那条 worklog 里"为 SDK 版本差异保留 if 形式"的判断相反，正确做法是改语法而非忍 lint。修法：改 null-aware 元素语法 `'peerJoined': ?effectivePeerJoined,`（Dart 3.9 语言特性，各 pubspec sdk 均 ^3.13 满足）。验证：本地 `flutter analyze` No issues found；`flutter test` 全量 344 通过（1 skip 为既有）。教训备忘：analyze 类 lint 会随 CI 的 Flutter stable 滚动新增，"本地 0 error"不等于 CI 绿，判据是 CI 同版本 analyzer。
