@@ -504,12 +504,15 @@ void main() {
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
     // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
-    // 再弹出生成通道码弹窗（老板 2026-09-25）
+    // 再弹出生成通道码弹层（老板 2026-09-25；2026-10-15 起弹窗改底部弹层）
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
     await tester.tap(sheetText(_zh.chatPageEntranceListNew));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     expect(find.text(_zh.chatPageInviteDialogTitleAttachSelf), findsOneWidget);
-    expect(find.byType(BottomSheet), findsNothing,
+    // 按弹层**标题**判定"通道列表弹层已收起"——不能用 byType(BottomSheet)（邀请
+    // 弹层也是 BottomSheet，2026-10-15 起会撞车），也不能用「添加我的新通道」
+    // （它同时是邀请弹层的标题 chatPageInviteDialogTitleAttachSelf，同文不同键）
+    expect(sheetText(_zh.chatPageMenuEntranceList), findsNothing,
         reason: '点「新建通道」后通道列表弹层应已收起');
   });
 

@@ -14965,3 +14965,25 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
   stub。回归：全量 app 330 过 1 跳 0 败。
 - 顺带：老板并行手改 app_zh.arb（远程托管警示文案加「真的要切换吗？」），按
   arb→gen-l10n 惯例补生成（app_localizations_zh.dart 同步）。
+
+**（2026-10-16T00:52:25Z / 2026-10-16 08:52）**：生成通道码弹窗改底部弹层（老板
+2026-10-15：「改成弹层，底下不需要关闭按钮，只要一个重新生成，不要像附件存储的
+提交一样占满宽度」）。`_showInviteDialog`（invite/attach-self/reinvite 三场景共用
+一条代码路径）从 showDialog+AlertDialog 改为 showModalBottomSheet：标题/备注/二维码/
+通道码/链接结构保留；去掉「关闭」按钮（无输入框，点遮罩/下滑即关）；「重新生成」
+为居中 TextButton、不占满宽度（可按可不按，不做成满宽提交按钮的口气）。
+- **矮窗滚动修复**（老板 2026-10-15 实测：高度不够时 bottom overflowed 且无法
+  滚动）：中部改 Flexible(loose)+Scrollbar+ListView(shrinkWrap)，标题/备注/
+  「重新生成」固定两端、只有中部滚——与 ScrollableCardArea 同一套路（其注释就是
+  为同一个 overflow bug 写的）。
+- **备注口径对齐**（老板 2026-10-15 观察到不一致：大多数弹层滚动区不含备注）：
+  备注从滚动区挪出，按 OptionPickerSheet 的 note 同款处理——固定、居中、
+  12px/outline、贴着标题（上 0 下 14），归标题组。
+- 测试：invite_dialog_layout_test 补结构断言（是 BottomSheet 非 AlertDialog、无
+  关闭文字、重新生成居中且宽度<弹层60%）+ 矮窗回归一例（导航后压窗到 420x320：
+  首帧无溢出、链接行视口外→拖滚后进视口、备注位置不随滚动改变、按钮固定在
+  视口内）。有效性验证：把可滚中部临时换回普通 Column 后该测试红（溢出真实
+  复现），换回修复后绿。entrance_list_sheet_test 修一处撞车：原用
+  byType(BottomSheet) findsNothing 判"通道列表弹层已收起"，邀请弹层也是
+  BottomSheet 会误伤；且「添加我的新通道」同文两键（列表按钮 vs 邀请标题），
+  改用弹层标题「我的设备通道」判定。回归：全量 331 过 1 跳 0 败。

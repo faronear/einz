@@ -2569,7 +2569,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [purpose]（2026-10-04 收敛）：`invite` = 开**新身份**（邀请新成员）；
   /// `attach` = 进**已有身份**（缺省=我自己换设备；指向别人 = 帮对方找回）。
   /// **必传**：两种码语义相反，share 错一种等于把对方变成我（2026-10-04 审查
-  /// 实测的 P0）。弹窗内「重新生成」必须沿用同一组参数。
+  /// 实测的 P0）。弹层内「重新生成」必须沿用同一组参数。
   ///
   /// [targetMemberId] / [passphrase]（2026-10-04 定向 token）：`attach` 指向
   /// **别人**时用——passphrase 是"对别人的身份动手"的授权因子，由调用方先向
@@ -2577,6 +2577,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// [targetName] 仅用于**找回**场景的说明文案（"把这个码发给「X」"）。调用方
   /// 已经知道要找的是谁，顺手传进来；缺省（拿不到名字）则文案退成"对方"。
+  ///
+  /// 呈现为**底部弹层**（老板 2026-10-15，原来是 AlertDialog）：无输入框，点
+  /// 遮罩/下滑即关，故底部不放「关闭」按钮，只留一个居中、不占满宽度的
+  /// 「重新生成」（可按可不按，不做成满宽提交按钮那种"必须决定"的口气）。
+  /// 布局与 OptionPickerSheet 同口径：标题+备注固定在顶部（备注归标题组、
+  /// 居中、不滚动），中部（二维码/通道码/链接）Flexible+ListView 内部滚动，
+  /// 「重新生成」固定底部——矮窗不溢出、常用入口不滚走。
   Future<void> _showInviteDialog({
     required String purpose,
     String? targetMemberId,
@@ -2619,125 +2626,163 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           : purpose == 'invite'
               ? l10n.chatPageInviteDialogHintInvite
               : l10n.chatPageInviteDialogHintAttachSelf;
-      await showDialog<void>(
+      await showModalBottomSheet<void>(
         context: context,
+        // 允许用满窗高（与「我的通道」「更多设置」等弹层同口径，老板 2026-10-02）
+        isScrollControlled: true,
         builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setLocal) => AlertDialog(
-            // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中，不居左）——
-            // 与底部弹层的标题口径一致（Center；正文/字段仍靠左）
-            title: Center(child: Text(title)),
-            // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
-            contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 说明文案作为大标题的补充说明，置于标题与二维码之间（老板 2026-09-13）；
-                // 靠左对齐——本弹窗除二维码外其余内容均靠左
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(hint,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ),
-                const SizedBox(height: 14),
-                // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
-                // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
-                Center(child: _InviteQrCode(data: r.link)),
-                const SizedBox(height: 12),
-                // 顺序（老板 2026-09-22）：**纯通道码在上、邀请链接在下**——
-                // 多数人是直接复制通道码；链接留给『点开看邀请页』的场景。
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(r.joinToken,
-                          // 通道码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
-                          // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                              color: Theme.of(ctx).colorScheme.onSurface)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.copy, size: 16),
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      tooltip: l10n.chatPageInviteCopyCodeTooltip,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: r.joinToken));
-                        if (!ctx.mounted) return;
-                        _notice(ctx, l10n.chatPageInviteCodeCopied);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                // 邀请链接 + 拷贝图标（点击即复制，弹窗不关闭——根 Overlay 通知
-                // 在弹窗之上可见，老板 2026-09-11）
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(r.link,
-                          // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
+          builder: (ctx, setLocal) {
+            final scheme = Theme.of(ctx).colorScheme;
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 标题居中（与其它选项弹层口径一致）
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+                    child: Center(
+                      child: Text(title,
                           style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                              fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.copy, size: 16),
-                      color: const Color(0xFF2271F7),
-                      tooltip: l10n.chatPageInviteCopyLinkTooltip,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: r.link));
-                        if (!ctx.mounted) return;
-                        _notice(ctx, l10n.chatPageInviteLinkCopied);
-                      },
+                  ),
+                  // 标题下的备注（与 OptionPickerSheet 的 note 同款口径）：
+                  // **固定不随中部滚动**——贴着标题（上 0）、离内容远一点（下
+                  // 14）、居中，表明它归标题那一组，不是内容主体（老板
+                  // 2026-10-15：各弹层口径一致，备注不滚）
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                    child: Center(
+                      child: Text(
+                        hint,
+                        // 换行后的每一行都要居中（Center 只管整块，不管行内对齐）
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12, height: 1.4, color: scheme.outline),
+                      ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-            // 只留一个「关闭」（老板 2026-09-23：原来 Copy/Close 两个纯文字按钮没有主次）。
-            // 去掉了 Copy —— 它复制的是**链接**，而上面 token / 链接两行各自都有复制图标
-            // （带 tooltip 与顶部提示），底部的 Copy 既冗余又没说清复制哪个。
-            // 点弹窗外/返回键本来就能关（showDialog 默认 barrierDismissible:true）；
-            // 留一个 Close 是给"不知道能点外面"的人一条明路。
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  if (busy) return; // 进行中：忽略重复点击
-                  setLocal(() => busy = true);
-                  try {
-                    final fresh = await _withAuth((t) => api.createJoinToken(
-                          widget.spaceId,
-                          t,
-                          purpose: purpose,
-                          targetMemberId: targetMemberId,
-                          passphrase: passphrase,
-                        ));
-                    if (!ctx.mounted) return;
-                    r = fresh; // 就地刷新：二维码 / 通道码 / 链接 ✓
-                    setLocal(() {});
-                  } on ApiException catch (e) {
-                    if (!ctx.mounted) return;
-                    _notice(
-                        ctx, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
-                  } catch (e) {
-                    if (!ctx.mounted) return;
-                    _notice(ctx, l10n.chatPageInviteFailed('$e'));
-                  } finally {
-                    if (ctx.mounted) setLocal(() => busy = false);
-                  }
-                },
-                child: Text(l10n.chatPageInviteRegenerate),
+                  ),
+                  // 中部（二维码+通道码+链接）**可滚动**：Flexible(loose) +
+                  // ListView(shrinkWrap)——内容短时贴着内容（弹层不撑高），窗口
+                  // 矮/内容超高时在这一块内部滚动，不再整体溢出（老板 2026-10-15
+                  // 实测：高度不够时 bottom overflowed 且无法滚动）。标题、备注与
+                  // 「重新生成」固定在两端：它们是随时要用的入口，滚出去找不回来
+                  // （与 ScrollableCardArea 同一套路，见其注释）。
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: Scrollbar(
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                        children: [
+                          // 自绘二维码：QrImageView 的 LayoutBuilder 会触发固有尺寸
+                          // 异常（见 _InviteQrCode 注释），此处不用它
+                          Center(child: _InviteQrCode(data: r.link)),
+                          const SizedBox(height: 12),
+                          // 顺序（老板 2026-09-22）：**纯通道码在上、邀请链接在下**——
+                          // 多数人是直接复制通道码；链接留给『点开看邀请页』的场景。
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SelectableText(r.joinToken,
+                                    // 通道码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
+                                    // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                        color: scheme.onSurface)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, size: 16),
+                                color: scheme.onSurfaceVariant,
+                                tooltip: l10n.chatPageInviteCopyCodeTooltip,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: r.joinToken));
+                                  if (!ctx.mounted) return;
+                                  _notice(ctx, l10n.chatPageInviteCodeCopied);
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          // 邀请链接 + 拷贝图标（点击即复制，弹层不关闭——根 Overlay 通知
+                          // 在弹层之上可见，老板 2026-09-11）
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SelectableText(r.link,
+                                    // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
+                                    style: const TextStyle(
+                                        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, size: 16),
+                                color: const Color(0xFF2271F7),
+                                tooltip: l10n.chatPageInviteCopyLinkTooltip,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: r.link));
+                                  if (!ctx.mounted) return;
+                                  _notice(ctx, l10n.chatPageInviteLinkCopied);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 底部只要一个「重新生成」，**居中且不占满宽度**（老板 2026-10-15）：
+                  // 附件存储那种满宽提交按钮是"必须做决定"的口气，而重新生成可按可不
+                  // 按；关闭走弹层惯例外（点遮罩/下滑），不再给「关闭」按钮。
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: TextButton(
+                      onPressed: busy
+                          ? null
+                          : () async {
+                              if (busy) return; // 进行中：忽略重复点击
+                              setLocal(() => busy = true);
+                              try {
+                                final fresh = await _withAuth((t) => api.createJoinToken(
+                                      widget.spaceId,
+                                      t,
+                                      purpose: purpose,
+                                      targetMemberId: targetMemberId,
+                                      passphrase: passphrase,
+                                    ));
+                                if (!ctx.mounted) return;
+                                r = fresh; // 就地刷新：二维码 / 通道码 / 链接 ✓
+                                setLocal(() {});
+                              } on ApiException catch (e) {
+                                if (!ctx.mounted) return;
+                                _notice(
+                                    ctx, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
+                              } catch (e) {
+                                if (!ctx.mounted) return;
+                                _notice(ctx, l10n.chatPageInviteFailed('$e'));
+                              } finally {
+                                if (ctx.mounted) setLocal(() => busy = false);
+                              }
+                            },
+                      child: busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.4))
+                          : Text(l10n.chatPageInviteRegenerate),
+                    ),
+                  ),
+                ],
               ),
-              TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.close)),
-            ],
-          ),
+            );
+          },
         ),
       );
     } on ApiException catch (e) {

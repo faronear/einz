@@ -142,6 +142,95 @@ void main() {
     final qrSize = tester.getSize(qrPaint);
     expect(qrSize.width, 160);
     expect(qrSize.height, 160);
+
+    // 弹层化（老板 2026-10-15）：底部弹层而非 AlertDialog；无输入框 → 点遮罩/
+    // 下滑即关，底部不放「关闭」按钮
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text(_zh.close), findsNothing, reason: '弹层不该再有「关闭」按钮');
+
+    // 只要一个「重新生成」：居中、且**不占满宽度**（可按可不按，不像附件存储
+    // 的提交按钮那样满宽——那是"必须做决定"的口气）
+    final regenerate =
+        find.widgetWithText(TextButton, _zh.chatPageInviteRegenerate);
+    expect(regenerate, findsOneWidget);
+    final sheetWidth = tester.getSize(find.byType(BottomSheet)).width;
+    expect(tester.getSize(regenerate).width, lessThan(sheetWidth * 0.6),
+        reason: '重新生成是可选操作：不该占满宽度');
+    expect((tester.getCenter(regenerate).dx - sheetWidth / 2).abs(), lessThan(2),
+        reason: '重新生成应水平居中');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('通道码弹层：屏幕高度不够时中部内部滚动、不溢出（老板 2026-10-15 实测）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: Uint8List(32),
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _InviteFakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // 菜单 → 我的通道（默认 800x600 里走：菜单本身有近 500px 高，矮窗口开不全）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageMenuEntranceList));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageMenuEntranceList));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 弹层开着呢，把窗口压矮（默认高度装得下全部内容，320 才复现"底部溢出
+    // 且无法滚动"——原 Column 直接 overflow）
+    tester.view.physicalSize = const Size(420, 320);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.descendant(
+        of: find.byType(BottomSheet), matching: find.text(_zh.chatPageEntranceListNew)));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    expect(tester.takeException(), isNull,
+        reason: '矮窗口里弹层首帧不应抛溢出异常（RenderFlex overflow）');
+    await tester.pumpAndSettle();
+
+    // 中部是 ListView（可滚；聊天页消息列表也是 ListView，限定在弹层内找）。
+    // 矮窗口下链接行在滚动视口外——ListView 懒加载，这会儿还不在树里；往下拖
+    // 滚才该出现（这正证明中部是可滚的、内容没被裁掉）。
+    final link = find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789');
+    final middleList = find.descendant(
+        of: find.byType(BottomSheet), matching: find.byType(ListView));
+    expect(middleList, findsOneWidget);
+    // 备注归标题组：固定不随中部滚动（老板 2026-10-15：与 OptionPickerSheet
+    // 等弹层口径一致，滚动区不包括备注）
+    final hint = find.text(_zh.chatPageInviteDialogHintAttachSelf);
+    final hintBefore = tester.getTopLeft(hint).dy;
+    expect(link, findsNothing,
+        reason: '链接行初始应在滚动视口外（矮窗口装不下全部内容）');
+    await tester.drag(middleList, const Offset(0, -150));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(hint).dy, hintBefore,
+        reason: '备注应固定在标题下方，不随中部滚动');
+    expect(link, findsWidgets, reason: '拖滚后链接行应滚进视口');
+
+    // 「重新生成」固定在底部：不随中部滚走，一直在视口内
+    final regenerate =
+        find.widgetWithText(TextButton, _zh.chatPageInviteRegenerate);
+    expect(tester.getCenter(regenerate).dy, lessThan(320),
+        reason: '重新生成应固定在弹层底部，矮窗口也看得见');
     expect(tester.takeException(), isNull);
   });
 }
