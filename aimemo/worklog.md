@@ -15007,3 +15007,9 @@ artifact 与 latest Release 都随主产物一起上传。TUI/CLI（dart compile
 plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下次全平台构建实测。
 
 **（2026-10-16T09:34:42Z / 2026-10-16 17:34）**：修「我的秘境」弹层卡片改名后错显我的名字（真根因二轮定位）。表象：改名（含勾「应用于所有秘境」）后，卡片显示我的新名字而非对方名字/「待加入」；切走再切回自愈。**主犯**：`AppLockService.saveProfile` 是整份覆盖写（jsonEncode 固定键），但不含 `peerJoined`/`peerMemberId`——这两个键由 `savePeerPresence`（09-25）单独追加维护，覆盖写把它们抹掉 → 卡片 `peerPending=false` 退正常态 + `peerName` 空（对方未加入）→ `_titleOf` 兜底显示 Spaces.name=我的名字。修法：saveProfile 读旧值透传这两个键（`m['peerJoined'] is bool` 才带上）。**次犯（真实但非本次主犯）**：`_onProfileUpdated` 不排除自己触发的 profile.updated 广播（广播发全空间在线通道含自己的其它通道），`_peerName` 会被写成我的名字——加 `event.memberId==_myMemberId` 或等名兜底（改名 UI 禁与对方同名故等名必是自己）两条判据排除。**排查弯路备忘**：① 老板说"没效果"其实是在 pex 项目（`/Users/Shared/productX/pex`，flutter 从上级目录命中 `lib/main_agidin.dart`）里测的——lsof 实测全系统无进程打开正式 einz.sqlite，虚惊；② 首轮诊断（以为是广播直接污染 Spaces 行）修的是真隐患但不是主犯，老板补充"两个空间对方都未加入、本该显示待加入"才锁定真根因——用户观察细节比推测金贵。附：`Spaces.name` 列本来就存"我的名字"（peerName 另有列），弹层 `_titleOf` 是 peerName 优先、name 兜底，所以 name 列没写错。验证：flutter analyze 0 error（2 条 use_null_aware_elements info 为 SDK 版本差异，保留 if 形式）；老板实测两空间卡片保持「待加入」✅。中途一次 edit_file 缩进事故弄坏 app_lock.dart 大括号配对（113 个 error），已修复并复查。
+
+## 20261016 emu* 脚本收归 wo_scripts 依赖
+
+- 本地 `scripts/emu{BootIos.sh,ResolveIos.js,UdidIos.sh}` 是 wo_scripts 的分叉副本（einz 侧演进后已回同步至 wo_scripts 仓库 75ae4e9），现统一改从 `node_modules/wo_scripts/` 引用，package.json 三个脚本路径已改，本地拷贝删除。
+- `npm update wo_scripts` 后裸跑 `app-ios-boot` 实测成功（Booted 优先/最新系统 iPhone 自适应）。commit 22110194，未推送。
+- 维护约定：emu 脚本唯一源头 = git.tic.cc/opx/wo_scripts；改动先在该仓库提交，einz/pex 升级依赖即生效。
