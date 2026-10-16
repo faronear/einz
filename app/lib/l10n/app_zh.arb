@@ -627,7 +627,7 @@
     }
   },
   "chatPageEntranceRevoked": "这条通道已被撤销，本地数据已清除，请重新配置",
-  "burnOptionOff": "关闭（不再自动焚毁）",
+  "burnOptionOff": "不再自动焚毁",
   "burnSubmit": "启用",
   "burnPreviewDelay": "{duration}",
   "@burnPreviewDelay": {

@@ -672,7 +672,7 @@
     }
   },
   "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
-  "burnOptionOff": "Off (Do not auto-burn)",
+  "burnOptionOff": "Do not auto-burn",
   "burnSubmit": "Apply",
   "burnPreviewDelay": "{duration}",
   "@burnPreviewDelay": {

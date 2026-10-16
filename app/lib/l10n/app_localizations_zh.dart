@@ -1107,7 +1107,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清除，请重新配置';
 
   @override
-  String get burnOptionOff => '关闭（不再自动焚毁）';
+  String get burnOptionOff => '不再自动焚毁';
 
   @override
   String get burnSubmit => '启用';

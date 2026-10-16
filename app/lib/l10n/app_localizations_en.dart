@@ -1180,7 +1180,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Entrance revoked — local data cleared, please set up again';
 
   @override
-  String get burnOptionOff => 'Off (Do not burn anymore)';
+  String get burnOptionOff => 'Do not auto-burn';
 
   @override
   String get burnSubmit => 'Apply';

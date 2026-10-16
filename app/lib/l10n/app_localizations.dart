@@ -2033,7 +2033,7 @@ abstract class AppLocalizations {
   /// No description provided for @burnOptionOff.
   ///
   /// In en, this message translates to:
-  /// **'Off (Do not burn anymore)'**
+  /// **'Do not auto-burn'**
   String get burnOptionOff;
 
   /// No description provided for @burnSubmit.
