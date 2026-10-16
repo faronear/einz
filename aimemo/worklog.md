@@ -14987,3 +14987,7 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
   byType(BottomSheet) findsNothing 判"通道列表弹层已收起"，邀请弹层也是
   BottomSheet 会误伤；且「添加我的新通道」同文两键（列表按钮 vs 邀请标题），
   改用弹层标题「我的设备通道」判定。回归：全量 331 过 1 跳 0 败。
+
+## 2026-10-16
+
+**（2026-10-16T04:57:21Z / 2026-10-16 12:57）**：阅后即焚弹窗迭代并提交 5eb62125。① 上限 30→36→60 天（对数轴上时长刻度离「关闭」顶点太近防手抖误触，老板逐档看效果后定 60）；② 按钮文案「提交」→「启用」/ en "Apply"（本地生效设置，老板改 arb、我同步生成文件，顺带把 setPinDialogSetPin、chatPageAttachmentStorageSubmit 的测试断言对齐「启用」）；③ 轴下可点标注默认加淡背景（primary 6% / 关闭 error 8%）提示可点；④ 清理死代码：kBurnAfterOptions 档位 Map、burnOption1Minute/5Minutes/1Hour/1Day/7Days 五个 l10n 键，_burnOptionLabel 简化为 formatBurnDuration 透传。测试修了老板改 zh 预览文案（burnPreviewDelay→纯 "{duration}"）造成的 3 个断言失配，burn_duration_sheet_test 11/11、chat_page_menu_test 41/41。未提交遗留：package.json + localConfig.example.json（老板自己的运行脚本改动）。记忆已更新：热重启 pid 按平台分 /tmp/einz_flutter_<平台>.pid（android/ios/macos）。
