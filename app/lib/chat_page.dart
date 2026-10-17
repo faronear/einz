@@ -5393,6 +5393,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// App 生命周期：切后台记时，回前台超过阈值 → 覆盖锁屏（保留聊天页状态）。
   ///
+  /// **计时只认 [AppLifecycleState.paused]**（老板 2026-10-17 实测 bug）：iOS 回
+  /// 前台的序列是 `paused → inactive → resumed`，`inactive` 在回来那一下也会触发——
+  /// 若它也 `recordBackgrounded`，会把后台开始时刻覆写成"刚回来"，`resumed` 一算
+  /// 差值不到阈值 → 永不锁。`paused`（App 真正不可见）才是唯一可靠的"进后台"信号。
+  ///
   /// 两条硬规则（老板 2026-09-20 实测报的 bug）：
   /// 1. **没设锁屏码就不要锁**：`_hasPin=false` 时锁屏页只会显示"尚未设置锁屏码"
   ///    提示页，既没意义又让人以为 App 出了问题——直接不锁，并照常补报已读。
@@ -5402,7 +5407,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appResumed = state == AppLifecycleState.resumed; // 回执：只有前台才允许标已读
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused) {
       _lockTimer.recordBackgrounded(DateTime.now());
       // 进后台（含息屏）：**主动**断开 WS，让对端几秒内就看到离线。
       // 不这么做的话要等服务端的 30s 心跳超时、再等对端 30s 轮询，最长约 90 秒里
@@ -5410,7 +5415,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       //
       // **通话中绝不停**：贴耳通话必然息屏，停了就直接把通话掐断——通话期间靠
       // iOS 的 audio 后台模式 + 常亮维持，本来也不会进到这里断链。
-      if (state == AppLifecycleState.paused && _voiceCall?.state.value.inCall != true) {
+      if (_voiceCall?.state.value.inCall != true) {
         unawaited(_ws?.stop());
       }
     } else if (state == AppLifecycleState.resumed) {
