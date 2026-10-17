@@ -8612,15 +8612,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: Row(
                     children: [
                       Text(l10n.chatPageMenuMyProfile, style: labelStyle),
-                      const Spacer(),
-                      // 人名（空 → 「未设置」占位）；长名截断，与头像小图间留 6
-                      Flexible(
-                        child: Text(
-                          _myMemberName.isEmpty
-                              ? l10n.chatPageNameUnset
-                              : _myMemberName,
-                          style: valueStyle,
-                          overflow: TextOverflow.ellipsis,
+                      // 人名（空 → 「未设置」占位）；长名截断，与头像小图间留 6。
+                      // 结构注意（老板 2026-10-17，两种失败各实测过）：
+                      // - 纯 [Spacer] + [_menuValue]：PopupMenu 的内在宽度测量会把
+                      //   本行报成最宽行、实际布局却给不满 → 溢出 6.4px（长名时）；
+                      // - [Flexible] 包值：内在宽度失真使 Spacer 吸不到右缘 →
+                      //   头像缩进 16.5px，不与其他行齐右。
+                      // 最终形：Expanded 紧贴占满（不溢出）+ Align 右对齐 +
+                      // [_menuValue] 的 180 上限（与整菜单共用同一截断规则），
+                      // 头像恒在行最右缘。
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _menuValue(
+                            _myMemberName.isEmpty
+                                ? l10n.chatPageNameUnset
+                                : _myMemberName,
+                            valueStyle,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
