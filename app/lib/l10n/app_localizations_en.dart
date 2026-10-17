@@ -924,8 +924,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageTombstoneSubmit => 'Apply';
 
   @override
-  String get chatPageBurnOff =>
-      'Burn-after-read is off (this message will be kept)';
+  String get chatPageBurnOff => 'Burn-after-read is disabled on this message';
 
   @override
   String get chatPageBurnFailed => 'Failed to set burn-after-read';

@@ -521,7 +521,7 @@
   "chatPageTombstoneHide": "Hide completely",
   "chatPageTombstoneHideDesc": "Tombstones disappear from the message flow entirely",
   "chatPageTombstoneSubmit": "Apply",
-  "chatPageBurnOff": "Burn-after-read is off (this message will be kept)",
+  "chatPageBurnOff": "Burn-after-read is disabled on this message",
   "chatPageBurnFailed": "Failed to set burn-after-read",
   "chatPageBurnWillDelete": "New messages auto-delete after {duration}",
   "@chatPageBurnWillDelete": {

@@ -836,31 +836,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageBurnHeading => '阅后即焚';
 
   @override
-  String get chatPageBurnNote => '倒计时自动删除已阅读的新消息（仅对本通道生效）';
+  String get chatPageBurnNote => '倒计时自动删除已阅读的新消息';
 
   @override
-  String get chatPageTombstoneHeading => '墓碑消息';
+  String get chatPageTombstoneHeading => '消息留痕';
 
   @override
-  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息如何显示？';
+  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否留痕？';
 
   @override
-  String get chatPageTombstoneKeep => '保留占位';
+  String get chatPageTombstoneKeep => '占位留痕';
 
   @override
-  String get chatPageTombstoneKeepDesc => '显示为占位墓碑：正文隐藏，时间与记录仍在，不打破消息流水';
+  String get chatPageTombstoneKeepDesc => '显示为消息墓碑：正文隐藏，时间记录仍在，不打破消息流水';
 
   @override
   String get chatPageTombstoneHide => '彻底消失';
 
   @override
-  String get chatPageTombstoneHideDesc => '墓碑不再显示，从消息流中彻底消失';
+  String get chatPageTombstoneHideDesc => '完全不再显示，从消息流中彻底消失';
 
   @override
   String get chatPageTombstoneSubmit => '启用';
 
   @override
-  String get chatPageBurnOff => '阅后即焚已关闭（这一消息将会保留）';
+  String get chatPageBurnOff => '已对这一个消息取消了阅后即焚';
 
   @override
   String get chatPageBurnFailed => '设置阅后即焚失败';
