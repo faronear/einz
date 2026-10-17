@@ -450,14 +450,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockCleared =>
-      'PIN deleted. You can enter the space directly at next launch.';
+      'PIN cleared. You can enter the space directly at next launch.';
 
   @override
-  String get chatPageClearLockTitle => 'Delete PIN?';
+  String get chatPageClearLockTitle => 'Clear PIN?';
 
   @override
   String get chatPageClearLockMessage =>
-      'Delete the PIN? After deletion, next app launch will go straight into chat.';
+      'Clear the PIN? After clearing, next app launch will go straight into chat.';
 
   @override
   String get chatPageInviteDialogTitleInvite => 'Invite';

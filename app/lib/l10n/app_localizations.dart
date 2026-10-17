@@ -839,19 +839,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
-  /// **'PIN deleted. You can enter the space directly at next launch.'**
+  /// **'PIN cleared. You can enter the space directly at next launch.'**
   String get chatPageSetLockCleared;
 
   /// No description provided for @chatPageClearLockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete PIN?'**
+  /// **'Clear PIN?'**
   String get chatPageClearLockTitle;
 
   /// No description provided for @chatPageClearLockMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete the PIN? After deletion, next app launch will go straight into chat.'**
+  /// **'Clear the PIN? After clearing, next app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
   /// No description provided for @chatPageInviteDialogTitleInvite.
