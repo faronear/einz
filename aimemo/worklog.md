@@ -15056,3 +15056,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 ## 20261017 修复「后台恢复永不锁屏」：计时只认 paused
 
 - **（2026-10-17T12:55:05Z / 2026-10-17 20:55）**：老板报「后台超 30s 回前台应锁屏，但从未体验到」，确认是跳过 PIN 后又在菜单补设了 PIN（冷启动锁屏正常 ⇒ 确有 PIN）。诊断：widget 测试假时钟推不动 `LockTimer` 的 `DateTime.now()`，先前只测了「无 PIN 不锁」，主路径「有 PIN+超时→锁」无覆盖。改用 `runAsync` 真睡 31s 复刻（设 PIN→切后台→回前台），复现 `shouldRelock=false`。逐环打点：`resumed` 回调到了（自建 observer 探针四态全收）、`_hasPin=true`、但 `shouldRelock=false` → 读内部发现 `recordBackgrounded` 被调了**两次**，第二次在"回前台"那一下。根因：`didChangeAppLifecycleState` 里 `paused || inactive` 都记时，而 iOS 回前台序列是 `paused → inactive → resumed`，`inactive` 回来时触发，把后台开始时刻覆写成"刚回来"，差值永远不足 30s → 永不锁。修复：计时只认 `paused`（App 真正不可见的唯一可靠信号），顺带删 WS 断开处冗余的 `state==paused` 内层判断。回归测试 `test/lock_background_resume_test.dart`（真时钟，约 +31s）。验证：锁屏页 `findsOneWidget` 且严格锁；`lock_timer/lock_page/app_lock/chat_page_menu` 69 项全过；analyze 0。commit bfa6960c。
+
+## 20261017 三处可点控件底色统一淡灰（邀请新同伴 + 群名胶囊 + 我的名字胶囊）
+
+- **（2026-10-17T13:02:50Z / 2026-10-17 21:02）**：老板要求「我的群组」弹层「邀请新同伴」大按钮底色对齐「我的秘境」/「我的设备通道」里的大按钮，并把群名胶囊、我的名字胶囊的底色也统一成同款淡灰。参考基准 = 「添加秘境」（space_switcher.dart）与「新建通道」（chat_page 通道列表弹层）大按钮：`Colors.black.withValues(alpha: 0.05)` 淡灰底 + hover 0.10 + highlight 0.14。改动 ①「邀请新同伴」`_genderTint('')` 中性 tint → 淡灰，hover/highlight 从 0.05/0.08 对齐到 0.10/0.14（否则与底色相同、hover 无反馈）；② 群名胶囊、③ 我的名字胶囊：淡蓝 `tertiaryContainer`（#DCE9F8，上轮老板嫌粉改的）→ 同款淡灰，两处注释同步。验证：`flutter analyze lib/chat_page.dart` 0 问题；`chat_page_menu_test` + `group_status_bar_test` 52 项全过。commit 58916c40。
