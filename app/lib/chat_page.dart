@@ -3336,18 +3336,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return text;
   }
 
-  /// 空间成员弹层（**2026-10-05 重做**，老板定的版式）：
-  /// **每行一张成员卡**——底色=该成员性别色（男浅蓝 / 女浅粉 / 性别未知=中性灰）；
-  /// 左：真实头像 + 名字；右：可点的文字按钮（已有成员=「重新邀请」）。
+  /// 空间成员弹层。**group 与 duo 两套版式**（duo 2026-10-18 改版，老板定）：
+  ///
+  /// **group（我的群组）**：每行一张成员卡——底色=该成员性别色（男浅蓝 / 女浅粉 /
+  /// 性别未知=中性灰）；左：真实头像 + 名字；右：可点的文字按钮（已有成员=
+  /// 「重新邀请」）。
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
-  /// - **尚未加入**的卡：默认头像 + 淡色占位词「待加入」（`memberPending`）；
-  ///   duo 里对方还没来 = 就是那一张；
-  /// - 未满员时列表末尾追加一张「邀请」占位卡（新人还没有卡片可挂按钮）；
+  /// - 未满员时列表末尾是「邀请新同伴」大按钮；
   /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
   /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
   /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
   /// - **无退出入口**（一期：入群即不退群）。
+  ///
+  /// **duo（我的同伴）**：改走 [_showDuoPeerSheet]——与「我的资料」同款的单张
+  /// 只读身份卡（duo 只有对方一个人，成员卡列表反而零碎）。
   Future<void> _showMembersSheet() async {
+    if (!_isGroup) {
+      await _showDuoPeerSheet();
+      return;
+    }
     final l10n = AppLocalizations.of(context)!;
     // 其他成员（不含我），按加入先后（槽位升序 = 入群顺序）排
     final others = _memberSlots.entries
@@ -3458,24 +3465,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             e.key, _memberNames[e.key]));
                       },
                     ),
-                  // 未满 → 末尾一张邀请卡（duo 保留"默认头像+待加入+邀请"版式；
-                  // **群组改加号行**（老板 2026-10-06）：头像与"待加入"占位词去掉，
-                  // 与「添加秘境」/「新建通道」同款——加号图标 + 文字整体居中；
-                  // 底色暂保持原中性 tint，等老板检查）
-                  if (_canInvite && !_isGroup)
-                    _membersCard(
-                      memberId: null, // 默认头像
-                      gender: '',
-                      name: l10n.memberPending, // 占位词（"待加入"）
-                      faintName: true,
-                      actionLabel: l10n.chatPageMembersInvite,
-                      onAction: () {
-                        Navigator.of(ctx).pop();
-                        _menuAction(
-                            () => _showInviteDialog(purpose: 'invite'));
-                      },
-                    )
-                  else if (_canInvite && _isGroup)
+                  // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
+                  // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
+                  if (_canInvite)
                     Material(
                       // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
                       // 三个大按钮底色统一）；hover/按住加深同口径
@@ -3513,6 +3505,228 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _memberCount, _maxMembers),
                       muted: true,
                     ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// duo 的「我的同伴」弹层（老板 2026-10-18 改版）：与「我的资料」弹层**同款
+  /// 布局的单张身份卡**，但**全部只读**——不能编辑（改名/换头像是「我的资料」
+  /// 的权利，对方的资料我们没有权限动）。
+  ///
+  /// - 左：头像（粉蓝渐变细环 + surface 留白，与「我的资料」同款）。**点头像 =
+  ///   打开头像全屏**——与消息气泡旁对方头像同一份共享全屏实现（底部「保存」
+  ///   可下载；没有「更换头像」：不给改别人的图）。没头像时点它没有动作
+  ///   （[_MessageAvatarState.handleTap] 自己按图缓存决策，我们不替它猜）。
+  /// - 右两行：名字（上）+ 性别（下），左对齐。
+  ///   - 名字：对方名字；没名字时按状态给占位词——还没加入 = 「待加入」
+  ///     （`memberPending`），已加入但没命名 = 「未命名」（`chatPageMembersUnnamed`）；
+  ///   - 性别：图标+文字只读（性别为空整行不显示性别部分）。
+  /// - **邀请 / 重新邀请按钮放在性别那一行、右端对齐**（老板 2026-10-18）：
+  ///   对方已加入 = 「重新邀请」（先要共享口令，见 [_reinviteMemberIdentity]）；
+  ///   还没加入 = 「邀请」（[_showInviteDialog] purpose=invite）。原来它们挂在
+  ///   成员卡右侧 / 状态条尾部，改版后收进身份卡；状态条尾部只留语音通话。
+  ///
+  /// 桌面端限宽 [kMyProfileSheetMaxWidth]（与「我的资料」同口径：宽屏下不拉成
+  /// 空旷长带）；点按衔接同样走「先收弹层、错峰 300ms 再开下一条」。
+  Future<void> _showDuoPeerSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    // 对方 member：duo 只有一位——槽位表里除我之外那个（含未命名成员）；
+    // 槽位里没有他 = 还没加入（duo 满 2 人即永久关闭邀请，见 [_canInvite]）。
+    final others = _memberSlots.entries
+        .where((e) => e.key != _myMemberId)
+        .toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final peerId = others.isNotEmpty ? others.first.key : null;
+    final peerJoined = peerId != null;
+    // 性别配色：男女各用 Logo 里的粉/蓝（与「我的资料」、向导、改名弹窗同色）
+    final isFemale = _peerGender == 'female';
+    final isMale = _peerGender == 'male';
+    final genderColor = isFemale
+        ? const Color(0xFFD6529C)
+        : isMale
+            ? const Color(0xFF3BAFFD)
+            : scheme.outline;
+    final genderLabel =
+        isFemale ? l10n.wizardGenderFemale : isMale ? l10n.wizardGenderMale : '';
+    // 名字占位词：还没来 = 「待加入」（与状态条同一口径）；来了没命名 = 「未命名」
+    final peerName = _peerName.isNotEmpty
+        ? _peerName
+        : peerJoined
+            ? l10n.chatPageMembersUnnamed
+            : l10n.memberPending;
+    final nameIsPlaceholder = _peerName.isEmpty;
+    // 头像组件句柄：外层方形热区（头像 + 渐变环）通过它触发头像自己的点按决策
+    // （有图 → 全屏 / 没图 → 无动作），内层传 openFullscreenOnTap:false 让出
+    // 点击——与「我的资料」弹层同手法（老板 2026-10-17）。
+    final avatarKey = GlobalKey<_MessageAvatarState>();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
+      // 桌面端限宽（与「我的资料」同口径，老板 2026-10-17）：不限宽时整张
+      // 身份卡随窗口拉长，头像和名字之间会隔出一大片空白。
+      constraints: const BoxConstraints(maxWidth: kMyProfileSheetMaxWidth),
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Center(
+                      child: Text(l10n.chatPageMembersTitle('duo'),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: scheme.onSurface)),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      // 头像（左侧大图）= **一个方形热区**（与「我的资料」同款）：
+                      // 点头像、点渐变环的空白都算——去向由 _MessageAvatar 按它
+                      // 自己的图缓存决定（有图 → 全屏；没图 → 没有动作）。
+                      Clickable(
+                        behavior: HitTestBehavior.opaque, // 方角空白也算热区
+                        circle: true, // 反馈遮罩仍跟圆走，方角不染色
+                        onTap: () => avatarKey.currentState?.handleTap(),
+                        // key 供测试定位头像热区（弹层外状态条上也有头像）
+                        key: const ValueKey('duoPeerSheetAvatar'),
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: scheme.surface,
+                            ),
+                            child: _MessageAvatar(
+                              key: avatarKey,
+                              memberId: peerId,
+                              server: effectiveServer,
+                              api: widget.api,
+                              radius: 40,
+                              // 点击交给外层方形热区（统一一个动作）
+                              openFullscreenOnTap: false,
+                              // 别人的头像：只有「保存」可下载，不给换/不给扇出
+                              onSaveImage: (bytes) => _saveAvatarImage(
+                                  _senderNameOf(peerId), bytes),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      // 右侧两行：名字（上）+ 性别（下），左对齐
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 名字：纯文字（**不能编辑**，不做成「我的资料」那种
+                            // 带编辑图标的胶囊——那是在邀请点击，这里没有可点的）。
+                            // 占位词单独降档（浅色），与「我的资料」未设名同口径。
+                            Text(
+                              peerName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 20,
+                                height: 1.2,
+                                color:
+                                    nameIsPlaceholder ? scheme.outline : null,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            // 性别行：图标+文字只读 + 右端对齐的邀请/重新邀请按钮
+                            Row(
+                              children: [
+                                if (genderLabel.isNotEmpty) ...[
+                                  Semantics(
+                                    // 只有一枚「男/女」，读屏补上「性别」二字
+                                    // （与「我的资料」弹层同口径）
+                                    label: '${l10n.chatPageGenderLabel} '
+                                        '$genderLabel',
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          isFemale ? Icons.female : Icons.male,
+                                          size: 16,
+                                          color: genderColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          genderLabel,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                            color: genderColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                const Spacer(),
+                                // 已加入 = 「重新邀请」（需共享口令）；还没加入 =
+                                // 「邀请」。duo 满员后不再有邀请（_canInvite 关）。
+                                if (peerJoined || _canInvite)
+                                  TextButton(
+                                    key: const ValueKey(
+                                        'duoPeerSheetActionButton'),
+                                    onPressed: () {
+                                      // 先收起弹层；等它收完再弹下一条
+                                      // （route 交接，见 _waitRouteHandoff）
+                                      Navigator.of(ctx).pop();
+                                      if (peerJoined) {
+                                        _menuAction(() =>
+                                            _reinviteMemberIdentity(
+                                                peerId, _peerName));
+                                      } else {
+                                        _menuAction(() => _showInviteDialog(
+                                            purpose: 'invite'));
+                                      }
+                                    },
+                                    style: TextButton.styleFrom(
+                                      // 链接蓝 = 品牌深蓝，与状态条「邀请加入」
+                                      // 链接、通道码弹窗邀请链接同源
+                                      foregroundColor: const Color(0xFF2271F7),
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
+                                      textStyle: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    child: Text(peerJoined
+                                        ? l10n.chatPageMembersReinvite
+                                        : l10n.chatPageMembersInvite),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
