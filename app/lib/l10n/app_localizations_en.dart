@@ -534,7 +534,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuExit => 'Quit app';
 
   @override
-  String get chatPageMenuMore => 'Menu';
+  String get chatPageMenuMore => 'Main menu';
 
   @override
   String get chatPageMsgMoreActions => 'More actions';

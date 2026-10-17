@@ -989,7 +989,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuMore.
   ///
   /// In en, this message translates to:
-  /// **'Menu'**
+  /// **'Main menu'**
   String get chatPageMenuMore;
 
   /// No description provided for @chatPageMsgMoreActions.
