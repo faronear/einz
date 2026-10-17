@@ -3351,7 +3351,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       padding: const EdgeInsets.only(top: 2, bottom: 14),
                       child: Center(
                         child: Material(
-                          color: Theme.of(ctx).colorScheme.tertiaryContainer,
+                          // 与「添加秘境」/「新建通道」/「邀请新同伴」大按钮同款淡灰
+                          // （老板 2026-10-17：胶囊底也统一成淡灰，不再用淡蓝）
+                          color: Colors.black.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(999),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
@@ -3440,7 +3442,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     )
                   else if (_canInvite && _isGroup)
                     Material(
-                      color: _genderTint(''), // 底色暂保持不变，等老板检查
+                      // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
+                      // 三个大按钮底色统一）；hover/按住加深同口径
+                      color: Colors.black.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(mouseCursor: SystemMouseCursors.click,
@@ -3449,8 +3453,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _menuAction(
                               () => _showInviteDialog(purpose: 'invite'));
                         },
-                        hoverColor: Colors.black.withValues(alpha: 0.05),
-                        highlightColor: Colors.black.withValues(alpha: 0.08),
+                        hoverColor: Colors.black.withValues(alpha: 0.10),
+                        highlightColor: Colors.black.withValues(alpha: 0.14),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Row(
@@ -4901,11 +4905,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 弹层群名行同款交互），点击 → 收起弹层、打开改名弹窗。
                             // 实底 + Material/InkWell：透明底看不出「可以点」；实底
                             // 还把点击区撑到胶囊大小（只点文字太窄，桌面端不好点）。
-                            // 底色淡蓝 tertiaryContainer（老板：胶囊底不要粉色，
-                            // 与「我的同伴」群名胶囊统一淡蓝）。长名字由 Expanded
-                            // 给上限，超出省略。
+                            // 底色淡灰（与群名胶囊及「添加秘境」/「新建通道」/
+                            // 「邀请新同伴」大按钮统一，老板 2026-10-17）。长名字由
+                            // Expanded 给上限，超出省略。
                             Material(
-                              color: scheme.tertiaryContainer,
+                              color: Colors.black.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(999),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
