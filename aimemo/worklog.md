@@ -15035,3 +15035,18 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
   ③ **扇出字节来源**：`showMyAvatarFullscreen` 的 onApplyAllSpaces 原为无参 VoidCallback，各调用方捕获 `_myAvatarBytes!`——与全屏展示的图可能不是同一份。改为 `Future<void> Function(Uint8List)` 参数回调，扇出的就是用户看的那张。
   ④ **卫生**：过时注释 3 处（chat_page 菜单「我的头像」提法 + 测试里"两个输入框/我的身份"残留）；arb 删除无引用的死键 chatPageMenuAvatar、chatPageMenuMyNameLabel 并 gen-l10n 重新生成。
 - 测试：受影响 5 个测试文件补双秘境 Vault（tombstone/attachment/email-notify 三个原本单秘境却断言勾选框存在的用例）；新增「单秘境 → 邮件通知弹窗不显示勾选框」回归用例。全量 345 通过（344+1 新增），analyze 0 问题。另修复 worklog 末条被上次写入截断的损坏（本地时刻补全）。
+
+## 20261017 「我的资料」弹层重设计：性别收成小胶囊
+
+- **（2026-10-17T08:56:00Z / 2026-10-17 16:56）**：老板反馈「我的资料」弹层外观不好看、性别不要占一整行。版式重做为居中单轴三段收窄：**渐变环头像**（外圈 3px 粉蓝渐变（3BAFFD→D6529C）+ 3px surface 留白，解决头像边界糊在浅粉底上的问题，同时给弹层一个视觉焦点）→ **实底名字胶囊**（surfaceContainerHighest 底 + Material/InkWell 水波，此前透明底只有文字+铅笔，看不出可点；padding 18/10/14/10，长名用 264 上限约束避免撑成横贯长条）→ **性别小胶囊**（图标 + 男/女，男女分别取 Logo 的粉/蓝，12% 同色底、圆角 999，垂直居中）。性别为空（向导未写入/老账号）整枚不显示，不留「未设置」空壳；胶囊外补 Semantics label「性别 女」供读屏。删除原整行只读 TextFormField（那个样子像没填完的表单）。验证：`flutter analyze lib/chat_page.dart` 0 问题；`chat_page_menu_test.dart` 42 项全过；用临时 golden（Arial Unicode 字体 + 390×844）实渲染三种情形核对——短名/长名、女/男、性别为空——长名截断与胶囊比例正常，核对完删除临时测试与 PNG。
+
+## 20261017 「我的资料」二次调整：横向布局 + 桌面限宽 + 编辑角标重做
+
+- **（2026-10-17T09:20:00Z / 2026-10-17 17:20）**：老板二次要求：①头像在左、右边上名下性别；②桌面端不要无限变宽；③头像编辑角标不要红底（太显眼），位置自定，且角标要可点、和头像合成一个可点区域（方形）。做法：**布局**改为 Row（左渐变环头像 40 半径 / 右 Expanded 两行左对齐：名字实底胶囊 + 性别彩色胶囊），整卡垂直居中；**限宽**用 `showModalBottomSheet(constraints: BoxConstraints(maxWidth: kMyProfileSheetMaxWidth=480))`——弹层本体在宽屏下居中停在窗口底部（手机端本就更窄，不受影响），避免身份卡被拉成空旷长带；**角标**去粉红底改 surface 底 + outlineVariant 细描边 + 灰蓝 14px 铅笔 + 轻投影，压到环内右下角（right/bottom 4）；**热区**把 Stack 包进 `Clickable(behavior: opaque, circle: true)`，方形区域整体一个 tap，内层 `_MessageAvatar` 传新参数 `openFullscreenOnTap: false` 让出点击，外层用 `GlobalKey<_MessageAvatarState>` 调新公开的 `handleTap()`（有图→全屏、无图→选图），仍是同一条决策路径，不会退回「外层拿 _myAvatarBytes 猜」的错航问题；`_MessageAvatar` 构造补 `super.key`。验证：analyze 0 问题；全量 345 通过（1 skip 既有）；临时 golden 渲染手机 390×844 / 桌面 1280×800 / 32 字长名三张核对版式与截断，并用 `tapAt` 点圆形外的方形角落确认弹层被关掉（热区成立），核对完删除临时测试与 PNG。
+
+## 20261017 锁屏页左上角 Logo 可点 → 打开「关于秘境」弹层
+
+- **（2026-10-17T11:50:00Z / 2026-10-17 19:50）**：老板要求锁屏页左上角 Logo 也能点击打开 About Einz 弹层。做法：锁屏页两处 AppBar（未设 PIN 的兜底页 + 已激活的解锁页）原先各写一份「Logo + 标题」Row，现合并为私有方法 `_buildAppBarTitle(l10n)`，其中 Logo 套 `Tooltip(关于秘境) + InkWell(onTap: _openAboutPage) + 四周 8/10 留白`——与对话页顶栏同款（chat_page 8465 附近）；严格锁屏下没有返回箭头，Logo 是标题栏唯一常驻图标，绕开 AppBar leading 不会冲突。About 弹层在锁屏态无副作用：只读版本号 / effectiveServer（锁包本就不存地址）/ 连接探测。验证：`flutter analyze` 0 问题；`lock_page_test.dart` 7 项全过（新增 2 项回归：未设 PIN 兜底页与已激活解锁页点 Logo 都能开出 AboutSheet）；golden 渲染锁屏页确认版式无变化（goldens 不入库，已删）。注意：全量跑时有 2 项失败（chat_page_menu_test 长名字溢出、menu_ovf_tmp_test），系并行 agent 正在改 chat_page 顶栏（HEAD 3b8700a 起）的中间态，复跑已绿，非本次改动引入。
+## 20261017 汉堡菜单「我的资料」行右簇不齐右修复
+
+- **（2026-10-17T12:01:00Z / 2026-10-17 20:01）**：老板反馈菜单「我的资料」行的人名+头像没靠右缘、不与其他菜单条目齐右。用临时几何测试打开真实菜单逐行量右缘定位：其他行右簇右缘 780，本行头像只到 763.5，缩进 16.5px——根因是聚合改造时人名用了 `Flexible` 包裹，含 flex 的 Row 在 PopupMenu 内在宽度测量里失真，Spacer 吸不到右缘。先试 `Spacer + _menuValue(CB 180)` 又暴露另一个失败：长名时该行报最宽行、实际布局给不满 → 溢出 6.4px（长名回归测试红）。最终定型：`Expanded`（紧贴占满，不溢出）+ `Align.centerRight` + `_menuValue` 180 上限（与整菜单共用截断规则），头像恒贴行右缘。验证：几何测试长名/短名均齐右无溢出、`chat_page_menu_test` 全过、analyze 0、全量 349 过。commit 79191b6a。
