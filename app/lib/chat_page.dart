@@ -4735,13 +4735,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 「我的资料」弹层（老板 2026-10-17）：头像大图 + 名字编辑胶囊 + 性别只读框。
+  /// 「我的资料」弹层（老板 2026-10-17）：头像大图 + 名字编辑胶囊 + 性别小胶囊。
   /// 名字胶囊 → 现有改名弹窗；头像 → 共享的 [showMyAvatarFullscreen]
   /// （本人的头像：更换头像/应用所有秘境/保存图标）。
-  /// 性别沿用改名弹窗同款只读样式（insight：由向导写入，暂不提供修改入口）。
+  ///
+  /// 版式（老板 2026-10-17 重设计）：居中单轴 —— 渐变环头像 → 实底名字胶囊 →
+  /// 性别胶囊，三者层层收窄，视觉重心落在头像上。性别不再占一整行只读输入框
+  /// （那个样子像没填完的表单），改成名字下方一枚彩色小胶囊；性别为空（向导
+  /// 未写入/老账号）就整枚不显示，不留空壳。性别由向导写入，暂不提供修改入口。
   Future<void> _showMyProfileSheet() async {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
+    final isFemale = _myGender == 'female';
+    final isMale = _myGender == 'male';
+    // 性别配色：男女各用 Logo 里的粉/蓝（与向导、改名弹窗的原图标同色）
+    final genderColor = isFemale
+        ? const Color(0xFFD6529C)
+        : isMale
+            ? const Color(0xFF3BAFFD)
+            : scheme.outline;
+    final genderLabel =
+        isFemale ? l10n.wizardGenderFemale : isMale ? l10n.wizardGenderMale : '';
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
@@ -4749,17 +4763,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.only(bottom: 18),
                     child: Center(
                       child: Text(l10n.chatPageMenuMyProfile,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: scheme.onSurface)),
                     ),
                   ),
                   // 头像（居中大图）：点击 → 走 _MessageAvatar 自己的头像全屏
@@ -4770,28 +4786,49 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 点击去向完全由 _MessageAvatar 按自己的图缓存决定
                   // （onTapWithoutImage），不再由外层按 _myAvatarBytes 猜——
                   // 两个独立加载源不一致会错航/死区（2026-10-17 复查修复）。
+                  // 外圈粉蓝渐变细环 + 一圈 surface 留白（老板 2026-10-17 重设计）：
+                  // 弹层底色也是浅粉白，没有环的话头像边界糊在背景里，整页只剩控件
+                  // 平铺；细环给了视觉焦点，颜色取自 Logo 的蓝/粉两端。
                   Center(
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        _MessageAvatar(
-                          memberId: _myMemberId,
-                          server: effectiveServer,
-                          api: widget.api,
-                          radius: 44,
-                          onTapWithoutImage: () {
-                            Navigator.of(ctx).pop();
-                            _menuAction(_showAvatarUpload);
-                          },
-                          onReplaceAvatar: () {
-                            Navigator.of(ctx).pop();
-                            _menuAction(_showAvatarUpload);
-                          },
-                          onApplyAllSpaces: _hasMultipleSpaces
-                              ? (bytes) => _applyAvatarAllSpaces(bytes)
-                              : null,
-                          onSaveImage: (bytes) =>
-                              _saveAvatarImage(_myMemberName, bytes),
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: scheme.surface,
+                            ),
+                            child: _MessageAvatar(
+                              memberId: _myMemberId,
+                              server: effectiveServer,
+                              api: widget.api,
+                              radius: 44,
+                              onTapWithoutImage: () {
+                                Navigator.of(ctx).pop();
+                                _menuAction(_showAvatarUpload);
+                              },
+                              onReplaceAvatar: () {
+                                Navigator.of(ctx).pop();
+                                _menuAction(_showAvatarUpload);
+                              },
+                              onApplyAllSpaces: _hasMultipleSpaces
+                                  ? (bytes) => _applyAvatarAllSpaces(bytes)
+                                  : null,
+                              onSaveImage: (bytes) =>
+                                  _saveAvatarImage(_myMemberName, bytes),
+                            ),
+                          ),
                         ),
                         // 编辑角标：粉强调色小圆徽 + 白色编辑笔（与「我的同伴」
                         // 弹层群名行的编辑图标同一动作语义）
@@ -4805,8 +4842,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 color: const Color(0xFFD6529C),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                    color: Theme.of(ctx).colorScheme.surface,
-                                    width: 2),
+                                    color: scheme.surface, width: 2),
                               ),
                               child: const Padding(
                                 padding: EdgeInsets.all(4),
@@ -4819,72 +4855,97 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   // 名字胶囊：文字 + 编辑图标组成可点击胶囊（与「我的同伴」弹层
-                  // 群名行同款交互），点击 → 收起弹层、打开改名弹窗
+                  // 群名行同款交互），点击 → 收起弹层、打开改名弹窗。
+                  // 实底（surfaceContainerHighest）+ Material/InkWell：以前只有
+                  // 文字+图标、底色透明，看不出「可以点」，也显得空（2026-10-17）。
                   Center(
-                    child: InkWell(
-                      key: const ValueKey('myProfileNameRow'),
-                      mouseCursor: SystemMouseCursors.click,
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        _menuAction(_showRenameDialog);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                _myMemberName.isEmpty
-                                    ? l10n.chatPageNameUnset
-                                    : _myMemberName,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 20,
-                                  height: 1.2,
-                                  color: _myMemberName.isEmpty
-                                      ? scheme.outline
-                                      : null,
+                    child: ConstrainedBox(
+                      // 长名字不至于把胶囊撑成一条横贯弹层的长条（32 字上限下
+                      // 会贴到两边、失去「胶囊」形状）：最多 264 宽，超出省略
+                      constraints: const BoxConstraints(maxWidth: 264),
+                      child: Material(
+                        color: scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(999),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          key: const ValueKey('myProfileNameRow'),
+                          mouseCursor: SystemMouseCursors.click,
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showRenameDialog);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 10, 14, 10),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    _myMemberName.isEmpty
+                                        ? l10n.chatPageNameUnset
+                                        : _myMemberName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 20,
+                                      height: 1.2,
+                                      color: _myMemberName.isEmpty
+                                          ? scheme.outline
+                                          : null,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.edit_outlined,
+                                    size: 18, color: scheme.onSurfaceVariant),
+                              ],
                             ),
-                            const SizedBox(width: 6),
-                            Icon(Icons.edit_outlined,
-                                size: 18,
-                                color: scheme.onSurfaceVariant),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  // 性别：只读展示（与改名弹窗同款样式——「性别」标签 + 图标，
-                  // 由向导写入，暂不提供修改入口）
-                  TextFormField(
-                    initialValue: _myGender == 'female'
-                        ? l10n.wizardGenderFemale
-                        : _myGender == 'male'
-                            ? l10n.wizardGenderMale
-                            : '',
-                    readOnly: true,
-                    style: const TextStyle(fontSize: 16),
-                    decoration: InputDecoration(
-                      labelText: l10n.chatPageGenderLabel,
-                      border: const OutlineInputBorder(),
-                      suffixIcon: _myGender == 'male'
-                          ? const Icon(Icons.male,
-                              color: Color(0xFF3BAFFD), size: 24)
-                          : _myGender == 'female'
-                              ? const Icon(Icons.female,
-                                  color: Color(0xFFD6529C), size: 24)
-                              : null,
+                  // 性别：只读小胶囊（2026-10-17 重设计，替代原来的整行只读输入框）。
+                  // 性别为空不显示——留一枚「未设置」空壳反而像缺数据待填。
+                  if (genderLabel.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Semantics(
+                        // 胶囊里只有「男/女」，读屏补上「性别」二字
+                        label: '${l10n.chatPageGenderLabel} $genderLabel',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: genderColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isFemale ? Icons.female : Icons.male,
+                                size: 16,
+                                color: genderColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                genderLabel,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.2,
+                                  color: genderColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
