@@ -158,6 +158,11 @@ const double _bubbleTimeRowControlHeight = 28;
 /// 「我的通道」弹层标题行右端「刷新」按钮的占位/按钮边长（标题居中靠它配平）。
 const double _entranceRefreshSize = 40;
 
+/// 「我的资料」弹层的最大宽度（老板 2026-10-17）：BottomSheet 默认铺满窗口，
+/// 桌面端宽屏下这张身份卡会被拉成一条空旷的长带——限到 480 后居中停在窗口底部，
+/// 手机端本就比它窄，不受影响。
+const double kMyProfileSheetMaxWidth = 480;
+
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -4735,14 +4740,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 「我的资料」弹层（老板 2026-10-17）：头像大图 + 名字编辑胶囊 + 性别小胶囊。
+  /// 「我的资料」弹层（老板 2026-10-17）：左头像、右侧名字（上）+ 性别（下）。
   /// 名字胶囊 → 现有改名弹窗；头像 → 共享的 [showMyAvatarFullscreen]
   /// （本人的头像：更换头像/应用所有秘境/保存图标）。
   ///
-  /// 版式（老板 2026-10-17 重设计）：居中单轴 —— 渐变环头像 → 实底名字胶囊 →
-  /// 性别胶囊，三者层层收窄，视觉重心落在头像上。性别不再占一整行只读输入框
-  /// （那个样子像没填完的表单），改成名字下方一枚彩色小胶囊；性别为空（向导
-  /// 未写入/老账号）就整枚不显示，不留空壳。性别由向导写入，暂不提供修改入口。
+  /// 版式（老板 2026-10-17 二次调整）：横向身份卡 —— 左边渐变环头像，右边两行
+  /// 左对齐（名字在上、性别在下），眼睛一眼就能把「人 + 资料」连起来，不再是一
+  /// 列居中的控件塔。性别用小胶囊而非整行只读输入框（后者像没填完的表单）；
+  /// 性别为空（向导未写入/老账号）整枚不显示，不留空壳。
+  /// 桌面端弹层限宽 [kMyProfileSheetMaxWidth]（老板 2026-10-17）：BottomSheet
+  /// 默认铺满窗口宽度，宽屏下这张身份卡会被拉成一条空旷的长带——限宽后居中
+  /// 停在窗口底部，仍是底部弹层的形态。
   Future<void> _showMyProfileSheet() async {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
@@ -4756,14 +4764,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             : scheme.outline;
     final genderLabel =
         isFemale ? l10n.wizardGenderFemale : isMale ? l10n.wizardGenderMale : '';
+    // 头像组件句柄：外层方形热区（头像 + 编辑角标）通过它触发头像自己的点按
+    // 决策（有图 → 全屏 / 没图 → 选图），避免外层另存一份图去猜（老板 2026-10-17）
+    final avatarKey = GlobalKey<_MessageAvatarState>();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
+      // 桌面端限宽（老板 2026-10-17）：不限宽时整张身份卡随窗口拉长，头像和
+      // 名字之间会隔出一大片空白。maxWidth 之外手机端不受影响（本就比它窄）。
+      constraints: const BoxConstraints(maxWidth: kMyProfileSheetMaxWidth),
       builder: (ctx) {
         return SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4778,174 +4792,196 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               color: scheme.onSurface)),
                     ),
                   ),
-                  // 头像（居中大图）：点击 → 走 _MessageAvatar 自己的头像全屏
-                  // （与状态条/气泡头像同一家），本人的头像带「更换头像」+「保存」。
-                  // 右上角编辑角标（老板 2026-10-17）：与头像同一点击动作——
-                  // 有头像 = 开全屏（换头像从全屏里的「更换头像」按钮进），
-                  // 无头像 = 直接进选图（没有大图可看）。
-                  // 点击去向完全由 _MessageAvatar 按自己的图缓存决定
-                  // （onTapWithoutImage），不再由外层按 _myAvatarBytes 猜——
-                  // 两个独立加载源不一致会错航/死区（2026-10-17 复查修复）。
-                  // 外圈粉蓝渐变细环 + 一圈 surface 留白（老板 2026-10-17 重设计）：
-                  // 弹层底色也是浅粉白，没有环的话头像边界糊在背景里，整页只剩控件
-                  // 平铺；细环给了视觉焦点，颜色取自 Logo 的蓝/粉两端。
-                  Center(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: scheme.surface,
-                            ),
-                            child: _MessageAvatar(
-                              memberId: _myMemberId,
-                              server: effectiveServer,
-                              api: widget.api,
-                              radius: 44,
-                              onTapWithoutImage: () {
-                                Navigator.of(ctx).pop();
-                                _menuAction(_showAvatarUpload);
-                              },
-                              onReplaceAvatar: () {
-                                Navigator.of(ctx).pop();
-                                _menuAction(_showAvatarUpload);
-                              },
-                              onApplyAllSpaces: _hasMultipleSpaces
-                                  ? (bytes) => _applyAvatarAllSpaces(bytes)
-                                  : null,
-                              onSaveImage: (bytes) =>
-                                  _saveAvatarImage(_myMemberName, bytes),
-                            ),
-                          ),
-                        ),
-                        // 编辑角标：粉强调色小圆徽 + 白色编辑笔（与「我的同伴」
-                        // 弹层群名行的编辑图标同一动作语义）
-                        Positioned(
-                          right: -2,
-                          top: -2,
-                          child: IgnorePointer(
-                            // 点击穿透到头像本体（整个区域一个动作）
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD6529C),
+                  Row(
+                    children: [
+                      // 头像（左侧大图）+ 编辑角标 = **一个方形热区**（老板 2026-10-17）：
+                      // 点头像、点角标、点圆的四角都是同一个动作——有头像 = 开全屏
+                      // （换头像从全屏里的「更换头像」按钮进），无头像 = 直接进选图。
+                      // 去向由 _MessageAvatar.handleTap 按它自己的图缓存决定，不再由
+                      // 外层按 _myAvatarBytes 猜——两个独立加载源不一致会错航/死区
+                      // （2026-10-17 复查修复）。内层传 openFullscreenOnTap:false 让出
+                      // 点击：否则内圈圆形手势和外层方形热区会抢同一个 tap。
+                      // 外圈粉蓝渐变细环 + 一圈 surface 留白：弹层底色也是浅粉白，
+                      // 没有环的话头像边界糊在背景里；细环颜色取自 Logo 的蓝/粉两端。
+                      Clickable(
+                        behavior: HitTestBehavior.opaque, // 方角空白也算热区
+                        circle: true, // 反馈遮罩仍跟圆走，方角不染色
+                        onTap: () => avatarKey.currentState?.handleTap(),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: scheme.surface, width: 2),
-                              ),
-                              child: const Padding(
-                                padding: EdgeInsets.all(4),
-                                child: Icon(Icons.edit,
-                                    size: 14, color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // 名字胶囊：文字 + 编辑图标组成可点击胶囊（与「我的同伴」弹层
-                  // 群名行同款交互），点击 → 收起弹层、打开改名弹窗。
-                  // 实底（surfaceContainerHighest）+ Material/InkWell：以前只有
-                  // 文字+图标、底色透明，看不出「可以点」，也显得空（2026-10-17）。
-                  Center(
-                    child: ConstrainedBox(
-                      // 长名字不至于把胶囊撑成一条横贯弹层的长条（32 字上限下
-                      // 会贴到两边、失去「胶囊」形状）：最多 264 宽，超出省略
-                      constraints: const BoxConstraints(maxWidth: 264),
-                      child: Material(
-                        color: scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(999),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          key: const ValueKey('myProfileNameRow'),
-                          mouseCursor: SystemMouseCursors.click,
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            _menuAction(_showRenameDialog);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 10, 14, 10),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    _myMemberName.isEmpty
-                                        ? l10n.chatPageNameUnset
-                                        : _myMemberName,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 20,
-                                      height: 1.2,
-                                      color: _myMemberName.isEmpty
-                                          ? scheme.outline
-                                          : null,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                const SizedBox(width: 6),
-                                Icon(Icons.edit_outlined,
-                                    size: 18, color: scheme.onSurfaceVariant),
-                              ],
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: scheme.surface,
+                                ),
+                                child: _MessageAvatar(
+                                  key: avatarKey,
+                                  memberId: _myMemberId,
+                                  server: effectiveServer,
+                                  api: widget.api,
+                                  radius: 40,
+                                  // 点击交给外层方形热区（统一一个动作）
+                                  openFullscreenOnTap: false,
+                                  onTapWithoutImage: () {
+                                    Navigator.of(ctx).pop();
+                                    _menuAction(_showAvatarUpload);
+                                  },
+                                  onReplaceAvatar: () {
+                                    Navigator.of(ctx).pop();
+                                    _menuAction(_showAvatarUpload);
+                                  },
+                                  onApplyAllSpaces: _hasMultipleSpaces
+                                      ? (bytes) => _applyAvatarAllSpaces(bytes)
+                                      : null,
+                                  onSaveImage: (bytes) =>
+                                      _saveAvatarImage(_myMemberName, bytes),
+                                ),
+                              ),
                             ),
-                          ),
+                            // 编辑角标（老板 2026-10-17 二次调整）：原先是粉红圆徽 +
+                            // 白色铅笔，比头像还抢眼；改成 surface 底 + 细描边 + 灰蓝
+                            // 铅笔，压在环内右下角。不挂独立手势——整个方形热区共用
+                            // 头像的动作，点角标就等于点头像。
+                            Positioned(
+                              right: 4,
+                              bottom: 4,
+                              child: IgnorePointer(
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: scheme.outlineVariant),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.06),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(Icons.edit,
+                                      size: 14,
+                                      color: scheme.onSurfaceVariant),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  // 性别：只读小胶囊（2026-10-17 重设计，替代原来的整行只读输入框）。
-                  // 性别为空不显示——留一枚「未设置」空壳反而像缺数据待填。
-                  if (genderLabel.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Center(
-                      child: Semantics(
-                        // 胶囊里只有「男/女」，读屏补上「性别」二字
-                        label: '${l10n.chatPageGenderLabel} $genderLabel',
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: genderColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isFemale ? Icons.female : Icons.male,
-                                size: 16,
-                                color: genderColor,
+                      const SizedBox(width: 18),
+                      // 右侧两行：名字（上）+ 性别（下），左对齐
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 名字胶囊：文字 + 编辑图标组成可点击胶囊（与「我的同伴」
+                            // 弹层群名行同款交互），点击 → 收起弹层、打开改名弹窗。
+                            // 实底（surfaceContainerHighest）+ Material/InkWell：透明
+                            // 底看不出「可以点」；实底还把点击区撑到胶囊大小（只点
+                            // 文字太窄，桌面端不好点）。长名字由 Expanded 给上限，
+                            // 超出省略。
+                            Material(
+                              color: scheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(999),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                key: const ValueKey('myProfileNameRow'),
+                                mouseCursor: SystemMouseCursors.click,
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  _menuAction(_showRenameDialog);
+                                },
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 9, 12, 9),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          _myMemberName.isEmpty
+                                              ? l10n.chatPageNameUnset
+                                              : _myMemberName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 20,
+                                            height: 1.2,
+                                            color: _myMemberName.isEmpty
+                                                ? scheme.outline
+                                                : null,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Icon(Icons.edit_outlined,
+                                          size: 18,
+                                          color: scheme.onSurfaceVariant),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                genderLabel,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.2,
-                                  color: genderColor,
+                            ),
+                            // 性别：只读小胶囊（2026-10-17 重设计，替代原来的整行
+                            // 只读输入框）。性别为空不显示——留一枚「未设置」空壳
+                            // 反而像缺数据待填。
+                            if (genderLabel.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Semantics(
+                                // 胶囊里只有「男/女」，读屏补上「性别」二字
+                                label:
+                                    '${l10n.chatPageGenderLabel} $genderLabel',
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: genderColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isFemale ? Icons.female : Icons.male,
+                                        size: 16,
+                                        color: genderColor,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        genderLabel,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.2,
+                                          color: genderColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -10609,7 +10645,8 @@ Future<void> showMyAvatarFullscreen(
 
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar(
-      {this.memberId,
+      {super.key,
+      this.memberId,
       required this.server,
       this.api,
       this.radius = 16,
@@ -10729,14 +10766,27 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     );
   }
 
+  /// 点按动作：本组件唯一的「去向」决策——有图 → 全屏大图；没图 → 调用方的
+  /// [onTapWithoutImage]。
+  ///
+  /// 对外公开是给「我的资料」弹层用的（老板 2026-10-17）：那里把头像和编辑角标
+  /// 包成一个方形热区，点在角标或圆的四角也要落到和图像同一动作上——外层热区
+  /// 直接调这个方法，内层则传 `openFullscreenOnTap: false` 让出点击，避免两个
+  /// 手势识别器抢同一个 tap。
+  void handleTap() {
+    if (_bytes != null) {
+      _showFullscreen();
+    } else {
+      widget.onTapWithoutImage?.call();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
     // 点按去向由**本组件**决定（有图 → 全屏；没图 → 调用方的 onTapWithoutImage），
     // 不靠调用方从外部猜缓存状态（见 onTapWithoutImage 注释）。
-    final onTap = !widget.openFullscreenOnTap
-        ? null
-        : (bytes != null ? _showFullscreen : widget.onTapWithoutImage);
+    final onTap = widget.openFullscreenOnTap ? handleTap : null;
     return Clickable(
       onTap: onTap,
       circle: true,
