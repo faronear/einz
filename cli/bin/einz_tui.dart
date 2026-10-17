@@ -3264,6 +3264,136 @@ Future<void> _uploadAvatarInBackground(ChatSession session, String path) async {
   }
 }
 
+/// 系统文件选择窗口（老板 2026-10-17）：`/attach` / `/avatar` 不带参数时弹出，
+/// 用户选中确认后把 `<命令> <路径>` 填进输入行——**不自动发送**，让人先看见路径
+/// 再回车执行（发错文件/头像没有撤回，宁可多一次确认）。
+///
+/// 平台实现（按优先级探测，缺工具/无图形会话时明确告知并退回手敲路径）：
+/// - macOS：`osascript choose file`（UTI 过滤）
+/// - Linux：`zenity --file-selection`（备选 `kdialog --getopenfilename`）
+/// - Windows：PowerShell `OpenFileDialog`（-STA）
+///
+/// **取消 vs 出错的区分**：用户按取消时三种工具的共同表现是"无输出"，此时**静默**
+/// （输入行本是空的，不发消息最不易被误解）；但只要 stderr 有内容且不是取消语
+/// （osascript 的 "User canceled. (-128)"），就是真故障——TCC 未授权、GTK 打不开
+/// 显示等——必须说出来，否则用户以为命令没反应（排查半天）。
+///
+/// 终端配合：选择器与 TUI 共用同一个 tty，raw 模式下它往屏幕写会把 TUI 画面糊掉，
+/// 故弹窗前后成对切换——先 `_restoreTerminal`（cooked + 显示光标 + 关鼠标上报），
+/// 选完 `_enterRaw` + 全量重绘（_render 开头即清屏，选择器残留一笔勾销）。期间置
+/// processing：模态窗口前的误敲不进输入行（Ctrl+C 仍可退出，不锁死）。
+///
+/// 返回 true = 路径已填入输入行；false = 取消/不可用（原因已进消息流）。
+Future<bool> _pickFileIntoInput(String commandPrefix, {bool imagesOnly = false}) async {
+  final s = _state;
+  if (s == null) return false;
+
+  String? picked;
+  String? failReason;
+  /// stderr 是"用户取消"的标准语吗（osascript 取消文案 / -128 错误码）？
+  /// 是 → 静默；否 → 当故障报出来（见上方说明）。
+  bool isCancelNoise(String err) =>
+      err.isEmpty || err.contains('User canceled') || err.contains('-128');
+  try {
+    if (Platform.isMacOS) {
+      // public.image = png/jpg/gif/heic/webp 等（UTI 体系，勿逐扩展名列举）
+      final typeClause = imagesOnly ? ' of type {"public.image"}' : '';
+      final r = await Process.run(
+          'osascript', ['-e', 'POSIX path of (choose file$typeClause)']);
+      final out = r.stdout.toString().trim();
+      final err = r.stderr.toString().trim();
+      if (r.exitCode == 0 && out.isNotEmpty) {
+        picked = out;
+      } else if (!isCancelNoise(err)) {
+        // 典型：macOS TCC 未授权发 Apple 事件（系统设置→隐私与安全性→自动化）
+        failReason = '系统选择窗口未能打开（$err）';
+      }
+    } else if (Platform.isLinux) {
+      // 无图形会话（纯 SSH）：zenity/kdialog 必然失败，提前说明，别让用户对黑屏干等
+      final hasGui = Platform.environment['DISPLAY']?.isNotEmpty == true ||
+          Platform.environment['WAYLAND_DISPLAY']?.isNotEmpty == true;
+      if (!hasGui) {
+        failReason = '当前是无图形会话（SSH），无法弹出文件选择窗口，请直接输入路径';
+      } else {
+        final filter = imagesOnly
+            ? ['--file-filter=图片 | *.png *.jpg *.jpeg *.gif *.webp *.heic']
+            : const <String>[];
+        try {
+          final r = await Process.run('zenity', ['--file-selection', ...filter]);
+          final out = r.stdout.toString().trim();
+          final err = r.stderr.toString().trim();
+          if (r.exitCode == 0 && out.isNotEmpty) {
+            picked = out;
+          } else if (!isCancelNoise(err)) {
+            failReason = 'zenity 未能打开选择窗口（$err）';
+          }
+        } on ProcessException {
+          // zenity 缺失（很多发行版默认不装）→ 试 kdialog（KDE 系）
+          try {
+            final r = await Process.run('kdialog', ['--getopenfilename', '.']);
+            final out = r.stdout.toString().trim();
+            final err = r.stderr.toString().trim();
+            if (r.exitCode == 0 && out.isNotEmpty) {
+              picked = out;
+            } else if (!isCancelNoise(err)) {
+              failReason = 'kdialog 未能打开选择窗口（$err）';
+            }
+          } on ProcessException {
+            failReason = '未找到 zenity / kdialog，无法弹出文件选择窗口，请直接输入路径';
+          }
+        }
+      }
+    } else if (Platform.isWindows) {
+      // 5.1/pwsh 通用：-STA 是 OpenFileDialog 的硬要求（WPF/WinForms 对话框要单线程单元）
+      final ps = imagesOnly
+          ? "Add-Type -AssemblyName System.Windows.Forms;"
+            "\$f=New-Object System.Windows.Forms.OpenFileDialog;"
+            "\$f.Filter='图片 (*.png;*.jpg;*.jpeg;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.gif;*.webp|所有文件 (*.*)|*.*';"
+            "if (\$f.ShowDialog() -eq 'OK') { \$f.FileName }"
+          : "Add-Type -AssemblyName System.Windows.Forms;"
+            "\$f=New-Object System.Windows.Forms.OpenFileDialog;"
+            "if (\$f.ShowDialog() -eq 'OK') { \$f.FileName }";
+      final r = await Process.run('powershell',
+          ['-NoProfile', '-STA', '-Command', ps]);
+      final out = r.stdout.toString().trim();
+      if (out.isNotEmpty) picked = out;
+    } else {
+      failReason = '当前平台不支持系统文件选择窗口，请直接输入路径';
+    }
+  } on ProcessException catch (e) {
+    failReason = '无法启动文件选择窗口（${e.message}），请直接输入路径';
+  }
+
+  if (picked == null) {
+    if (failReason != null) {
+      s.session.messages.add(_systemMessage(s.session, 'ℹ️ $failReason'));
+    } else {
+      // 用户主动取消：静默即可（输入行本是空的，什么都不做最不易被误解）
+    }
+    return false;
+  }
+  // 填入输入行（含命令本身，回车即执行）；光标落在行尾，可继续手工改路径
+  _setInput(s, '$commandPrefix $picked');
+  return true;
+}
+
+/// 弹出系统文件选择窗口并在选完后恢复 TUI 画面（[_pickFileIntoInput] 的终端配合
+/// 包装）：raw → cooked → 选择器 → raw + 全量重绘。返回 false = 取消/不可用。
+Future<bool> _pickFileIntoInputWithTerminal(String commandPrefix,
+    {bool imagesOnly = false}) async {
+  final s = _state;
+  if (s == null) return false;
+  s.processing = true; // 模态窗口期间忽略键入（Ctrl+C 仍可退出）
+  _restoreTerminal();
+  try {
+    return await _pickFileIntoInput(commandPrefix, imagesOnly: imagesOnly);
+  } finally {
+    _enterRaw();
+    s.processing = false;
+    _render();
+  }
+}
+
 /// `/reset`：重置本通道——三道闸门过后清本地数据，然后**原地回到全新入网向导**
 /// （老板 2026-09-23：以前是清完就退出进程，得自己重新敲命令启动）。
 ///
@@ -3357,9 +3487,10 @@ Future<void> _execCommand(String line) async {
       // 按命令字母序输出（老板 2026-10-08）：列表 + sort，新增命令时只需往列表
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
       const helpEntries = <(String, String)>[
-        ('/attach <文件路径>', '上传文件'),
+        ('/attach <文件路径>', '上传文件（不带参数 = 弹系统文件选择窗口，选中后填进输入行）'),
         ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
-        ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像）'),
+        ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像；'
+            '不带参数 = 弹系统文件选择窗口，只列图片）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -3762,7 +3893,9 @@ Future<void> _execCommand(String line) async {
       break;
     case '/attach':
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /attach <文件路径> [描述]'));
+        // 不带参数 = 弹系统文件选择窗口（老板 2026-10-17），选中后把
+        // `/attach <路径>` 填进输入行，用户确认后再回车发送
+        await _pickFileIntoInputWithTerminal('/attach');
       } else {
         // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
         // 2026-09-14）；这里**不 await**——回车即交还输入（否则输入循环 busy 到上传结束，
@@ -3774,8 +3907,8 @@ Future<void> _execCommand(String line) async {
       // TUI 本身不渲染头像，但头像是 per-member 的共享资料：这里设的就是对方 App /
       // TUI 里看到的我的头像（与 App「我的资料」弹层同一个服务端存储）。
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session,
-            '🔧 用法: /avatar <图片路径> 👉 设置我的头像（png/jpg 等图片，≤2MB）'));
+        // 不带参数 = 弹系统文件选择窗口（只列图片），选中后填 `/avatar <路径>` 待确认
+        await _pickFileIntoInputWithTerminal('/avatar', imagesOnly: true);
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
