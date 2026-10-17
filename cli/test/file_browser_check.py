@@ -181,6 +181,24 @@ class Tui:
                 self.pump(1.5)
         return False
 
+    def wait_for(self, needle, timeout=10):
+        """等到屏幕上出现 needle（轮询泵帧）；超时返回 False。
+
+        为什么不用固定 pump：连续跑多个回归时机器有负载，`dart run` 编译 + 首帧
+        渲染可能拖过固定时长，随后按键落到错误状态（实测 ⑥ 偶发失败就是这类）。
+        按"出现什么"等，比按"等多久"等确定得多。"""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if needle in self.text():
+                return True
+            self.pump(0.4)
+        return False
+
+    def press(self, keys, expect, timeout=10):
+        """发按键并等到 expect 出现（浏览器交互的统一姿势）。"""
+        self.send(keys)
+        return self.wait_for(expect, timeout)
+
     def alive(self):
         return self.p.poll() is None
 
@@ -217,9 +235,10 @@ def main():
             fail('TUI 未进入聊天态（30s 超时）')
         print('聊天态就绪')
 
-        # ① 列出目录
+        # ① 列出目录（等到提示行出现，不用固定时长）
         t.send(b'/attach\r')
-        t.pump(4)
+        if not t.wait_for('↑↓ 移动'):
+            fail('① 浏览器未打开')
         text = t.text()
         for needle in ['..', 'sub/', 'a.txt', 'b.png',
                        '↑↓ 移动', 'Enter 进入/选中', 'Backspace 上级', 'q 取消']:
@@ -231,13 +250,14 @@ def main():
             fail('① 头部未显示目录/文件计数')
         print('① 目录列表 OK（.. + sub/ + a.txt + b.png + 提示行 + 头部）')
 
-        # ② 选中文件（光标 0=.. → ↓↓ 到 a.txt）→ 输入行填 `/attach <路径>`
-        t.send(DOWN)
-        t.pump(1.5)
-        t.send(DOWN)
-        t.pump(1.5)
+        # ② 选中文件（光标 0=.. → ↓ 到 sub/ → ↓ 到 a.txt）→ 输入行填 `/attach <路径>`
+        if not t.press(DOWN, f'{home}/sub'):
+            fail('② 第一次 ↓ 未移到 sub/')
+        if not t.press(DOWN, f'{home}/a.txt'):
+            fail('② 第二次 ↓ 未移到 a.txt')
         t.send(CR)
-        t.pump(2.5)
+        if not t.wait_for(f'/attach {home}/a.txt'):
+            fail('② 回车后输入行未填入路径')
         text = t.text()
         if f'/attach {home}/a.txt' not in text:
             fail(f'② 选中 a.txt 后输入行未填入路径：{text[-200:]!r}')
@@ -248,9 +268,11 @@ def main():
         # ③ q 取消
         t.clear_input()
         t.send(b'/attach\r')
-        t.pump(4)
+        if not t.wait_for('↑↓ 移动'):
+            fail('③ 浏览器未打开')
         t.send(b'q')
-        t.pump(2.5)
+        if not t.wait_for('/help 查看命令'):
+            fail('③ q 未退出浏览器')
         text = t.text()
         if '↑↓ 移动' in text:
             fail('③ q 未退出浏览器')
@@ -264,25 +286,26 @@ def main():
         # ④ Esc 取消（裸 Esc：50ms 超时判定）
         t.clear_input()
         t.send(b'/attach\r')
-        t.pump(4)
+        if not t.wait_for('↑↓ 移动'):
+            fail('④ 浏览器未打开')
         t.send(ESC)
-        t.pump(2.5)
-        if '↑↓ 移动' in t.text():
+        if not t.wait_for('/help 查看命令'):
             fail('④ Esc 未退出浏览器')
         print('④ Esc 取消 OK')
 
         # ⑤ Enter 进子目录 + Backspace 回上级
         t.clear_input()
         t.send(b'/attach\r')
-        t.pump(4)
-        t.send(DOWN)  # .. → sub/
-        t.pump(1.5)
+        if not t.wait_for('↑↓ 移动'):
+            fail('⑤ 浏览器未打开')
+        if not t.press(DOWN, f'{home}/sub'):  # .. → sub/
+            fail('⑤ 未移到 sub/')
         t.send(CR)
-        t.pump(2.5)
-        if f'{home}/sub' not in t.text() or 'c.txt' not in t.text():
+        if not t.wait_for('c.txt'):
             fail('⑤ 进入子目录失败')
         t.send(BS)
-        t.pump(2.5)
+        if not t.wait_for('a.txt'):
+            fail('⑤ Backspace 未回上级目录')
         text = t.text()
         if home not in text or 'a.txt' not in text:
             fail('⑤ Backspace 未回上级目录')
@@ -291,34 +314,34 @@ def main():
         # ⑥ /avatar 只放行图片
         t.clear_input()
         t.send(b'/avatar\r')
-        t.pump(4)
-        t.send(DOWN)  # .. → sub/
-        t.pump(1.5)
-        t.send(DOWN)  # sub/ → a.txt
-        t.pump(1.5)
+        if not t.wait_for('只选图片'):
+            fail('⑥ /avatar 浏览器未打开（应标注只选图片）')
+        if not t.press(DOWN, f'{home}/sub'):  # .. → sub/
+            fail('⑥ 未移到 sub/')
+        if not t.press(DOWN, f'{home}/a.txt'):  # sub/ → a.txt
+            fail('⑥ 未移到 a.txt')
         t.send(CR)
-        t.pump(2.5)
-        text = t.text()
-        if '头像只能是图片' not in text:
+        if not t.wait_for('头像只能是图片'):
             fail('⑥ 选非图片未给提示')
-        if '↑↓ 移动' not in text:
+        if '↑↓ 移动' not in t.text():
             fail('⑥ 选非图片后浏览器不应退出')
-        t.send(DOWN)  # a.txt → b.png
-        t.pump(1.5)
+        if not t.press(DOWN, f'{home}/b.png'):  # a.txt → b.png
+            fail('⑥ 未移到 b.png')
         t.send(CR)
-        t.pump(2.5)
-        if f'/avatar {home}/b.png' not in t.text():
+        if not t.wait_for(f'/avatar {home}/b.png'):
             fail('⑥ 选图片未填入 /avatar <路径>')
         print('⑥ /avatar 只放行图片 OK（拦 .txt 有提示，放行 .png）')
 
         # ⑦ h 切换隐藏文件
         t.clear_input()
         t.send(b'/attach\r')
-        t.pump(4)
+        if not t.wait_for('↑↓ 移动'):
+            fail('⑦ 浏览器未打开')
         if '.hidden.txt' in t.text():
             fail('⑦ 默认不应显示隐藏文件')
         t.send(b'h')
-        t.pump(2.5)
+        if not t.wait_for('.hidden.txt'):
+            fail('⑦ 按 h 未显示隐藏文件')
         text = t.text()
         if '.hidden.txt' not in text or '含隐藏' not in text:
             fail('⑦ 按 h 未显示隐藏文件')

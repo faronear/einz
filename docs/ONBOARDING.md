@@ -104,7 +104,8 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc \
 > 命令一览：`/help`；空间状态 `/space`；改口令 `/passphrase`；通道名 `/entrance <名>`（别名 `/device`）；
 > 我的显示名 `/myname <名>`；我的头像 `/avatar <图片路径>`。
 > `/attach`、`/avatar` 不带参数可直接选文件：有图形界面弹系统窗口，SSH 下自动用 TUI 内置
-> 浏览器（方向键 + 回车），选中后路径进输入行、回车才发。
+> 浏览器（方向键 + 回车），选中后路径进输入行、回车才发。记得路径前缀的话，直接敲字按 Tab
+> 也能补全（唯一匹配直接补全，多个候选列出供选）。
 
 ---
 

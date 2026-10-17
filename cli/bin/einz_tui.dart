@@ -160,6 +160,10 @@ class _TuiState {
 
   bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
 
+  /// Tab 补全列出的候选消息（方案 C）：重复 Tab 时替换上一条，
+  /// 否则连按十次就把消息流刷成十条差不多的列表。
+  ChatMessage? completionMsg;
+
   /// 内置文件浏览器（方案 B，老板 2026-10-17）处于活动态时非 null——**模态**：
   /// 输入循环的按键全部分发给浏览器，消息区改画目录列表，输入行实时预览光标
   /// 所在条目。系统文件选择窗口不可用（纯 SSH / 缺 zenity）时由 `/attach`、
@@ -3199,6 +3203,18 @@ Future<void> _runInputLoop() async {
         });
         continue;
       }
+      if (code == 9) {
+        // Tab：路径补全（方案 C）。只在聊天态补——浏览器是模态态（Tab 无意义）、
+        // 引导问答/机密输入是纯文本输入（补全会把答案搅乱）、隐藏回显不补。
+        final s = _state!;
+        if (s.browser == null &&
+            s.pendingGuideCompleter == null &&
+            !s.hiddenInput) {
+          _completePathAtCursor(s);
+          inputChanged = true;
+        }
+        continue;
+      }
       if (code == 127 || code == 8) {
         // 文件浏览器态（方案 B）：退格 = 回上级目录
         if (_state!.browser != null) {
@@ -3631,6 +3647,133 @@ void _browserChar(_TuiState s, String ch) {
   }
 }
 
+// ---------- Tab 路径补全（方案 C：记得前缀，用键盘敲完）----------
+
+/// 第一个参数是**路径**的命令：其后即使是裸名字也按路径补全
+/// （`/open` 收序号，不补；其余命令的参数不是路径）。
+const Set<String> _kPathArgCommands = {'/attach', '/avatar', '/backup', '/switch'};
+
+/// 光标所在 token 是不是"该按路径补全"的样子：含 `/` 或以 `~` 开头（显然是
+/// 路径），或整行是路径命令、这是它的参数（裸名字 = 相对当前目录的路径）。
+/// 行首 token 一律不补——那是命令本身（`/attach` 含 `/`，不排除会把敲命令名
+/// 当成敲路径，Tab 下去只会得到"没有匹配"的噪音）。
+bool _tokenLooksLikePath(String token, String line, int tokenStart) {
+  if (tokenStart <= 0) return false;
+  if (token.startsWith('~') || token.contains('/')) return true;
+  final head = line.substring(0, tokenStart).trim();
+  return head.isNotEmpty && _kPathArgCommands.contains(head.split(RegExp(r'\s+')).first);
+}
+
+/// 文件系统实体的 basename（兼容 Windows 反斜杠）。
+String _baseName(FileSystemEntity e) => e.path.replaceAll('\\', '/').split('/').last;
+
+/// Tab 补全（老板 2026-10-17，方案 C）：补全光标所在的路径 token。
+///
+/// 语义对齐 shell：唯一匹配 → 直接补全（目录补到带 `/`，接着 Tab 就能进下一层）；
+/// 多个匹配 → 扩展到**最长公共前缀**（通常再按一两次 Tab 就唯一了），并列出了候选
+/// （替换上一条候选消息，不刷屏）；没有匹配 → 状态行给一句提示，不改输入。
+/// `~` 形式在输入行里保留原样（展开只用于查目录）——用户敲什么风格就还他什么风格。
+void _completePathAtCursor(_TuiState s) {
+  final text = s.input.toString();
+  if (s.cursor <= 0 || s.cursor > text.length) return;
+  // 词边界（空白分隔）：光标前扫到空白、光标后扫到空白
+  var start = s.cursor;
+  while (start > 0 && !RegExp(r'\s').hasMatch(text[start - 1])) {
+    start--;
+  }
+  var end = s.cursor;
+  while (end < text.length && !RegExp(r'\s').hasMatch(text[end])) {
+    end++;
+  }
+  final token = text.substring(start, end);
+  if (token.isEmpty) return;
+  if (!_tokenLooksLikePath(token, text, start)) return;
+
+  // ~ 展开（仅用于查目录；展示路径折回 ~ 形式，见 toDisplay）
+  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final expanded = (token.startsWith('~') && home != null)
+      ? home + token.substring(1)
+      : token;
+  String toDisplay(String p) {
+    if (token.startsWith('~') && home != null && p.startsWith(home)) {
+      return '~' + p.substring(home.length);
+    }
+    return p;
+  }
+
+  // 目录段 / 名字段：以最后一个 / 切分（结尾带 / = 名字段为空，列整个目录）
+  final cut = expanded.lastIndexOf('/');
+  final dirPart = cut >= 0 ? expanded.substring(0, cut + 1) : '';
+  final namePart = cut >= 0 ? expanded.substring(cut + 1) : expanded;
+  final searchDir = dirPart.isEmpty ? Directory.current.path : dirPart;
+
+  final List<FileSystemEntity> entries;
+  try {
+    entries = Directory(searchDir).listSync(followLinks: false);
+  } catch (_) {
+    s.status = '⚠️ 目录不存在或读不了：$searchDir';
+    _render();
+    return;
+  }
+  // 点文件只在用户自己敲了点时才候选（shell 惯例）
+  final showHidden = namePart.startsWith('.');
+  final matches = <FileSystemEntity>[];
+  for (final e in entries) {
+    final name = _baseName(e);
+    if (name.isEmpty) continue;
+    if (!showHidden && name.startsWith('.')) continue;
+    if (!name.startsWith(namePart)) continue;
+    matches.add(e);
+  }
+  if (matches.isEmpty) {
+    s.status = '⚠️ ${toDisplay(searchDir)} 下没有以「$namePart」开头的项';
+    _render();
+    return;
+  }
+  // 目录在前、各自按名排序（与内置浏览器一致，候选列表顺序可预期）
+  matches.sort((a, b) {
+    final aDir = a is Directory;
+    final bDir = b is Directory;
+    if (aDir != bDir) return aDir ? -1 : 1;
+    return _baseName(a).toLowerCase().compareTo(_baseName(b).toLowerCase());
+  });
+  final names = [for (final e in matches) _baseName(e)];
+  // 最长公共前缀（多个候选时至少不会补错）
+  var lcp = names.first;
+  for (final n in names.skip(1)) {
+    var i = 0;
+    while (i < lcp.length && i < n.length && lcp[i] == n[i]) {
+      i++;
+    }
+    lcp = lcp.substring(0, i);
+  }
+  final unique = matches.length == 1;
+  var completed = dirPart + (unique ? names.first : lcp);
+  if (unique && matches.first is Directory) completed += '/'; // 目录补到可继续进
+  final newToken = toDisplay(completed);
+  s.input
+    ..clear()
+    ..write(text.substring(0, start))
+    ..write(newToken)
+    ..write(text.substring(end));
+  s.cursor = start + newToken.length;
+  if (!unique) {
+    final list = [
+      for (final e in matches) '${_baseName(e)}${e is Directory ? '/' : ''}'
+    ].join('  ');
+    _showCompletionCandidates(
+        s, '📂 ${toDisplay(searchDir)} 匹配 ${matches.length} 项（再补几个字符按 Tab）：\n  $list');
+  }
+  _render();
+}
+
+/// 候选列表作为一条 system 消息进消息流（可滚动回看）；重复 Tab **替换**上一条。
+void _showCompletionCandidates(_TuiState s, String text) {
+  if (s.completionMsg != null) s.session.messages.remove(s.completionMsg);
+  s.completionMsg = _systemMessage(s.session, text);
+  s.session.messages.add(s.completionMsg!);
+}
+
 /// 文件大小的人读格式（1.2 MB / 843 B）。
 String _humanSize(int bytes) {
   if (bytes < 1024) return '$bytes B';
@@ -3922,10 +4065,10 @@ Future<void> _execCommand(String line) async {
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
       const helpEntries = <(String, String)>[
         ('/attach <文件路径>', '上传文件（不带参数 = 选文件：有 GUI 弹系统窗口，SSH 自动用内置浏览器；'
-            '选中后把路径填进输入行，回车才发）'),
+            '选中后把路径填进输入行，回车才发。敲路径时按 Tab 可补全）'),
         ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
         ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像；'
-            '不带参数 = 选图片，只列图片）'),
+            '不带参数 = 选图片，只列图片；Tab 补全路径）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),

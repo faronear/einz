@@ -15083,3 +15083,11 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 - 回归：`dart analyze` 0 问题；CLI 28 项 dart 测试过；guide_crash/guide_exit/guide_input_rules 三个引导回归过（改过 ESC 解析与回车路径，必须确认没碰坏引导）；presence_check 双 TUI 端到端过；file_browser_check 8 项全过。文档：DEPLOYMENT.md 新增 §2.3.1（两条选文件路线 + 按键表 + EINZ_TUI_PICKER），ONBOARDING.md 命令一览补一句。
 
 **（2026-10-17T15:30:29Z / 2026-10-17 23:30）**：前台无操作锁屏完成。设了 PIN 的用户在前台亮屏闲置 30s（无点/滑/打字）也弹严格锁屏（canDismiss=false），与后台锁共用 `kLockSeconds`（将来做成可调菜单项）。实现要点：一次性 Timer 每次交互重排（空闲时睡着零唤醒，widget 测试可用假时钟 `pump(30s)` 推进，无需 runAsync 实睡）；交互信号 = build 根 Listener（点/滑/拖）+ 输入框控制器监听（打字）；弹层/锁屏覆盖守卫 = build 根 FocusNode（push 弹层失焦不计时，pop 回聊天焦点回归重排）；复用既有 `_hasPin`/`_appResumed`/`_voiceCall` 字段，通话中不锁，没设 PIN 不锁。中途曾走偏到 NavigatorObserver 方案（`NavigatorState` 无公开 observers getter，编译失败）， analyze 揪出后改回 FocusNode 方案。新增 test/lock_idle_test.dart 3 用例（到点锁/交互重排不锁/无 PIN 不锁），全量 351 过，analyze 0 issues。
+
+## 20261017 Tab 路径补全（方案 C）：记得前缀，用键盘敲完
+
+- **（2026-10-17T14:10:00Z / 2026-10-17 22:10）**：老板问"已有 A/B 还值得做 C 吗"——评估为值得（A 限 GUI、B 治"完全不知道叫啥"、C 治"记得前缀想敲完"，场景不重叠；且 Tab(0x09) 在 TUI 里原本完全没用，无旧行为可坏），随后实现。语义对齐 shell：**唯一匹配**直接补全（目录补到带 `/`，接着 Tab 进下一层）；**多个匹配**扩展到最长公共前缀并列候选（消息流里一条，重复 Tab **替换**上一条，不刷屏）；**无匹配**状态行提示、输入不动。只补"路径样子"的词：含 `/` 或 `~` 开头，或 `/attach`、`/avatar`、`/backup`、`/switch` 的参数（裸名按 TUI 的 cwd 解析——shell 口径，实测注意：从别的目录启动 TUI 时裸名不按 HOME 解析）；行首 token 一律不补（那是命令名，`/attach` 含 `/` 不排除会把敲命令当成敲路径）。`~` 形式在输入行保留原样（展开只用于查目录）。排除态：浏览器（模态）、引导问答、隐藏输入。点文件只在用户自己敲了点时才候选。
+- 新增 `cli/test/tab_complete_check.py`（9 项：唯一补全/LCP+候选/目录加 / /无匹配/裸名按 cwd/聊天词不补/行首命令名不补/浏览器态 Tab 无效/重复 Tab 只一条候选）。
+- **测试稳定性整改**（重要，两个 pty 测试都改）：原用固定 `pump(N 秒)` 等状态，连续跑多个回归时机器有负载，`dart run` 编译+首帧可能拖过时长，后续按键落错状态——`file_browser_check` ⑥ 实测偶发失败一次（"狼来了"比没测试更糟）。改为 `wait_for(needle)` 轮询 + `press(key, expect)` 按"出现什么"等，Tab 测试连跑 3 遍、浏览器测试连跑 2 遍均稳定通过。
+- 验证：`dart analyze` 0；CLI 28 项 dart 测试过；tab_complete 9 项 + file_browser 8 项 + 三个引导回归 + presence_check 端到端全过。文档：DEPLOYMENT.md §2.3.1 补 Tab 一节，ONBOARDING.md 命令一览补一句，`/help` 两条目加"Tab 可补全"。
+- 备注：本次还修正了 worklog 工作区被并行同事旧 buffer 覆盖丢节的问题（提交前把他们两节补回，最终 diff 纯新增）。
