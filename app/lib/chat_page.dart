@@ -4905,11 +4905,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 弹层群名行同款交互），点击 → 收起弹层、打开改名弹窗。
                             // 实底 + Material/InkWell：透明底看不出「可以点」；实底
                             // 还把点击区撑到胶囊大小（只点文字太窄，桌面端不好点）。
-                            // 底色淡灰（与群名胶囊及「添加秘境」/「新建通道」/
-                            // 「邀请新同伴」大按钮统一，老板 2026-10-17）。长名字由
-                            // Expanded 给上限，超出省略。
+                            // 底色随性别调（老板 2026-10-17）：女→淡粉 / 男→淡蓝，
+                            // 与下方性别展示的粉/蓝呼应；性别未设 → 中性淡灰（与群名
+                            // 胶囊及「添加秘境」等大按钮统一）。长名字由 Expanded 给
+                            // 上限，超出省略。
                             Material(
-                              color: Colors.black.withValues(alpha: 0.05),
+                              color: _myGender.isEmpty
+                                  ? Colors.black.withValues(alpha: 0.05)
+                                  : genderColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(999),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
