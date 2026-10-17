@@ -3341,60 +3341,67 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
-                  // 群空间：成员列表前放「群名称」标题行（老板 2026-10-11）：
-                  // **不用卡片**——白底上的标题文字（同弹层标题字号/字重），
-                  // 未设置 → 淡色占位词「群空间名称/Group space name」；
-                  // 编辑按钮紧跟文字右侧（不顶到最右）。点它打开改群名弹窗
-                  //（同状态条点群名）。
+                  // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
+                  // 「我的资料」弹层的名字胶囊同款——实底 + Material/InkWell 水波，
+                  // 文字+编辑图标一眼可点）。底色淡蓝 tertiaryContainer（老板：
+                  // 胶囊底不要粉色，淡蓝/灰皆可——两处胶囊统一淡蓝）。未设置 →
+                  // 淡色占位词；点击打开改群名弹窗（同状态条点群名）。
                   if (_isGroup)
                     Padding(
                       padding: const EdgeInsets.only(top: 2, bottom: 14),
                       child: Center(
-                        child: InkWell(
-                          // key 供测试定位群名行（状态条上可能有同文案，需区分）
-                          key: const ValueKey('membersSheetGroupNameRow'),
-                          mouseCursor: SystemMouseCursors.click,
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            // 先收起成员弹层；等它收完再弹改群名弹窗（同
-                            // 「重新邀请」的 route 交接处理，见其注释）
-                            Navigator.of(ctx).pop();
-                            _menuAction(_showGroupNameDialog);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  // 占位词与改群名弹窗标题共用同一键（老板
-                                  // 2026-10-11：合并为一个文案「群组名称/
-                                  // Group name」，不另设占位词键）
-                                  _groupName.isEmpty
-                                      ? l10n.chatPageGroupNameTitle
-                                      : _groupName,
-                                  style: TextStyle(
-                                    // 占位词单独降档（老板 2026-10-11）：字号
-                                    // 小一档 + 更浅的 outline 色，别与真群名
-                                    // 的 22/w700 深色抢眼；有名字 → 群名
-                                    // 弹层里最显眼（22/w700）
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: _groupName.isEmpty ? 18 : 22,
-                                    height: 1.2,
-                                    color: _groupName.isEmpty
-                                        ? Theme.of(ctx).colorScheme.outline
-                                        : null,
+                        child: Material(
+                          color: Theme.of(ctx).colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            // key 供测试定位群名行（状态条上可能有同文案，需区分）
+                            key: const ValueKey('membersSheetGroupNameRow'),
+                            mouseCursor: SystemMouseCursors.click,
+                            onTap: () {
+                              // 先收起成员弹层；等它收完再弹改群名弹窗（同
+                              // 「重新邀请」的 route 交接处理，见其注释）
+                              Navigator.of(ctx).pop();
+                              _menuAction(_showGroupNameDialog);
+                            },
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 9, 12, 9),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      // 占位词与改群名弹窗标题共用同一键（老板
+                                      // 2026-10-11：合并为一个文案「群组名称/
+                                      // Group name」，不另设占位词键）
+                                      _groupName.isEmpty
+                                          ? l10n.chatPageGroupNameTitle
+                                          : _groupName,
+                                      style: TextStyle(
+                                        // 占位词单独降档（老板 2026-10-11）：字号
+                                        // 小一档 + 更浅的 outline 色，别与真群名
+                                        // 的 20/w700 深色抢眼；有名字 → 胶囊里
+                                        // 最显眼（20/w700，与「我的资料」名字
+                                        // 胶囊同档）
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: _groupName.isEmpty ? 18 : 20,
+                                        height: 1.2,
+                                        color: _groupName.isEmpty
+                                            ? Theme.of(ctx).colorScheme.outline
+                                            : null,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(Icons.edit_outlined,
-                                    size: 18,
-                                    color: Theme.of(ctx)
-                                        .colorScheme
-                                        .onSurfaceVariant),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.edit_outlined,
+                                      size: 18,
+                                      color: Theme.of(ctx)
+                                          .colorScheme
+                                          .onSurfaceVariant),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -4892,12 +4899,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           children: [
                             // 名字胶囊：文字 + 编辑图标组成可点击胶囊（与「我的同伴」
                             // 弹层群名行同款交互），点击 → 收起弹层、打开改名弹窗。
-                            // 实底（surfaceContainerHighest）+ Material/InkWell：透明
-                            // 底看不出「可以点」；实底还把点击区撑到胶囊大小（只点
-                            // 文字太窄，桌面端不好点）。长名字由 Expanded 给上限，
-                            // 超出省略。
+                            // 实底 + Material/InkWell：透明底看不出「可以点」；实底
+                            // 还把点击区撑到胶囊大小（只点文字太窄，桌面端不好点）。
+                            // 底色淡蓝 tertiaryContainer（老板：胶囊底不要粉色，
+                            // 与「我的同伴」群名胶囊统一淡蓝）。长名字由 Expanded
+                            // 给上限，超出省略。
                             Material(
-                              color: scheme.surfaceContainerHighest,
+                              color: scheme.tertiaryContainer,
                               borderRadius: BorderRadius.circular(999),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
