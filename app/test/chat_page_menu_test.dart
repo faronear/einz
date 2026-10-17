@@ -278,13 +278,18 @@ Future<void> _settleFanout(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// 菜单 → 「我的身份」弹窗（_menuAction 有 300ms 错峰延迟）。
+/// 菜单 → 「我的资料」弹层 → 点名字胶囊 → 改名弹窗（_menuAction 有 300ms
+/// 错峰延迟，两段都要等）。
 Future<void> _openMyNameDialog(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.text(_zh.chatPageMenuMyNameLabel));
+  await tester.ensureVisible(find.text(_zh.chatPageMenuMyProfile));
   await tester.pumpAndSettle();
-  await tester.tap(find.text(_zh.chatPageMenuMyNameLabel));
+  await tester.tap(find.text(_zh.chatPageMenuMyProfile));
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+  // 「我的资料」弹层 → 点名字胶囊 → 改名弹窗（同样错峰）
+  await tester.tap(find.byKey(const ValueKey('myProfileNameRow')));
   await tester.pump(const Duration(milliseconds: 350));
   await tester.pumpAndSettle();
 }
@@ -369,11 +374,10 @@ void main() {
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
     expect(find.text(_zh.advancedMenuTitle), findsOneWidget);
-    // 我的身份/当前通道（未传 → 显示「未设置」）+ 退出本应用
-    expect(find.text('我的身份'), findsOneWidget);
+    // 我的资料（聚合原我的身份/我的头像两项，未传名 → 右侧「未设置」）+ 退出本应用
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget);
     expect(find.text(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(find.text('退出本应用'), findsOneWidget);
-    expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text(_zh.advancedMenuTitle), findsOneWidget);
     expect(find.text(_zh.chatPagePinLabel), findsOneWidget);
     // 点"PIN: 未设置"菜单项
@@ -584,10 +588,11 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 点「我的身份」（未传 memberName → 显示"我的身份: 未设置"）
+    // 打开菜单 → 我的资料弹层 → 名字胶囊 → 改名弹窗（未传名 → 右侧「未设置」）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.textContaining(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
     // 弹窗内含两个输入框：可编辑名字在前、只读性别在后 → 取 .first
     await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
@@ -634,6 +639,8 @@ void main() {
       await tester.tap(find.byIcon(Icons.menu));
       await tester.pumpAndSettle();
       await tapDeferred(tester, find.textContaining(menuItem));
+      // 「我的资料」是弹层：先点名字胶囊进改名弹窗（两段错峰）
+      await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
       // 初始只读：先点「编辑」进可编辑态（只读态不接键盘输入）
       await tester.tap(find.byIcon(Icons.edit));
       await tester.pumpAndSettle();
@@ -671,7 +678,7 @@ void main() {
     }
 
     // 我的名字（member_name：按**码点**算，与 shared member_name_policy 同一常量）
-    final mine = await typeInto('我的身份', 'x' * 40);
+    final mine = await typeInto(_zh.chatPageMenuMyProfile, 'x' * 40);
     expect(mine.length, kMemberNameMaxLength, reason: '第 33 个字符应敲不进去');
 
     // 我的通道名（entrance_name：同样 32）——当前通道名没有独立菜单项，
@@ -705,7 +712,8 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.textContaining(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
     // 点名字输入框本身（不是右侧编辑图标）→ 也应切到编辑态
     await tester.tap(
@@ -941,7 +949,8 @@ void main() {
     // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first; // 弹窗内可编辑名字框在前、只读性别框在后
@@ -1085,22 +1094,20 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync + profile load 完成
 
-    // 菜单 → 我的身份（打开个人资料弹窗）
+    // 菜单 → 我的资料弹层 → 点名字胶囊 → 改名弹窗（两段错峰）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
 
-    // 标题「我的身份」、输入框标签「名字」、名字框下性别彩色图标（男高亮）
-    expect(find.text('我的身份'), findsOneWidget, reason: '弹窗标题应为「我的身份」');
+    // 标题「我的名字」（2026-10-17 由「我的身份」改）、输入框标签「名字」；
+    // 性别展示已从本弹窗删除（只在「我的资料」弹层显示）
+    expect(find.text(_zh.chatPageRenameNameTitle), findsOneWidget,
+        reason: '弹窗标题应为「我的名字」');
     expect(find.text('名字'), findsWidgets, reason: '输入框标签应为「名字」');
-    expect(find.text('性别'), findsOneWidget, reason: '名字框下应显示性别标签');
-    expect(find.byIcon(Icons.female), findsNothing,
-        reason: '只显示本人性别图标，不应显示女图标');
-    final maleIcon = tester.widget<Icon>(find.byIcon(Icons.male));
-    expect(maleIcon.color, const Color(0xFF3BAFFD), reason: '本人为男：显示天蓝色男图标');
+    expect(find.text('性别'), findsNothing, reason: '改名弹窗不再展示性别');
 
-    // 清空名字 → 保存 → 红字警示并停留（弹窗内含两个输入框：可编辑名字在前、
-    // 只读性别在后 → 取 .first）
+    // 清空名字 → 保存 → 红字警示并停留（弹窗内只剩一个可编辑名字输入框）
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first;
@@ -1134,7 +1141,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('我的身份'), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
+    expect(find.text(_zh.chatPageRenameNameTitle), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
   });
 
   testWidgets('长按菜单预览行对齐：我的消息靠右、对方消息靠左', (WidgetTester tester) async {

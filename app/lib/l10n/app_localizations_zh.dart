@@ -478,6 +478,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAvatar => '我的头像';
 
   @override
+  String get chatPageMenuMyProfile => '我的资料';
+
+  @override
   String get chatPageAvatarUploaded => '✅ 我的头像已更新';
 
   @override
@@ -501,7 +504,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMsgMoreActions => '更多操作';
 
   @override
-  String get chatPageRenameNameTitle => '我的身份';
+  String get chatPageRenameNameTitle => '我的名字';
 
   @override
   String get chatPageRenameNameLabel => '名字';

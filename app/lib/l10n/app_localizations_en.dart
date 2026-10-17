@@ -517,6 +517,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAvatar => 'My avatar';
 
   @override
+  String get chatPageMenuMyProfile => 'My profile';
+
+  @override
   String get chatPageAvatarUploaded => '✅ My avatar updated';
 
   @override
@@ -540,7 +543,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgMoreActions => 'More actions';
 
   @override
-  String get chatPageRenameNameTitle => 'My identity';
+  String get chatPageRenameNameTitle => 'My name';
 
   @override
   String get chatPageRenameNameLabel => 'Name';

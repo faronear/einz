@@ -1817,7 +1817,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   未登记性别回退淡灰；
   /// - 有头像时可点开**全屏大图**（老板 2026-09-26）；
   /// - [icon] 覆盖"没头像时"的默认图标（群空间用 `Icons.groups_outlined`）。
-  /// - [saveName] 全屏大图里「下载」按钮保存用的文件名（通常传对方的显示名）。
+  /// - [saveName] 全屏大图「保存」图标圆钮用的文件名（通常传对方的显示名）。
   Widget _statusAvatar({
     Uint8List? bytes,
     String gender = '',
@@ -1833,8 +1833,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onTap: onTap ??
           (bytes == null
               ? null
-              : () => unawaited(
-                  _showAvatarFullscreen(bytes, saveName: saveName))),
+              : () => unawaited(_showAvatarFullscreen(bytes, saveName: saveName))),
     );
   }
 
@@ -1848,97 +1847,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return const Color(0xFFF1F1F1);
   }
 
-  /// 全屏看头像大图（点状态条上的头像触发）。
+  /// 全屏看头像大图：状态条头像入口（老板 2026-10-17 起走**共享**的
+  /// [showMyAvatarFullscreen]——与消息气泡旁头像 / 「我的资料」弹层头像同一份
+  /// 实现，不再各写一套）。
   ///
-  /// [allowReplace]：**本人的**头像为 true → 大图顶部（关闭键旁）多一个
-  /// 「更换头像」按钮（点了关掉大图再进选图流程）。这样"点头像"这一个动作
-  /// 既能看、也能换，不用再回菜单里找那一项（老板 2026-09-26）。
-  /// 对方的头像不给这个按钮——我们没有权限改别人的头像。
-  ///
-  /// 底部「保存」按钮（老板 2026-10-09）：**本人/对方头像都给**，与图片/视频
-  /// 全屏口径一致（保存动作用 [saveName] 作文件名，本人头像传自己的显示名）。
+  /// [allowReplace]：**本人的**头像为 true → 大图带「更换头像」和
+  /// 「应用于本机所有秘境」按钮（后者把这份头像扇出到本机其它秘境）。
+  /// 对方的头像不传这些回调——我们没有权限改别人的头像。
+  /// 「保存」图标圆钮三处一致都给（[saveName] 是保存用的文件名）。
   Future<void> _showAvatarFullscreen(Uint8List bytes,
       {bool allowReplace = false, String? saveName}) async {
-    await withImmersiveFullscreen(() => showDialog<void>(
-          context: context,
-          barrierDismissible: true,
-          useSafeArea: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.zero,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            child: SizedBox.expand(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(gradient: kBrandGradient),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Clickable(
-                        onTap: () => Navigator.of(ctx).pop(),
-                        child: InteractiveViewer(
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Image.memory(bytes, fit: BoxFit.contain),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 顶部一行：右上是关闭键；本人的头像再放「更换头像」
-                    // （老板 2026-10-09：底部让位给「保存」，与图片/视频全屏一致；
-                    // 按钮与「保存」同款居中横排，关闭键浮在右上角）
-                    if (allowReplace)
-                      Positioned(
-                        top: 8,
-                        left: 0,
-                        right: 0,
-                        child: SafeArea(
-                          child: Center(
-                            child: FilledButton.icon(
-                              // 先关大图再进选图：不关的话选图弹层会叠在它上面，
-                              // 取消选图后回到一张"已经没意义"的大图（头像还没换）
-                              onPressed: () {
-                                Navigator.of(ctx).pop();
-                                unawaited(_showAvatarUpload());
-                              },
-                              icon: const Icon(Icons.photo_camera_outlined),
-                              label: Text(
-                                  AppLocalizations.of(ctx)!.chatPageAvatarChange),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // 右上角关闭键（独立一层，「更换头像」居中不挤占它）
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: SafeArea(child: _FullscreenCloseButton()),
-                    ),
-                    // 底部「保存」（移动端入相册、桌面弹保存对话框）。先关大图再
-                    // 保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面会看不见。
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 32,
-                      child: Center(
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            unawaited(_saveAvatarImage(saveName, bytes));
-                          },
-                          icon: const Icon(Icons.save_alt),
-                          label:
-                              Text(AppLocalizations.of(ctx)!.chatPageActionSave),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ));
+    await showMyAvatarFullscreen(
+      context,
+      bytes: bytes,
+      onReplace:
+          allowReplace ? () => unawaited(_showAvatarUpload()) : null,
+      onApplyAllSpaces: allowReplace && _myAvatarBytes != null
+          ? () => unawaited(_applyAvatarAllSpaces(_myAvatarBytes!))
+          : null,
+      onSave: (b) => _saveAvatarImage(saveName, b),
+    );
   }
 
   /// 状态灯 + 时刻（老板 2026-09-26 新设计）：**绿灯旁是上线时间、红灯旁是下线时间**。
@@ -2940,6 +2868,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 单个空间失败不阻塞其余空间
       }
     }
+  }
+
+  /// 把当前头像扇出到本机其它秘境（老板 2026-10-17，头像全屏里的
+  /// 「应用于本机所有秘境」按钮）：逐空间用 bytes 再走一遍 uploadAvatar。
+  /// 与 _fanoutOtherSpaces 同款 best-effort——单个空间失败不影响其余，也不打扰
+  /// 用户。当前空间在上传时已经处理过，这里跳过。
+  Future<void> _applyAvatarAllSpaces(Uint8List bytes) async {
+    final vault = VaultSession.current;
+    final spaces = vault?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) {
+      _notice(context, AppLocalizations.of(context)!.settingsScopeAllDone);
+      return;
+    }
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue; // 当前空间已处理
+      if ((space.token ?? '').isEmpty) continue;
+      try {
+        await SpaceSessions.ofPayload(space, db: widget.db)
+            .call((t) => ApiClient(effectiveServer).uploadAvatar(bytes, t));
+      } catch (_) {
+        // 单个空间失败不阻塞其余空间
+      }
+    }
+    if (!mounted) return;
+    _notice(context, AppLocalizations.of(context)!.settingsScopeAllDone);
   }
 
   /// 邮件通知设置（菜单项，2026-10-01）：填邮箱 → 服务端发一封确认信 → 点信里链接生效。
@@ -4770,19 +4723,175 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 「我的资料」弹层（老板 2026-10-17）：头像大图 + 名字编辑胶囊 + 性别只读框。
+  /// 名字胶囊 → 现有改名弹窗；头像 → 共享的 [showMyAvatarFullscreen]
+  /// （本人的头像：更换头像/应用所有秘境/保存图标）。
+  /// 性别沿用改名弹窗同款只读样式（insight：由向导写入，暂不提供修改入口）。
+  Future<void> _showMyProfileSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Center(
+                      child: Text(l10n.chatPageMenuMyProfile,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    ),
+                  ),
+                  // 头像（居中大图）：点击 → 走 _MessageAvatar 自己的头像全屏
+                  // （与状态条/气泡头像同一家），本人的头像带「更换头像」+「保存」。
+                  // 右上角编辑角标（老板 2026-10-17）：与头像同一点击动作——
+                  // 有头像 = 开全屏（换头像从全屏里的「更换头像」按钮进），
+                  // 无头像 = 直接进选图（没有大图可看）。
+                  Center(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        InkWell(
+                          key: const ValueKey('myProfileAvatar'),
+                          mouseCursor: SystemMouseCursors.click,
+                          customBorder: const CircleBorder(),
+                          onTap: _myAvatarBytes == null
+                              ? () {
+                                  Navigator.of(ctx).pop();
+                                  _menuAction(_showAvatarUpload);
+                                }
+                              : null, // 有头像：交给 _MessageAvatar 的全屏（含更换/保存）
+                          child: _MessageAvatar(
+                            memberId: _myMemberId,
+                            server: effectiveServer,
+                            api: widget.api,
+                            radius: 44,
+                            onReplaceAvatar: () {
+                              Navigator.of(ctx).pop();
+                              _menuAction(_showAvatarUpload);
+                            },
+                            onApplyAllSpaces: _myAvatarBytes == null
+                                ? null
+                                : () => unawaited(_applyAvatarAllSpaces(
+                                    _myAvatarBytes!)),
+                            onSaveImage: (bytes) =>
+                                _saveAvatarImage(_myMemberName, bytes),
+                          ),
+                        ),
+                        // 编辑角标：粉强调色小圆徽 + 白色编辑笔（与「我的同伴」
+                        // 弹层群名行的编辑图标同一动作语义）
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: IgnorePointer(
+                            // 点击穿透到头像本体（整个区域一个动作）
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD6529C),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Theme.of(ctx).colorScheme.surface,
+                                    width: 2),
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.edit,
+                                    size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // 名字胶囊：文字 + 编辑图标组成可点击胶囊（与「我的同伴」弹层
+                  // 群名行同款交互），点击 → 收起弹层、打开改名弹窗
+                  Center(
+                    child: InkWell(
+                      key: const ValueKey('myProfileNameRow'),
+                      mouseCursor: SystemMouseCursors.click,
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        _menuAction(_showRenameDialog);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _myMemberName.isEmpty
+                                    ? l10n.chatPageNameUnset
+                                    : _myMemberName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 20,
+                                  height: 1.2,
+                                  color: _myMemberName.isEmpty
+                                      ? scheme.outline
+                                      : null,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(Icons.edit_outlined,
+                                size: 18,
+                                color: scheme.onSurfaceVariant),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // 性别：只读展示（与改名弹窗同款样式——「性别」标签 + 图标，
+                  // 由向导写入，暂不提供修改入口）
+                  TextFormField(
+                    initialValue: _myGender == 'female'
+                        ? l10n.wizardGenderFemale
+                        : _myGender == 'male'
+                            ? l10n.wizardGenderMale
+                            : '',
+                    readOnly: true,
+                    style: const TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: l10n.chatPageGenderLabel,
+                      border: const OutlineInputBorder(),
+                      suffixIcon: _myGender == 'male'
+                          ? const Icon(Icons.male,
+                              color: Color(0xFF3BAFFD), size: 24)
+                          : _myGender == 'female'
+                              ? const Icon(Icons.female,
+                                  color: Color(0xFFD6529C), size: 24)
+                              : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// 修改我的名字（服务端同步 + 本地刷新菜单显示）。
   /// （原「当前通道」改名弹窗 2026-10-02 并入「我的通道」弹层，公钥展示一并删除。）
   Future<void> _showRenameDialog() async {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: _myMemberName);
-    // 性别只读展示（我的个人资料弹窗）：框内显示 男/女，随对话框关闭释放
-    final genderCtrl = TextEditingController(
-      text: _myGender == 'female'
-          ? l10n.wizardGenderFemale
-          : _myGender == 'male'
-              ? l10n.wizardGenderMale
-              : '',
-    );
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
     // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
@@ -4864,25 +4973,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                       ),
               ),
-              // 性别用与名字输入框同款组件（只读）——「性别」标签
-              // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
-              // （老板要求 2026-09-09）
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: genderCtrl,
-                readOnly: true,
-                style: const TextStyle(fontSize: 16),
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageGenderLabel,
-                  border: const OutlineInputBorder(), // 与名字输入框同款边框
-                  // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
-                  suffixIcon: _myGender == 'male'
-                      ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
-                      : _myGender == 'female'
-                          ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
-                          : null,
-                ),
-              ),
               // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
               // 不勾＝只改当前秘境。每次开弹窗默认不勾选
               ValueListenableBuilder<bool>(
@@ -4953,7 +5043,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
-      genderCtrl.dispose();
       nameError.dispose();
       editing.dispose();
       nameFocus.dispose();
@@ -8328,15 +8417,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showSetLockDialog);
                 case 'about':
                   _menuAction(_openAboutPage);
-                case 'name':
-                  _menuAction(_showRenameDialog);
-                case 'avatar':
-                  // 与状态条头像同款逻辑（老板 2026-10-17）：空头像直接换；
-                  // 有头像先开大图（大图里有「更换头像」按钮）。
-                  _menuAction(_myAvatarBytes == null
-                      ? _showAvatarUpload
-                      : () => _showAvatarFullscreen(_myAvatarBytes!,
-                          allowReplace: true, saveName: _myMemberName));
+                case 'profile':
+                  _menuAction(_showMyProfileSheet);
                 case 'members':
                   _menuAction(_showMembersSheet);
                 case 'entrancelist':
@@ -8371,7 +8453,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 菜单分组（老板 2026-09-24 定；2026-09-25 删「生成通道码」项，
                 // 改由「通道列表」弹层里的「新建通道」按钮承担）：
                 //   ① 外观与锁：界面语言 / 界面主题 / 锁屏码
-                //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 通道列表 /
+                //   ② 身份·通道·内容：我的资料（聚合原我的身份/我的头像）/ 当前通道 / 通道列表 /
                 //      阅后即焚 / 附件存储 / 高级安全
                 //   ③ 结尾：关于秘境 / 切换我的秘境 / 退出本应用
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
@@ -8415,24 +8497,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight),
+                // 「我的资料」（老板 2026-10-17，聚合原「我的身份/我的头像」两项）：
+                // 右侧人名+头像小图；点击 → 「我的资料」弹层（头像/名字/性别）
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
-                  value: 'name',
+                  value: 'profile',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMyNameLabel, style: captionStyle),
+                      Text(l10n.chatPageMenuMyProfile, style: labelStyle),
                       const Spacer(),
-                      _menuValue(_myMemberName.isEmpty ? l10n.chatPageNameUnset : _myMemberName, valueStyle),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'avatar',
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(l10n.chatPageMenuAvatar, style: labelStyle)),
-                      const SizedBox(width: 10),
+                      // 人名（空 → 「未设置」占位）；长名截断，与头像小图间留 6
+                      Flexible(
+                        child: Text(
+                          _myMemberName.isEmpty
+                              ? l10n.chatPageNameUnset
+                              : _myMemberName,
+                          style: valueStyle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       CircleAvatar(
                         radius: 12,
                         backgroundImage:
@@ -8798,7 +8882,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 bytes: _myAvatarBytes,
                                 gender: _myGender,
                                 // 空头像：点它没有大图可看 → 直接进换头像流程；
-                                // 有头像：开大图，顶部「更换头像」+ 底部「保存」
+                                // 有头像：开大图（「更换头像」+「应用于本机所有
+                                // 秘境」+「保存」图标，三处一致）
                                 onTap: _myAvatarBytes == null
                                     ? () => unawaited(_showAvatarUpload())
                                     : () => unawaited(_showAvatarFullscreen(
@@ -9178,13 +9263,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                       if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
-                        // 自己的头像大图也给「保存」（老板 2026-10-09：与对方头像
-                        // 一致——气泡旁点开的头像只是"查看"，保存动作与"我"无关）
+                        // 自己的头像也给「更换头像」「应用于本机所有秘境」
+                        // （老板 2026-10-17：气泡旁/状态条/「我的资料」三处
+                        // 同一份"我的头像全屏"）；「保存」人人都有
                         _MessageAvatar(
                             memberId: senderMemberId,
                             server: effectiveServer,
                             api: widget.api,
                             radius: kMessageAvatarDiameter / 2,
+                            onReplaceAvatar: () => unawaited(_showAvatarUpload()),
+                            onApplyAllSpaces: _myAvatarBytes == null
+                                ? null
+                                : () => unawaited(
+                                    _applyAvatarAllSpaces(_myAvatarBytes!)),
                             onSaveImage: (bytes) => _saveAvatarImage(
                                 _senderNameOf(senderMemberId), bytes)),
                       ],
@@ -10307,6 +10398,145 @@ class _PastePayload {
   final String kind;
 }
 
+/// 头像全屏页（**唯一实现**，老板 2026-10-17 要求三处共享）：状态条头像 /
+/// 消息气泡旁头像 / 「我的资料」弹层头像共用。品牌渐变背景 + 轻触关闭 + 右上
+/// 关闭键；底部按钮按回调组合（都**先关大图再执行**）：
+/// - [onReplace]：「更换头像」（顶部居中；本人的头像才传）；
+/// - [onApplyAllSpaces]：「应用于本机所有秘境」（字号小一档分主次；本人的
+///   头像才传）；
+/// - [onSave]：「保存」——与 [onApplyAllSpaces] **并排时**缩成图标圆钮
+///   （我的头像 = 下载图标 + 应用所有秘境）；[onApplyAllSpaces] 为 null
+///   （对方头像）时独占一行，用与消息图片全屏同款的「图标+保存」完整按钮。
+Future<void> showMyAvatarFullscreen(
+  BuildContext context, {
+  required Uint8List bytes,
+  VoidCallback? onReplace,
+  VoidCallback? onApplyAllSpaces,
+  Future<void> Function(Uint8List bytes)? onSave,
+}) async {
+  await withImmersiveFullscreen(() => showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        useSafeArea: false,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          child: SizedBox.expand(
+            child: DecoratedBox(
+              decoration: const BoxDecoration(gradient: kBrandGradient),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Clickable(
+                      onTap: () => Navigator.of(ctx).pop(),
+                      child: InteractiveViewer(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Image.memory(bytes, fit: BoxFit.contain),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 顶部「更换头像」（SafeArea 内居中；关闭键独立一层浮右上角，
+                  // 不挤占居中按钮）。先关大图再进选图——不关的话取消选图会
+                  // 回到一张"已经没意义"的大图（头像还没换）。
+                  if (onReplace != null)
+                    Positioned(
+                      top: 8,
+                      left: 0,
+                      right: 0,
+                      child: SafeArea(
+                        child: Center(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              onReplace();
+                            },
+                            icon: const Icon(Icons.photo_camera_outlined),
+                            label: Text(AppLocalizations.of(ctx)!
+                                .chatPageAvatarChange),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // 右上角关闭键（独立一层，居中按钮不挤占它）
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: SafeArea(child: _FullscreenCloseButton()),
+                  ),
+                  // 底部一行（SafeArea 内居中，bottom:32）：
+                  // - **本人的头像**：「保存」图标圆钮 +「应用于本机所有秘境」
+                  //   并排（老板 2026-10-17：下载图标不抢戏，悬停有 tooltip）；
+                  // - **对方头像**（无 apply 回调）：与普通图片全屏同款的
+                  //   「图标+保存」完整按钮。
+                  // 先关大图再执行——顶部提示/加载是聊天页的覆盖层，压在
+                  // Dialog 下面看不见。
+                  if (onSave != null || onApplyAllSpaces != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 32,
+                      child: SafeArea(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (onSave != null && onApplyAllSpaces != null) ...[
+                              // 我的头像：图标圆钮版
+                              Tooltip(
+                                message:
+                                    AppLocalizations.of(ctx)!.chatPageActionSave,
+                                child: IconButton.filled(
+                                  onPressed: () {
+                                    Navigator.of(ctx).pop();
+                                    unawaited(onSave(bytes));
+                                  },
+                                  icon: const Icon(Icons.save_alt),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            if (onApplyAllSpaces != null)
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  textStyle: const TextStyle(fontSize: 13),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  onApplyAllSpaces();
+                                },
+                                icon: const Icon(Icons.layers_outlined),
+                                label: Text(
+                                    AppLocalizations.of(ctx)!.settingsScopeAll),
+                              ),
+                            // 对方头像（无 apply）：完整「图标+保存」按钮，
+                            // 与消息图片全屏同款（老板 2026-10-17）
+                            if (onSave != null && onApplyAllSpaces == null)
+                              FilledButton.icon(
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  unawaited(onSave(bytes));
+                                },
+                                icon: const Icon(Icons.save_alt),
+                                label: Text(
+                                    AppLocalizations.of(ctx)!.chatPageActionSave),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ));
+}
+
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar(
       {this.memberId,
@@ -10314,7 +10544,9 @@ class _MessageAvatar extends StatefulWidget {
       this.api,
       this.radius = 16,
       this.openFullscreenOnTap = true,
-      this.onSaveImage});
+      this.onSaveImage,
+      this.onReplaceAvatar,
+      this.onApplyAllSpaces});
 
   final String? memberId;
   final String server;
@@ -10332,6 +10564,15 @@ class _MessageAvatar extends StatefulWidget {
   /// null = 不放按钮（如状态条头像条：它压根不开全屏）。存哪儿由聊天页决定
   /// （移动端入相册、桌面弹保存对话框）。
   final Future<void> Function(Uint8List bytes)? onSaveImage;
+
+  /// 顶部「更换头像」按钮的回调（老板 2026-10-17：本人的头像才给——「我的资料」
+  /// 弹层/状态条用，点「我的头像」大图能直接去换头像）。null = 不放按钮
+  /// （别人的头像，没有权限改）。
+  final VoidCallback? onReplaceAvatar;
+
+  /// 「应用于本机所有秘境」按钮的回调（老板 2026-10-17：把这份头像扇出到本机
+  /// 其它秘境）。与 [onReplaceAvatar] 同源——都是本人的头像才给。
+  final VoidCallback? onApplyAllSpaces;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -10388,64 +10629,23 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     }
   }
 
-  /// 全屏查看头像（品牌粉蓝渐变大图 + 右上角关闭；隐藏系统状态栏 = 沉浸感）。
-  /// 背景 = kBrandGradient，与图片全屏一致（老板 2026-09-15）。
-  /// 底部「保存」按钮（老板 2026-10-08）：仅在调用方给了 [onSaveImage] 时出现
-  /// （别人的头像可下载；状态条头像条不开全屏、也没给回调）。
-  /// 轻触关闭（老板 2026-10-12）：点屏幕任何地方返回聊天页（Image.memory 的
-  /// hitTestSelf 恒真，整块 fill 区域都接得住轻触），与图片/视频全屏一致。
+  /// 全屏查看头像：走共享的 [showMyAvatarFullscreen]（老板 2026-10-17：
+  /// 状态条/「我的资料」/本头像三处必须同一份全屏实现）。按钮集合由回调决定：
+  /// 「更换头像」「应用于本机所有秘境」仅本人头像有（调用方传）；「保存」
+  /// 人人都有（[onSaveImage]，本人是图标圆钮、对方是完整按钮——见共享页注释）。
   Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
+    final onReplace = widget.onReplaceAvatar;
+    final onApplyAll = widget.onApplyAllSpaces;
     final onSave = widget.onSaveImage;
-    await withImmersiveFullscreen(() => showDialog<void>(
-          context: context,
-          barrierDismissible: true,
-          useSafeArea: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.zero,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            child: SizedBox.expand(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(gradient: kBrandGradient),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Clickable(
-                        onTap: () => Navigator.of(ctx).pop(),
-                        child: Image.memory(bytes, fit: BoxFit.contain),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: SafeArea(child: _FullscreenCloseButton()),
-                    ),
-                    // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见
-                    if (onSave != null)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 32,
-                        child: Center(
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              unawaited(onSave(bytes));
-                            },
-                            icon: const Icon(Icons.save_alt),
-                            label: Text(
-                                AppLocalizations.of(ctx)!.chatPageActionSave),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ));
+    await showMyAvatarFullscreen(
+      context,
+      bytes: bytes,
+      onReplace: onReplace,
+      onApplyAllSpaces: onApplyAll,
+      onSave: onSave,
+    );
   }
 
   @override
