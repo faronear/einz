@@ -11,14 +11,16 @@
 #
 # 断言（pty 真实渲染，按光标定位序列还原二维屏幕）：
 #   ① 唯一匹配直接补全
-#   ② 多个匹配 → 最长公共前缀 + 候选消息
+#   ② 多个匹配 → 最长公共前缀 + 候选消息（候选前带文件图标 📄）
 #   ③ 目录补到带 /（可接着 Tab 进下一层）
-#   ④ 没有匹配：输入不动 + 状态行提示
+#   ④ 没有匹配：输入不动 + 消息流提示（不落底部通知条——老板 2026-10-18）
 #   ⑤ 裸名按 cwd 补全（cli 目录下 pubs → pubspec.，因 pubs.lock/yaml 两个候选）
 #   ⑥ 聊天消息里的词不补
 #   ⑦ 行首命令名不补
 #   ⑧ 浏览器态 Tab 无效（浏览器不关、不补全）
 #   ⑨ 连按多次 Tab 只保留一条候选消息（替换而非堆积）
+#   ⑩ 候选列表带类型图标：目录 📁 / 文件 📄（混排时可区分——老板 2026-10-18）
+#   ⑪ 目录读不了：提示同样进消息流（不落底部通知条——老板 2026-10-18）
 #
 # 运行：python3 cli/test/tab_complete_check.py
 import base64
@@ -224,20 +226,22 @@ def main():
             fail(f'① 唯一匹配未补全：{t.input_line()!r}')
         print('① 唯一匹配补全 OK（photo. → photo.png）')
 
-        # ② 多个匹配 → 最长公共前缀 + 候选消息
+        # ② 多个匹配 → 最长公共前缀 + 候选消息（候选前带文件图标）
         if not tab('/attach ~/Pictures/pho', '[我] /attach ~/Pictures/photo'):
             fail(f'② 未扩展到最长公共前缀：{t.input_line()!r}')
         text = t.text()
         if '匹配 2 项' not in text or 'photo.png' not in text or 'photo2.png' not in text:
             fail('② 候选消息缺失或不完整')
-        print('② 多匹配 LCP + 候选消息 OK（pho → photo，列出 2 项）')
+        if '📄 photo.png' not in text or '📄 photo2.png' not in text:
+            fail('② 候选前缺少文件图标（老板 2026-10-18）')
+        print('② 多匹配 LCP + 候选消息 OK（pho → photo，列出 2 项，带 📄）')
 
         # ③ 目录补到带 /
         if not tab('/attach ~/Pictures/wall', '[我] /attach ~/Pictures/wallpaper/'):
             fail(f'③ 目录未补到带 /：{t.input_line()!r}')
         print('③ 目录补全加 / OK')
 
-        # ④ 没有匹配：输入不动 + 状态行提示
+        # ④ 没有匹配：输入不动 + 消息流提示（提示在消息区、不在底部状态行）
         t.send(b'\x7f' * 200)
         t.pump(1.0)
         t.send(b'/attach ~/Pictures/zzz' + TAB)
@@ -245,7 +249,12 @@ def main():
             fail('④ 无匹配时无提示')
         if t.input_line() != '[我] /attach ~/Pictures/zzz':
             fail(f'④ 无匹配时输入被改动：{t.input_line()!r}')
-        print('④ 无匹配：输入不动 + 提示 OK')
+        rows = t.screen()
+        if '没有以' in rows[-1]:
+            fail('④ 提示仍出现在底部状态行（应进消息流——老板 2026-10-18）')
+        if not any('没有以' in line for line in rows[:-1]):
+            fail('④ 提示不在消息区')
+        print('④ 无匹配：输入不动 + 消息流提示（非状态行）OK')
 
         # ⑤ 裸名按 cwd 补全（cli 目录下 pubs → pubspec.，lock/yaml 两个候选）
         if not tab('/attach pubs', '[我] /attach pubspec.'):
@@ -302,6 +311,32 @@ def main():
         if count != 1:
             fail(f'⑨ 候选消息应只有 1 条，实际 {count} 条')
         print('⑨ 重复 Tab 只保留一条候选消息 OK')
+
+        # ⑩ 候选列表带类型图标：目录 📁 / 文件 📄（混排时可区分）
+        t.send(b'\x7f' * 200)
+        t.pump(1.0)
+        t.send(b'/attach ~/Pictures/' + TAB)
+        if not t.wait_for('匹配 4 项'):
+            fail('⑩ 未列出整个目录的候选')
+        text = t.text()
+        if '📁 wallpaper/' not in text:
+            fail('⑩ 目录候选前缺少 folder 图标（或目录名未带 /）')
+        if '📄 photo.png' not in text:
+            fail('⑩ 文件候选前缺少文件图标')
+        print('⑩ 候选图标 OK（📁 目录 / 📄 文件，各就各位）')
+
+        # ⑪ 目录读不了（不存在/无权限）：提示进消息流、不在底部状态行
+        t.send(b'\x7f' * 200)
+        t.pump(1.0)
+        t.send(b'/attach ~/NoSuchDir/x' + TAB)
+        if not t.wait_for('目录不存在或读不了'):
+            fail('⑪ 目录读不了时无提示')
+        rows = t.screen()
+        if '目录不存在或读不了' in rows[-1]:
+            fail('⑪ 目录读不了的提示仍出现在底部状态行（应进消息流）')
+        if not any('目录不存在或读不了' in line for line in rows[:-1]):
+            fail('⑪ 目录读不了的提示不在消息区')
+        print('⑪ 目录读不了：消息流提示（非状态行）OK')
 
         if not t.alive():
             fail('收尾：进程已退出')

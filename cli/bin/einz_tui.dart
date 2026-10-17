@@ -160,8 +160,10 @@ class _TuiState {
 
   bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
 
-  /// Tab 补全列出的候选消息（方案 C）：重复 Tab 时替换上一条，
-  /// 否则连按十次就把消息流刷成十条差不多的列表。
+  /// Tab 补全的反馈消息（方案 C）：候选列表或错误提示（目录读不了/无匹配）。
+  /// 重复 Tab 时替换上一条，否则连按十次就把消息流刷成十条差不多的列表、
+  /// 报错也刷屏；二者共用同一槽——候选顶掉错误、错误顶掉候选，都是"上一条
+  /// 补全反馈已过时"。
   ChatMessage? completionMsg;
 
   /// 内置文件浏览器（方案 B，老板 2026-10-17）处于活动态时非 null——**模态**：
@@ -3671,7 +3673,9 @@ String _baseName(FileSystemEntity e) => e.path.replaceAll('\\', '/').split('/').
 ///
 /// 语义对齐 shell：唯一匹配 → 直接补全（目录补到带 `/`，接着 Tab 就能进下一层）；
 /// 多个匹配 → 扩展到**最长公共前缀**（通常再按一两次 Tab 就唯一了），并列出了候选
-/// （替换上一条候选消息，不刷屏）；没有匹配 → 状态行给一句提示，不改输入。
+/// （替换上一条候选消息，不刷屏）；没有匹配/目录读不了 → **消息流**给一句提示
+/// （老板 2026-10-18：路径相关的错误不落底部通知条，免得被下一条瞬时状态冲掉，
+/// 也可滚动回看），不改输入。
 /// `~` 形式在输入行里保留原样（展开只用于查目录）——用户敲什么风格就还他什么风格。
 void _completePathAtCursor(_TuiState s) {
   final text = s.input.toString();
@@ -3711,7 +3715,9 @@ void _completePathAtCursor(_TuiState s) {
   try {
     entries = Directory(searchDir).listSync(followLinks: false);
   } catch (_) {
-    s.status = '⚠️ 目录不存在或读不了：$searchDir';
+    // 目录读不了：提示进消息流（老板 2026-10-18，路径类错误不落底部通知条）。
+    // 复用候选那条的替换槽——连按 Tab 不堆积，上一条提示被顶掉。
+    _showCompletionFeedback(s, '⚠️ 目录不存在或读不了：$searchDir');
     _render();
     return;
   }
@@ -3726,7 +3732,9 @@ void _completePathAtCursor(_TuiState s) {
     matches.add(e);
   }
   if (matches.isEmpty) {
-    s.status = '⚠️ ${toDisplay(searchDir)} 下没有以「$namePart」开头的项';
+    // 同上：无匹配提示进消息流（替换槽），不走底部通知条
+    _showCompletionFeedback(
+        s, '⚠️ ${toDisplay(searchDir)} 下没有以「$namePart」开头的项');
     _render();
     return;
   }
@@ -3758,17 +3766,23 @@ void _completePathAtCursor(_TuiState s) {
     ..write(text.substring(end));
   s.cursor = start + newToken.length;
   if (!unique) {
+    // 候选列表（老板 2026-10-18）：每个条目前加类型图标——目录 📁、文件 📄。
+    // 堆成一行纯文件名时分不清哪个是目录（还能接着 Tab 进），图标 + 目录名
+    // 自带 / 与内置浏览器（_browserLines）同款，两处列表风格一致。
     final list = [
-      for (final e in matches) '${_baseName(e)}${e is Directory ? '/' : ''}'
+      for (final e in matches)
+        '${e is Directory ? '📁' : '📄'} ${_baseName(e)}${e is Directory ? '/' : ''}'
     ].join('  ');
-    _showCompletionCandidates(
+    _showCompletionFeedback(
         s, '📂 ${toDisplay(searchDir)} 匹配 ${matches.length} 项（再补几个字符按 Tab）：\n  $list');
   }
   _render();
 }
 
-/// 候选列表作为一条 system 消息进消息流（可滚动回看）；重复 Tab **替换**上一条。
-void _showCompletionCandidates(_TuiState s, String text) {
+/// Tab 补全的反馈（候选列表 / 错误提示）作为一条 system 消息进消息流（可滚动
+/// 回看）；重复 Tab **替换**上一条——否则连按十次就把消息流刷成十条差不多的
+/// 列表，报错也会刷屏（老板 2026-10-18：错误提示同样走这里）。
+void _showCompletionFeedback(_TuiState s, String text) {
   if (s.completionMsg != null) s.session.messages.remove(s.completionMsg);
   s.completionMsg = _systemMessage(s.session, text);
   s.session.messages.add(s.completionMsg!);
