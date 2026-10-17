@@ -4938,42 +4938,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            // 性别：只读小胶囊（2026-10-17 重设计，替代原来的整行
-                            // 只读输入框）。性别为空不显示——留一枚「未设置」空壳
-                            // 反而像缺数据待填。
+                            // 性别：只读纯文字（图标+字，无底色——老板 2026-10-17：
+                            // 胶囊有背景像可点的按钮，实际只是展示）。性别为空
+                            // 不显示——留「未设置」空壳反而像缺数据待填。
                             if (genderLabel.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Semantics(
-                                // 胶囊里只有「男/女」，读屏补上「性别」二字
+                                // 只有一枚「男/女」，读屏补上「性别」二字
                                 label:
                                     '${l10n.chatPageGenderLabel} $genderLabel',
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: genderColor.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        isFemale ? Icons.female : Icons.male,
-                                        size: 16,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isFemale ? Icons.female : Icons.male,
+                                      size: 16,
+                                      color: genderColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      genderLabel,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.2,
                                         color: genderColor,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        genderLabel,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.2,
-                                          color: genderColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
