@@ -153,24 +153,27 @@ void main() {
     // （页面被弹层盖着，文本仍在树里——断言一律限定在弹层内）
     expect(find.descendant(of: _sheet, matching: find.text('Alice')), findsOneWidget,
         reason: '名字应显示对方名字');
-    final genderText =
-        find.descendant(of: _sheet, matching: find.text(_zh.wizardGenderFemale));
-    expect(genderText, findsOneWidget, reason: '性别行应显示「女」');
+    final genderIcon =
+        find.descendant(of: _sheet, matching: find.byIcon(Icons.female));
+    expect(genderIcon, findsOneWidget, reason: '性别行应显示性别图标');
+    expect(find.descendant(of: _sheet, matching: find.text(_zh.wizardGenderFemale)),
+        findsNothing,
+        reason: '老板 2026-10-18：只显示性别图标，不显示男/女文字');
     expect(find.descendant(of: _sheet, matching: find.byIcon(Icons.edit)),
         findsNothing, reason: '对方的资料不能编辑：不应出现任何编辑图标');
 
     // ② 邀请/重新邀请按钮 = 「重新邀请」，放在性别那一行、右端对齐
     expect(find.descendant(of: _sheet, matching: find.text(_zh.chatPageMembersReinvite)),
         findsOneWidget, reason: '对方已加入 → 按钮应为「重新邀请」');
-    final genderRect = tester.getRect(genderText);
+    final genderRect = tester.getRect(genderIcon);
     final buttonRect = tester.getRect(_actionButton);
     expect((buttonRect.center.dy - genderRect.center.dy).abs(), lessThan(4),
-        reason: '按钮应与性别文字同一行（按钮 dy=${buttonRect.center.dy} 性别 dy=${genderRect.center.dy}）');
+        reason: '按钮应与性别图标同一行（按钮 dy=${buttonRect.center.dy} 性别 dy=${genderRect.center.dy}）');
     final sheetRect = tester.getRect(_sheet);
     expect(buttonRect.right, closeTo(sheetRect.right - 22, 1),
         reason: '按钮应右端对齐到弹层内容右缘（22 是弹层水平内边距）');
     expect(buttonRect.left, greaterThan(genderRect.right),
-        reason: '按钮应排在性别文字右侧');
+        reason: '按钮应排在性别图标右侧');
 
     // ③ 点头像 → 头像全屏（与对方头像既有全屏同一份实现）
     await tester.tap(_avatarHotZone);

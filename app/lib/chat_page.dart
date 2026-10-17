@@ -3525,7 +3525,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// - 右两行：名字（上）+ 性别（下），左对齐。
   ///   - 名字：对方名字；没名字时按状态给占位词——还没加入 = 「待加入」
   ///     （`memberPending`），已加入但没命名 = 「未命名」（`chatPageMembersUnnamed`）；
-  ///   - 性别：图标+文字只读（性别为空整行不显示性别部分）。
+  ///   - 性别：只读性别图标（老板 2026-10-18：不显示男/女文字；性别为空
+  ///     整行不显示性别部分）。
   /// - **邀请 / 重新邀请按钮放在性别那一行、右端对齐**（老板 2026-10-18）：
   ///   对方已加入 = 「重新邀请」（先要共享口令，见 [_reinviteMemberIdentity]）；
   ///   还没加入 = 「邀请」（[_showInviteDialog] purpose=invite）。原来它们挂在
@@ -3654,37 +3655,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 8),
-                            // 性别行：图标+文字只读 + 右端对齐的邀请/重新邀请按钮
+                            // 性别行：只读性别图标（老板 2026-10-18：不显示男/女
+                            // 文字）+ 右端对齐的邀请/重新邀请按钮
                             Row(
                               children: [
-                                if (genderLabel.isNotEmpty) ...[
+                                if (genderLabel.isNotEmpty)
                                   Semantics(
-                                    // 只有一枚「男/女」，读屏补上「性别」二字
+                                    // 只有一枚性别图标，读屏补上「性别」二字
                                     // （与「我的资料」弹层同口径）
                                     label: '${l10n.chatPageGenderLabel} '
                                         '$genderLabel',
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          isFemale ? Icons.female : Icons.male,
-                                          size: 16,
-                                          color: genderColor,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          genderLabel,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.2,
-                                            color: genderColor,
-                                          ),
-                                        ),
-                                      ],
+                                    child: Icon(
+                                      isFemale ? Icons.female : Icons.male,
+                                      size: 16,
+                                      color: genderColor,
                                     ),
                                   ),
-                                ],
                                 const Spacer(),
                                 // 已加入 = 「重新邀请」（需共享口令）；还没加入 =
                                 // 「邀请」。duo 满员后不再有邀请（_canInvite 关）。
@@ -5202,34 +5188,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            // 性别：只读纯文字（图标+字，无底色——老板 2026-10-17：
+                            // 性别：只读——**只有图标**（老板 2026-10-18：不显示
+                            // 男/女文字，图标本身已够辨识），无底色（老板 2026-10-17：
                             // 胶囊有背景像可点的按钮，实际只是展示）。性别为空
                             // 不显示——留「未设置」空壳反而像缺数据待填。
+                            // 读屏仍补上「性别 男/女」：光秃图标对读屏是哑的。
                             if (genderLabel.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Semantics(
-                                // 只有一枚「男/女」，读屏补上「性别」二字
                                 label:
                                     '${l10n.chatPageGenderLabel} $genderLabel',
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isFemale ? Icons.female : Icons.male,
-                                      size: 16,
-                                      color: genderColor,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      genderLabel,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.2,
-                                        color: genderColor,
-                                      ),
-                                    ),
-                                  ],
+                                child: Icon(
+                                  isFemale ? Icons.female : Icons.male,
+                                  size: 16,
+                                  color: genderColor,
                                 ),
                               ),
                             ],
