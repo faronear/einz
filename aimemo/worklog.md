@@ -15060,3 +15060,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 ## 20261017 三处可点控件底色统一淡灰（邀请新同伴 + 群名胶囊 + 我的名字胶囊）
 
 - **（2026-10-17T13:02:50Z / 2026-10-17 21:02）**：老板要求「我的群组」弹层「邀请新同伴」大按钮底色对齐「我的秘境」/「我的设备通道」里的大按钮，并把群名胶囊、我的名字胶囊的底色也统一成同款淡灰。参考基准 = 「添加秘境」（space_switcher.dart）与「新建通道」（chat_page 通道列表弹层）大按钮：`Colors.black.withValues(alpha: 0.05)` 淡灰底 + hover 0.10 + highlight 0.14。改动 ①「邀请新同伴」`_genderTint('')` 中性 tint → 淡灰，hover/highlight 从 0.05/0.08 对齐到 0.10/0.14（否则与底色相同、hover 无反馈）；② 群名胶囊、③ 我的名字胶囊：淡蓝 `tertiaryContainer`（#DCE9F8，上轮老板嫌粉改的）→ 同款淡灰，两处注释同步。验证：`flutter analyze lib/chat_page.dart` 0 问题；`chat_page_menu_test` + `group_status_bar_test` 52 项全过。commit 58916c40。
+
+## 20261017 「我的资料」名字胶囊底色随性别调（女淡粉/男淡蓝）
+
+- **（2026-10-17T13:11:51Z / 2026-10-17 21:11）**：老板设计——「我的资料」弹层名字胶囊底色随性别调，女淡粉、男淡蓝。复用方法顶部已有的 genderColor（女 #D6529C / 男 #3BAFFD，与下方性别图标/文字同源），12% 透明度铺底（与之前性别小胶囊的配色口径一致）；性别未设 → 中性淡灰 Colors.black 5%（与群名胶囊及「添加秘境」等大按钮统一），不出现"未设置"色。注：性别为空的兜底分支单独走淡灰，不会误用 genderColor 的 outline 兜底色。验证：flutter analyze 0 问题；chat_page_menu_test 42 项全过。commit 1799ea1f。
