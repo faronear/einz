@@ -25,10 +25,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
+import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/attachment_storage_settings.dart';
 import 'package:einz/data/attachment_store.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/space_session.dart';
+import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 // disableAnimationsInTests 也住在这个 helper 里（本文件不再用 settleRealAsync）
@@ -80,6 +82,29 @@ class _FakeApi extends ApiClient {
 }
 
 final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
+/// 发布双秘境 Vault：「应用于本机所有秘境」勾选框只在多秘境时渲染
+/// （老板 2026-10-17；单秘境时整个不出现）。
+void _publishTwoSpaceVault() {
+  SpaceSessions.clear();
+  VaultSession.publish(const VaultPayload(
+    spaces: [
+      AppLockPayload(
+        spaceKeyB64: 'a2V5LWE=',
+        spaceId: 'space-a',
+        entranceId: 'dev-a',
+        token: 'tok-a',
+      ),
+      AppLockPayload(
+        spaceKeyB64: 'a2V5LWI=',
+        spaceId: 'space-b',
+        entranceId: 'dev-b',
+        token: 'tok-b',
+      ),
+    ],
+    activeSpaceId: 'space-a',
+  ));
+}
 
 /// 打开「附件存储」选择器：菜单 → 更多设置 → 附件存储行（老板 2026-10-15 起
 /// 附件存储从顶层菜单迁进「更多设置」二级弹层；两段都有错峰延迟）。
@@ -212,6 +237,8 @@ void main() {
       (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
+    _publishTwoSpaceVault(); // 多秘境才渲染「所有秘境」勾选框（2026-10-17）
+    addTearDown(() => VaultSession.publish(null));
 
     final spaceKey = await generateSpaceKey();
     await tester.pumpWidget(MaterialApp(

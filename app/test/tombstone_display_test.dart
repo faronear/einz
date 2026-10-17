@@ -12,10 +12,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
+import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/message_repository.dart';
 import 'package:einz/data/space_session.dart';
 import 'package:einz/data/tombstone_settings.dart';
+import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'real_async_settle.dart';
@@ -69,6 +71,29 @@ class _FakeApi extends ApiClient {
 }
 
 final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
+/// 发布双秘境 Vault：「应用于本机所有秘境」勾选框只在多秘境时渲染
+/// （老板 2026-10-17；单秘境时整个不出现）。
+void _publishTwoSpaceVault() {
+  SpaceSessions.clear();
+  VaultSession.publish(const VaultPayload(
+    spaces: [
+      AppLockPayload(
+        spaceKeyB64: 'a2V5LWE=',
+        spaceId: 'space-a',
+        entranceId: 'dev-a',
+        token: 'tok-a',
+      ),
+      AppLockPayload(
+        spaceKeyB64: 'a2V5LWI=',
+        spaceId: 'space-b',
+        entranceId: 'dev-b',
+        token: 'tok-b',
+      ),
+    ],
+    activeSpaceId: 'space-a',
+  ));
+}
 
 /// 打开「墓碑消息」选择器：菜单 → 更多设置 → 墓碑消息行（两段错峰延迟）。
 Future<void> _openTombstonePicker(WidgetTester tester) async {
@@ -173,6 +198,8 @@ void main() {
       (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
+    _publishTwoSpaceVault(); // 多秘境才渲染「所有秘境」勾选框（2026-10-17）
+    addTearDown(() => VaultSession.publish(null));
     final spaceKey = await generateSpaceKey();
 
     // 两个空间各自持有 per-space 设置：a=keep（当前空间）、b=hide（与 a 不同，

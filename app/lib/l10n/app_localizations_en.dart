@@ -514,9 +514,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuChangePassphrase => 'Change shared passphrase';
 
   @override
-  String get chatPageMenuAvatar => 'My avatar';
-
-  @override
   String get chatPageMenuMyProfile => 'My profile';
 
   @override
@@ -742,9 +739,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMenuBurnLabel => 'Burn-after-read';
-
-  @override
-  String get chatPageMenuMyNameLabel => 'My identity';
 
   @override
   String get chatPageMenuEntranceList => 'My entrances';

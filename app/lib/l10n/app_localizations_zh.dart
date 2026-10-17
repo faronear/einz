@@ -475,9 +475,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuChangePassphrase => '修改共享口令';
 
   @override
-  String get chatPageMenuAvatar => '我的头像';
-
-  @override
   String get chatPageMenuMyProfile => '我的资料';
 
   @override
@@ -687,9 +684,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMenuBurnLabel => '阅后即焚';
-
-  @override
-  String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
   String get chatPageMenuEntranceList => '我的设备通道';

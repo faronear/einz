@@ -1537,8 +1537,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         note: l10n.chatPageAttachmentStorageNote,
         selected: _attachmentStorage,
         submitLabel: l10n.chatPageAttachmentStorageSubmit,
-        // 「应用于本机所有秘境」勾选框（老板 2026-10-15；提交按钮上方）
-        scopeAllLabel: l10n.settingsScopeAll,
+        // 「应用于本机所有秘境」勾选框（老板 2026-10-15；提交按钮上方）。
+        // 单秘境时不传 = 整个不渲染（没有可作用的对象，老板 2026-10-17）
+        scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
         options: [
           for (final mode in kAttachmentStorageOptions)
             OptionPickerItem(
@@ -1709,8 +1710,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 单选 + 提交（老板 2026-10-15：与附件存储同构——勾选框配提交按钮才
         // 防呆：提交前统一确认"选什么 + 作用域"）
         submitLabel: l10n.chatPageTombstoneSubmit,
-        // 「应用于本机所有秘境」勾选框（提交按钮上方，提交时随 onApply 交出）
-        scopeAllLabel: l10n.settingsScopeAll,
+        // 「应用于本机所有秘境」勾选框（提交按钮上方，提交时随 onApply 交出）。
+        // 单秘境时不传 = 整个不渲染（老板 2026-10-17）
+        scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
         options: [
           OptionPickerItem(
             value: 'keep',
@@ -1862,8 +1864,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       bytes: bytes,
       onReplace:
           allowReplace ? () => unawaited(_showAvatarUpload()) : null,
-      onApplyAllSpaces: allowReplace && _myAvatarBytes != null
-          ? () => unawaited(_applyAvatarAllSpaces(_myAvatarBytes!))
+      // 扇出用的就是全屏展示的这份 bytes（不再另读 _myAvatarBytes——状态可能
+      // 已变，扇出去的必须和用户看的一致）；单秘境时按钮不出现
+      onApplyAllSpaces: allowReplace && _hasMultipleSpaces
+          ? (b) => _applyAvatarAllSpaces(b)
           : null,
       onSave: (b) => _saveAvatarImage(saveName, b),
     );
@@ -2870,17 +2874,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 本机是否有 ≥2 个秘境：「应用于本机所有秘境」一族控件（各弹层勾选框 /
+  /// 头像全屏按钮）只在多秘境时出现——单秘境时"应用所有"没有任何可作用的
+  /// 对象，摆着纯误导（老板 2026-10-17）。与 [_fanoutOtherSpaces] 同一个
+  /// 数据源（VaultSession 内存态，解锁后的聊天页里必然非空；取不到时按
+  /// false 处理 = 不显示，保守方向）。
+  bool get _hasMultipleSpaces =>
+      (VaultSession.current?.spaces.length ?? 0) >= 2;
+
   /// 把当前头像扇出到本机其它秘境（老板 2026-10-17，头像全屏里的
   /// 「应用于本机所有秘境」按钮）：逐空间用 bytes 再走一遍 uploadAvatar。
   /// 与 _fanoutOtherSpaces 同款 best-effort——单个空间失败不影响其余，也不打扰
   /// 用户。当前空间在上传时已经处理过，这里跳过。
   Future<void> _applyAvatarAllSpaces(Uint8List bytes) async {
-    final vault = VaultSession.current;
-    final spaces = vault?.spaces ?? const <AppLockPayload>[];
-    if (spaces.length < 2) {
-      _notice(context, AppLocalizations.of(context)!.settingsScopeAllDone);
-      return;
-    }
+    final spaces = VaultSession.current?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) return; // 单秘境：没什么可扇出的（按钮本就不该出现）
     for (final space in spaces) {
       if (space.spaceId == widget.spaceId) continue; // 当前空间已处理
       if ((space.token ?? '').isEmpty) continue;
@@ -2977,14 +2985,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 秘境」同模块、同居中式样，文案也收敛到共享键 settingsScopeAll。
               // **纯一次性开关**：不持久化、每次开弹窗默认不勾选（老板 2026-10-15；
               // 新空间自动继承邮箱的功能已一并取消）——扇出必须是每次显式 opt-in。
-              ValueListenableBuilder<bool>(
-                valueListenable: allSpaces,
-                builder: (_, all, _) => LabeledCheckbox(
-                  value: all,
-                  label: l10n.settingsScopeAll,
-                  onChanged: (v) => allSpaces.value = v,
+              // 单秘境时整个不渲染（没有"其它秘境"可同步，老板 2026-10-17）
+              if (_hasMultipleSpaces)
+                ValueListenableBuilder<bool>(
+                  valueListenable: allSpaces,
+                  builder: (_, all, _) => LabeledCheckbox(
+                    value: all,
+                    label: l10n.settingsScopeAll,
+                    onChanged: (v) => allSpaces.value = v,
+                  ),
                 ),
-              ),
               // 已填但还没点链接：这一档不点明，用户会以为已经生效
               if (before?.isPending ?? false) ...[
                 const SizedBox(height: 10),
@@ -4585,15 +4595,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
               ),
               // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
-              // 不勾＝只改当前秘境。每次开弹窗默认不勾选
-              ValueListenableBuilder<bool>(
-                valueListenable: allSpaces,
-                builder: (_, all, _) => LabeledCheckbox(
-                  value: all,
-                  label: l10n.settingsScopeAll,
-                  onChanged: (v) => allSpaces.value = v,
+              // 不勾＝只改当前秘境。每次开弹窗默认不勾选。
+              // 单秘境时整个不渲染（没有"其它秘境"可同步，老板 2026-10-17）
+              if (_hasMultipleSpaces)
+                ValueListenableBuilder<bool>(
+                  valueListenable: allSpaces,
+                  builder: (_, all, _) => LabeledCheckbox(
+                    value: all,
+                    label: l10n.settingsScopeAll,
+                    onChanged: (v) => allSpaces.value = v,
+                  ),
                 ),
-              ),
             ],
           ),
           actions: [
@@ -4755,36 +4767,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 右上角编辑角标（老板 2026-10-17）：与头像同一点击动作——
                   // 有头像 = 开全屏（换头像从全屏里的「更换头像」按钮进），
                   // 无头像 = 直接进选图（没有大图可看）。
+                  // 点击去向完全由 _MessageAvatar 按自己的图缓存决定
+                  // （onTapWithoutImage），不再由外层按 _myAvatarBytes 猜——
+                  // 两个独立加载源不一致会错航/死区（2026-10-17 复查修复）。
                   Center(
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        InkWell(
-                          key: const ValueKey('myProfileAvatar'),
-                          mouseCursor: SystemMouseCursors.click,
-                          customBorder: const CircleBorder(),
-                          onTap: _myAvatarBytes == null
-                              ? () {
-                                  Navigator.of(ctx).pop();
-                                  _menuAction(_showAvatarUpload);
-                                }
-                              : null, // 有头像：交给 _MessageAvatar 的全屏（含更换/保存）
-                          child: _MessageAvatar(
-                            memberId: _myMemberId,
-                            server: effectiveServer,
-                            api: widget.api,
-                            radius: 44,
-                            onReplaceAvatar: () {
-                              Navigator.of(ctx).pop();
-                              _menuAction(_showAvatarUpload);
-                            },
-                            onApplyAllSpaces: _myAvatarBytes == null
-                                ? null
-                                : () => unawaited(_applyAvatarAllSpaces(
-                                    _myAvatarBytes!)),
-                            onSaveImage: (bytes) =>
-                                _saveAvatarImage(_myMemberName, bytes),
-                          ),
+                        _MessageAvatar(
+                          memberId: _myMemberId,
+                          server: effectiveServer,
+                          api: widget.api,
+                          radius: 44,
+                          onTapWithoutImage: () {
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showAvatarUpload);
+                          },
+                          onReplaceAvatar: () {
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showAvatarUpload);
+                          },
+                          onApplyAllSpaces: _hasMultipleSpaces
+                              ? (bytes) => _applyAvatarAllSpaces(bytes)
+                              : null,
+                          onSaveImage: (bytes) =>
+                              _saveAvatarImage(_myMemberName, bytes),
                         ),
                         // 编辑角标：粉强调色小圆徽 + 白色编辑笔（与「我的同伴」
                         // 弹层群名行的编辑图标同一动作语义）
@@ -4974,15 +4981,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
               ),
               // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
-              // 不勾＝只改当前秘境。每次开弹窗默认不勾选
-              ValueListenableBuilder<bool>(
-                valueListenable: allSpaces,
-                builder: (_, all, _) => LabeledCheckbox(
-                  value: all,
-                  label: l10n.settingsScopeAll,
-                  onChanged: (v) => allSpaces.value = v,
+              // 不勾＝只改当前秘境。每次开弹窗默认不勾选。
+              // 单秘境时整个不渲染（没有"其它秘境"可同步，老板 2026-10-17）
+              if (_hasMultipleSpaces)
+                ValueListenableBuilder<bool>(
+                  valueListenable: allSpaces,
+                  builder: (_, all, _) => LabeledCheckbox(
+                    value: all,
+                    label: l10n.settingsScopeAll,
+                    onChanged: (v) => allSpaces.value = v,
+                  ),
                 ),
-              ),
             ],
           ),
           actions: [
@@ -5138,7 +5147,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final picked = await _pickBurnSeconds(
       current: current,
-      scopeAllLabel: l10n.settingsScopeAll, // 全局设置才有"所有秘境"一说
+      // 全局设置才有"所有秘境"之说；单秘境时不传 = 不渲染勾选框（老板 2026-10-17）
+      scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
     );
     if (picked == null || !mounted) return;
     if (picked.scopeAll) {
@@ -8529,7 +8539,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，用邮件把离线的
-                // 人拉回来。2026-10-02 起挪到「我的头像」之后（老板定），属分组②
+                // 人拉回来。2026-10-02 起挪到「我的资料」之后（老板定），属分组②
                 // （身份·通道·内容）。
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
@@ -9272,10 +9282,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             api: widget.api,
                             radius: kMessageAvatarDiameter / 2,
                             onReplaceAvatar: () => unawaited(_showAvatarUpload()),
-                            onApplyAllSpaces: _myAvatarBytes == null
-                                ? null
-                                : () => unawaited(
-                                    _applyAvatarAllSpaces(_myAvatarBytes!)),
+                            onApplyAllSpaces: _hasMultipleSpaces
+                                ? (bytes) => _applyAvatarAllSpaces(bytes)
+                                : null,
                             onSaveImage: (bytes) => _saveAvatarImage(
                                 _senderNameOf(senderMemberId), bytes)),
                       ],
@@ -10403,7 +10412,7 @@ class _PastePayload {
 /// 关闭键；底部按钮按回调组合（都**先关大图再执行**）：
 /// - [onReplace]：「更换头像」（顶部居中；本人的头像才传）；
 /// - [onApplyAllSpaces]：「应用于本机所有秘境」（字号小一档分主次；本人的
-///   头像才传）；
+///   头像才传，参数 = 要扇出的 bytes，即本页展示的那张）；
 /// - [onSave]：「保存」——与 [onApplyAllSpaces] **并排时**缩成图标圆钮
 ///   （我的头像 = 下载图标 + 应用所有秘境）；[onApplyAllSpaces] 为 null
 ///   （对方头像）时独占一行，用与消息图片全屏同款的「图标+保存」完整按钮。
@@ -10411,7 +10420,7 @@ Future<void> showMyAvatarFullscreen(
   BuildContext context, {
   required Uint8List bytes,
   VoidCallback? onReplace,
-  VoidCallback? onApplyAllSpaces,
+  Future<void> Function(Uint8List bytes)? onApplyAllSpaces,
   Future<void> Function(Uint8List bytes)? onSave,
 }) async {
   await withImmersiveFullscreen(() => showDialog<void>(
@@ -10507,7 +10516,7 @@ Future<void> showMyAvatarFullscreen(
                                 ),
                                 onPressed: () {
                                   Navigator.of(ctx).pop();
-                                  onApplyAllSpaces();
+                                  unawaited(onApplyAllSpaces(bytes));
                                 },
                                 icon: const Icon(Icons.layers_outlined),
                                 label: Text(
@@ -10546,7 +10555,8 @@ class _MessageAvatar extends StatefulWidget {
       this.openFullscreenOnTap = true,
       this.onSaveImage,
       this.onReplaceAvatar,
-      this.onApplyAllSpaces});
+      this.onApplyAllSpaces,
+      this.onTapWithoutImage});
 
   final String? memberId;
   final String server;
@@ -10572,7 +10582,17 @@ class _MessageAvatar extends StatefulWidget {
 
   /// 「应用于本机所有秘境」按钮的回调（老板 2026-10-17：把这份头像扇出到本机
   /// 其它秘境）。与 [onReplaceAvatar] 同源——都是本人的头像才给。
-  final VoidCallback? onApplyAllSpaces;
+  /// 参数 = 全屏里实际展示的 bytes（扇出去的必须就是用户看的那张）。
+  final Future<void> Function(Uint8List bytes)? onApplyAllSpaces;
+
+  /// **没有头像图片**时点头像的动作（如「我的资料」弹层：直接进选图流程）。
+  ///
+  /// 为什么由本组件自己决定：图在不在，只有本组件的静态缓存说了算
+  /// （[_MessageAvatarState._load] 独立加载）。调用方另存一份 bytes
+  /// （如 `_myAvatarBytes`）来猜，两次独立加载不一致时会**错航**（有图却进
+  /// 选图）或**死区**（没图却不开全屏）——2026-10-17 代码复查发现的竞态，
+  /// 故把决策权收回到唯一的数据源。
+  final VoidCallback? onTapWithoutImage;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -10651,10 +10671,13 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
+    // 点按去向由**本组件**决定（有图 → 全屏；没图 → 调用方的 onTapWithoutImage），
+    // 不靠调用方从外部猜缓存状态（见 onTapWithoutImage 注释）。
+    final onTap = !widget.openFullscreenOnTap
+        ? null
+        : (bytes != null ? _showFullscreen : widget.onTapWithoutImage);
     return Clickable(
-      onTap: (widget.openFullscreenOnTap && bytes != null)
-          ? _showFullscreen
-          : null,
+      onTap: onTap,
       circle: true,
       child: CircleAvatar(
         radius: widget.radius,

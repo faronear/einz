@@ -594,7 +594,7 @@ void main() {
     await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
     await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
-    // 弹窗内含两个输入框：可编辑名字在前、只读性别在后 → 取 .first
+    // 弹窗内只剩一个可编辑名字输入框（性别只读框 2026-10-17 已移到「我的资料」弹层）
     await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
@@ -946,14 +946,14 @@ void main() {
     // initState loadProfile 补名（memberB——顶部条/菜单显示）
     expect(find.text('memberB'), findsWidgets);
 
-    // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
+    // 菜单 → 「我的资料」弹层 → 点名字胶囊 → 改名弹窗 → 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
     await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
-        .first; // 弹窗内可编辑名字框在前、只读性别框在后
+        .first; // 弹窗内只有一个名字输入框（性别框已移入「我的资料」弹层）
     await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
     await tester.pumpAndSettle();
     await tester.enterText(renameField, 'Alice');
@@ -1866,6 +1866,8 @@ void main() {
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
+    _publishTwoSpaceVault(); // 多秘境才有「所有秘境」一说（2026-10-17）
+    addTearDown(() => VaultSession.publish(null));
     final spaceKey = await generateSpaceKey();
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1905,6 +1907,45 @@ void main() {
     await tester.tap(find.text(_zh.settingsScopeAll));
     await tester.pumpAndSettle();
     expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+  });
+
+  testWidgets('邮件通知弹窗：单秘境 → 不显示「应用于本机所有秘境」勾选框（老板 2026-10-17）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    // 不发布 Vault（VaultSession.current 为 null）= 单秘境本机
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 邮件通知（_menuAction 有 300ms 错峰延迟）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageNotifyLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageNotifyLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 没有"其它秘境"可同步：勾选框整个不出现（弹窗本身照常）
+    expect(find.text(_zh.settingsScopeAll), findsNothing);
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.widgetWithText(FilledButton, _zh.chatPageEmailSubmit),
+        findsOneWidget);
   });
 
   testWidgets('邮件通知：已设邮箱时点停用 → 关弹窗 + 顶部通知一句（老板 2026-10-15）',

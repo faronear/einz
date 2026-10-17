@@ -950,12 +950,6 @@ abstract class AppLocalizations {
   /// **'Change shared passphrase'**
   String get chatPageMenuChangePassphrase;
 
-  /// No description provided for @chatPageMenuAvatar.
-  ///
-  /// In en, this message translates to:
-  /// **'My avatar'**
-  String get chatPageMenuAvatar;
-
   /// No description provided for @chatPageMenuMyProfile.
   ///
   /// In en, this message translates to:
@@ -1339,12 +1333,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Burn-after-read'**
   String get chatPageMenuBurnLabel;
-
-  /// No description provided for @chatPageMenuMyNameLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'My identity'**
-  String get chatPageMenuMyNameLabel;
 
   /// No description provided for @chatPageMenuEntranceList.
   ///
