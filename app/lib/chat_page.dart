@@ -253,6 +253,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _inputFocusNode = FocusNode(); // 回车发送后重新聚焦（与图标发送一致保持焦点）
   final _lockTimer = LockTimer();
+  // —— 前台无操作锁屏（老板 2026-10-17）——
+  // 一直前台亮屏、但超过 [kLockSeconds] 秒没任何交互（点/滑/打字）也进锁屏。
+  // 与后台锁共用同一阈值（kLockSeconds，将来统一做成用户可调菜单项）。
+  // 一次性 Timer：每次交互 cancel+重排到"现在+阈值"；空闲时 Timer 睡着零唤醒，
+  // 比周期 Timer（每秒醒一次查墙钟）更省，且可用 widget 测试的假时钟推进。
+  Timer? _idleTimer; // 一次性：每次交互重排到"现在+kLockSeconds"，空闲时睡着零唤醒
+  // build 根 Focus：hasFocus=true 当且仅当聊天页在栈顶、无弹层/对话框/锁屏盖着
+  //（弹层是 push 的独立 route，会把焦点带走上层 route）。用于：
+  // ① 焦点监听——pop 回聊天/焦点回归时重排计时；② 到点触发前确认仍持有焦点。
+  // 复用的既有字段（勿再声明）：_hasPin（448）、_appResumed（308，生命周期里维护）、
+  // _voiceCall?.state.value.inCall（456，通话中信号）。
+  final _rootFocusNode = FocusNode(debugLabel: 'chatIdleLockRoot');
+  bool _idleFocusHooked = false; // 根 Focus 监听是否已挂（didChangeDependencies）
   // 插件懒构造：AudioRecorder()/AudioPlayer() 构造即触发原生平台通道，
   // 仅在实际录音/播放时才实例化（widget 测试环境无原生实现，渲染路径不触碰）。
   AudioRecorder? _recorder;
@@ -928,9 +941,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _scrollController.addListener(_maybeLoadOlder);
     _scrollController.addListener(_onScrollForRead);
     _inputFocusNode.addListener(_onInputFocusChanged);
+    // 前台无操作锁屏：输入框持焦时打字（软键盘，onPointerDown 抓不到）也算交互，
+    // 监听控制器文本变化刷新最近交互时刻。
+    _input.addListener(_onInputInteraction);
     _loadBurnLabel();
     _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
     _refreshPinStatus();
+    // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
+    // 交互信号由 build 根的 Listener（点/滑）+ 输入框监听（打字）喂给 _armIdleLock；
+    // 解锁/关弹层 pop 回聊天时由根 Focus 焦点回归（见 _onIdleFocusChanged）重排。
+    _armIdleLock();
     _refreshNotifyEmail(); // 菜单项「邮件通知」的当前值（拉不到就保持 null，不显示）
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
     // 随后用持久化值校正（_loadUiStyle 异步）
@@ -951,6 +971,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _unreadTimer = Timer.periodic(
         const Duration(seconds: 30), (_) => unawaited(_refreshOtherUnread()));
     unawaited(_refreshOtherUnread());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 前台无操作锁屏：根 Focus 的焦点变化监听。聊天页在栈顶时根节点恒 hasFocus
+    //（子控件持焦也算）；弹层/对话框/锁屏 push 上来会把焦点带走上层 route → 失焦；
+    // pop 回聊天（解锁/关弹层）焦点回归 → 重排 idle 计时器，给完整的新窗口。
+    if (!_idleFocusHooked) {
+      _rootFocusNode.addListener(_onIdleFocusChanged);
+      _idleFocusHooked = true;
+    }
   }
 
   /// 顶部栏的通话按钮：发起呼叫（振铃界面由状态监听弹出）。
@@ -2775,6 +2807,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final has = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
     if (!mounted || has == _hasPin) return;
     setState(() => _hasPin = has);
+    // PIN 状态刚确定（如 initState 首读完成）→ 重排 idle 计时器：
+    // 设了 PIN 才开始计（_armIdleLock 内会判 _hasPin），没设则清空
+    _armIdleLock();
   }
 
   /// 「邮件通知」菜单项右侧的当前值（没设置/没拉到 → null，不显示）。
@@ -5373,6 +5408,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _peerTicker?.cancel();
     _notifyTicker?.cancel(); // 邮件通知"待确认"期间的那一路轮询
     _recordTimer?.cancel();
+    _idleTimer?.cancel(); // 前台无操作锁屏
+    _rootFocusNode.removeListener(_onIdleFocusChanged);
+    _rootFocusNode.dispose();
+    _input.removeListener(_onInputInteraction);
     _highlightTimer?.cancel(); // 跳转高亮定时清除（防 dispose 后 setState）
     _ampSub?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
@@ -5437,11 +5476,77 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 两种都照常补报已读——别把"未超时不锁"顺手吞掉（原逻辑就在这个分支里报已读）
       if (!relock || !_hasPin || !mounted) {
         _scheduleReadReport();
+        // 前台无操作锁屏：回到前台重新计时（给一个完整的 idle 窗口）
+        _armIdleLock();
         return;
       }
       Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
     }
+  }
+
+  // ==================== 前台无操作锁屏（老板 2026-10-17）====================
+  // 一直前台亮屏、但超过 [kLockSeconds] 秒没任何交互（点/滑/打字）也进锁屏。
+  // 与后台锁共用同一阈值（kLockSeconds，将来统一做成用户可调菜单项）。
+  //
+  // 用「一次性 Timer + 每次交互重排」而非周期 Timer：
+  //  · 空闲时 Timer 睡着，零唤醒——比每秒醒一次查墙钟更省资源（老板关注点）；
+  //  · 用 Dart 逻辑时钟（Timer 由 FakeAsync 驱动），widget 测试可直接
+  //    tester.pump(Duration(seconds: 30)) 推进到触发点，无需 runAsync 实睡；
+  //  · 切后台/来电/通话等"不该计时"的场景由 _armIdleLock 内的条件挡掉，
+  //    回前台/解锁时统一 _armIdleLock() 重排，语义干净。
+  // 交互信号：build 根的 Listener（点/滑/拖，onPointerDown）+ 输入框控制器
+  // 监听（打字，软键盘在 Flutter 视图外，纯 onPointerDown 抓不到）。
+  // 解锁/关弹层 pop 回聊天：根 Focus 焦点回归（_onIdleFocusChanged）重排。
+  //
+  // 弹层守卫：不特意挡住"开着弹层时 idle 锁屏"——30 秒没任何交互即视为离开，
+  // 锁屏盖上去是安全方向（与"切后台超时就锁"同一条安全取向）。代价仅是极端
+  // 场景（开着一个弹层放着不管 30s）会被锁，但这正是功能想要的。
+
+  /// 安排/重排 idle 锁屏计时器到"现在+[kLockSeconds]"。交互、回前台、焦点回归
+  /// （解锁/关弹层）、PIN 状态确定后都调它。不满足锁条件时直接清掉计时器（不排）。
+  void _armIdleLock() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    if (!_hasPin) return; // 没设 PIN 不锁（与后台锁同一条硬规则）
+    if (!_appResumed) return; // 后台中：交给后台锁路径，回前台再排
+    if (_voiceCall?.state.value.inCall == true) return; // 通话中不锁
+    if (!_rootFocusNode.hasFocus) return; // 被弹层/锁屏盖着：等焦点回归再排
+    _idleTimer = Timer(const Duration(seconds: kLockSeconds), _fireIdleLock);
+  }
+
+  /// 交互信号刷新：点/滑/拖都走这里（build 根 Listener）。打字走
+  /// [_onInputInteraction]，同样落到 _armIdleLock。
+  void _onPointerInteraction() {
+    _armIdleLock();
+  }
+
+  /// 输入框文本变化 → 也算交互（打字）。
+  void _onInputInteraction() {
+    _armIdleLock();
+  }
+
+  /// 根 Focus 焦点变化：pop 回聊天（解锁/关弹层）焦点回归 → 重排计时；
+  /// 被弹层盖上来失焦 → 计时器在 _armIdleLock 已清/将清，无需额外处理。
+  void _onIdleFocusChanged() {
+    if (_rootFocusNode.hasFocus) {
+      _armIdleLock();
+    } else {
+      _idleTimer?.cancel(); // 被覆盖期间不计时
+      _idleTimer = null;
+    }
+  }
+
+  /// 到点触发：前置条件在 _armIdleLock 已挡过；这里兜底检查"期间状态是否变了"
+  ///（如来电、被弹层盖住、切后台），仍满足才锁。
+  void _fireIdleLock() {
+    if (!mounted) return;
+    if (!_appResumed || !_hasPin) return;
+    if (_voiceCall?.state.value.inCall == true) return;
+    if (!_rootFocusNode.hasFocus) return; // 被弹层/锁屏盖着，别抢锁
+    // 与手动锁屏/后台锁同一条路径：严格锁（canDismiss=false），必须输 PIN 回聊天
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
   }
 
   /// 首次载入：先用本地缓存秒开（离线/慢网也能立刻看到历史）→ 再同步全量 →
@@ -9576,6 +9681,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 桌面端拖入文件的高亮浮层（覆盖整页，松手即发送）
           if (_fileDragHover) const Positioned.fill(child: _DropHintOverlay()),
         ],
+      ),
+    );
+    // 前台无操作锁屏（老板 2026-10-17）：整页套两层（包在最内层，后面的
+    // CallbackShortcuts/DropTarget 不消费指针与焦点事件，都能正常收到）。
+    // ① Listener：点/滑/拖都在 onPointerDown 抓到 → 重排 idle 计时器。
+    //    打字由输入框控制器监听兜底（软键盘在 Flutter 视图外，点不到）。
+    // ② Focus：根 FocusNode——聊天页在栈顶时恒 hasFocus（子控件持焦也算），
+    //    弹层/锁屏 push 上来失焦、pop 回来重排计时（见 _onIdleFocusChanged）。
+    page = Focus(
+      focusNode: _rootFocusNode,
+      skipTraversal: true, // 只当"在栈顶"守卫信号，不参与 Tab 焦点遍历
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _onPointerInteraction(),
+        child: page,
       ),
     );
     // 桌面端：整页套一个投递区，从访达/资源管理器拖文件进来即发送；移动端不挂
