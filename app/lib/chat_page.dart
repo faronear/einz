@@ -8331,7 +8331,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 case 'name':
                   _menuAction(_showRenameDialog);
                 case 'avatar':
-                  _menuAction(_showAvatarUpload);
+                  // 与状态条头像同款逻辑（老板 2026-10-17）：空头像直接换；
+                  // 有头像先开大图（大图里有「更换头像」按钮）。
+                  _menuAction(_myAvatarBytes == null
+                      ? _showAvatarUpload
+                      : () => _showAvatarFullscreen(_myAvatarBytes!,
+                          allowReplace: true, saveName: _myMemberName));
                 case 'members':
                   _menuAction(_showMembersSheet);
                 case 'entrancelist':
