@@ -797,6 +797,30 @@ class ChatSession {
     return (messageId: messageId, attachmentId: attachmentId, caption: cap);
   }
 
+  /// 上传本人头像（`/avatar <图片路径>`，老板 2026-10-17）：读本地图片 → POST /avatar
+  /// （raw bytes，服务端按 member 存储覆盖，同时广播 profile.updated 让伴侣立即重拉）。
+  ///
+  /// 与服务端/App 端同口径的**本地先行校验**（白传一通再被 400/413 挡很浪费）：
+  /// 文件存在、非空、≤2MB（服务端 `MAX_AVATAR_BYTES`）、扩展名是图片
+  /// （App 端由 file_picker 的 FileType.image 保证，TUI 收路径没有这层过滤）。
+  /// 返回服务端确认的 member_id（响应不合法时为 null——上传本身已成功，
+  /// 不能让解析失败把成功的一次上传报成失败，与 [ApiClient.uploadAvatar] 同口径）。
+  Future<String?> setAvatar(String filePath) async {
+    store.requireSession();
+    final resolved = _expandUserHome(filePath);
+    final file = File(resolved);
+    if (!file.existsSync()) throw StateError('文件不存在: $filePath（已展开为 $resolved）');
+    if (!_kImageExtensions.hasMatch(file.path)) {
+      throw StateError('不是图片文件: ${file.path}（支持 png / jpg / gif / webp / heic 等）');
+    }
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw StateError('图片内容为空: $filePath');
+    if (bytes.length > kMaxAvatarBytes) {
+      throw StateError('图片超过 2MB 上限（${(bytes.length / 1024 / 1024).toStringAsFixed(1)}MB）: $filePath');
+    }
+    return _withAutoAuth((token) => ApiClient(server).uploadAvatar(bytes, token));
+  }
+
   /// 打开某条消息的附件（/open）：按 message_id 定位附件元数据 → 下载密文 blob
   /// → 校验 sha256 → 解密 → 写入缓存文件 → 系统默认应用打开（macOS open /
   /// Linux xdg-open）。返回本地缓存路径（无打开器的平台仅保存，由界面提示）。
@@ -941,6 +965,14 @@ String _expandUserHome(String path) {
   }
   return path;
 }
+
+/// 头像字节上限（2MB，与服务端 `MAX_AVATAR_BYTES` 同值——本地先挡，别白传）。
+const int kMaxAvatarBytes = 2 * 1024 * 1024;
+
+/// 头像允许的图片扩展名（与 App 端 `_inferAttachmentType` 的图片集合一致；
+/// App 由 file_picker 的 FileType.image 保证，TUI 收路径须自己校验）。
+final RegExp _kImageExtensions =
+    RegExp(r'\.(png|jpe?g|gif|webp|heic|heif|bmp)$', caseSensitive: false);
 
 String _homeDir() {
   return Platform.environment['HOME'] ??

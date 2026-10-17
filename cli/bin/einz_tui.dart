@@ -3245,6 +3245,25 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
   }
 }
 
+/// 后台上传头像（老板 2026-10-17）：与 [_uploadAttachmentInBackground] 同款**不
+/// await**——头像上传不占输入循环。进度走状态栏（⏳），结果/失败进消息流。
+/// 本地校验（存在/图片/≤2MB）失败时状态栏不闪，直接给 ❌ 提示。
+Future<void> _uploadAvatarInBackground(ChatSession session, String path) async {
+  final s = _state;
+  try {
+    s?.status = '⏳ 正在上传头像……';
+    _scheduleRender();
+    await session.setAvatar(path);
+    session.messages.add(_systemMessage(session, '✅ 头像已更新（对方下次拉取即可看到）'));
+    if (s != null) s.status = '';
+  } catch (e) {
+    session.messages.add(_systemMessage(session, '❌ 头像上传失败: $e'));
+    if (s != null) s.status = '';
+  } finally {
+    _scheduleRender();
+  }
+}
+
 /// `/reset`：重置本通道——三道闸门过后清本地数据，然后**原地回到全新入网向导**
 /// （老板 2026-09-23：以前是清完就退出进程，得自己重新敲命令启动）。
 ///
@@ -3340,6 +3359,7 @@ Future<void> _execCommand(String line) async {
       const helpEntries = <(String, String)>[
         ('/attach <文件路径>', '上传文件'),
         ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
+        ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -3748,6 +3768,21 @@ Future<void> _execCommand(String line) async {
         // 2026-09-14）；这里**不 await**——回车即交还输入（否则输入循环 busy 到上传结束，
         // 中途打不了字）；结果/失败只在消息区体现，状态栏不占（老板要求状态栏保持干净）。
         unawaited(_uploadAttachmentInBackground(s.session, arg));
+      }
+    case '/avatar':
+      // 设置我的头像（老板 2026-10-17）：/avatar <图片路径> → 读图 → POST /avatar。
+      // TUI 本身不渲染头像，但头像是 per-member 的共享资料：这里设的就是对方 App /
+      // TUI 里看到的我的头像（与 App「我的资料」弹层同一个服务端存储）。
+      if (arg.isEmpty) {
+        s.session.messages.add(_systemMessage(s.session,
+            '🔧 用法: /avatar <图片路径> 👉 设置我的头像（png/jpg 等图片，≤2MB）'));
+      } else if (s.session.store.sessionToken == null) {
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
+        s.status = '';
+      } else {
+        // 与 /attach 同款**不 await**：上传期间输入照常可用；进度走状态栏，
+        // 结果/失败进消息流（头像上传通常一两秒，不阻塞打字更重要）。
+        unawaited(_uploadAvatarInBackground(s.session, arg));
       }
     case '/entoken':
       // 生成通道码（join token——24h 一次性）。三种签法（老板 2026-10-07 定名）：
