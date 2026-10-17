@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
 import '../data/space_session.dart';
+import '../widgets/cancel_button.dart';
 import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
@@ -301,10 +302,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.cancel),
-        ),
+        CancelButton(onPressed: () => Navigator.of(context).pop(false)),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.error,

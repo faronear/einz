@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'cancel_button.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_lock.dart';
@@ -131,9 +133,8 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
         ],
       ),
       actions: [
-        TextButton(
+        CancelButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,

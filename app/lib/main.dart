@@ -17,6 +17,7 @@ import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/version_gate.dart';
+import 'widgets/cancel_button.dart';
 
 /// Einz 移动端（及桌面端）入口。
 ///
@@ -265,10 +266,7 @@ class _StartupGateState extends State<StartupGate> {
           title: Center(child: Text(l10n.startupInitClearDataTitle)),
           content: Text(l10n.startupInitClearDataMessage),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.cancel),
-            ),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error,

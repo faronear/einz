@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'widgets/about_sheet.dart';
+import 'widgets/cancel_button.dart';
 import 'brand_logo.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
@@ -286,7 +287,7 @@ class _LockPageState extends State<LockPage> {
           title: Center(child: Text(l10n.chatPageExitTitle)),
           content: Text(l10n.chatPageExitMessage),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
           ],
         ),

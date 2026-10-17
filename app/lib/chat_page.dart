@@ -23,6 +23,7 @@ import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'widgets/about_sheet.dart';
+import 'widgets/cancel_button.dart';
 import 'brand_logo.dart';
 import 'widgets/burn_duration_sheet.dart';
 import 'widgets/version_gate.dart';
@@ -1610,10 +1611,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 fontSize: 12, color: Theme.of(ctx).colorScheme.error),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.cancel),
-            ),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(l10n.confirm),
@@ -2695,6 +2693,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: TextButton(
+                      // 淡灰底（老板 2026-10-18）：与弹窗「取消」按钮同色系，
+                      // 可按可不按的低强调动作
+                      style: TextButton.styleFrom(
+                        backgroundColor:
+                            Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                        foregroundColor:
+                            Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
                       onPressed: busy
                           ? null
                           : () async {
@@ -3051,12 +3057,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
             if (active)
               ValueListenableBuilder<bool>(
                 valueListenable: busy,
                 builder: (_, isBusy, _) => TextButton(
+                  // 淡灰底（老板 2026-10-18）：停用不值得鼓励，不用主色，但与
+                  // 「取消」按钮呼应给个底色；大小同下方「保存」提交按钮
+                  style: TextButton.styleFrom(
+                    backgroundColor:
+                        Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                    foregroundColor:
+                        Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    minimumSize: const Size(64, 36),
+                  ),
                   onPressed: isBusy
                       ? null
                       : () async {
@@ -3299,10 +3315,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-              ),
+              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
@@ -4846,7 +4859,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               onPressed: () async {
                 final err = await _applyEntranceName(ctrl.text, l10n,
@@ -4934,9 +4947,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
-            TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: Text(l10n.cancel)),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               onPressed: () {
                 final name = ctrl.text.trim();
@@ -5306,7 +5317,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               onPressed: () async {
                 final name = ctrl.text.trim();
@@ -5403,7 +5414,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           title: Center(child: Text(l10n.chatPageExitTitle)),
           content: Text(l10n.chatPageExitMessage),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
           ],
         ),
@@ -6742,10 +6753,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
           content: Text(l10n.chatPageDeleteConfirmMessage),
           actions: [
-            OutlinedButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.chatPageDeleteCancel),
-            ),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false), label: l10n.chatPageDeleteCancel),
             // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
             // 用实体样式，不再是纯文字）
             FilledButton(
@@ -6790,10 +6798,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
           content: Text(l10n.chatPageRecallConfirmBody),
           actions: [
-            OutlinedButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.cancel),
-            ),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: FilledButton.styleFrom(
@@ -7864,10 +7869,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.cancel),
-            ),
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(l10n.send),
@@ -10081,7 +10083,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             title: Center(child: Text(l10n.chatPageClearLockTitle)),
             content: Text(l10n.chatPageClearLockMessage),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
               // 确认按钮与「删除所有消息」弹窗同款红底白字，但文案用「清除」
               // （与删除消息的「删除」措辞区分，老板 2026-10-18）
               FilledButton(
@@ -10205,7 +10207,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
+        CancelButton(onPressed: () => Navigator.of(context).pop()),
         FilledButton(onPressed: _busy ? null : _submit, child: Text(l10n.setPinDialogSetPin)),
       ],
     );
@@ -10424,7 +10426,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
+        CancelButton(onPressed: () => Navigator.of(context).pop(false)),
         FilledButton(
           onPressed: _busy ? null : _submit,
           child: Text(l10n.chatPageChangePassphraseSubmit),
