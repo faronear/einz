@@ -236,6 +236,7 @@
   "chatPageSetLockCleared": "PIN cleared. You can enter the space directly at next launch.",
   "chatPageClearLockTitle": "Clear PIN?",
   "chatPageClearLockMessage": "Clear the PIN? After clearing, next app launch will go straight into chat.",
+  "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
   "chatPageInviteDialogTitleAttachSelf": "Add my new entrance",
   "chatPageInviteDialogTitleReinvite": "Re-invite",

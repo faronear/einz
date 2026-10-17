@@ -215,6 +215,7 @@
   "chatPageSetLockCleared": "已清除锁屏码，下次启动应用可直接进入秘境。",
   "chatPageClearLockTitle": "清除锁屏码？",
   "chatPageClearLockMessage": "确定要清除锁屏码吗？清除后下次启动将直接进入聊天。",
+  "chatPageLockClearConfirm": "清除",
   "chatPageInviteDialogTitleInvite": "邀请",
   "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
   "chatPageInviteDialogTitleReinvite": "重新邀请",

@@ -460,6 +460,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Clear the PIN? After clearing, next app launch will go straight into chat.';
 
   @override
+  String get chatPageLockClearConfirm => 'Clear';
+
+  @override
   String get chatPageInviteDialogTitleInvite => 'Invite';
 
   @override

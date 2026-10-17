@@ -854,6 +854,12 @@ abstract class AppLocalizations {
   /// **'Clear the PIN? After clearing, next app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
+  /// No description provided for @chatPageLockClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get chatPageLockClearConfirm;
+
   /// No description provided for @chatPageInviteDialogTitleInvite.
   ///
   /// In en, this message translates to:

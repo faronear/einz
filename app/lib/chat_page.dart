@@ -10082,13 +10082,14 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             content: Text(l10n.chatPageClearLockMessage),
             actions: [
               TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-              // 确认按钮与「删除所有消息」弹窗一致：红底白字、文案「删除」
+              // 确认按钮与「删除所有消息」弹窗同款红底白字，但文案用「清除」
+              // （与删除消息的「删除」措辞区分，老板 2026-10-18）
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: Theme.of(ctx).colorScheme.error,
                 ),
                 onPressed: () => Navigator.of(ctx).pop(true),
-                child: Text(l10n.clearMessagesConfirm),
+                child: Text(l10n.chatPageLockClearConfirm),
               ),
             ],
           ),

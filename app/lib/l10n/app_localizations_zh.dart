@@ -421,6 +421,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '确定要清除锁屏码吗？清除后下次启动将直接进入聊天。';
 
   @override
+  String get chatPageLockClearConfirm => '清除';
+
+  @override
   String get chatPageInviteDialogTitleInvite => '邀请';
 
   @override
