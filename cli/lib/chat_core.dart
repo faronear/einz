@@ -810,7 +810,7 @@ class ChatSession {
     final resolved = _expandUserHome(filePath);
     final file = File(resolved);
     if (!file.existsSync()) throw StateError('文件不存在: $filePath（已展开为 $resolved）');
-    if (!_kImageExtensions.hasMatch(file.path)) {
+    if (!kImageFileExtension.hasMatch(file.path)) {
       throw StateError('不是图片文件: ${file.path}（支持 png / jpg / gif / webp / heic 等）');
     }
     final bytes = await file.readAsBytes();
@@ -969,9 +969,10 @@ String _expandUserHome(String path) {
 /// 头像字节上限（2MB，与服务端 `MAX_AVATAR_BYTES` 同值——本地先挡，别白传）。
 const int kMaxAvatarBytes = 2 * 1024 * 1024;
 
-/// 头像允许的图片扩展名（与 App 端 `_inferAttachmentType` 的图片集合一致；
-/// App 由 file_picker 的 FileType.image 保证，TUI 收路径须自己校验）。
-final RegExp _kImageExtensions =
+/// 头像/附件选择器共用的图片扩展名（与 App 端 `_inferAttachmentType` 的图片集合
+/// 一致）：[ChatSession.setAvatar] 与 TUI 内置文件浏览器（imagesOnly 模式）都用它
+/// 判断"这是不是图片"。App 由 file_picker 的 FileType.image 保证，CLI 侧须自己校验。
+final RegExp kImageFileExtension =
     RegExp(r'\.(png|jpe?g|gif|webp|heic|heif|bmp)$', caseSensitive: false);
 
 String _homeDir() {

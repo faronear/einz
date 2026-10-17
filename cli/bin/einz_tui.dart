@@ -159,6 +159,56 @@ class _TuiState {
   bool pendingExitOnEmpty = false;
 
   bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
+
+  /// 内置文件浏览器（方案 B，老板 2026-10-17）处于活动态时非 null——**模态**：
+  /// 输入循环的按键全部分发给浏览器，消息区改画目录列表，输入行实时预览光标
+  /// 所在条目。系统文件选择窗口不可用（纯 SSH / 缺 zenity）时由 `/attach`、
+  /// `/avatar` 不带参数自动落入；也可用 EINZ_TUI_PICKER=browser 强制使用。
+  _FileBrowser? browser;
+}
+
+/// 内置文件浏览器的一个条目（目录或文件；`..` 是虚拟的上级条目）。
+class _FileEntry {
+  _FileEntry(this.name, {required this.isDir, this.size});
+
+  final String name;
+  final bool isDir;
+  final int? size; // 文件字节数（目录为 null）
+}
+
+/// 内置文件浏览器状态（方案 B）：纯键盘的目录浏览 + 选文件。
+///
+/// 为什么除了系统选择窗口还要它：系统窗口依赖 GUI 会话（macOS AppleScript /
+/// Linux zenity 都要有显示服务器），SSH 进 TUI 的用户完全没有；而且 TUI 用户
+/// 本就生活在键盘里，能不离屏选文件是一致的体验（老板 2026-10-17 拍板 A+B）。
+class _FileBrowser {
+  _FileBrowser(
+      {required this.commandPrefix, required this.imagesOnly, required String startDir})
+      : dir = startDir;
+
+  /// 选中后拼进输入行的命令（'/attach' / '/avatar'）——用户回车即执行。
+  final String commandPrefix;
+
+  /// 只允许选图片（/avatar）：目录照样进，选文件时按 [kImageFileExtension] 拦。
+  final bool imagesOnly;
+
+  /// 当前目录（绝对路径）。
+  String dir;
+
+  /// 当前目录条目：`..`（有父目录时）→ 目录 → 文件，目录/文件各自按名称排序。
+  List<_FileEntry> entries = [];
+
+  /// 光标下标（0..entries.length-1）；空目录为 0。
+  int cursor = 0;
+
+  /// 列表滚动窗口顶部下标（渲染时按光标校正，保证光标可见）。
+  int scrollTop = 0;
+
+  /// 是否显示点文件（默认不显示；h 切换——配置/密钥常藏在点目录里）。
+  bool showHidden = false;
+
+  /// 目录读取失败原因（无权限等）：显示在列表头部，不影响继续浏览。
+  String? error;
 }
 
 _TuiState? _state;
@@ -1948,9 +1998,13 @@ int _termCols() {
   return null;
 }
 
+/// 输入行提示符：聊天态 `[我] `；文件浏览器态（方案 B）`📂 `——那行此时是
+/// 光标条目的路径预览，不是待发消息，提示符必须换掉才不会误导。
+String _inputPrompt(_TuiState s) =>
+    s.browser != null ? '${_cyan}📂${_reset} ' : '${_cyan}[我]${_reset} ';
+
 /// 输入内容折行：每行最大宽度 = cols - prompt 显示宽度（最后一行行首带 prompt）。
-List<String> _wrapInput(String input, int cols) {
-  final prompt = '${_cyan}[我]${_reset} ';
+List<String> _wrapInput(String input, int cols, {required String prompt}) {
   return _wrapByWidth(input, cols - _displayWidth(prompt));
 }
 
@@ -1994,7 +2048,8 @@ void _render() {
   final cols = _termCols();
   // 输入区折行行数：超长输入自动多行，消息区高度动态让位
   final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
-  final inputWrapped = _wrapInput(display, cols);
+  final prompt = _inputPrompt(s);
+  final inputWrapped = _wrapInput(display, cols, prompt: prompt);
   s.inputLines = inputWrapped.length;
   final msgArea = rows - 2 - s.inputLines; // 顶部标题栏 1 行 + 底部状态行 1 行 + 输入区 N 行
 
@@ -2067,27 +2122,51 @@ void _render() {
   // 滚动窗口由 scrollTop 决定：贴底（scrollTop == lastMaxStart）时跟随最新，
   // 翻页浏览（PgUp/PgDn/滚轮）时停留在浏览位置，新消息到达不打断（自动跟随
   // 只发生在贴底状态）。
+  // 文件浏览器态（方案 B）整体接管这一区：列目录而不是消息，滚动窗口归
+  // 浏览器自己的 scrollTop（光标可见即可），不动消息的 scrollTop——退出浏览
+  // 器后消息区停回原处，不丢浏览位置。
+  final browser = s.browser;
   final lines = <String>[];
-  final msgs = s.session.messages;
-  // 附件固定序号表每帧预计算一次（formatMessage 逐条复用，避免 O(n²) 扫描）
-  final attachmentNos = _attachmentNos(s.session);
-  for (var i = 0; i < msgs.length; i++) {
-    lines.addAll(formatMessage(msgs[i], cols, attachmentNos: attachmentNos));
-    // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
-    // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
-    lines.add('');
+  List<String> visible;
+  if (browser != null) {
+    final all = _browserLines(browser, cols);
+    // 头部占 2~3 行（目录行 + 提示行 + 可能的错误行），列表从其后开始
+    final headerRows = 2 + (browser.error != null ? 1 : 0);
+    final listRows = (msgArea - headerRows).clamp(1, 1 << 20);
+    final listStart = headerRows;
+    final total = all.length - headerRows;
+    var top = browser.scrollTop;
+    if (browser.cursor < top) top = browser.cursor;
+    if (browser.cursor >= top + listRows) top = browser.cursor - listRows + 1;
+    top = top.clamp(0, total > listRows ? total - listRows : 0);
+    browser.scrollTop = top;
+    final from = listStart + top;
+    final to = (from + listRows).clamp(from, all.length);
+    visible = all.sublist(0, from) + all.sublist(from, to);
+    s.lastMaxStart = 0; // 状态行不走"历史浏览"分支（浏览器有自己的提示）
+    s.lastMsgArea = msgArea;
+  } else {
+    final msgs = s.session.messages;
+    // 附件固定序号表每帧预计算一次（formatMessage 逐条复用，避免 O(n²) 扫描）
+    final attachmentNos = _attachmentNos(s.session);
+    for (var i = 0; i < msgs.length; i++) {
+      lines.addAll(formatMessage(msgs[i], cols, attachmentNos: attachmentNos));
+      // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
+      // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
+      lines.add('');
+    }
+    final maxStart = lines.length > msgArea ? lines.length - msgArea : 0;
+    if (s.scrollTop >= s.lastMaxStart) {
+      s.scrollTop = maxStart; // 上次贴底（或首次渲染）：跟随到底部
+    } else if (s.scrollTop > maxStart) {
+      s.scrollTop = maxStart; // 消息变少导致越界：钳制回底部
+    }
+    s.lastMaxStart = maxStart;
+    s.lastMsgArea = msgArea;
+    final end =
+        s.scrollTop + msgArea < lines.length ? s.scrollTop + msgArea : lines.length;
+    visible = lines.sublist(s.scrollTop, end);
   }
-  final maxStart = lines.length > msgArea ? lines.length - msgArea : 0;
-  if (s.scrollTop >= s.lastMaxStart) {
-    s.scrollTop = maxStart; // 上次贴底（或首次渲染）：跟随到底部
-  } else if (s.scrollTop > maxStart) {
-    s.scrollTop = maxStart; // 消息变少导致越界：钳制回底部
-  }
-  s.lastMaxStart = maxStart;
-  s.lastMsgArea = msgArea;
-  final end =
-      s.scrollTop + msgArea < lines.length ? s.scrollTop + msgArea : lines.length;
-  final visible = lines.sublist(s.scrollTop, end);
   final bottom = rows - s.inputLines - 1; // 输入条上方第一行（消息区底部）
   // 先清空整个消息区（第 2 行到输入行上方）：连续渲染时旧行残留可能覆盖新消息
   // （表现为"连续两个 system 消息第二个不显示"）
@@ -2105,7 +2184,6 @@ void _render() {
   // 与 _renderInputLine 的定位计算完全一致——否则消息少时输入区被画在
   // 屏幕中间，与局部重绘的底部定位不一致 → you> 跳动、上下重复。
   // 逐行定位 + 清行（\x1B[K），避免残留旧行。
-  final prompt = '${_cyan}[我]${_reset} ';
   final top = rows - inputWrapped.length; // 输入区顶部行号（状态行占最底一行）
   for (var i = 0; i < inputWrapped.length; i++) {
     buf.write('\x1B[${top + i};1H'); // 定位输入区各行第 1 列
@@ -2130,6 +2208,19 @@ void _render() {
     // status、历史浏览提示在验证通过前一律不上屏（与标题栏同一策略：
     // 屏幕上一个身份/状态字节都不出现）。
     buf.write(_barLine(_bgBlack, _centerText('Einz', cols), cols));
+  } else if (browser != null) {
+    // 文件浏览器态：有 status（如"头像只能是图片"的即时提示）时优先显示——
+    // 否则路径预览会把它挤掉，用户选了非图片却看不到为什么没反应；
+    // 无 status 时显示光标条目的完整路径（消息区那行可能被截断，长路径在这儿看全）
+    if (s.status.isNotEmpty) {
+      buf.write(_barLine(_bgBlack, '⚙ ${_truncateByWidth(s.status, cols - 4)}', cols));
+    } else {
+      final preview = s.input.toString();
+      buf.write(_barLine(
+          _bgBlack,
+          '📂 ${_truncateByWidth(preview.isEmpty ? '(空目录)' : preview, cols - 4)}',
+          cols));
+    }
   } else if (s.scrollTop < s.lastMaxStart) {
     // 历史浏览模式：正在看更早的消息（未贴底），提示翻页键；到底后自动回正常状态
     buf.write(_barLine(_bgBlack, '📜 历史浏览（PgUp/PgDn, Shift+↑/↓ 或鼠标滚轮；翻到底自动回到最新）', cols));
@@ -2817,12 +2908,12 @@ void _renderInputLine() {
   final rows = _termLines();
   final cols = _termCols();
   final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
-  final inputWrapped = _wrapInput(display, cols);
+  final prompt = _inputPrompt(s);
+  final inputWrapped = _wrapInput(display, cols, prompt: prompt);
   if (inputWrapped.length != s.inputLines) {
     _render(); // 行数变化 → 消息区让位 → 全量重绘
     return;
   }
-  final prompt = '${_cyan}[我]${_reset} ';
   final promptW = _displayWidth(prompt);
   final top = rows - inputWrapped.length; // 输入区顶部行号（状态行占最底一行）
 
@@ -2869,6 +2960,29 @@ Future<void> _runInputLoop() async {
   // 终端转义序列缓冲：raw 模式下方向键等到达为 ESC [ A 等多个字节（可能跨 chunk），
   // 需在此拼合完整后再解释，避免 '[' 与字母被当成普通字符打进输入（曾显示 [D[C[A[B）。
   var esc = '';
+  // 裸 Esc 检测（文件浏览器要用 Esc 取消）：终端对"只按 Esc"只发一个 0x1B，
+  // 与转义序列首字节无法区分——只能等一小会儿，没有后续字节才算单独按下。
+  // 50ms 内来了字节 → 定时器作废（那是序列的一部分），不影响方向键等。
+  Timer? escTimer;
+  void armEscTimer() {
+    escTimer?.cancel();
+    escTimer = Timer(const Duration(milliseconds: 50), () {
+      escTimer = null;
+      if (esc != '\x1B') return; // 已进入/完成序列：不是裸 Esc
+      esc = '';
+      final s = _state;
+      if (s?.running != true) return; // 已退出：不再渲染（终端已恢复）
+      if (s?.browser != null) {
+        // 浏览器态：Esc = 取消（与 q 等价）
+        try {
+          _browserCancel(s!);
+        } catch (e, st) {
+          _inputLoopCrash(e, st);
+        }
+      }
+      // 聊天态：Esc 无绑定动作（保留给将来），不影响输入
+    });
+  }
   // 退出序列（Ctrl+C / 无上一问的问答空回车 / 命令处理后 !running 三处共用）：
   // 置退出标志 → 释放引导/解锁问答等待（否则 _runGuide/_unlockPin 的 await 挂起）
   // → 恢复终端（必须在 sub.cancel 之前，否则 fd 失效设不了 echoMode）→ 取消监听
@@ -2876,6 +2990,7 @@ Future<void> _runInputLoop() async {
   // WS 连接中会挂起到不了 exit(0)——进程退出自动关闭连接）。
   void exitNow() {
     _state!.running = false;
+    escTimer?.cancel();
     _abortPendingGuide();
     _restoreTerminal();
     sub.cancel();
@@ -2895,6 +3010,7 @@ Future<void> _runInputLoop() async {
       if (esc.isNotEmpty || code == 27) {
         if (esc.isEmpty) {
           esc = '\x1B';
+          armEscTimer(); // 50ms 内没有后续字节 → 按裸 Esc 处理
           continue;
         }
         final seq = esc + ch;
@@ -2905,7 +3021,14 @@ Future<void> _runInputLoop() async {
         final isFinal = code >= 0x40 && code <= 0x7E; // CSI 终止字节
         if (!isFinal) {
           if (esc == '\x1B') {
-            esc = ''; // ESC 后跟非 [ / O：死亡序列，整体丢弃
+            // ESC 后跟非 [ / O：浏览器态视为 Esc（用户按了 Esc 又顺手敲了个键），
+            // 聊天态保持原语义整体丢弃
+            final wasLoneEsc = esc == '\x1B';
+            esc = '';
+            if (wasLoneEsc && _state?.browser != null) {
+              _browserCancel(_state!);
+              inputChanged = true;
+            }
           } else if (seq.length >= 32) {
             esc = ''; // 兜底：异常长参数序列丢弃（上限放宽以容纳 SGR 鼠标序列）
           } else {
@@ -2914,9 +3037,37 @@ Future<void> _runInputLoop() async {
           continue;
         }
         esc = '';
+        escTimer?.cancel();
         final action = _escAction(seq);
         if (action == null) continue; // 未知序列：整体丢弃（不进输入）
         final s = _state!;
+        // 文件浏览器态（方案 B）：方向键/翻页/滚轮全部归浏览器
+        if (s.browser != null) {
+          switch (action) {
+            case 'up':
+              _browserMove(s, -1);
+            case 'down':
+              _browserMove(s, 1);
+            case 'left':
+              _browserParent(s);
+            case 'pgup':
+              _browserMove(s, -(s.lastMsgArea - 3).clamp(1, 1 << 20));
+            case 'pgdn':
+              _browserMove(s, (s.lastMsgArea - 3).clamp(1, 1 << 20));
+            case 'home':
+              _browserMove(s, -s.browser!.entries.length);
+            case 'end':
+              _browserMove(s, s.browser!.entries.length);
+            case 'wheelup':
+              _browserMove(s, -3);
+            case 'wheeldown':
+              _browserMove(s, 3);
+            default:
+              break; // right/delete/shift* 在浏览器里无意义
+          }
+          inputChanged = true;
+          continue;
+        }
         switch (action) {
           case 'up':
             _historyUp(s);
@@ -2956,6 +3107,12 @@ Future<void> _runInputLoop() async {
         return;
       }
       if (code == 13 || code == 10) {
+        // 文件浏览器态（方案 B）：回车 = 进入目录 / 选中文件（绝不提交输入）
+        if (_state!.browser != null) {
+          _browserEnter(_state!);
+          inputChanged = true;
+          continue;
+        }
         // 回车：提交输入
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
@@ -3043,12 +3200,24 @@ Future<void> _runInputLoop() async {
         continue;
       }
       if (code == 127 || code == 8) {
+        // 文件浏览器态（方案 B）：退格 = 回上级目录
+        if (_state!.browser != null) {
+          _browserParent(_state!);
+          inputChanged = true;
+          continue;
+        }
         // 退格：删除光标前一个字符（支持光标中途编辑）
         _backspaceAt(_state!);
         inputChanged = true;
         continue;
       }
       if (code >= 32) {
+        // 文件浏览器态（方案 B）：只认 q / h，其余字符不进输入
+        if (_state!.browser != null) {
+          _browserChar(_state!, ch);
+          inputChanged = true;
+          continue;
+        }
         _insertAtCursor(_state!, ch);
         inputChanged = true;
       }
@@ -3264,6 +3433,247 @@ Future<void> _uploadAvatarInBackground(ChatSession session, String path) async {
   }
 }
 
+/// 系统文件选择窗口的结果（决定要不要落内置浏览器）。
+enum _PickOutcome {
+  /// 选中了文件，已填进输入行。
+  picked,
+
+  /// 用户主动取消（静默，不落浏览器——取消就是"改主意了"）。
+  cancelled,
+
+  /// 系统选择窗口用不了（无 GUI / 缺工具 / EINZ_TUI_PICKER=browser）→ 落内置浏览器。
+  unavailable,
+}
+
+// ---------- 内置文件浏览器（方案 B：纯键盘，SSH 也能用）----------
+
+/// 路径拼接（无 path 依赖）：两端都不带分隔符时补一个；已带则不重复。
+String _pathJoin(String dir, String name) {
+  if (dir.isEmpty) return name;
+  final sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '/';
+  return '$dir$sep$name';
+}
+
+/// 父目录；已在根（'/' 或盘符根）返回 null。
+String? _pathParent(String path) {
+  if (path.isEmpty) return null;
+  var p = path;
+  while (p.isNotEmpty && (p.endsWith('/') || p.endsWith('\\'))) {
+    p = p.substring(0, p.length - 1); // 去掉尾部分隔符（根目录会剩空）
+  }
+  if (p.isEmpty) return null; // 原本就是根
+  final last = p.lastIndexOf('/');
+  final lastBack = p.lastIndexOf('\\');
+  final cut = last > lastBack ? last : lastBack;
+  if (cut < 0) return null; // 相对路径且无分隔符：没有可去的上级
+  if (cut == 0) return '/'; // 父目录是文件系统根
+  return p.substring(0, cut);
+}
+
+/// 打开内置文件浏览器：起始目录取用户主目录（图片/下载都在这儿），
+/// 主目录不可读（容器/权限）时退当前工作目录。
+void _openFileBrowser({required String commandPrefix, required bool imagesOnly}) {
+  final s = _state;
+  if (s == null) return;
+  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final start = (home != null && Directory(home).existsSync())
+      ? home
+      : Directory.current.path;
+  s.browser = _FileBrowser(
+      commandPrefix: commandPrefix, imagesOnly: imagesOnly, startDir: start);
+  s.input.clear();
+  s.cursor = 0;
+  _browserLoad(s);
+  _render();
+}
+
+/// 读取当前目录条目（目录在前、各自按名排序；`..` 作为首项当有父目录时）。
+/// 读取失败（无权限/被删）不退出浏览器：记下原因显示在头部，条目清空。
+void _browserLoad(_TuiState s) {
+  final b = s.browser!;
+  b.error = null;
+  try {
+    final dirs = <_FileEntry>[];
+    final files = <_FileEntry>[];
+    for (final e in Directory(b.dir).listSync(followLinks: false)) {
+      final name = e.path.replaceAll('\\', '/').split('/').last;
+      if (name.isEmpty) continue;
+      if (!b.showHidden && name.startsWith('.')) continue;
+      if (e is Directory) {
+        dirs.add(_FileEntry(name, isDir: true));
+      } else if (e is File) {
+        try {
+          files.add(_FileEntry(name, isDir: false, size: e.lengthSync()));
+        } catch (_) {
+          files.add(_FileEntry(name, isDir: false)); // 取不到大小不阻断列出
+        }
+      }
+    }
+    int byName(_FileEntry a, _FileEntry z) =>
+        a.name.toLowerCase().compareTo(z.name.toLowerCase());
+    dirs.sort(byName);
+    files.sort(byName);
+    b.entries = [
+      if (_pathParent(b.dir) != null) _FileEntry('..', isDir: true),
+      ...dirs,
+      ...files,
+    ];
+    b.cursor = 0;
+    b.scrollTop = 0;
+  } catch (e) {
+    b.error = '读不了该目录：$e';
+    b.entries = [];
+    b.cursor = 0;
+    b.scrollTop = 0;
+  }
+  _browserSyncPreview(s);
+}
+
+/// 输入行实时预览光标所在条目（选中后这里会变成 `<命令> <路径>`，
+/// 所以浏览时就让用户先看见路径长什么样）。
+void _browserSyncPreview(_TuiState s) {
+  final b = s.browser!;
+  final e = (b.cursor >= 0 && b.cursor < b.entries.length) ? b.entries[b.cursor] : null;
+  final preview = e == null
+      ? ''
+      : e.name == '..'
+          ? (_pathParent(b.dir) ?? b.dir)
+          : _pathJoin(b.dir, e.name);
+  s.input
+    ..clear()
+    ..write(preview);
+  s.cursor = s.input.length;
+}
+
+/// 移动光标（钳在条目范围内），并按需滚动窗口保持光标可见。
+void _browserMove(_TuiState s, int delta) {
+  final b = s.browser!;
+  if (b.entries.isEmpty) return;
+  s.status = ''; // 上一条提示（如"只能选图片"）已处置：移动光标即翻篇
+  final next = (b.cursor + delta).clamp(0, b.entries.length - 1);
+  if (next == b.cursor) return;
+  b.cursor = next;
+  // 可见行数：消息区减去头部（目录行 + 提示行 + 可能的错误行）
+  final visibleRows = (s.lastMsgArea - 3).clamp(1, 1 << 20);
+  if (b.cursor < b.scrollTop) b.scrollTop = b.cursor;
+  if (b.cursor >= b.scrollTop + visibleRows) b.scrollTop = b.cursor - visibleRows + 1;
+  _browserSyncPreview(s);
+  _render(); // 光标高亮在消息区：必须全量重绘（只重绘输入行只会动预览）
+}
+
+/// 回车：目录 → 进入；文件 → 选中（图片模式先按扩展名拦）。
+void _browserEnter(_TuiState s) {
+  final b = s.browser!;
+  if (b.cursor < 0 || b.cursor >= b.entries.length) return;
+  final e = b.entries[b.cursor];
+  final target = e.name == '..' ? _pathParent(b.dir) : _pathJoin(b.dir, e.name);
+  if (target == null) return;
+  if (e.isDir) {
+    b.dir = target;
+    _browserLoad(s);
+    _render();
+    return;
+  }
+  if (b.imagesOnly && !kImageFileExtension.hasMatch(target)) {
+    // 不退出浏览器：只提示，光标还在原处，换个文件继续（q 取消）
+    s.status = '⚠️ 头像只能是图片（png/jpg/gif/webp/heic）——换个文件，或按 q 取消';
+    _render();
+    return;
+  }
+  _browserFinish(s, target);
+}
+
+/// 选中完成：退出浏览器，把 `<命令> <路径>` 放进输入行（**不自动发送**）。
+void _browserFinish(_TuiState s, String path) {
+  final b = s.browser!;
+  s.browser = null;
+  s.status = '';
+  s.input
+    ..clear()
+    ..write('${b.commandPrefix} $path');
+  s.cursor = s.input.length;
+  _render();
+}
+
+/// 上级目录（Backspace / ←）。
+void _browserParent(_TuiState s) {
+  final b = s.browser!;
+  final parent = _pathParent(b.dir);
+  if (parent == null) {
+    s.status = '⚠️ 已经在文件系统根目录了';
+    _render();
+    return;
+  }
+  b.dir = parent;
+  _browserLoad(s);
+  _render();
+}
+
+/// 取消（q / Esc）：退出浏览器，清空输入行（浏览期间它是预览，不是用户的字）。
+void _browserCancel(_TuiState s) {
+  s.browser = null;
+  s.status = '';
+  s.input.clear();
+  s.cursor = 0;
+  _render();
+}
+
+/// 浏览器里的字符键：q 取消、h 切换隐藏文件（其余忽略——模态态不打字）。
+void _browserChar(_TuiState s, String ch) {
+  final b = s.browser!;
+  switch (ch) {
+    case 'q':
+      _browserCancel(s);
+    case 'h':
+      b.showHidden = !b.showHidden;
+      _browserLoad(s);
+      _render();
+  }
+}
+
+/// 文件大小的人读格式（1.2 MB / 843 B）。
+String _humanSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+}
+
+/// 浏览器态的消息区内容：头部（当前目录 + 统计 + 提示）+ 条目列表（光标行高亮）。
+/// 每行都按显示宽度截到 [cols]——消息区是逐行定位重绘，超宽会触发终端自动折行
+/// 把画面糊掉。
+List<String> _browserLines(_FileBrowser b, int cols) {
+  final out = <String>[];
+  final hasParent = b.entries.isNotEmpty && b.entries.first.name == '..';
+  final dirCount = b.entries.where((e) => e.isDir && e.name != '..').length;
+  final fileCount = b.entries.length - dirCount - (hasParent ? 1 : 0);
+  out.add(_truncateByWidth(
+      '${_bold}📂 ${b.dir}${_reset}  '
+      '${_gray}${dirCount} 目录 / ${fileCount} 文件'
+      '${b.showHidden ? ' · 含隐藏' : ''}${_reset}',
+      cols));
+  if (b.error != null) out.add(_truncateByWidth('${_yellow}⚠️ ${b.error}${_reset}', cols));
+  out.add(_truncateByWidth(
+      '${_gray}↑↓ 移动 · Enter 进入/选中 · Backspace 上级 · h 隐藏文件 · q 取消'
+      '${b.imagesOnly ? ' · 只选图片' : ''}${_reset}',
+      cols));
+  final icon = (e) => e.isDir ? '📁 ' : '🖼 '; // 图片/文件不细分：列表要短，认图标不如认名字
+  for (final e in b.entries) {
+    final selected = b.cursor >= 0 &&
+        b.cursor < b.entries.length &&
+        identical(e, b.entries[b.cursor]);
+    // `..` 不带斜杠（它本身就是"上级"的写法，加斜杠变成 "../" 反而怪）
+    final name = (e.isDir && e.name != '..') ? '${e.name}/' : e.name;
+    final size = (!e.isDir && e.size != null) ? '  ${_gray}${_humanSize(e.size!)}${_reset}' : '';
+    // 光标行：反显（终端通用高亮，不依赖颜色支持）
+    final body = '${icon(e)}$name$size';
+    out.add(_truncateByWidth(selected ? '${_esc}[7m$body${_esc}[27m' : '  $body', cols));
+  }
+  if (b.entries.isEmpty && b.error == null) {
+    out.add(_truncateByWidth('${_gray}（空目录）${_reset}', cols));
+  }
+  return out;
+}
+
 /// 系统文件选择窗口（老板 2026-10-17）：`/attach` / `/avatar` 不带参数时弹出，
 /// 用户选中确认后把 `<命令> <路径>` 填进输入行——**不自动发送**，让人先看见路径
 /// 再回车执行（发错文件/头像没有撤回，宁可多一次确认）。
@@ -3283,10 +3693,20 @@ Future<void> _uploadAvatarInBackground(ChatSession session, String path) async {
 /// 选完 `_enterRaw` + 全量重绘（_render 开头即清屏，选择器残留一笔勾销）。期间置
 /// processing：模态窗口前的误敲不进输入行（Ctrl+C 仍可退出，不锁死）。
 ///
-/// 返回 true = 路径已填入输入行；false = 取消/不可用（原因已进消息流）。
-Future<bool> _pickFileIntoInput(String commandPrefix, {bool imagesOnly = false}) async {
+/// 返回 picked = 路径已填入输入行；cancelled = 用户主动取消（静默）；
+/// unavailable = 系统选择窗口用不了（SSH/缺工具/被 EINZ_TUI_PICKER=browser 指定）
+/// ——调用方据此落入内置文件浏览器（方案 B）。
+Future<_PickOutcome> _pickFileIntoInput(String commandPrefix,
+    {bool imagesOnly = false}) async {
   final s = _state;
-  if (s == null) return false;
+  if (s == null) return _PickOutcome.unavailable;
+
+  // 选择器模式（环境变量 EINZ_TUI_PICKER）：
+  //   auto（默认）= 有 GUI 用系统窗口，用不了就落内置浏览器
+  //   browser     = 一律用内置浏览器（偏爱键盘 / pty 测试固定走这条路径）
+  //   system      = 一律系统窗口，用不了只报错、不落浏览器
+  final pickerMode = Platform.environment['EINZ_TUI_PICKER'] ?? 'auto';
+  if (pickerMode == 'browser') return _PickOutcome.unavailable;
 
   String? picked;
   String? failReason;
@@ -3367,22 +3787,24 @@ Future<bool> _pickFileIntoInput(String commandPrefix, {bool imagesOnly = false})
   if (picked == null) {
     if (failReason != null) {
       s.session.messages.add(_systemMessage(s.session, 'ℹ️ $failReason'));
-    } else {
-      // 用户主动取消：静默即可（输入行本是空的，什么都不做最不易被误解）
+      return pickerMode == 'system'
+          ? _PickOutcome.cancelled // 指定了只用系统窗口：不落浏览器
+          : _PickOutcome.unavailable;
     }
-    return false;
+    // 用户主动取消：静默即可（输入行本是空的，什么都不做最不易被误解）
+    return _PickOutcome.cancelled;
   }
   // 填入输入行（含命令本身，回车即执行）；光标落在行尾，可继续手工改路径
   _setInput(s, '$commandPrefix $picked');
-  return true;
+  return _PickOutcome.picked;
 }
 
 /// 弹出系统文件选择窗口并在选完后恢复 TUI 画面（[_pickFileIntoInput] 的终端配合
-/// 包装）：raw → cooked → 选择器 → raw + 全量重绘。返回 false = 取消/不可用。
-Future<bool> _pickFileIntoInputWithTerminal(String commandPrefix,
+/// 包装）：raw → cooked → 选择器 → raw + 全量重绘。返回 [_PickOutcome]。
+Future<_PickOutcome> _pickFileIntoInputWithTerminal(String commandPrefix,
     {bool imagesOnly = false}) async {
   final s = _state;
-  if (s == null) return false;
+  if (s == null) return _PickOutcome.unavailable;
   s.processing = true; // 模态窗口期间忽略键入（Ctrl+C 仍可退出）
   _restoreTerminal();
   try {
@@ -3391,6 +3813,18 @@ Future<bool> _pickFileIntoInputWithTerminal(String commandPrefix,
     _enterRaw();
     s.processing = false;
     _render();
+  }
+}
+
+/// 选文件的统一入口（老板 2026-10-17，方案 A+B）：先试系统文件选择窗口，
+/// 用不了（SSH/缺 zenity/被 EINZ_TUI_PICKER=browser 指定）就落内置文件浏览器。
+/// 两条路都只把 `<命令> <路径>` 填进输入行，**不自动发送**。
+Future<void> _pickFileIntoInputOrBrowser(String commandPrefix,
+    {bool imagesOnly = false}) async {
+  final outcome = await _pickFileIntoInputWithTerminal(commandPrefix,
+      imagesOnly: imagesOnly);
+  if (outcome == _PickOutcome.unavailable) {
+    _openFileBrowser(commandPrefix: commandPrefix, imagesOnly: imagesOnly);
   }
 }
 
@@ -3487,10 +3921,11 @@ Future<void> _execCommand(String line) async {
       // 按命令字母序输出（老板 2026-10-08）：列表 + sort，新增命令时只需往列表
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
       const helpEntries = <(String, String)>[
-        ('/attach <文件路径>', '上传文件（不带参数 = 弹系统文件选择窗口，选中后填进输入行）'),
+        ('/attach <文件路径>', '上传文件（不带参数 = 选文件：有 GUI 弹系统窗口，SSH 自动用内置浏览器；'
+            '选中后把路径填进输入行，回车才发）'),
         ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
         ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像；'
-            '不带参数 = 弹系统文件选择窗口，只列图片）'),
+            '不带参数 = 选图片，只列图片）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -3893,9 +4328,9 @@ Future<void> _execCommand(String line) async {
       break;
     case '/attach':
       if (arg.isEmpty) {
-        // 不带参数 = 弹系统文件选择窗口（老板 2026-10-17），选中后把
-        // `/attach <路径>` 填进输入行，用户确认后再回车发送
-        await _pickFileIntoInputWithTerminal('/attach');
+        // 不带参数 = 选文件（老板 2026-10-17）：有 GUI 弹系统窗口，没有（SSH）
+        // 自动落内置浏览器；选中后把 `/attach <路径>` 填进输入行待确认
+        await _pickFileIntoInputOrBrowser('/attach');
       } else {
         // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
         // 2026-09-14）；这里**不 await**——回车即交还输入（否则输入循环 busy 到上传结束，
@@ -3907,8 +4342,8 @@ Future<void> _execCommand(String line) async {
       // TUI 本身不渲染头像，但头像是 per-member 的共享资料：这里设的就是对方 App /
       // TUI 里看到的我的头像（与 App「我的资料」弹层同一个服务端存储）。
       if (arg.isEmpty) {
-        // 不带参数 = 弹系统文件选择窗口（只列图片），选中后填 `/avatar <路径>` 待确认
-        await _pickFileIntoInputWithTerminal('/avatar', imagesOnly: true);
+        // 不带参数 = 选图片：系统窗口（只列图片）优先，不可用落内置浏览器
+        await _pickFileIntoInputOrBrowser('/avatar', imagesOnly: true);
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
