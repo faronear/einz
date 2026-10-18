@@ -4080,12 +4080,15 @@ Future<void> _execCommand(String line) async {
       // 命令列表作为 system 消息进消息流（随消息区滚动，不占顶部状态栏）。
       // 按命令字母序输出（老板 2026-10-08）：列表 + sort，新增命令时只需往列表
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
+      // 带参数（/help attach / /help /attach）只输出该命令的帮助（老板 2026-10-18）。
       const helpEntries = <(String, String)>[
         ('/attach <文件路径>', '上传文件（不带参数 = 选文件：有 GUI 弹系统窗口，SSH 自动用内置浏览器；'
-            '选中后把路径填进输入行，回车才发。敲路径时按 Tab 可补全）'),
+            '选中后把路径填进输入行，回车才发。敲路径时按 Tab 可补全；'
+            '设 EINZ_TUI_PICKER=browser 固定用内置浏览器）'),
         ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
         ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像；'
-            '不带参数 = 选图片，只列图片；Tab 补全路径）'),
+            '不带参数 = 选图片，只列图片；Tab 补全路径；'
+            '设 EINZ_TUI_PICKER=browser 固定用内置浏览器）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -4110,7 +4113,25 @@ Future<void> _execCommand(String line) async {
       ];
       // 合并为**一条**系统消息（老板 2026-10-08）：此前每条命令一条消息，
       // 每行都带 [时间 秘境] 前缀，视觉零散；单条消息内按 \n 分行，只有一个前缀。
+      // /help <命令名>：只输出该命令的帮助（不带 <用法> 尖括号也能匹配，别名如
+      // invite 也直接命中自己的条目；查不到按未知命令提示）。
       final sorted = [...helpEntries]..sort((a, b) => a.$1.compareTo(b.$1));
+      final helpArg = arg.trim().replaceFirst(RegExp(r'^/'), '');
+      if (helpArg.isNotEmpty) {
+        final query = '/$helpArg';
+        final hit = sorted
+            .where((e) => e.$1.split(' ').first == query)
+            .toList();
+        s.session.messages.add(_systemMessage(
+            s.session,
+            hit.isEmpty
+                ? '未知命令: $query（/help 查看全部命令）'
+                : (hit.first.$2.isEmpty
+                    ? hit.first.$1
+                    : '${hit.first.$1} 👉 ${hit.first.$2}')));
+        s.status = '';
+        break;
+      }
       final helpText = StringBuffer('可输入以下系统命令：\n');
       for (final (cmd, desc) in sorted) {
         helpText.writeln(desc.isEmpty ? cmd : '$cmd 👉 $desc\n');
@@ -4489,7 +4510,14 @@ Future<void> _execCommand(String line) async {
     case '/attach':
       if (arg.isEmpty) {
         // 不带参数 = 选文件（老板 2026-10-17）：有 GUI 弹系统窗口，没有（SSH）
-        // 自动落内置浏览器；选中后把 `/attach <路径>` 填进输入行待确认
+        // 自动落内置浏览器；选中后把 `/attach <路径>` 填进输入行待确认。
+        // 先补一条用法消息（老板 2026-10-18：GUI 升级后丢了，找回），含固定用
+        // 内置浏览器的环境变量开关。
+        s.session.messages.add(_systemMessage(s.session,
+            '📎 /attach <文件路径> 👉 上传文件（Tab 补全路径）\n'
+            '   不带参数 = 选文件：默认有 GUI 弹系统窗口、无 GUI 落内置浏览器；\n'
+            '   设环境变量 EINZ_TUI_PICKER=browser 可固定用内置浏览器（system = 固定系统窗口）'));
+        s.status = '';
         await _pickFileIntoInputOrBrowser('/attach');
       } else {
         // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
@@ -4502,7 +4530,13 @@ Future<void> _execCommand(String line) async {
       // TUI 本身不渲染头像，但头像是 per-member 的共享资料：这里设的就是对方 App /
       // TUI 里看到的我的头像（与 App「我的资料」弹层同一个服务端存储）。
       if (arg.isEmpty) {
-        // 不带参数 = 选图片：系统窗口（只列图片）优先，不可用落内置浏览器
+        // 不带参数 = 选图片：系统窗口（只列图片）优先，不可用落内置浏览器。
+        // 用法消息同 /attach（老板 2026-10-18）。
+        s.session.messages.add(_systemMessage(s.session,
+            '🖼️ /avatar <图片路径> 👉 设置我的头像（App 与 TUI 共用；Tab 补全路径）\n'
+            '   不带参数 = 选图片：默认有 GUI 弹系统窗口、无 GUI 落内置浏览器；\n'
+            '   设环境变量 EINZ_TUI_PICKER=browser 可固定用内置浏览器（system = 固定系统窗口）'));
+        s.status = '';
         await _pickFileIntoInputOrBrowser('/avatar', imagesOnly: true);
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
