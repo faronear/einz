@@ -140,7 +140,9 @@ class _EinzAppState extends State<EinzApp> {
           style: FilledButton.styleFrom(
             minimumSize: const Size(96, 50),
             textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            // 全圆角胶囊（老板 2026-10-18）：与取消按钮（TextButton 默认
+            // StadiumBorder）同款四角弧度，弹窗里两颗按钮弧度一致
+            shape: const StadiumBorder(),
           ).copyWith(
             mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
           ),

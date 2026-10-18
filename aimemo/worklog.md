@@ -14536,6 +14536,7 @@ loadHistory → `_render`（没验证的历史全屏渲染）→ `_runInputLoop`
 （该判断在 code==3 分支之前），completer 永不 complete → 挂死。
 
 重构（`cli/bin/einz_tui.dart`）：
+
 1. 解锁从"循环外同步 readByteSync"改为"输入循环内的消息流问答"
    （`_prompt(hidden: true, secret: true)`）——**先起输入循环再解锁**，
    main 的启动后续全部裹进 `if (_state!.running)` 守卫：中止（空回车 /
@@ -14543,27 +14544,28 @@ loadHistory → `_render`（没验证的历史全屏渲染）→ `_runInputLoop`
    都不加载、一帧都不渲染。根因结构性消灭（中止再也流不进 TUI 启动路径）。
 2. 解锁步只认两种输入：输内容 = 当 PIN 校验（`/exit` 不识别，只是错码）；
    直接回车 = 退出整个 TUI（新增 `pendingUnlock`，输入循环落地退出）。
-3. PIN 不明文回显（hidden 输入行回显 *）。
+3. PIN 不明文回显（hidden 输入行回显 \*）。
 4. 统一策略落地到全部"验证机密"提示（新增 `secret` 参数 →
    `pendingSecretVerify`：/ 开头不当命令拦截、按错误尝试提交；退出只能
    直接回车取消）：启动解锁、/switch 目标 PIN、/reset PIN、/revoke 与
-   /entoken reinvite 的共享口令授权。"设置机密"（/pin、_askSetPin、
+   /entoken reinvite 的共享口令授权。"设置机密"（/pin、\_askSetPin、
    入网口令、/passphrase）保持明文 + 随时 /exit（老板 2026-09-14 规则）。
 5. 顺手：输入循环五处退出序列收敛为 `exitNow()`；stdin EOF（onDone）
    补 `_abortPendingGuide()`——否则引导/解锁问答的 await 永远挂起。
 
 实测踩坑记录（都有测试佐证）：
-- 解锁成功消息**不能加在 _unlockPin 里**：微任务渲染不落地 + loadHistory
+
+- 解锁成功消息**不能加在 \_unlockPin 里**：微任务渲染不落地 + loadHistory
   开头 clear messages，会被抹掉——改由 main 在 loadHistory 之后补。
 - pty 下告别语「已退出 Einz」稳定丢失（exit(0) 与 stderr 异步 sink 竞速，
   既有行为）——测试不断言告别语，只断言退出码。
 - pty 无控制终端时字节 3 被行规丢弃（补 setsid+TIOCSCTTY 也是内核 SIGINT
   直接杀进程）——Ctrl+C 不在 pty 测试范围内，空回车走同一条退出序列已覆盖。
-- 输入若整串一次写入（'\r 与字符同 chunk），提交即清输入，* 掩码来不及
+- 输入若整串一次写入（'\r 与字符同 chunk），提交即清输入，\* 掩码来不及
   渲染——测试逐字符发送模拟真人。
 
 回归：新增 `cli/test/unlock_flow_check.py`（6 场景 19 断言全过：错码重试、
-/exit 只是错码、* 掩码、正确 PIN、空回车退出、EOF 退出、/switch 闸门、
+/exit 只是错码、\* 掩码、正确 PIN、空回车退出、EOF 退出、/switch 闸门、
 /reset 闸门）；`guide_input_rules_check.py`（PIN 设置规则 + 入网口令）
 与 `revoke_command_check.py`（/revoke 口令闸门取消/错码）全过。
 `guide_exit_check` / `reset_returns_to_guide_check` / `cliMultiverseE2E`
@@ -14594,16 +14596,18 @@ loadHistory → `_render`（没验证的历史全屏渲染）→ `_runInputLoop`
 /entoken）空回车=取消动作（原语义）。
 
 实现（cli/bin/einz_tui.dart）：
+
 - `_prompt` 参数收敛为 `{hidden, exitOnEmpty}`（删 required/secret）；输入循环
   删除整个「/ 开头当命令」拦截（旧 /exit 逃生门与"引导中仅支持 /exit"提示一并废除）
 - `_spaceCreate`/`_spaceJoin` 的顺序 while 循环重构为**步骤索引机**：无效输入原地
-  重问，空回车 step--（链首空回车=退出/回到通道码），_runGuide 的 c/j 作链首；
+  重问，空回车 step--（链首空回车=退出/回到通道码），\_runGuide 的 c/j 作链首；
   每个提问文案补「（直接回车返回上一步）」，回退有「↩️ 已返回上一步」反馈
 - `/auth <通道码>` 未绑定直接加入（替换 pendingJoinToken 子模式）；
   pendingSpaceKey 本就是从未置 true 的死代码，两个 handler 连路由一起删
-- 顺手：`myGender`/`peerGender` 全局变量清除（_spaceJoin 本就有局部变量）
+- 顺手：`myGender`/`peerGender` 全局变量清除（\_spaceJoin 本就有局部变量）
 
 踩坑记录（都有佐证）：
+
 - **Dart switch 没有 break 会穿透**：步骤机初版每个 case 结尾没 break，前进时
   碰巧穿透到下一问看似正常，回退时 step 改了却继续穿透执行下一 case（类型步
   回退→跑去问口令）——测试抓到的。修法：每 case 尾 break 回 while 重新分发。
@@ -14655,6 +14659,7 @@ analyze 通过。
 
 **（2026-10-13T08:55:00Z / 2026-10-13 16:55）**：DNS 污染警报补全——**假 IP 展示、
 真 IP 保护**（老板 2026-10-13 追问：被注入的 IP 是多少）。三处联动：
+
 - shared `dns_fallback.dart`：钩子改 3 参 `(host, pinnedIp, poisonedIp)`；
   DoH 成功后当场再解析一次系统 DNS 捕获**假 IP**（2s 超时、查不到=null），
   纯展示用；服务端上报载荷维持 {domain, doh_ip} 不变（假 IP 入库需先做
@@ -14683,7 +14688,7 @@ about_sheet 10 测全过、TUI analyze 无问题。
 
 **（2026-10-13T09:20:33Z / 2026-10-13 17:20）**：dart-docker.sh 启动慢根因与修复。老板在 cn1 上有时 root 直接运行、有时 sudo 运行：脚本挂载 `$HOME/.pub-cache`，sudo 下 HOME=/var/root、root 下 HOME=/root，都是与普通用户各异的空缓存目录 → 每次启动 pub 全量重新下载 + 全量编译，慢 30-60s；残留容器是强杀时 --rm 未清理，与慢无直接关系。修复：检测 SUDO_USER 自动切回真实用户的 HOME/uid/gid（容器本就无需特权）；直接 root 运行时警告缓存分裂并提示固定方式，另加 DART_PUB_CACHE_HOME 环境变量可让 root 与普通用户共用一份缓存。bash -n 与 sudo/非 sudo 两条路径 sourcing 验证通过；cn1 上待老板实测首次后第二次启动应秒级（pub get 秒回、dart run 走快照缓存）。
 
-**（策略更新，2026-10-13）**：dart-docker.sh 身份策略定稿——**允许直接 root 运行、禁止 sudo 运行**。cn1 实测第二阶段：sudo 曾以 root 身份往 adot 家目录写 ~/.pub-cache/_temp、.einz（HOME 未重置的污染），adot 随后 `pub get` 报 Permission denied。脚本改为检测 SUDO_USER 直接 exit 1 并提示；root 直接登录放行（写 /root 自己的，无污染），保留 root 运行警告与 DART_PUB_CACHE_HOME 共享缓存选项。修复污染：sudo chown -R adot:adot /home/adot/.pub-cache（.einz 同查）。
+**（策略更新，2026-10-13）**：dart-docker.sh 身份策略定稿——**允许直接 root 运行、禁止 sudo 运行**。cn1 实测第二阶段：sudo 曾以 root 身份往 adot 家目录写 ~/.pub-cache/\_temp、.einz（HOME 未重置的污染），adot 随后 `pub get` 报 Permission denied。脚本改为检测 SUDO_USER 直接 exit 1 并提示；root 直接登录放行（写 /root 自己的，无污染），保留 root 运行警告与 DART_PUB_CACHE_HOME 共享缓存选项。修复污染：sudo chown -R adot:adot /home/adot/.pub-cache（.einz 同查）。
 
 **（2026-10-13T09:57:51Z / 2026-10-13 17:57）**：cn1 启动慢第二阶段定位与修复。chown 后仍 30s+：实测 pub get 仅 2s 且不下载（缓存已热），大头是 dart run 每次 JIT 全量编译 TUI ~15s（dart run 不落内核缓存，cn1 CPU 慢放大）。另发现 cli/.dart_tool 为 root 属主（9月 root 跑 pub get 残留），adot 写不进——属主污染第二现场。老板定稿身份策略：cn1 上该仓库**统一 root 运行**（禁 sudo 脚本已拦截；git/构建也 root）。实施：① dart-docker.sh tui 改为 compile kernel 一次（源码未变跳过，find -newer 判过期）+ dart 直跑 dill（提交 fdf56bc）；② cn1 实测：compile 首次 7s、dill 运行 1s、二次启动 1s（30s→~10s 含 pub get，之后启动 ~3-4s）；③ .einz 身份 myeinz.json 已迁 /root/.einz（root 属主），.dart_tool 归 root。
 
@@ -14699,6 +14704,7 @@ DoH 的结果**——连接失败可能只是服务没起来，与 DNS 无关。
 
 修复（shared `probeWithDohFallback`）：DoH 成功后先取系统解析（仅 IPv4，
 与 DoH 的 A 记录同口径）再判定——
+
 - 系统解析与 DoH **一致** → 不钉扎不报警（钉同一 IP 无意义）；
 - 系统解析指向**回环/内网/链路本地**（127/8、10/8、172.16/12、192.168/16、
   169.254/16，rawAddress 逐字节判）→ 用户刻意本地配置，尊重而非“修复”，
@@ -14706,7 +14712,7 @@ DoH 的结果**——连接失败可能只是服务没起来，与 DNS 无关。
 - 系统解析**无答案**而 DoH 有 → 仍算分歧（NXDOMAIN 注入），钉扎+报警
   （假 IP 未知降级展示）；
 - 公网假 IP 与 DoH 分歧 → 真·劫持，钉扎+报警（原路径）。
-新增 `systemResolver` 注入参数（测试/排查用；App/TUI 生产路径用默认真实解析）。
+  新增 `systemResolver` 注入参数（测试/排查用；App/TUI 生产路径用默认真实解析）。
 
 回归：shared 87 测全过（+4 新用例：一致/回环/内网/无答案）；app
 server_config+about_sheet 13 测全过；**真实环境实测**（本机 hosts 同样把
@@ -14737,7 +14743,7 @@ Info.plist 读**（`plutil -extract CFBundleShortVersionString raw`，iOS job �
 状态栏只显示中间的产品名）。此前并行提交只把标题栏两侧换成占位「?」——老板
 要求更彻底：解锁前**标题栏左右两段整个置空**（连 ? 都不要），只留居中产品名
 Einz；底部状态行同步只显示居中 Einz（命令提示、瞬时 status、历史浏览提示
-一并压制）；_unlockPin 里不会显示的解锁 status 设置删除（提示语本就在消息流）。
+一并压制）；\_unlockPin 里不会显示的解锁 status 设置删除（提示语本就在消息流）。
 消息流本就干净（loadHistory 在解锁后才跑——上一轮 bug 修复的结构性保证）。
 测试（unlock_flow_check 场景 G，新基建）：store 预置可辨名字/通道名，pty 按
 清屏序列切「当前稳定帧」断言——解锁提示态与错误重试态帧内只有 Einz（名字、
@@ -14747,8 +14753,9 @@ revoke、dart analyze 全过。
 
 **（2026-10-14T01:04:27Z / 2026-10-14 09:04）**：两处 UI 文案/字号微调（老板
 2026-10-14 要求）：
+
 1. 气泡顶栏时间戳字号 12 → 11（chat_page.dart 气泡时间行 Text）——与同行
-   「加速中…/重发中…」「点击重发」文字、沙漏后焚毁时长标签（_burnTagLabel）、
+   「加速中…/重发中…」「点击重发」文字、沙漏后焚毁时长标签（\_burnTagLabel）、
    群聊送达人数数字统一为 11 号（此前仅时间戳是 12，其余均已是 11）。
 2. 「我的通道」→「我的设备通道」（app_zh.arb + app_localizations_zh.dart 的
    chatPageMenuEntranceList）——菜单项（PopupMenuItem）、通道弹层标题、状态条
@@ -14757,14 +14764,14 @@ revoke、dart analyze 全过。
 
 **（2026-10-14T03:31:50Z / 2026-10-14 11:31）**：点击被引用消息跳转失败时弹
 通知「被引用消息已不存在」（老板 2026-10-14，墓碑显示开关评估后第一个落地
-的小功能）。_jumpToMessage 此前三条失败路径全部静默 return：引用快照缺
+的小功能）。\_jumpToMessage 此前三条失败路径全部静默 return：引用快照缺
 messageId、原消息行不存在（sequenceOfMessage 返 null=非本空间/本机已清屏）、
 往前分页到顶仍未覆盖目标——用户点了引用卡什么都不会发生。现三条统一弹
 showTopNotice。背景：墓碑消息保持显示的最初动因就是"跳转要有东西可落"，
 真落不了时至少把结果说清楚。l10n 新增 chatPageQuoteGoneNotice（zh「被引用
 消息已不存在」/ en "The quoted message is no longer available"）。同时按老板
 要求把 chatPageDeletedMessage 更名 **chatPageTombMessage**——墓碑占位（长按
-菜单顶部 _tombstoneMenuPlaceholder）覆盖删除/焚毁/撤回三种墓碑，Deleted 名字
+菜单顶部 \_tombstoneMenuPlaceholder）覆盖删除/焚毁/撤回三种墓碑，Deleted 名字
 太窄；arb 双文件 + gen-l10n 重新生成 + 使用点一并改。测试：新增
 test/chat_quote_jump_gone_test.dart 三用例（引用不存在 id→弹通知 / 快照缺
 messageId→弹通知 / 原消息在列表→正常跳转不误报）。回归：flutter analyze
@@ -14776,24 +14783,25 @@ messageId→弹通知 / 原消息在列表→正常跳转不误报）。回归�
 纠过一个方向性误读：最初想显示 key_version——但密钥轮换不做（2026-09-14 决策），
 同空间所有通道恒同一版本，没有区分度；老板点破真正想要的是**各设备跑的 App
 版本**（yymm.ddhh.mm）。四端改动：
+
 - 服务端：entrances 加 `client`/`app_version` 两列（install_uid 迁移先例）；
   新端点 `POST /entrances/client`（幂等，client 白名单 + 版本格式校验，
   app_version 只在带值时写——读不到包信息不清已存值）；listEntrances 带出
   两字段（对端可见——这正是用途）；PROTOCOL.md §7.1 同步。
 - shared：`reportClientInfo` api 方法；`entranceClientLabel` 三态 helper
   （App→v版本 / TUI→TUI / 存量→null），App 卡片与 TUI 行共用。
-- App：进聊天页上报（搭 _registerInstallUid 同一点）；卡片第二行（状态灯+时间
+- App：进聊天页上报（搭 \_registerInstallUid 同一点）；卡片第二行（状态灯+时间
   后）合成「时间 · v版本/TUI」——放第二行不放名称行（名称可能很长）。
 - TUI：启动时（通道名同步点）只报 `client='tui'`——AOT 二进制拿不到自身版本
   （buildTui.sh 时间戳只写文件名），报类型标记；/entrances 行尾同构加客户端段。
-**回归教训（重要）**：曾把 `await appVersionString()` 写进弹层 load()——widget
-测试环境无 mock 时 `PackageInfo.fromPlatform()` 的 future **永不完成**，把弹层
-打开整个卡死，连累 chat_page_menu/invite_dialog_layout 三个用例挂掉（sheet 测试
-因静态版本缓存被首个 mock 用例焐热而侥幸全过，险些漏网）。修复：版本只在
-initState 上报流程里读一次存 state 字段，弹层只读字段。**平台调用永远不要
-await 在交互路径上**。验证：四端 analyze 干净；server client_info 3/3 +
-install_uid 6/6、tsc 干净；app 全量 315 过 1 跳；cli dart 22/22；shared 除
-2 个 DNS 污染测试（干净树上同样失败，沙箱 DNS 拦截环境预存，与本次无关）。
+  **回归教训（重要）**：曾把 `await appVersionString()` 写进弹层 load()——widget
+  测试环境无 mock 时 `PackageInfo.fromPlatform()` 的 future **永不完成**，把弹层
+  打开整个卡死，连累 chat_page_menu/invite_dialog_layout 三个用例挂掉（sheet 测试
+  因静态版本缓存被首个 mock 用例焐热而侥幸全过，险些漏网）。修复：版本只在
+  initState 上报流程里读一次存 state 字段，弹层只读字段。**平台调用永远不要
+  await 在交互路径上**。验证：四端 analyze 干净；server client_info 3/3 +
+  install_uid 6/6、tsc 干净；app 全量 315 过 1 跳；cli dart 22/22；shared 除
+  2 个 DNS 污染测试（干净树上同样失败，沙箱 DNS 拦截环境预存，与本次无关）。
 
 **（2026-10-14T10:08:15Z / 2026-10-14 18:08）**：npm run testAll 全量排查与修复
 （老板要求，CI 红线）。修掉一个真 bug：`chat_quote_video_test` 在 full-suite 下
@@ -14802,7 +14810,7 @@ install_uid 6/6、tsc 干净；app 全量 315 过 1 跳；cli dart 22/22；share
 实测确认）——settleRealAsync 的 12 轮（≈1.2s）预算在 46 文件并发 isolate 的 CPU
 争抢下偶发不够，循环耗尽时 spinner 还在，随后的 pumpAndSettle 挂在它上面超时；
 单独跑/小组并发从不复现（时序竞品，与业务代码无关）。② pending 消息的
-_SendingPlane 也是无限动画（次要隐患）。修复：settleRealAsync 轮询上限 12→40
+\_SendingPlane 也是无限动画（次要隐患）。修复：settleRealAsync 轮询上限 12→40
 （≈4s，无附件测试第一轮即退出不受影响）+ 视频测试开 disableAnimationsInTests
 双保险。验证：全量 app 套件连跑 2 次 316 过 0 败；testAll 复跑 app/cli/server
 全绿。**仍失败的仅 shared 2 个 DNS 污染测试——沙箱环境问题，非代码问题**：本沙箱
@@ -14830,6 +14838,7 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
 
 **（2026-10-15T01:48:54Z / 2026-10-15 09:48）**：「更多设置」菜单 + 墓碑消息
 显示开关（老板 2026-10-15）。三层结构：
+
 - 顶层菜单「附件存储」项替换为「更多设置」（右侧 Icons.settings_outlined 通用
   设置图标，18px 与 burn 沙漏同尺寸）；
 - 「更多设置」二级弹层（仿「高级安全」ListTile 式样，行尾带当前值）两项：
@@ -14840,8 +14849,8 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
   消失）。设置存 per-space 键 space.<spaceId>.tombstone_display（TombstoneSettings
   仿 BurnAfterSettings，默认 keep，存量回退旧全局键），**只影响显示**：数据层
   墓碑语义（打标记不打行、附件保留、pending 仍补发）两种模式下一模一样。
-  消息流经 _displayMessages getter 过滤（Builder 包一层只算一次，避免 getter
-  被 itemBuilder 逐项重复构建），_messages 数据层不动（recall/跳转判断仍用它）。
+  消息流经 \_displayMessages getter 过滤（Builder 包一层只算一次，避免 getter
+  被 itemBuilder 逐项重复构建），\_messages 数据层不动（recall/跳转判断仍用它）。
 - l10n：9 个新键 zh/en（chatPageMenuMoreSettings / chatPageMoreSettingsTitle /
   chatPageMoreSettingsStorage / chatPageMoreSettingsTombstone / chatPageTombstone
   Heading/Note/Keep(+Desc)/Hide(+Desc)）。
@@ -14851,6 +14860,7 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
 
 **（2026-10-15T02:35:18Z / 2026-10-15 10:35）**：dialog 间距统一 + 菜单图标
 去红（老板 2026-10-15）。两件事：
+
 - 「高级安全」菜单项的警告图标**去红**（改 labelStyle.color）——菜单里红色太
   引人注意，红色保留在弹层内部那行销毁操作上；
 - 带备注行的 dialog 间距参考弹层节奏重调：M3 AlertDialog 默认标题→内容 16
@@ -14862,6 +14872,7 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
 
 **（2026-10-15T05:15:14Z / 2026-10-15 13:15）**：墓碑消息弹层改提交制 +
 「应用于本机所有秘境」可复用勾选框（老板 2026-10-15 连续几轮体验迭代的合并落地）。
+
 - 墓碑弹层 → **单选+提交**（与附件存储同构）：勾选框配提交按钮才防呆；l10n 补
   chatPageTombstoneSubmit。
 - **可复用组件 LabeledCheckbox**（widgets/labeled_checkbox.dart）：勾框+标签、
@@ -14870,10 +14881,10 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
   模式放**提交按钮上方**（提交前统一确认"选什么+作用域"）；点选即生效放选项区
   上方（选项即提交，放下方没机会改范围）。提交使能条件：选项**或勾选框**有变动
   即可提交（只勾范围不改选项同样是有效操作）。
-- **SpaceScopedSetting mixin**（data/space_scoped_setting.dart）：scopedKey +
+- **SpaceScopedSetting mixin**（data/space*scoped_setting.dart）：scopedKey +
   saveAll（写全局键+清除各空间 per-space 覆盖）+ clearSpaceOverrides——"几乎每个
   配置项都要加" rollout 前先收敛重复实现（清除用 Dart 侧精确匹配键名，不用 SQL
-  LIKE——键名里的 `_` 是通配符）。
+  LIKE——键名里的 `*` 是通配符）。
 - l10n 收敛为共享键 settingsScopeAll / settingsScopeAllDone（先例：
   wizardPassphraseHint）。
 - 测试：picker 补 3 例（点选即生效位置+交出、提交模式位置+只勾范围可提交、
@@ -14882,6 +14893,7 @@ pump+runAsync **交替多轮**推回来——settleRealAsync 见无 spinner 首�
 
 **（2026-10-15T05:23:41Z / 2026-10-15 13:23）**：附件存储接入「应用于本机所有
 秘境」勾选框 + 切远程托管加确认弹窗（老板 2026-10-15；勾选框基础设施见上一笔）。
+
 - 附件存储弹层加 scope 勾选框（提交模式 → 提交按钮上方，居中）：勾选 →
   AttachmentStorageSettings.saveAll（mixin：全局键+清 per-space 覆盖），且切
   secured 时清**全部空间**留存明文（全局 AttachmentStore.clear）；不勾 → 原
@@ -14912,6 +14924,7 @@ ValueNotifier）退役为普通 bool，少一层无用的响应式包装。测�
 
 **（2026-10-15T07:05:33Z / 2026-10-15 15:05）**：弹窗退出策略全面落地（老板
 2026-10-15 定：有输入框的弹窗必须点按钮退出；追问后确认破坏性确认也锁死）。
+
 - 输入类 9 处（设锁 PIN/邮件通知/改口令/索要口令/通道改名/群组名/我的名字 +
   pin_prompt/reset_entrance）与破坏性确认 4 处（删除消息/撤回/粘贴发送/远程托管
   警示）：`barrierDismissible: false` + builder 外包 `PopScope(canPop: false)`。
@@ -14927,7 +14940,7 @@ ValueNotifier）退役为普通 bool，少一层无用的响应式包装。测�
 新空间继承（老板 2026-10-15：默认值应不被勾选，每次新开弹窗都默认不勾选；随后
 拍板「干脆取消继承，思路实现都更简单」）。勾选框退化为纯一次性开关：不持久化、
 不读 NotifyAllSpacesPref；继承整条链拆净——space_switcher 的 onCompleted 钩子、
-_notifyEmailSourceSpaces/_inheritNotifyEmail、notify_settings.dart（删文件，老板
+\_notifyEmailSourceSpaces/\_inheritNotifyEmail、notify_settings.dart（删文件，老板
 确认）。代价（新空间要手填一次邮箱）被服务端地址级验证抵消：老地址重填直接
 verified、不再发确认信。回归：全量 app 327 过 1 跳 0 败。
 
@@ -14951,9 +14964,10 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
 
 **（2026-10-15T08:40:19Z / 2026-10-15 16:40）**：「我的身份」「当前通道」弹窗加
 「应用于本机所有秘境」范围选择（老板 2026-10-15：「也加上范围选择 实现相关逻辑」）。
+
 - UI：两个弹窗各加 LabeledCheckbox(settingsScopeAll)，放在输入框/性别框下方，
   每次开弹窗默认不勾选（与邮件通知同策略——扇出是每次显式 opt-in，不持久化）。
-- 逻辑：抽 `_fanoutOtherSpaces(action)`（原 _fanoutNotifyEmail 的循环升级为通用，
+- 逻辑：抽 `_fanoutOtherSpaces(action)`（原 \_fanoutNotifyEmail 的循环升级为通用，
   邮件通知改委托）；新增 `_rewriteOtherSpacesProfile({memberName, entranceName})`
   ——逐空间 loadProfile→只替换目标字段→saveProfile 整份写回（mode/otherMembers/
   groupName 传 null 保持原值；Spaces 行名字由 saveProfile 一并更新）。勾选时
@@ -14961,8 +14975,8 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
   一起扇出，best-effort；不勾＝只当前空间（原行为）。
 - 测试补 3 例：我的身份勾选（两空间服务端都改名 + space-b 只换 memberName
   其余字段保留）、我的身份不勾（仅当前空间）、当前通道勾选（entranceName 扇出
-  + memberName 保留）。_FakeApi 增加改名调用记录（name+token）与 listEntrances
-  stub。回归：全量 app 330 过 1 跳 0 败。
+  - memberName 保留）。\_FakeApi 增加改名调用记录（name+token）与 listEntrances
+    stub。回归：全量 app 330 过 1 跳 0 败。
 - 顺带：老板并行手改 app_zh.arb（远程托管警示文案加「真的要切换吗？」），按
   arb→gen-l10n 惯例补生成（app_localizations_zh.dart 同步）。
 
@@ -14972,6 +14986,7 @@ canRequestFocus:false 会被重置。修法：`canRequestFocus: !active` 传给 
 一条代码路径）从 showDialog+AlertDialog 改为 showModalBottomSheet：标题/备注/二维码/
 通道码/链接结构保留；去掉「关闭」按钮（无输入框，点遮罩/下滑即关）；「重新生成」
 为居中 TextButton、不占满宽度（可按可不按，不做成满宽提交按钮的口气）。
+
 - **矮窗滚动修复**（老板 2026-10-15 实测：高度不够时 bottom overflowed 且无法
   滚动）：中部改 Flexible(loose)+Scrollbar+ListView(shrinkWrap)，标题/备注/
   「重新生成」固定两端、只有中部滚——与 ScrollableCardArea 同一套路（其注释就是
@@ -15008,7 +15023,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 **（2026-10-16T09:34:42Z / 2026-10-16 17:34）**：修「我的秘境」弹层卡片改名后错显我的名字（真根因二轮定位）。表象：改名（含勾「应用于所有秘境」）后，卡片显示我的新名字而非对方名字/「待加入」；切走再切回自愈。**主犯**：`AppLockService.saveProfile` 是整份覆盖写（jsonEncode 固定键），但不含 `peerJoined`/`peerMemberId`——这两个键由 `savePeerPresence`（09-25）单独追加维护，覆盖写把它们抹掉 → 卡片 `peerPending=false` 退正常态 + `peerName` 空（对方未加入）→ `_titleOf` 兜底显示 Spaces.name=我的名字。修法：saveProfile 读旧值透传这两个键（`m['peerJoined'] is bool` 才带上）。**次犯（真实但非本次主犯）**：`_onProfileUpdated` 不排除自己触发的 profile.updated 广播（广播发全空间在线通道含自己的其它通道），`_peerName` 会被写成我的名字——加 `event.memberId==_myMemberId` 或等名兜底（改名 UI 禁与对方同名故等名必是自己）两条判据排除。**排查弯路备忘**：① 老板说"没效果"其实是在 pex 项目（`/Users/Shared/productX/pex`，flutter 从上级目录命中 `lib/main_agidin.dart`）里测的——lsof 实测全系统无进程打开正式 einz.sqlite，虚惊；② 首轮诊断（以为是广播直接污染 Spaces 行）修的是真隐患但不是主犯，老板补充"两个空间对方都未加入、本该显示待加入"才锁定真根因——用户观察细节比推测金贵。附：`Spaces.name` 列本来就存"我的名字"（peerName 另有列），弹层 `_titleOf` 是 peerName 优先、name 兜底，所以 name 列没写错。验证：flutter analyze 0 error（2 条 use_null_aware_elements info 为 SDK 版本差异，保留 if 形式）；老板实测两空间卡片保持「待加入」✅。中途一次 edit_file 缩进事故弄坏 app_lock.dart 大括号配对（113 个 error），已修复并复查。
 
-## 20261016 emu* 脚本收归 wo_scripts 依赖
+## 20261016 emu\* 脚本收归 wo_scripts 依赖
 
 - 本地 `scripts/emu{BootIos.sh,ResolveIos.js,UdidIos.sh}` 是 wo_scripts 的分叉副本（einz 侧演进后已回同步至 wo_scripts 仓库 75ae4e9），现统一改从 `node_modules/wo_scripts/` 引用，package.json 三个脚本路径已改，本地拷贝删除。
 - `npm update wo_scripts` 后裸跑 `app-ios-boot` 实测成功（Booted 优先/最新系统 iPhone 自适应）。commit 22110194，未推送。
@@ -15042,11 +15057,12 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 ## 20261017 「我的资料」二次调整：横向布局 + 桌面限宽 + 编辑角标重做
 
-- **（2026-10-17T09:20:00Z / 2026-10-17 17:20）**：老板二次要求：①头像在左、右边上名下性别；②桌面端不要无限变宽；③头像编辑角标不要红底（太显眼），位置自定，且角标要可点、和头像合成一个可点区域（方形）。做法：**布局**改为 Row（左渐变环头像 40 半径 / 右 Expanded 两行左对齐：名字实底胶囊 + 性别彩色胶囊），整卡垂直居中；**限宽**用 `showModalBottomSheet(constraints: BoxConstraints(maxWidth: kMyProfileSheetMaxWidth=480))`——弹层本体在宽屏下居中停在窗口底部（手机端本就更窄，不受影响），避免身份卡被拉成空旷长带；**角标**去粉红底改 surface 底 + outlineVariant 细描边 + 灰蓝 14px 铅笔 + 轻投影，压到环内右下角（right/bottom 4）；**热区**把 Stack 包进 `Clickable(behavior: opaque, circle: true)`，方形区域整体一个 tap，内层 `_MessageAvatar` 传新参数 `openFullscreenOnTap: false` 让出点击，外层用 `GlobalKey<_MessageAvatarState>` 调新公开的 `handleTap()`（有图→全屏、无图→选图），仍是同一条决策路径，不会退回「外层拿 _myAvatarBytes 猜」的错航问题；`_MessageAvatar` 构造补 `super.key`。验证：analyze 0 问题；全量 345 通过（1 skip 既有）；临时 golden 渲染手机 390×844 / 桌面 1280×800 / 32 字长名三张核对版式与截断，并用 `tapAt` 点圆形外的方形角落确认弹层被关掉（热区成立），核对完删除临时测试与 PNG。
+- **（2026-10-17T09:20:00Z / 2026-10-17 17:20）**：老板二次要求：①头像在左、右边上名下性别；②桌面端不要无限变宽；③头像编辑角标不要红底（太显眼），位置自定，且角标要可点、和头像合成一个可点区域（方形）。做法：**布局**改为 Row（左渐变环头像 40 半径 / 右 Expanded 两行左对齐：名字实底胶囊 + 性别彩色胶囊），整卡垂直居中；**限宽**用 `showModalBottomSheet(constraints: BoxConstraints(maxWidth: kMyProfileSheetMaxWidth=480))`——弹层本体在宽屏下居中停在窗口底部（手机端本就更窄，不受影响），避免身份卡被拉成空旷长带；**角标**去粉红底改 surface 底 + outlineVariant 细描边 + 灰蓝 14px 铅笔 + 轻投影，压到环内右下角（right/bottom 4）；**热区**把 Stack 包进 `Clickable(behavior: opaque, circle: true)`，方形区域整体一个 tap，内层 `_MessageAvatar` 传新参数 `openFullscreenOnTap: false` 让出点击，外层用 `GlobalKey<_MessageAvatarState>` 调新公开的 `handleTap()`（有图→全屏、无图→选图），仍是同一条决策路径，不会退回「外层拿 \_myAvatarBytes 猜」的错航问题；`_MessageAvatar` 构造补 `super.key`。验证：analyze 0 问题；全量 345 通过（1 skip 既有）；临时 golden 渲染手机 390×844 / 桌面 1280×800 / 32 字长名三张核对版式与截断，并用 `tapAt` 点圆形外的方形角落确认弹层被关掉（热区成立），核对完删除临时测试与 PNG。
 
 ## 20261017 锁屏页左上角 Logo 可点 → 打开「关于秘境」弹层
 
 - **（2026-10-17T11:50:00Z / 2026-10-17 19:50）**：老板要求锁屏页左上角 Logo 也能点击打开 About Einz 弹层。做法：锁屏页两处 AppBar（未设 PIN 的兜底页 + 已激活的解锁页）原先各写一份「Logo + 标题」Row，现合并为私有方法 `_buildAppBarTitle(l10n)`，其中 Logo 套 `Tooltip(关于秘境) + InkWell(onTap: _openAboutPage) + 四周 8/10 留白`——与对话页顶栏同款（chat_page 8465 附近）；严格锁屏下没有返回箭头，Logo 是标题栏唯一常驻图标，绕开 AppBar leading 不会冲突。About 弹层在锁屏态无副作用：只读版本号 / effectiveServer（锁包本就不存地址）/ 连接探测。验证：`flutter analyze` 0 问题；`lock_page_test.dart` 7 项全过（新增 2 项回归：未设 PIN 兜底页与已激活解锁页点 Logo 都能开出 AboutSheet）；golden 渲染锁屏页确认版式无变化（goldens 不入库，已删）。注意：全量跑时有 2 项失败（chat_page_menu_test 长名字溢出、menu_ovf_tmp_test），系并行 agent 正在改 chat_page 顶栏（HEAD 3b8700a 起）的中间态，复跑已绿，非本次改动引入。
+
 ## 20261017 汉堡菜单「我的资料」行右簇不齐右修复
 
 - **（2026-10-17T12:01:00Z / 2026-10-17 20:01）**：老板反馈菜单「我的资料」行的人名+头像没靠右缘、不与其他菜单条目齐右。用临时几何测试打开真实菜单逐行量右缘定位：其他行右簇右缘 780，本行头像只到 763.5，缩进 16.5px——根因是聚合改造时人名用了 `Flexible` 包裹，含 flex 的 Row 在 PopupMenu 内在宽度测量里失真，Spacer 吸不到右缘。先试 `Spacer + _menuValue(CB 180)` 又暴露另一个失败：长名时该行报最宽行、实际布局给不满 → 溢出 6.4px（长名回归测试红）。最终定型：`Expanded`（紧贴占满，不溢出）+ `Align.centerRight` + `_menuValue` 180 上限（与整菜单共用截断规则），头像恒贴行右缘。验证：几何测试长名/短名均齐右无溢出、`chat_page_menu_test` 全过、analyze 0、全量 349 过。commit 79191b6a。
@@ -15059,7 +15075,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 ## 20261017 TUI 新增 /avatar 命令（设置我的头像）
 
-- **（2026-10-17T12:30:00Z / 2026-10-17 20:30）**：老板要求 cli/tui 里加 `/avatar <图片路径>` 设置我的头像。实现：**网络层**放 `cli/lib/chat_core.dart` 的 `ChatSession.setAvatar(path)`（与 `attachFile` 同款架构——store/网络归 chat_core，TUI 只做交互），本地先行校验：`~` 展开（复用 `_expandUserHome`）→ 文件存在 → 扩展名是图片（`_kImageExtensions`：png/jpg/gif/webp/heic/heif/bmp，对齐 App `_inferAttachmentType` 的图片集合，补上 TUI 没有 picker 过滤的缺口）→ 非空 → ≤2MB（`kMaxAvatarBytes` 与服务端 `MAX_AVATAR_BYTES` 同值），全过才 `_withAutoAuth`  POST `/avatar`，返回服务端确认的 member_id。**UI 层**在 `_execCommand` 加 `/avatar` case（用法提示 / 未激活先 /auth / 后台执行）与 `/help` 条目；后台助手 `_uploadAvatarInBackground` 与 `/attach` 同款**不 await**（不占输入循环），进度走状态栏、结果进消息流。TUI 不渲染头像，但头像是 per-member 共享资料，这里设的就是对方 App/TUI 里看到的我的头像。验证：`dart analyze` 0 问题；`cli` 全量 28 项 dart 测试通过（新增 `cli/test/avatar_upload_test.dart` 6 项：文件不存在/非图片/空文件/超 2MB/~ 展开/未激活，均断言本地抛错且不打网络——server 留空，一旦走到网络阶段即另一种错）；文档 `docs/DEPLOYMENT.md` 命令表 + `docs/ONBOARDING.md` 命令一览各加一行。
+- **（2026-10-17T12:30:00Z / 2026-10-17 20:30）**：老板要求 cli/tui 里加 `/avatar <图片路径>` 设置我的头像。实现：**网络层**放 `cli/lib/chat_core.dart` 的 `ChatSession.setAvatar(path)`（与 `attachFile` 同款架构——store/网络归 chat_core，TUI 只做交互），本地先行校验：`~` 展开（复用 `_expandUserHome`）→ 文件存在 → 扩展名是图片（`_kImageExtensions`：png/jpg/gif/webp/heic/heif/bmp，对齐 App `_inferAttachmentType` 的图片集合，补上 TUI 没有 picker 过滤的缺口）→ 非空 → ≤2MB（`kMaxAvatarBytes` 与服务端 `MAX_AVATAR_BYTES` 同值），全过才 `_withAutoAuth` POST `/avatar`，返回服务端确认的 member_id。**UI 层**在 `_execCommand` 加 `/avatar` case（用法提示 / 未激活先 /auth / 后台执行）与 `/help` 条目；后台助手 `_uploadAvatarInBackground` 与 `/attach` 同款**不 await**（不占输入循环），进度走状态栏、结果进消息流。TUI 不渲染头像，但头像是 per-member 共享资料，这里设的就是对方 App/TUI 里看到的我的头像。验证：`dart analyze` 0 问题；`cli` 全量 28 项 dart 测试通过（新增 `cli/test/avatar_upload_test.dart` 6 项：文件不存在/非图片/空文件/超 2MB/~ 展开/未激活，均断言本地抛错且不打网络——server 留空，一旦走到网络阶段即另一种错）；文档 `docs/DEPLOYMENT.md` 命令表 + `docs/ONBOARDING.md` 命令一览各加一行。
 
 ## 20261017 三处可点控件底色统一淡灰（邀请新同伴 + 群名胶囊 + 我的名字胶囊）
 
@@ -15071,7 +15087,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 ## 20261017 TUI /attach、/avatar 不带参数弹系统文件选择窗口（方案 A）
 
-- **（2026-10-17T13:05:00Z / 2026-10-17 21:05）**：老板问 CLI 能否弹文件选择窗口、选中后把路径作为参数送进 TUI 输入行；确认走「A 系统选择窗口先行，B 内置键盘浏览后续」。实现：新增 `_pickFileIntoInput`（平台分发：macOS `osascript choose file`［UTI 过滤，public.image］/ Linux `zenity --file-selection` 备选 `kdialog` / Windows PowerShell `OpenFileDialog -STA`）+ `_pickFileIntoInputWithTerminal`（终端配合包装）；`/attach`、`/avatar` 不带参数改为弹窗而非打用法，选中后 `_setInput('<命令> <路径>')` 填入输入行——**不自动发送**，人先看见再回车（发错头像/文件不可撤回，宁可多一次确认）。**取消 vs 故障的区分**：三种工具取消时共同表现是无输出 → 静默；stderr 非空且不是取消语（osascript 的 "User canceled. (-128)"）→ 当故障报出来（TCC 未授权、GTK 打不开显示等），避免"没反应"式静默。Linux 无 DISPLAY/WAYLAND_DISPLAY 提前说明。终端成对切换：`_restoreTerminal`（cooked+光标+关鼠标上报）→ 选择器 → `_enterRaw` + 全量重绘（_render 开头即清屏）；期间 `processing=true` 忽略误敲（Ctrl+C 仍可退出）。
+- **（2026-10-17T13:05:00Z / 2026-10-17 21:05）**：老板问 CLI 能否弹文件选择窗口、选中后把路径作为参数送进 TUI 输入行；确认走「A 系统选择窗口先行，B 内置键盘浏览后续」。实现：新增 `_pickFileIntoInput`（平台分发：macOS `osascript choose file`［UTI 过滤，public.image］/ Linux `zenity --file-selection` 备选 `kdialog` / Windows PowerShell `OpenFileDialog -STA`）+ `_pickFileIntoInputWithTerminal`（终端配合包装）；`/attach`、`/avatar` 不带参数改为弹窗而非打用法，选中后 `_setInput('<命令> <路径>')` 填入输入行——**不自动发送**，人先看见再回车（发错头像/文件不可撤回，宁可多一次确认）。**取消 vs 故障的区分**：三种工具取消时共同表现是无输出 → 静默；stderr 非空且不是取消语（osascript 的 "User canceled. (-128)"）→ 当故障报出来（TCC 未授权、GTK 打不开显示等），避免"没反应"式静默。Linux 无 DISPLAY/WAYLAND_DISPLAY 提前说明。终端成对切换：`_restoreTerminal`（cooked+光标+关鼠标上报）→ 选择器 → `_enterRaw` + 全量重绘（\_render 开头即清屏）；期间 `processing=true` 忽略误敲（Ctrl+C 仍可退出）。
 - 踩坑与纠正（值得记住）：排查时怀疑 `_execCommand` 的 switch 有大规模 case 贯穿（`/help`→`/server`、`/sync`→`/history`、`/myname`→`/entrance`…源码里多个 case 无 break），先写 Dart 片段"证实"了贯穿，又用 pty 探针实测**不**贯穿，最后用最小复现定位真相：**Dart 3.13 起 switch 非空 case 隐式 break**（空 case 体仍可标签堆叠共享 body，如 `/help`+`/`、`/device`+`/entrance`）。第一个"证实"的实验是被循环欺骗（for 三次迭代各打一行，看起来像 A/B/C 贯穿）。教训：语言语义变迁不能凭记忆，最小复现 + 真机探针双重验证；本仓库 pubspec sdk ^3.13.0，**新增 TUI 命令不必写 break**，与既有风格一致。
 - 验证：`dart analyze` 0 问题；CLI 28 项 dart 测试通过；pty 探针（45×130）实测三条路径——选中（假 printf 命令代替真对话框，避免在老板机上乱弹窗）：输入行出现 `/attach /tmp/picked-ANY.png` 且 TUI 画面完整恢复；`/avatar` 只列图片分支填入 IMG 路径；取消（`true` 命令模拟无输出）：输入行不动、无打扰消息、TUI 正常渲染。真 osascript 语法用 `osacompile -e` 编译校验通过（不执行、不弹窗）；真对话框交互待老板本机实测。
 
@@ -15103,9 +15119,27 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 - **（2026-10-17T16:52:00Z / 2026-10-18 00:52）**：老板要求——「我的资料」「我的同伴」两个弹层里只要显示性别图标，不要显示男/女的文字。改动（app/lib/chat_page.dart）：两处性别展示都从「图标 + 4px 间距 + 文字」缩成**单枚图标**（16px，女 #D6529C / 男 #3BAFFD 不变）；「我的同伴」的性别行因此从 `if (...) ...[Semantics(Row(icon+text))]` 简化为 `if (...) Semantics(icon)`，Spacer + 邀请/重新邀请按钮位置不动。读屏不降级：Semantics 仍包着 `「性别 男/女」` 完整 label（光秃图标对读屏是哑的），只是视觉上去掉文字。测试同步：duo_peer_sheet_test ① 的性别断言从找文字「女」改为找 `Icons.female` 图标 + 反向断言 `wizardGenderFemale` 文字 findsNothing，同行/右对齐断言改拿图标的 rect。
 - 回归：flutter analyze 0 问题；duo_peer_sheet_test 2 + chat_page_menu_test 42 全过（menu 里那条「改名弹窗不再展示性别」的 `find.text('性别')` 断言不受影响——Semantics label 不是 Text widget）。提交时工作区仍有并行会话的锁屏重构未提交内容，本次继续只提本方 hunk。
 
-**（2026-10-17T16:57:15Z / 2026-10-18 00:57）**：锁屏两 commit（bfa6960c + 5d2c79fd）深度评审，发现并修复三处真问题（5eedcbb8）。①最严重：idle 锁用 FocusNode.hasFocus 当「聊天页在栈顶」信号根本不可靠——hasFocus 只在焦点链经过本子树时为 true，手机上输入框非 autofocus、点非焦点区不产生焦点 → 空闲锁很可能永不触发；改用 ModalRoute.isCurrent。②后台锁只认 paused 漏掉 app 切换器/通知下拉（只到 inactive 不到 paused，聊天快照躺着几小时回来不用输 PIN 的安全绕过）；改为「离开 resumed 即记录」+ wasResumed 区分回程 inactive，覆写 bug 不复发。③滚轮/惯性滚动不产生 pointer down，持续滚动会被误锁；加 ScrollUpdateNotification 兜底。另统一三处锁屏 push 为 _pushLockOverlay（防重复 push + pop 回聊天重排），paused 时显式取消 idle timer，后台锁测试改用真实生命周期顺序（出向 inactive→hidden→paused、回程 paused→hidden→inactive→resumed，回程 paused 直接到 inactive 会触发框架断言）。教训：评审揪出的 FocusNode.hasFocus 语义误区值得记住——它≠「我的 route 在栈顶」。
+**（2026-10-17T16:57:15Z / 2026-10-18 00:57）**：锁屏两 commit（bfa6960c + 5d2c79fd）深度评审，发现并修复三处真问题（5eedcbb8）。①最严重：idle 锁用 FocusNode.hasFocus 当「聊天页在栈顶」信号根本不可靠——hasFocus 只在焦点链经过本子树时为 true，手机上输入框非 autofocus、点非焦点区不产生焦点 → 空闲锁很可能永不触发；改用 ModalRoute.isCurrent。②后台锁只认 paused 漏掉 app 切换器/通知下拉（只到 inactive 不到 paused，聊天快照躺着几小时回来不用输 PIN 的安全绕过）；改为「离开 resumed 即记录」+ wasResumed 区分回程 inactive，覆写 bug 不复发。③滚轮/惯性滚动不产生 pointer down，持续滚动会被误锁；加 ScrollUpdateNotification 兜底。另统一三处锁屏 push 为 \_pushLockOverlay（防重复 push + pop 回聊天重排），paused 时显式取消 idle timer，后台锁测试改用真实生命周期顺序（出向 inactive→hidden→paused、回程 paused→hidden→inactive→resumed，回程 paused 直接到 inactive 会触发框架断言）。教训：评审揪出的 FocusNode.hasFocus 语义误区值得记住——它≠「我的 route 在栈顶」。
+
+**（2026-10-17T17:02:52Z / 2026-10-18 01:02）**：删除锁屏码确认弹窗：确认按钮改为红底白字「删除」（复用 clearMessagesConfirm 文案，样式对齐「删除所有消息」弹窗）。已 dart analyze 通过并 commit 1d1982ff。
+
+**（2026-10-17T17:06:39Z / 2026-10-18 01:06）**：锁屏码相关文案「删除」统一改「清除」（中：清除锁屏码弹窗标题/正文/成功提示；英：Clear PIN），与「删除消息」措辞区分。gen-l10n 已重生成，analyze 通过，commit 见 git log。
+
+**（2026-10-17T17:10:07Z / 2026-10-18 01:10）**：清除锁屏码弹窗确认按钮文案不再复用 clearMessagesConfirm，新增 chatPageLockClearConfirm（清除/Clear）。analyze 通过，commit d9a360a4。
 
 ## 20261018 TUI：路径类错误提示改走消息流 + Tab 候选列表加类型图标
 
 - **（2026-10-17T17:20:00Z / 2026-10-18 01:20）**：老板两条要求（cli/tui）。① `/avatar` `/attach` 快速输入路径时，文件类型不符合等错误不要显示在底部通知条，作为系统消息插入消息流。排查结论：快速输入链路的**上传类错误本来就走消息流**（`_uploadAvatarInBackground`/`_uploadAttachmentInBackground` 的 catch 已是 `_systemMessage`），落在底部通知条的是 **Tab 补全的两处提示**——「目录不存在或读不了」与「下没有以 X 开头的项」；改为经 `_showCompletionFeedback`（原 `_showCompletionCandidates` 更名，职责从"列候选"扩为"补全反馈"）进消息流，并**复用候选的替换槽**（`completionMsg`）：连按 Tab 不堆积、上一条候选/错误互相顶掉，都是"上一条补全反馈已过时"。内置浏览器（方案 B）的「头像只能是图片」提示**保持状态行不动**——浏览器态消息区整体被目录列表接管，system 消息在浏览器开着时根本不可见，且该提示是模态即时的（"换个文件或按 q 取消"）。② Tab 候选列表每个条目前加类型图标：目录 📁（名字仍带 /）、文件 📄，与内置浏览器 `_browserLines` 的图标风格一致，堆在一行纯文件名时分不清哪个是目录。
 - 测试：`cli/test/tab_complete_check.py` 扩到 11 例——④ 无匹配/⑪ 目录读不了：断言提示在消息区且**不在底部状态行**（rows[-1] 不含提示文本）；② 断言候选前带 📄；新增 ⑩ 混列整个目录（📁 wallpaper/ + 📄 photo.png…）。回归：`dart analyze` 0 问题；cli 28 项 dart 测试全过；tab_complete 11、file_browser 8、guide_input_rules、guide_exit、guide_crash、unlock_flow、revoke_command、revoked 全过。`reset_returns_to_guide_check` 与 `tui_smoke` 在此环境失败——已用 `git stash` 对照验证为**存量问题**（前者时序 flake，后者前置要求 127.0.0.1:3901 有服务端），与本次改动无关。
+
+**（2026-10-17T22:20:14Z / 2026-10-18 06:20）**：统一取消按钮淡灰底：新增 widgets/cancel_button.dart（surfaceContainerHighest 底），替换全部弹窗取消按钮（含撤回/立刻删除原 OutlinedButton）；通道码「重新生成」、邮件「停用」加同色系淡灰底（停用大小对齐保存按钮）。dart analyze 通过，commit 63c932b1。
+
+**（2026-10-18T00:19:02Z / 2026-10-18 08:19）**：code review TUI 文件选择相关 5 个 commits（f3fe8511/6350426e/188390a5/ccf5b2d6/db5baa3e）：4 条发现中 3 条核实为误报（s.cursor code-unit 口径正确、\_browserCancel 全量重绘已同步光标、peerJoined 判空当前安全），1 条真实问题已修——裸 Esc 检测窗口 50ms→150ms（SSH 慢链路拆散转义序列）。file_browser/tab_complete pty 测试通过，commit 5f0de3fb。
+
+**（2026-10-18T00:48:16Z / 2026-10-18 08:48）**：按钮样式重做：新 grayButtonStyle（黑 5%底/悬浮10%/按压14%，overlayColor 叠加修复按压底色消失），取消+重新生成共用；邮件停用红底白字同尺寸。analyze 通过。
+
+**（2026-10-18T00:59:31Z / 2026-10-18 08:59）**：取消/重新生成/停用按钮尺寸调正常（minimumSize 64x40，同 FilledButton 主力按钮）；worklog 清理已删 commits 引用。analyze 通过。
+
+**（2026-10-18T01:10:55Z / 2026-10-18 09:10）**：取消/停用按钮尺寸真正对齐主按钮：minimumSize 96x50 + 17号粗体（同 main.dart FilledButton 全局主题），此前 64x40 仍偏小（老板截图反馈）。analyze 通过。
+
+**（2026-10-18T01:16:12Z / 2026-10-18 09:16）**：主按钮圆角统一：FilledButton 全局主题 shape 从 BorderRadius 14 改 StadiumBorder（全圆角胶囊），与取消按钮（TextButton 默认）同弧度。analyze 通过。

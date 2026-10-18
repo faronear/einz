@@ -2693,13 +2693,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: TextButton(
-                      // 淡灰底（老板 2026-10-18）：与弹窗「取消」按钮同色系，
-                      // 可按可不按的低强调动作
-                      style: TextButton.styleFrom(
-                        backgroundColor:
-                            Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                        foregroundColor:
-                            Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      // 淡灰底+悬浮/按压变深（老板 2026-10-18）：与弹窗「取消」
+                      // 按钮共用 grayButtonStyle，同类低强调按钮观感一致
+                      style: grayButtonStyle().copyWith(
+                        overlayColor: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.pressed)) {
+                            return Colors.black.withValues(alpha: 0.09);
+                          }
+                          if (states.contains(WidgetState.hovered)) {
+                            return Colors.black.withValues(alpha: 0.05);
+                          }
+                          return Colors.transparent;
+                        }),
                       ),
                       onPressed: busy
                           ? null
@@ -3063,15 +3068,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ValueListenableBuilder<bool>(
                 valueListenable: busy,
                 builder: (_, isBusy, _) => TextButton(
-                  // 淡灰底（老板 2026-10-18）：停用不值得鼓励，不用主色，但与
-                  // 「取消」按钮呼应给个底色；大小同下方「保存」提交按钮
+                  // 红底白字警告色（老板 2026-10-18）：停用是警告级动作；
+                  // 不特地做小，大小与「取消」/「保存」提交按钮同款
                   style: TextButton.styleFrom(
-                    backgroundColor:
-                        Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                    foregroundColor:
-                        Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    minimumSize: const Size(64, 36),
+                    backgroundColor: Theme.of(ctx).colorScheme.error,
+                    foregroundColor: Theme.of(ctx).colorScheme.onError,
+                    // 与「取消」/「保存」提交按钮同块头（96x50、17 号粗体，
+                    // 同 main.dart 的 FilledButton 主题），不特地做小
+                    minimumSize: const Size(96, 50),
+                    textStyle: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w600),
                   ),
                   onPressed: isBusy
                       ? null
