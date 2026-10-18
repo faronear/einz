@@ -15143,3 +15143,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-18T01:10:55Z / 2026-10-18 09:10）**：取消/停用按钮尺寸真正对齐主按钮：minimumSize 96x50 + 17号粗体（同 main.dart FilledButton 全局主题），此前 64x40 仍偏小（老板截图反馈）。analyze 通过。
 
 **（2026-10-18T01:16:12Z / 2026-10-18 09:16）**：主按钮圆角统一：FilledButton 全局主题 shape 从 BorderRadius 14 改 StadiumBorder（全圆角胶囊），与取消按钮（TextButton 默认）同弧度。analyze 通过。
+
+**（2026-10-18T02:22:17Z / 2026-10-18 10:22）**：修 CI testAll 两例失败：昨日「弹窗按钮体系统一」把清空锁屏码确认弹窗文案改为 l10n「清除锁屏码？」/「清除」，chat_page_menu_test 仍断言旧硬编码「删除锁屏码？」/「确认」→ 改用 _zh.chatPageClearLockTitle / chatPageLockClearConfirm。chat_page_menu_test 全部通过。

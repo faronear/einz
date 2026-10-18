@@ -503,7 +503,7 @@ void main() {
     await tester.enterText(fields.at(2), '');
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
-    expect(find.text('删除锁屏码？'), findsOneWidget);
+    expect(find.text(_zh.chatPageClearLockTitle), findsOneWidget);
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
@@ -553,7 +553,7 @@ void main() {
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
+    await tester.tap(find.descendant(of: confirmDialog, matching: find.text(_zh.chatPageLockClearConfirm)));
     await tester.pumpAndSettle();
 
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '清空成功后设置弹窗应关闭');
