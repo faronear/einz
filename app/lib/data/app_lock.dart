@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 import 'local_database.dart';
+import 'lock_timer.dart';
 import 'vault_session.dart';
 import 'attachment_store.dart';
 import 'media_cache.dart';
@@ -432,6 +433,23 @@ class AppLockService {
     await (db.delete(db.appState)
           ..where((s) => s.key.equals(_kPackage)))
         .go();
+  }
+
+  /// 用户自选的锁屏时长（秒，前台闲置锁与后台锁共用；app_state 明文键，非秘密）。
+  /// 未设置或非法值 → 默认 [kLockSeconds]；越界钳到 [kLockSecondsChoices] 首尾。
+  static const _kLockSeconds = 'app_lock.lock_seconds';
+
+  Future<int> loadLockSeconds() async {
+    final v = int.tryParse(await _get(_kLockSeconds) ?? '');
+    if (v == null) return kLockSeconds;
+    if (kLockSecondsChoices.isEmpty) return kLockSeconds;
+    return v.clamp(kLockSecondsChoices.first, kLockSecondsChoices.last);
+  }
+
+  /// 保存用户自选的锁屏时长。调用方保证 [seconds] 是 [kLockSecondsChoices] 之一
+  /// （滚动轴按档位吸附，产生不了别的值）。
+  Future<void> saveLockSeconds(int seconds) async {
+    await _set(_kLockSeconds, '$seconds');
   }
 
   /// 设置 PIN 并加密保存 Vault（老板决策：不再生成 12 词恢复码）。

@@ -476,7 +476,10 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     expect(fields.evaluate().length, 3);
 
-    // 1) 旧码留空 → 红字要求先输入旧码，不动锁
+    // 1) 旧码留空 + 新码非空 → 红字要求先输入旧码，不动锁
+    // （2026-10-18 方案二：新码非空才算"改码"；两空提交=不改 PIN，见用例 4）
+    await tester.enterText(fields.at(1), '654321');
+    await tester.enterText(fields.at(2), '654321');
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('请先输入当前锁屏码'), findsOneWidget);
@@ -498,17 +501,15 @@ void main() {
     expect(find.text('新锁屏码与当前锁屏码相同，未作修改'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
 
-    // 4) 旧码正确 + 新码留空 → 才进清空确认；点取消不动锁
+    // 4) 新码两空 + 提交 → 不再清空（2026-10-18 方案二：两空=不改 PIN，只调时长），
+    //    弹窗直接关闭、锁不动；清空走显性「清除锁屏码」按钮（见删除用例）
     await tester.enterText(fields.at(1), '');
     await tester.enterText(fields.at(2), '');
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageClearLockTitle), findsOneWidget);
-    final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
-    await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget); // 设置弹窗仍在
-    expect(await AppLockService(db).isSetup, true, reason: '取消不清锁');
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing,
+        reason: '两空提交=不改 PIN：弹窗应直接关闭');
+    expect(await AppLockService(db).isSetup, true, reason: '两空提交不清锁');
   });
 
   testWidgets('有 PIN 时删除锁屏码：菜单项立即刷新（不再显示「已设置」）', (WidgetTester tester) async {
@@ -548,12 +549,14 @@ void main() {
     await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    // 旧码正确 + 新码两栏留空 → 清空确认 → 确认
-    await tester.enterText(fields.at(0), '123456');
-    await tester.tap(find.text('启用'));
+    // 标题行双标签（老板 2026-10-18）：切换到「清除锁屏码」页 → 警告文案 + 旧码框
+    // → 点红底「清除」主按钮（标签页本身即警示，不再叠二次确认弹窗）
+    expect(find.text(_zh.chatPageSetLockTabChange), findsOneWidget);
+    await tester.tap(find.text(_zh.chatPageSetLockClearButton));
     await tester.pumpAndSettle();
-    final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text(_zh.chatPageLockClearConfirm)));
+    expect(find.text(_zh.chatPageClearLockMessage), findsOneWidget, reason: '清除页应显示警告文案');
+    await tester.enterText(fields.at(0), '123456');
+    await tester.tap(find.text(_zh.chatPageLockClearConfirm));
     await tester.pumpAndSettle();
 
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '清空成功后设置弹窗应关闭');
@@ -563,6 +566,58 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已设置'), findsNothing,
         reason: '清空后菜单项应只显示「锁屏码」，不带「已设置」尾缀');
+  });
+
+  testWidgets('锁屏时长滚动轴：拖到 1 小时档 + 两空提交 → 时长落盘且 PIN 不动', (WidgetTester tester) async {
+    // 2026-10-18 方案二：时长与 PIN 独立——只拖滚动轴（新码两空）提交时，
+    // 不清锁、不需要旧码，仅写 lock_seconds（前台闲置锁与后台锁共用）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    await AppLockService(db).setPin('123456',
+        payload: AppLockPayload(
+          spaceKeyB64: base64Encode(spaceKey),
+          spaceId: 'space-demo',
+          entranceId: 'dev-a',
+          token: 'tok',
+        ));
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
+    // 弹窗有滚动轴，初始 30 秒档（默认 kLockSeconds）
+    expect(find.byType(Slider), findsOneWidget);
+    expect(find.text('30 秒'), findsOneWidget);
+    // 点滚动轴中点 → index 3 = 300 秒（档位 [30,60,120,300,600,1800,3600]）
+    await tester.tap(find.byType(Slider));
+    await tester.pumpAndSettle();
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 3.0, reason: '中点应落在第 4 档（300s）');
+    expect(find.text('5 分钟'), findsOneWidget, reason: '右侧当前值文本应跟随更新');
+    // 两空提交：只调时长，弹窗关闭、PIN 不动
+    await tester.tap(find.text('启用'));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing);
+    expect(await AppLockService(db).isSetup, true, reason: '只调时长不清锁');
+    expect(await AppLockService(db).loadLockSeconds(), 300);
   });
 
   testWidgets('改名对话框保存后无红屏（controller 延迟 dispose）', (WidgetTester tester) async {

@@ -254,8 +254,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _inputFocusNode = FocusNode(); // 回车发送后重新聚焦（与图标发送一致保持焦点）
   final _lockTimer = LockTimer();
-  // —— 锁屏（前台无操作 + 后台超时，共用 [kLockSeconds]，将来做成可调菜单项）——
-  // 前台无操作锁屏：超过 30s 没任何交互（点/滑/滚/打字）也进锁屏。
+  // —— 锁屏（前台无操作 + 后台超时，共用一个用户可调阈值）——
+  // 阈值默认 kLockSeconds；initState 异步读用户自选值（AppLockService.loadLockSeconds，
+  // 「设置锁屏码」弹窗的滚动轴写入）后回填 _lockSeconds / _lockTimer 并重排。
+  int _lockSeconds = kLockSeconds;
+  // 前台无操作锁屏：超过阈值没任何交互（点/滑/滚/打字）也进锁屏。
   // 一次性 Timer：每次交互 cancel+重排到"现在+阈值"；空闲时 Timer 睡着零唤醒，
   // 且用 Dart 逻辑时钟，widget 测试可 tester.pump(30s) 推进（无需 runAsync 实睡）。
   // 「聊天页在栈顶」用 ModalRoute.isCurrent 判（真实路由状态），**不用** FocusNode
@@ -945,6 +948,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadBurnLabel();
     _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
     _refreshPinStatus();
+    _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 30s；两个计时器共用）
     // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
     // 交互信号由 build 根的 Listener（点/滑）+ 滚动通知（滚轮）+ 输入框监听（打字）
     // 喂给 _armIdleLock；解锁/关弹层 pop 回聊天时由 push Future（_pushLockOverlay）
@@ -2806,6 +2810,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _hasPin = has);
     // PIN 状态刚确定（如 initState 首读完成）→ 重排 idle 计时器：
     // 设了 PIN 才开始计（_armIdleLock 内会判 _hasPin），没设则清空
+    _armIdleLock();
+  }
+
+  /// 恢复用户自选的锁屏时长（「设置锁屏码」弹窗的滚动轴写入；默认 30s）。
+  /// 前台闲置锁与后台锁共用同一阈值：回填 [_lockSeconds]（idle Timer 下次重排生效）
+  /// 与 [_lockTimer.backgroundLockSeconds]（回前台判定即时生效），并重排 idle。
+  Future<void> _loadLockSeconds() async {
+    final seconds = await AppLockService(widget.db ?? LocalDatabase.shared).loadLockSeconds();
+    if (!mounted) return;
+    setState(() => _lockSeconds = seconds);
+    _lockTimer.backgroundLockSeconds = seconds;
     _armIdleLock();
   }
 
@@ -5702,7 +5717,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!_appResumed) return; // 后台中：交给后台锁路径，回前台再排
     if (_voiceCall?.state.value.inCall == true) return; // 通话中不锁
     if (_lockOverlayShown) return; // 锁屏已盖着：等解锁 pop 再排
-    _idleTimer = Timer(const Duration(seconds: kLockSeconds), _fireIdleLock);
+    _idleTimer = Timer(Duration(seconds: _lockSeconds), _fireIdleLock);
   }
 
   /// 交互信号刷新：点/滑/拖都走这里（build 根 Listener）。滚动走
@@ -10004,6 +10019,26 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   // 已设锁屏码 → 出「当前锁屏码」验证框（老板 2026-09-14）
   bool get _hasPin => widget.hasPin;
   bool _busy = false; // 当前锁屏码校验中（Argon2id）：防连点重复提交
+  // 锁屏时长（前台闲置锁与后台锁共用，老板 2026-10-18 定）：滚动轴档位
+  // （kLockSecondsChoices）。initState 异步读持久化值；读回前按默认渲染
+  // （同 _loadUiStyle 套路）。_initialSeconds = 打开弹窗时的值，提交时判"是否真改过"。
+  int _lockSeconds = kLockSeconds;
+  int? _initialSeconds;
+  // 已设锁屏码时的标签页：0=更换锁屏码，1=清除锁屏码（老板 2026-10-18 定，
+  // 标题行双标签取代上一轮的「清除锁屏码」文字按钮；未设 PIN 时无标签页）。
+  int _setLockTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    AppLockService(widget.db).loadLockSeconds().then((value) {
+      if (!mounted) return;
+      setState(() {
+        _lockSeconds = value;
+        _initialSeconds ??= value;
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -10013,146 +10048,227 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     super.dispose();
   }
 
+  /// 验证当前锁屏码并取出整包 Vault（修改/清除 PIN 共用）。失败时已置 _error，
+  /// 返回 null（含"没输当前锁屏码"——直接红字提示，不发后台）。
+  Future<VaultPayload?> _verifyOldPin() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_oldCtrl.text.isEmpty) {
+      setState(() => _error = l10n.chatPageSetLockOldRequired);
+      return null;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final vault = await AppLockService(widget.db).unlockVault(_oldCtrl.text);
+      if (!mounted) return null;
+      setState(() => _busy = false);
+      return vault;
+    } on AppLockLockedException catch (e) {
+      if (!mounted) return null;
+      setState(() {
+        _busy = false;
+        _error = l10n.lockPageTooManyAttempts(e.remainingSeconds);
+      });
+    } on AppLockException {
+      if (!mounted) return null;
+      setState(() {
+        _busy = false;
+        _error = l10n.setPinDialogOldWrong;
+      });
+    } catch (e) {
+      if (!mounted) return null;
+      setState(() {
+        _busy = false;
+        _error = l10n.setPinDialogSetupFailed('$e');
+      });
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     if (_busy) return;
-    final oldPin = _oldCtrl.text;
     final pin = _pinCtrl.text;
     final confirm = _confirmCtrl.text;
-
-    // 已设锁屏码：修改与清空都必须先验证当前锁屏码（老板 2026-09-14 定）——
-    // 否则"清空 → 重设"两步即可绕过验证；手机被他人短暂拿到就能装一个自己的 PIN。
-    // 验证走 AppLockService.unlockVault（与锁屏同一套防爆破：连错 5 次锁 30 秒）。
-    //
-    // 顺带把整包 Vault 取出来：多空间下"改 / 清锁屏码"必须把**全部空间**一起搬
-    // （改：重加密整包；清：整包转明文）。已有的明文包在 PIN 模式下按设计不存在，
-    // 不给整包就只能写进当前这一个空间、静默丢掉其他秘境——见 AppLockService.setPin /
-    // savePlain 的 existing 参数（2026-10-06 模拟器实测的截断 bug）。
-    VaultPayload? existingVault;
-    if (_hasPin) {
-      if (oldPin.isEmpty) {
-        setState(() => _error = l10n.chatPageSetLockOldRequired);
-        return;
+    // 两框都空 = 不改 PIN（老板 2026-10-18 方案二：原先"两空=清空"的隐式语义
+    // 会和"只想调自动锁屏时长"撞车——时长改成可调后，空着提交反而把 PIN 清掉。
+    // 清空改由弹窗内显性「清除锁屏码」按钮承担，见 _clearPin）。
+    final changePin = pin.isNotEmpty || confirm.isNotEmpty;
+    // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活）
+    final overlay = Overlay.of(context, rootOverlay: true);
+    // 时长是否真的动过（初始值还没异步读回时不写盘）
+    final secondsChanged = _initialSeconds != null && _lockSeconds != _initialSeconds;
+    Future<void> saveSecondsIfChanged() async {
+      if (secondsChanged) {
+        await AppLockService(widget.db).saveLockSeconds(_lockSeconds);
       }
-      setState(() {
-        _busy = true;
-        _error = null;
-      });
-      try {
-        existingVault = await AppLockService(widget.db).unlockVault(oldPin);
-      } on AppLockLockedException catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _busy = false;
-          _error = l10n.lockPageTooManyAttempts(e.remainingSeconds);
-        });
-        return;
-      } on AppLockException {
-        if (!mounted) return;
-        setState(() {
-          _busy = false;
-          _error = l10n.setPinDialogOldWrong;
-        });
-        return;
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _busy = false;
-          _error = l10n.setPinDialogSetupFailed('$e');
-        });
-        return;
-      }
-      if (!mounted) return;
-      setState(() => _busy = false);
     }
 
-    // 两空 = 清空锁屏码（Space Key 转明文保存，与向导"不设置锁屏码"一致）
-    if (pin.isEmpty && confirm.isEmpty) {
-      // 本来就没设锁屏码：没有可清的东西——不调后台、不改动，只提示一句（老板 2026-09-14）；
-      // 先关弹窗再顶部提示（老板 2026-09-23）：通知浮在弹窗上不合理
-      if (!_hasPin) {
-        // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活）
-        final overlay = Overlay.of(context, rootOverlay: true);
-        Navigator.of(context).pop(); // 无改动：不回 true（菜单不做无谓刷新）
-        showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice, extraTop: kNoticeExtraTopBelowStatusBar);
+    if (changePin) {
+      // 已设锁屏码：修改必须先验证当前锁屏码（老板 2026-09-14 定）——
+      // 否则"清空 → 重设"两步即可绕过验证；手机被他人短暂拿到就能装一个自己的 PIN。
+      // 验证走 AppLockService.unlockVault（与锁屏同一套防爆破：连错 5 次锁 30 秒）。
+      //
+      // 顺带把整包 Vault 取出来：多空间下"改锁屏码"必须把**全部空间**一起搬
+      // （重加密整包）。已有的明文包在 PIN 模式下按设计不存在，不给整包就只能写进
+      // 当前这一个空间、静默丢掉其他秘境——见 AppLockService.setPin 的 existing 参数
+      // （2026-10-06 模拟器实测的截断 bug）。
+      VaultPayload? existingVault;
+      if (_hasPin) {
+        existingVault = await _verifyOldPin();
+        if (existingVault == null) return; // 校验失败已在表单内置 _error
+      }
+      // 新旧码相同 → 红字提示，不真去设置（老板 2026-09-14）。放在旧码校验之后：
+      // 先验完旧码再比，避免把"你猜对了当前锁屏码"当成提示漏出去
+      if (_hasPin && pin == _oldCtrl.text) {
+        setState(() => _error = l10n.chatPageSetLockSameAsOld);
         return;
       }
-      // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
-      final overlay = Overlay.of(context, rootOverlay: true);
-      // 显性确认：清空锁屏码（防误触——清空是降级操作）
-      final confirmed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => PopScope(
-          canPop: false,
-          child: AlertDialog(
-            title: Center(child: Text(l10n.chatPageClearLockTitle)),
-            content: Text(l10n.chatPageClearLockMessage),
-            actions: [
-              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
-              // 确认按钮与「删除所有消息」弹窗同款红底白字，但文案用「清除」
-              // （与删除消息的「删除」措辞区分，老板 2026-10-18）
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                ),
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: Text(l10n.chatPageLockClearConfirm),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (confirmed != true) return; // 取消：留在本弹窗（不执行清除）
+      if (!AppLockService.isPinDigitsOnly(pin)) {
+        setState(() => _error = l10n.setPinDialogPinDigitsOnly);
+        return;
+      }
+      if (pin.length < AppLockService.pinMinLength) {
+        setState(() => _error = l10n.setPinDialogPinTooShort);
+        return;
+      }
+      if (pin != confirm) {
+        setState(() => _error = l10n.setPinDialogPinMismatch);
+        return;
+      }
+      // 设置/重设不再弹二次确认（老板 2026-09-14：新码/确认两栏已足够，多一次确认多余）
       try {
-        await AppLockService(widget.db).savePlain(widget.payload, existing: existingVault);
-        await AppLockService(widget.db).clearPackage();
+        await AppLockService(widget.db).setPin(pin, payload: widget.payload, existing: existingVault);
+        await saveSecondsIfChanged();
         if (!mounted) return;
-        Navigator.of(context).pop(true); // 菜单刷新「PIN: 未设置」
-        showTopNoticeOn(overlay, l10n.chatPageSetLockCleared, extraTop: kNoticeExtraTopBelowStatusBar);
+        Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
+        showTopNoticeOn(overlay, l10n.chatPageSetLockDone, extraTop: kNoticeExtraTopBelowStatusBar);
       } catch (e) {
-        if (!mounted) return;
+        if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
         setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
       }
       return;
     }
-    // 新旧码相同 → 红字提示，不真去设置（老板 2026-09-14）。放在旧码校验之后：
-    // 先验完旧码再比，避免把"你猜对了当前锁屏码"当成提示漏出去
-    if (_hasPin && pin == oldPin) {
-      setState(() => _error = l10n.chatPageSetLockSameAsOld);
+
+    // 不改 PIN：只提交时长（没动就不写盘）
+    await saveSecondsIfChanged();
+    if (!mounted) return;
+    if (!_hasPin) {
+      // 本来就没设锁屏码：没有可清的东西——只提示一句（老板 2026-09-14）；
+      // 先关弹窗再顶部提示（老板 2026-09-23）：通知浮在弹窗上不合理
+      Navigator.of(context).pop(); // 无改动：不回 true（菜单不做无谓刷新）
+      showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice, extraTop: kNoticeExtraTopBelowStatusBar);
       return;
     }
-    if (!AppLockService.isPinDigitsOnly(pin)) {
-      setState(() => _error = l10n.setPinDialogPinDigitsOnly);
-      return;
-    }
-    if (pin.length < AppLockService.pinMinLength) {
-      setState(() => _error = l10n.setPinDialogPinTooShort);
-      return;
-    }
-    if (pin != confirm) {
-      setState(() => _error = l10n.setPinDialogPinMismatch);
-      return;
-    }
+    Navigator.of(context).pop(); // PIN 没变：不回 true（菜单不做无谓刷新）
+  }
+
+  /// 「清除锁屏码」标签页的执行（老板 2026-10-18）：验旧码 → 直接清除。
+  /// 标签页本身就是警示页（警告文案 + 红底「清除」主按钮），不再叠二次确认弹窗；
+  /// 但验旧码仍然必须（2026-09-14 定：否则手机被他人短暂拿到就能清锁再装自己的 PIN）。
+  Future<void> _clearPin() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_busy) return;
+    final existingVault = await _verifyOldPin();
+    if (!mounted) return;
+    if (existingVault == null) return; // 校验失败已在表单内置 _error
     // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
     final overlay = Overlay.of(context, rootOverlay: true);
-    // 设置/重设不再弹二次确认（老板 2026-09-14：新码/确认两栏已足够，多一次确认多余）
     try {
-      await AppLockService(widget.db).setPin(pin, payload: widget.payload, existing: existingVault);
+      await AppLockService(widget.db).savePlain(widget.payload, existing: existingVault);
+      await AppLockService(widget.db).clearPackage();
       if (!mounted) return;
-      Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
-      showTopNoticeOn(overlay, l10n.chatPageSetLockDone, extraTop: kNoticeExtraTopBelowStatusBar);
+      Navigator.of(context).pop(true); // 菜单刷新「PIN: 未设置」
+      showTopNoticeOn(overlay, l10n.chatPageSetLockCleared, extraTop: kNoticeExtraTopBelowStatusBar);
     } catch (e) {
-      if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
+      if (!mounted) return;
       setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
     }
+  }
+
+  /// 锁屏时长档位 → 人读标签（30 秒 / 5 分钟 / 1 小时）。
+  String _formatLockSeconds(int seconds, AppLocalizations l10n) {
+    if (seconds >= 3600) return l10n.lockDurationHour(seconds ~/ 3600);
+    if (seconds >= 60) return l10n.lockDurationMin(seconds ~/ 60);
+    return l10n.lockDurationSecs(seconds);
+  }
+
+  /// 标题行双标签（更换 / 清除，老板 2026-10-18）：胶囊分段控件——外层淡色圆角
+  /// 轨道 + 选中项实心药丸（更换页用主题色、清除页用警示红，语义跟着颜色走），
+  /// AnimatedContainer 平滑滑动。M3 SegmentedButton 默认样式生硬（高、方、灰），
+  /// 老板嫌不好看，改用与全局 StadiumBorder 按钮同语言的胶囊。
+  Widget _buildSetLockTabs(BuildContext context, AppLocalizations l10n) {
+    final colors = Theme.of(context).colorScheme;
+    Widget segment(int index, String label, Color activeBg, Color activeFg) {
+      final selected = _setLockTab == index;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (_setLockTab == index) return;
+            setState(() {
+              _setLockTab = index;
+              _error = null; // 换页不残留上一页的红字
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? activeBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: activeBg.withValues(alpha: 0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : const [],
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? activeFg : colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          segment(0, l10n.chatPageSetLockTabChange, colors.primary, colors.onPrimary),
+          segment(1, l10n.chatPageSetLockClearButton, colors.error, Colors.white),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final clearing = _hasPin && _setLockTab == 1; // 当前在「清除锁屏码」标签页
     return AlertDialog(
-      title: Center(child: Text(l10n.chatPageSetLockTitle)),
+      // 已设锁屏码：标题行换成双标签（更换锁屏码 / 清除锁屏码，老板 2026-10-18）；
+      // 未设锁屏码：保持原「设置锁屏码」单标题（没有可清除的东西）
+      title: _hasPin
+          ? _buildSetLockTabs(context, l10n)
+          : Center(child: Text(l10n.chatPageSetLockTitle)),
       // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
       contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
@@ -10160,52 +10276,109 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 提示：设置后，每次进入秘境都要解锁，更安全。已设锁屏码时另有说明（修改/清空需验旧码）。大标题下、输入框上方——老板要求
-          Text(
-            _hasPin ? l10n.chatPageSetLockClearHint : l10n.chatPageSetLockHintNoPin,
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.outline,
+          if (clearing) ...[
+            // 「清除锁屏码」标签页 = 原警告弹窗的内容搬进来（老板 2026-10-18）：
+            // 标签本身就是警示，不再叠二次确认弹窗。验旧码仍然必须（2026-09-14 定：
+            // 否则手机被他人短暂拿到就能清锁再装自己的 PIN）。
+            Text(
+              l10n.chatPageClearLockMessage,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          // 已设锁屏码：先输当前锁屏码（修改/清空都要验证）
-          if (_hasPin) ...[
+            const SizedBox(height: 14),
             TextField(
               controller: _oldCtrl,
               obscureText: true,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              autofocus: _hasPin, // 已设锁屏码时这是第一个框
+              autofocus: true, // 本页唯一输入框
               decoration: InputDecoration(
                 labelText: l10n.chatPageSetLockOldLabel,
                 border: const OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 8),
+          ] else ...[
+            // 提示：设置后，每次进入秘境都要解锁，更安全。已设锁屏码时另有说明（修改需验旧码）。大标题下、输入框上方——老板要求
+            Text(
+              _hasPin ? l10n.chatPageSetLockClearHint : l10n.chatPageSetLockHintNoPin,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 14),
+            // 已设锁屏码：先输当前锁屏码（修改要验证）
+            if (_hasPin) ...[
+              TextField(
+                controller: _oldCtrl,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                autofocus: _hasPin, // 已设锁屏码时这是第一个框
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageSetLockOldLabel,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _pinCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
+              decoration: InputDecoration(
+                labelText: l10n.setPinDialogPinLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _confirmCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: l10n.setPinDialogConfirmLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            // 锁屏时长滚动轴：前台闲置锁与后台锁共用（老板 2026-10-18 定，
+            // 30 秒~1 小时按档位吸附）。改它不需要验当前锁屏码。
+            Row(
+              children: [
+                Text(
+                  l10n.chatPageSetLockDurationLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatLockSeconds(_lockSeconds, l10n),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            Slider(
+              value: kLockSecondsChoices
+                  .indexOf(_lockSeconds)
+                  .clamp(0, kLockSecondsChoices.length - 1)
+                  .toDouble(),
+              min: 0,
+              max: (kLockSecondsChoices.length - 1).toDouble(),
+              divisions: kLockSecondsChoices.length - 1,
+              label: _formatLockSeconds(_lockSeconds, l10n),
+              onChanged: (value) =>
+                  setState(() => _lockSeconds = kLockSecondsChoices[value.round()]),
+            ),
           ],
-          TextField(
-            controller: _pinCtrl,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
-            decoration: InputDecoration(
-              labelText: l10n.setPinDialogPinLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _confirmCtrl,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(
-              labelText: l10n.setPinDialogConfirmLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -10214,7 +10387,18 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       ),
       actions: [
         CancelButton(onPressed: () => Navigator.of(context).pop()),
-        FilledButton(onPressed: _busy ? null : _submit, child: Text(l10n.setPinDialogSetPin)),
+        // 主按钮按标签页切换：更换页=「启用」（设置/修改）；清除页=红底白字「清除」
+        // （与删除消息弹窗同款警示配色，文案与「删除」措辞区分——老板 2026-10-18）
+        if (clearing)
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: _busy ? null : _clearPin,
+            child: Text(l10n.chatPageLockClearConfirm),
+          )
+        else
+          FilledButton(onPressed: _busy ? null : _submit, child: Text(l10n.setPinDialogSetPin)),
       ],
     );
   }

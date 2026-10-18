@@ -226,8 +226,35 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.",
+  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space. Changing the PIN requires the current PIN; leaving it blank only adjusts the auto-lock duration (clear via the tab above).",
   "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you enter the space.",
+  "chatPageSetLockDurationLabel": "Auto-lock after inactivity",
+  "chatPageSetLockTabChange": "Change PIN",
+  "chatPageSetLockClearButton": "Clear PIN",
+  "lockDurationSecs": "{n} sec",
+  "@lockDurationSecs": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lockDurationMin": "{n} min",
+  "@lockDurationMin": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lockDurationHour": "{n} hr",
+  "@lockDurationHour": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
   "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",

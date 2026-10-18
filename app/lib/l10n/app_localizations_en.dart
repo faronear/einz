@@ -424,11 +424,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.';
+      'Once set, you\'ll unlock every time you enter the space. Changing the PIN requires the current PIN; leaving it blank only adjusts the auto-lock duration (clear via the tab above).';
 
   @override
   String get chatPageSetLockHintNoPin =>
       'Once set, you\'ll unlock every time you enter the space.';
+
+  @override
+  String get chatPageSetLockDurationLabel => 'Auto-lock after inactivity';
+
+  @override
+  String get chatPageSetLockTabChange => 'Change PIN';
+
+  @override
+  String get chatPageSetLockClearButton => 'Clear PIN';
+
+  @override
+  String lockDurationSecs(int n) {
+    return '$n sec';
+  }
+
+  @override
+  String lockDurationMin(int n) {
+    return '$n min';
+  }
+
+  @override
+  String lockDurationHour(int n) {
+    return '$n hr';
+  }
 
   @override
   String get chatPageSetLockOldLabel => 'Current PIN';

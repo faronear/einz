@@ -205,8 +205,35 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockClearHint": "设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。",
+  "chatPageSetLockClearHint": "设置后，每次进入秘境都要解锁。修改需先输入当前锁屏码；新码留空则不改锁屏码，只调整自动锁屏时长（清除用上方标签页）。",
   "chatPageSetLockHintNoPin": "设置后，每次进入秘境都要解锁，更安全。",
+  "chatPageSetLockDurationLabel": "无操作多久后自动锁屏",
+  "chatPageSetLockTabChange": "更换锁屏码",
+  "chatPageSetLockClearButton": "清除锁屏码",
+  "lockDurationSecs": "{n} 秒",
+  "@lockDurationSecs": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lockDurationMin": "{n} 分钟",
+  "@lockDurationMin": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lockDurationHour": "{n} 小时",
+  "@lockDurationHour": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
   "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",

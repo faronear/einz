@@ -797,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockClearHint.
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.'**
+  /// **'Once set, you\'ll unlock every time you enter the space. Changing the PIN requires the current PIN; leaving it blank only adjusts the auto-lock duration (clear via the tab above).'**
   String get chatPageSetLockClearHint;
 
   /// No description provided for @chatPageSetLockHintNoPin.
@@ -805,6 +805,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Once set, you\'ll unlock every time you enter the space.'**
   String get chatPageSetLockHintNoPin;
+
+  /// No description provided for @chatPageSetLockDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-lock after inactivity'**
+  String get chatPageSetLockDurationLabel;
+
+  /// No description provided for @chatPageSetLockTabChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get chatPageSetLockTabChange;
+
+  /// No description provided for @chatPageSetLockClearButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear PIN'**
+  String get chatPageSetLockClearButton;
+
+  /// No description provided for @lockDurationSecs.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} sec'**
+  String lockDurationSecs(int n);
+
+  /// No description provided for @lockDurationMin.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} min'**
+  String lockDurationMin(int n);
+
+  /// No description provided for @lockDurationHour.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} hr'**
+  String lockDurationHour(int n);
 
   /// No description provided for @chatPageSetLockOldLabel.
   ///

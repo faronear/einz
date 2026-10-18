@@ -391,10 +391,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。';
+  String get chatPageSetLockClearHint =>
+      '设置后，每次进入秘境都要解锁。修改需先输入当前锁屏码；新码留空则不改锁屏码，只调整自动锁屏时长（清除用上方标签页）。';
 
   @override
   String get chatPageSetLockHintNoPin => '设置后，每次进入秘境都要解锁，更安全。';
+
+  @override
+  String get chatPageSetLockDurationLabel => '无操作多久后自动锁屏';
+
+  @override
+  String get chatPageSetLockTabChange => '更换锁屏码';
+
+  @override
+  String get chatPageSetLockClearButton => '清除锁屏码';
+
+  @override
+  String lockDurationSecs(int n) {
+    return '$n 秒';
+  }
+
+  @override
+  String lockDurationMin(int n) {
+    return '$n 分钟';
+  }
+
+  @override
+  String lockDurationHour(int n) {
+    return '$n 小时';
+  }
 
   @override
   String get chatPageSetLockOldLabel => '当前锁屏码';
