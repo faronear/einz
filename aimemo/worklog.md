@@ -15228,3 +15228,14 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-18T01:16:12Z / 2026-10-18 09:16）**：主按钮圆角统一：FilledButton 全局主题 shape 从 BorderRadius 14 改 StadiumBorder（全圆角胶囊），与取消按钮（TextButton 默认）同弧度。analyze 通过。
 
 **（2026-10-18T02:22:17Z / 2026-10-18 10:22）**：修 CI testAll 两例失败：昨日「弹窗按钮体系统一」把清空锁屏码确认弹窗文案改为 l10n「清除锁屏码？」/「清除」，chat_page_menu_test 仍断言旧硬编码「删除锁屏码？」/「确认」→ 改用 _zh.chatPageClearLockTitle / chatPageLockClearConfirm。chat_page_menu_test 全部通过。
+
+**（2026-10-18，二）**：feat/voice-transcript 再次合入最新 main。4 处冲突：
+① package.json——main 把 iOS 模拟器脚本挪到 node_modules/wo_scripts 并统一了
+app-apk-run/app-ios-run（SERVERMODE 自动判 localConfig 是否存在），照单全收，
+仅把 voice 的 fetchVoiceModel.sh 加回 app-apk-build 链（HEAD 侧引用的
+scripts/emu* 实际不在库里，是残留，弃）；② .gitignore——同段落双方各自加注，
+取 main 侧（含防 239MB 误入库说明）；③ chat_page.dart 录音启动——保留 voice
+的 16kHz WAV 配置（转写必需），并入 main 新增的「hasPermission 弹窗期间松手
+→ _stopVoice 只清旗标、start 后看到旗标已清即停录丢弃」防泄漏逻辑（修的是
+_startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ worklog——
+两侧日志条目全保留，main 侧补日期前缀。验证：app flutter analyze 0 issue。
