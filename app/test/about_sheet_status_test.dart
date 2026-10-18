@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:einz/data/dns_poison_notice.dart';
 import 'package:einz/data/server_config.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/widgets/about_sheet.dart';
@@ -94,6 +95,54 @@ void main() {
     final l10n = lookupAppLocalizations(const Locale('zh'));
     expect(find.text(l10n.aboutDownloadLabel), findsOneWidget);
     expect(find.text('https://github.com/faronear/einz/releases/tag/latest'),
+        findsOneWidget);
+  });
+
+  // ---------- DNS 污染提示（老板 2026-10-13：放「连接状态」下方） ----------
+  // 全局单槽：用例间必须清理，否则互相污染。
+  setUp(() => dnsPoisonNotice.value = null);
+  tearDown(() => dnsPoisonNotice.value = null);
+
+  testWidgets('无污染事件 → 连接状态下方不出现 DNS 污染行', (tester) async {
+    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutDnsPoisonLabel), findsNothing);
+  });
+
+  testWidgets('发生过 DoH 兜底 → 连接状态下方展示 DNS 污染行（域名+假 IP）',
+      (tester) async {
+    dnsPoisonNotice.value = DnsPoisonNotice(
+        host: 'einz.tic.cc',
+        poisonedIp: '198.51.100.7',
+        at: DateTime(2026, 10, 13));    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutDnsPoisonLabel), findsOneWidget);
+    // 假 IP 展示；真 IP 不出现在界面上（老板 2026-10-13：要保护）
+    expect(l10n.aboutDnsPoisonValue('einz.tic.cc', '198.51.100.7'),
+        contains('198.51.100.7'));
+    expect(find.textContaining('198.51.100.7'), findsOneWidget);
+    // note 整串展示（含"自动修复/已上报/真地址不展示"口径）
+    expect(find.text(l10n.aboutDnsPoisonNote), findsOneWidget);
+    // 「放在已连接下面」：污染行整体比连接状态行更靠下
+    expect(
+      tester.getTopLeft(find.text(l10n.aboutDnsPoisonLabel)).dy,
+      greaterThan(tester.getTopLeft(find.text(l10n.aboutStatusLabel)).dy),
+      reason: 'DNS 污染行应紧贴连接状态行下方',
+    );
+  });
+
+  testWidgets('假 IP 没能捕获 → 降级"未知"，行仍在', (tester) async {
+    dnsPoisonNotice.value = DnsPoisonNotice(
+        host: 'einz.tic.cc',
+        poisonedIp: null,
+        at: DateTime(2026, 10, 13));
+    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutDnsPoisonLabel), findsOneWidget);
+    expect(find.text(l10n.aboutDnsPoisonValue('einz.tic.cc', '未知')),
         findsOneWidget);
   });
 }

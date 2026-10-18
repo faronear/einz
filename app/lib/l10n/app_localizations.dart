@@ -134,6 +134,18 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// No description provided for @settingsScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to all spaces on this device'**
+  String get settingsScopeAll;
+
+  /// No description provided for @settingsScopeAllDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to all spaces on this device'**
+  String get settingsScopeAllDone;
+
   /// No description provided for @skip.
   ///
   /// In en, this message translates to:
@@ -725,7 +737,7 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogSetPin.
   ///
   /// In en, this message translates to:
-  /// **'Submit'**
+  /// **'Apply'**
   String get setPinDialogSetPin;
 
   /// No description provided for @setPinDialogPinTooShort.
@@ -785,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockClearHint.
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to delete the current PIN.'**
+  /// **'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.'**
   String get chatPageSetLockClearHint;
 
   /// No description provided for @chatPageSetLockHintNoPin.
@@ -827,20 +839,26 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
-  /// **'PIN deleted. You can enter the space directly at next launch.'**
+  /// **'PIN cleared. You can enter the space directly at next launch.'**
   String get chatPageSetLockCleared;
 
   /// No description provided for @chatPageClearLockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete PIN?'**
+  /// **'Clear PIN?'**
   String get chatPageClearLockTitle;
 
   /// No description provided for @chatPageClearLockMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete the PIN? After deletion, next app launch will go straight into chat.'**
+  /// **'Clear the PIN? After clearing, next app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
+
+  /// No description provided for @chatPageLockClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get chatPageLockClearConfirm;
 
   /// No description provided for @chatPageInviteDialogTitleInvite.
   ///
@@ -938,11 +956,11 @@ abstract class AppLocalizations {
   /// **'Change shared passphrase'**
   String get chatPageMenuChangePassphrase;
 
-  /// No description provided for @chatPageMenuAvatar.
+  /// No description provided for @chatPageMenuMyProfile.
   ///
   /// In en, this message translates to:
-  /// **'My avatar'**
-  String get chatPageMenuAvatar;
+  /// **'My profile'**
+  String get chatPageMenuMyProfile;
 
   /// No description provided for @chatPageAvatarUploaded.
   ///
@@ -977,7 +995,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuMore.
   ///
   /// In en, this message translates to:
-  /// **'Menu'**
+  /// **'Main menu'**
   String get chatPageMenuMore;
 
   /// No description provided for @chatPageMsgMoreActions.
@@ -989,7 +1007,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameNameTitle.
   ///
   /// In en, this message translates to:
-  /// **'My identity'**
+  /// **'My name'**
   String get chatPageRenameNameTitle;
 
   /// No description provided for @chatPageRenameNameLabel.
@@ -1220,6 +1238,36 @@ abstract class AppLocalizations {
   /// **'Attachment storage'**
   String get chatPageMenuAttachmentStorage;
 
+  /// No description provided for @chatPageMenuMoreSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'More settings'**
+  String get chatPageMenuMoreSettings;
+
+  /// No description provided for @chatPageMoreSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'More settings'**
+  String get chatPageMoreSettingsTitle;
+
+  /// No description provided for @chatPageMoreSettingsStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment storage'**
+  String get chatPageMoreSettingsStorage;
+
+  /// No description provided for @chatPageMoreSettingsTombstone.
+  ///
+  /// In en, this message translates to:
+  /// **'Tombstone messages'**
+  String get chatPageMoreSettingsTombstone;
+
+  /// No description provided for @chatPageAttachmentStorageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Where are attachments — images, videos, audio, files — stored?'**
+  String get chatPageAttachmentStorageNote;
+
   /// No description provided for @chatPageAttachmentStorageSecured.
   ///
   /// In en, this message translates to:
@@ -1247,7 +1295,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageSubmit.
   ///
   /// In en, this message translates to:
-  /// **'Submit'**
+  /// **'Apply'**
   String get chatPageAttachmentStorageSubmit;
 
   /// No description provided for @chatPageAttachmentStorageWarnClear.
@@ -1291,12 +1339,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Burn-after-read'**
   String get chatPageMenuBurnLabel;
-
-  /// No description provided for @chatPageMenuMyNameLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'My identity'**
-  String get chatPageMenuMyNameLabel;
 
   /// No description provided for @chatPageMenuEntranceList.
   ///
@@ -1466,12 +1508,6 @@ abstract class AppLocalizations {
   /// **'If you have new messages and haven\'t been online for a while, a notification will be sent to your email address.'**
   String get chatPageNotifyHint;
 
-  /// No description provided for @chatPageNotifyAllSpaces.
-  ///
-  /// In en, this message translates to:
-  /// **'Apply this setting to all spaces on this device.'**
-  String get chatPageNotifyAllSpaces;
-
   /// No description provided for @chatPageNotifyEmailLabel.
   ///
   /// In en, this message translates to:
@@ -1553,13 +1589,55 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnNote.
   ///
   /// In en, this message translates to:
-  /// **'New messages are deleted on a countdown once read'**
+  /// **'Delete new messages automatically once read on a countdown'**
   String get chatPageBurnNote;
+
+  /// No description provided for @chatPageTombstoneHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Tombstone messages'**
+  String get chatPageTombstoneHeading;
+
+  /// No description provided for @chatPageTombstoneNote.
+  ///
+  /// In en, this message translates to:
+  /// **'How deleted/burned/recalled messages appear?'**
+  String get chatPageTombstoneNote;
+
+  /// No description provided for @chatPageTombstoneKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep message status'**
+  String get chatPageTombstoneKeep;
+
+  /// No description provided for @chatPageTombstoneKeepDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a placeholder: content hidden, time and record kept, message flow unbroken'**
+  String get chatPageTombstoneKeepDesc;
+
+  /// No description provided for @chatPageTombstoneHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide completely'**
+  String get chatPageTombstoneHide;
+
+  /// No description provided for @chatPageTombstoneHideDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Tombstones disappear from the message flow entirely'**
+  String get chatPageTombstoneHideDesc;
+
+  /// No description provided for @chatPageTombstoneSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get chatPageTombstoneSubmit;
 
   /// No description provided for @chatPageBurnOff.
   ///
   /// In en, this message translates to:
-  /// **'Burn-after-read is off (this message will be kept)'**
+  /// **'Burn-after-read is disabled on this message'**
   String get chatPageBurnOff;
 
   /// No description provided for @chatPageBurnFailed.
@@ -1616,11 +1694,17 @@ abstract class AppLocalizations {
   /// **'Recall failed, try again later'**
   String get chatPageRecallFailed;
 
-  /// No description provided for @chatPageDeletedMessage.
+  /// No description provided for @chatPageQuotedTombMessage.
   ///
   /// In en, this message translates to:
   /// **'(This message is no longer available)'**
-  String get chatPageDeletedMessage;
+  String get chatPageQuotedTombMessage;
+
+  /// No description provided for @chatPageQuoteGoneNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The quoted message is no longer available'**
+  String get chatPageQuoteGoneNotice;
 
   /// No description provided for @chatPageActionQuote.
   ///
@@ -1751,13 +1835,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceUnrecognized.
   ///
   /// In en, this message translates to:
-  /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
+  /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.'**
   String get chatPageEntranceUnrecognized;
 
   /// No description provided for @chatPageMsgsSyncing.
   ///
   /// In en, this message translates to:
-  /// **'Waiting to sync… send/receive temporarily unavailable, local messages only'**
+  /// **'Waiting to sync… Send/receive temporarily unavailable, local messages only'**
   String get chatPageMsgsSyncing;
 
   /// No description provided for @chatPageMsgResending.
@@ -1991,38 +2075,50 @@ abstract class AppLocalizations {
   /// No description provided for @burnOptionOff.
   ///
   /// In en, this message translates to:
-  /// **'Off (Do not burn anymore)'**
+  /// **'Do not auto-burn'**
   String get burnOptionOff;
 
-  /// No description provided for @burnOption1Minute.
+  /// No description provided for @burnSubmit.
   ///
   /// In en, this message translates to:
-  /// **'1 minute'**
-  String get burnOption1Minute;
+  /// **'Apply'**
+  String get burnSubmit;
 
-  /// No description provided for @burnOption5Minutes.
+  /// No description provided for @burnPreviewDelay.
   ///
   /// In en, this message translates to:
-  /// **'5 minutes'**
-  String get burnOption5Minutes;
+  /// **'{duration}'**
+  String burnPreviewDelay(String duration);
 
-  /// No description provided for @burnOption1Hour.
+  /// No description provided for @burnUnitDays.
   ///
   /// In en, this message translates to:
-  /// **'1 hour'**
-  String get burnOption1Hour;
+  /// **'{count}d'**
+  String burnUnitDays(int count);
 
-  /// No description provided for @burnOption1Day.
+  /// No description provided for @burnUnitHours.
   ///
   /// In en, this message translates to:
-  /// **'1 day'**
-  String get burnOption1Day;
+  /// **'{count}h'**
+  String burnUnitHours(int count);
 
-  /// No description provided for @burnOption7Days.
+  /// No description provided for @burnUnitMinutes.
   ///
   /// In en, this message translates to:
-  /// **'7 days'**
-  String get burnOption7Days;
+  /// **'{count}m'**
+  String burnUnitMinutes(int count);
+
+  /// No description provided for @burnUnitSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}s'**
+  String burnUnitSeconds(int count);
+
+  /// No description provided for @burnAxisOffLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get burnAxisOffLabel;
 
   /// No description provided for @lockPageTitle.
   ///
@@ -2131,6 +2227,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unreachable'**
   String get aboutStatusUnreachable;
+
+  /// No description provided for @aboutDnsPoisonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS poisoning'**
+  String get aboutDnsPoisonLabel;
+
+  /// No description provided for @aboutDnsPoisonValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{host} hijacked to {ip}'**
+  String aboutDnsPoisonValue(String host, String ip);
+
+  /// No description provided for @aboutDnsPoisonUnknownIp.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get aboutDnsPoisonUnknownIp;
+
+  /// No description provided for @aboutDnsPoisonNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown'**
+  String get aboutDnsPoisonNote;
 
   /// No description provided for @advancedMenuTitle.
   ///

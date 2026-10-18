@@ -20,13 +20,32 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # 本脚本目录 = cli/
 ROOT="$(cd "$DIR/.." && pwd)"                        # 仓库根
 IMG="${DART_IMAGE:-dart-sodium}"
 
+# 身份策略（老板 2026-10-13 修订）：/root/.einz 是真正的身份仓库——sudo 运行的
+# 目的就是用它，因此 sudo 视同 root（挂 /root 的 pub 缓存与 .einz），直接 root
+# 登录同样放行；普通用户运行才提示身份差异（用的是自家 ~/.einz）。
+if [ "$(id -u)" = "0" ]; then
+  REAL_HOME="/root"
+  REAL_UID=0
+  REAL_GID=0
+elif [ -n "${SUDO_USER:-}" ]; then
+  echo "❌ 不支持的调用方式：sudo 身份不完整（SUDO_USER=$SUDO_USER 但 uid 非 0）。"
+  echo "   请直接 sudo ./dart-docker.sh，或以 root 登录后运行。"
+  exit 1
+else
+  REAL_HOME="${DART_PUB_CACHE_HOME:-$HOME}"
+  REAL_UID="$(id -u)"
+  REAL_GID="$(id -g)"
+  # 普通用户运行：真仓库就是他自己的 ~/.einz、缓存就是他自己的 ~/.pub-cache，
+  # 与 root 身份互不相通，各自独立成套（不提示、不干预——老板 2026-10-13）。
+fi
+
 run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
   local tty="$1"
   shift
   docker run --rm "$tty" \
-    -u "$(id -u):$(id -g)" -e HOME=/tmp \
-    -v "$HOME/.pub-cache":/tmp/.pub-cache \
-    -v "$HOME/.einz":/tmp/.einz \
+    -u "$REAL_UID:$REAL_GID" -e HOME=/tmp \
+    -v "$REAL_HOME/.pub-cache":/tmp/.pub-cache \
+    -v "$REAL_HOME/.einz":/tmp/.einz \
     -v "$ROOT":/app -w /app/cli \
     "$IMG" "$@"
 }
@@ -67,7 +86,22 @@ case "${1:-setup}" in
     # 按入库 lockfile 强制解析：lockfile 与 pubspec 不符或缓存残留旧包时直接报错，
     # 避免静默解析出不兼容版本（曾致首次安装时报 SodiumSumoInit 旧 API 编译错）
     run_container -i dart pub get --enforce-lockfile
-    run_container -it dart run bin/einz_tui.dart "$@"
+    # 内核快照缓存（cn1 实测 2026-10-13）：dart run 每次 JIT 编译整个 TUI ~15s
+    # （cn1 CPU 慢，dart run 不落内核缓存）——改为 compile kernel 一次（~2s，源码
+    # 未变则跳过重编）后 dart 直跑 dill（~2s）。dill 放 cli/.dart_tool/，随仓库走。
+    dill=".dart_tool/einz_tui.dill"
+    stale=1
+    if [ -f "$ROOT/cli/$dill" ]; then
+      # 任一源文件（bin/lib + pubspec）比 dill 新即过期 → 重编
+      if [ -z "$(find "$ROOT/cli/bin" "$ROOT/cli/lib" "$ROOT/cli/pubspec.yaml" -newer "$ROOT/cli/$dill" -print -quit 2>/dev/null)" ]; then
+        stale=0
+      fi
+    fi
+    if [ "$stale" = 1 ]; then
+      echo "==> 编译内核快照（源码有改动或首次启动；之后启动免编译）…"
+      run_container -i dart compile kernel -o "$dill" bin/einz_tui.dart
+    fi
+    run_container -it dart "$dill" "$@"
     ;;
   dartc)
     shift

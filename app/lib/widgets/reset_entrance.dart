@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
 import '../data/space_session.dart';
+import '../widgets/cancel_button.dart';
 import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
@@ -45,12 +46,16 @@ Future<bool> _confirmDestructive(
       entranceName.trim().isEmpty ? l10n.resetEntranceConfirmWord : entranceName.trim();
   final ok = await showDialog<bool>(
     context: context,
+    // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
     barrierDismissible: false,
-    builder: (ctx) => _ConfirmDestructiveDialog(
-      db: db,
-      entranceName: expected,
-      hasPin: hasPin,
-      copy: copy,
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: _ConfirmDestructiveDialog(
+        db: db,
+        entranceName: expected,
+        hasPin: hasPin,
+        copy: copy,
+      ),
     ),
   );
   return ok ?? false;
@@ -297,10 +302,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.cancel),
-        ),
+        CancelButton(onPressed: () => Navigator.of(context).pop(false)),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.error,

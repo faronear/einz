@@ -25,8 +25,11 @@ final Map<String, String> pinnedServerIps = <String, String>{};
 
 /// DNS 污染事件钩子：DoH 解析与系统解析**分歧**（= 链路被注入）并成功拿到
 /// 真 IP 时触发。App/CLI 用它把"此刻这个网络在被污染"变成可见警报。
-/// 全局单槽（本工程单服务器，无需多订阅）；回调异常被吞，绝不影响主流程。
-void Function(String host, String pinnedIp)? onDnsPoisonDetected;
+/// [poisonedIp] = 系统解析此刻返回的**假 IP**（现场再解析一次捕获，纯展示；
+/// 查不到/超时 = null）。全局单槽（本工程单服务器，无需多订阅）；回调异常被吞，
+/// 绝不影响主流程。
+void Function(String host, String pinnedIp, String? poisonedIp)?
+    onDnsPoisonDetected;
 
 void setServerPin(String host, String ip) => pinnedServerIps[host] = ip;
 void clearServerPin(String host) => pinnedServerIps.remove(host);
@@ -39,6 +42,10 @@ void resetDohFallbackState() {
 
 /// DoH 解析函数类型（测试可注入 fake）。
 typedef DoHResolver = Future<String?> Function(String host);
+
+/// 系统解析函数类型（测试可注入 fake）：返回该 host 的**首个 IPv4**（与 DoH 的
+/// A 记录同口径），查不到/超时 = null。
+typedef SystemResolver = Future<String?> Function(String host);
 
 /// DoH 解析：doh.pub 优先、alidns 兜底、Cloudflare 收尾（海外用户在前两家
 /// 慢/不稳时有更好的选择；大陆 1.1.1.1 被墙，实际永远轮不到它，零代价）；
@@ -158,14 +165,24 @@ final Map<String, DateTime> _dohTriedAt = <String, DateTime>{};
 /// _probeServer 共用）。
 ///
 /// - 健康网络：第一次 [attempt] 即 [ok] → 直接返回，零 DoH 流量；
-/// - 被污染网络：DoH 拿到真 IP 后钉扎重试；**仍失败也保留钉扎**
-///   （真实 A 记录好过被污染的系统 DNS）；
+/// - 被污染网络：系统解析给出**公网假 IP**（与 DoH 分歧）→ 钉扎真 IP 重试；
 /// - DoH 也失败（如飞行模式）：返回原始失败结果，行为与无兜底一致。
+///
+/// **只有"系统解析与加密解析分歧"才算污染**（2026-10-13 修，老板实测误报：
+/// 在服务器上跑 TUI，两个入口域名都报"被劫持"——其实一个是系统解析本来就对
+/// （与 DoH 一致，只是当时服务没起来）、一个是 hosts 刻意指向 127.0.0.1）：
+/// - 系统解析与 DoH **一致** → 首次失败与 DNS 无关（服务不可达/TLS/端口…），
+///   不钉扎（钉同一个 IP 没意义）、不报警；
+/// - 系统解析指向**回环/内网** → 用户刻意的本地覆盖（hosts 自部署、内网 DNS
+///   分流），不是劫持；更不能把用户的本地覆盖悄悄改道到公网——原样返回失败；
+/// - 系统解析**无答案**而 DoH 有 → 也算分歧证据（NXDOMAIN 注入 / 解析器故障），
+///   钉扎并报警（假 IP 未知，展示层降级为"未知"）。
 Future<T> probeWithDohFallback<T>(
   String server,
   Future<T> Function() attempt, {
   required bool Function(T result) ok,
   DoHResolver? dohResolver,
+  SystemResolver? systemResolver,
 }) async {
   final first = await attempt();
   if (ok(first)) return first;
@@ -184,17 +201,69 @@ Future<T> probeWithDohFallback<T>(
   _dohTriedAt[host] = DateTime.now();
   final ip = await (dohResolver ?? dohResolveHost)(host);
   if (ip == null) return first;
+  // 系统解析此刻的答案（IPv4，与 DoH 的 A 记录同口径）——与 DoH 比较才有资格
+  // 谈"分歧"；单独一次连接失败说明不了任何事。
+  final sysIp = await (systemResolver ?? _systemResolveIpv4)(host);
+  if (sysIp == ip) {
+    // 加密解析与系统解析一致：首次失败与 DNS 无关。钉扎同一个 IP 没有意义，
+    // 更不该报劫持警。
+    return first;
+  }
+  if (sysIp != null && _isPrivateOrLoopbackIpv4(sysIp)) {
+    // 系统解析指向回环/内网 = 用户刻意的本地覆盖。不是劫持；尊重本地配置，
+    // 原样返回失败（连接问题交由正常路径如实呈现）。
+    return first;
+  }
+  // sysIp 为公网假 IP（分歧 = 注入）或 null（系统无答案而 DoH 有）——钉扎重试。
   setServerPin(host, ip);
-  _onPoisonDetected(server, host, ip);
+  _onPoisonDetected(server, host, ip, sysIp);
   return attempt();
 }
 
-/// 污染事件落地：① 可见警报钩子；② 向被污染入口的服务端 fire-and-forget 上报
-/// 一条（走刚建立的钉扎连接，此时它是唯一保证可达的路径）。失败静默——
-/// 上报是尽力而为的遥测，绝不能反过来影响连接主流程。
-void _onPoisonDetected(String server, String host, String ip) {
+/// 系统解析（明文 DNS）当场查一次，取第一个 IPv4 地址。
+/// - 污染场景下返回注入的**假 IP**；
+/// - 本机刻意图 hosts/内网 DNS 时返回那个本地地址；
+/// - 查不到/超时（NXDOMAIN、解析器故障）→ null。
+/// 只取 IPv4：DoH 侧只认 A 记录（type=1），不同口径比较会误判。
+Future<String?> _systemResolveIpv4(String host) async {
   try {
-    onDnsPoisonDetected?.call(host, ip);
+    final addrs =
+        await InternetAddress.lookup(host).timeout(const Duration(seconds: 2));
+    for (final a in addrs) {
+      if (a.type == InternetAddressType.IPv4) return a.address;
+    }
+    return null;
+  } on Object {
+    return null;
+  }
+}
+
+/// 是否回环/内网/链路本地 IPv4——这类地址只可能来自**本机刻意配置**
+/// （hosts、内网 DNS、自部署），不可能是链路抢答注入（注入者要拦截流量，
+/// 给的必是公网 IP）。判据按 rawAddress 逐字节比（不做字符串前缀猜测）：
+/// 127/8 回环、10/8、172.16/12、192.168/16 私网、169.254/16 链路本地。
+bool _isPrivateOrLoopbackIpv4(String ip) {
+  final addr = InternetAddress.tryParse(ip);
+  if (addr == null || addr.type != InternetAddressType.IPv4) return false;
+  final b = addr.rawAddress;
+  final first = b[0], second = b[1];
+  if (first == 127) return true;
+  if (first == 10) return true;
+  if (first == 172 && second >= 16 && second <= 31) return true;
+  if (first == 192 && second == 168) return true;
+  if (first == 169 && second == 254) return true;
+  return false;
+}
+
+/// 污染事件落地：① 可见警报钩子（带假 IP）；② 向被污染入口的服务端
+/// fire-and-forget 上报一条（走刚建立的钉扎连接，此时它是唯一保证可达的路径）。
+/// 失败静默——上报是尽力而为的遥测，绝不能反过来影响连接主流程。
+/// 上报载荷维持 {domain, doh_ip} 不变（服务端表结构就这两列；假 IP 是展示向的，
+/// 要入库需先做迁移，另开任务）。
+void _onPoisonDetected(
+    String server, String host, String ip, String? poisonedIp) {
+  try {
+    onDnsPoisonDetected?.call(host, ip, poisonedIp);
   } on Object {
     // 钩子是纯观测，异常不追责
   }

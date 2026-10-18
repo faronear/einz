@@ -27,6 +27,7 @@ import {
   listEntrances,
   retireEntrance,
   revokeEntrance,
+  setClientInfo,
   setInstallUid,
   updateEntranceName,
   updateMemberName
@@ -600,6 +601,15 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 一次，落审计只会把 entrance_activity 冲成噪音。
     const body = await readJsonBody(req)
     sendJson(res, 200, setInstallUid(bearerToken(req), body))
+    return
+  }
+  if (method === 'POST' && path === '/entrances/client') {
+    // 上报本通道客户端信息（每启动一次，幂等，见 entrances.setClientInfo）：App 报
+    // client+app_version（升级后下次启动自动跟上），TUI 只报 client 类型标记。
+    // /entrances 响应带出，「我的设备通道」卡片据此显示各设备跑的客户端/版本。
+    // 同 install-uid：刻意**不落审计**（每次冷启动都来，落审计只会冲成噪音）。
+    const body = await readJsonBody(req)
+    sendJson(res, 200, setClientInfo(bearerToken(req), body))
     return
   }
   if (method === 'POST' && path === '/entrances/name') {

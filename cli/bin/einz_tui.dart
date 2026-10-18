@@ -4,7 +4,8 @@
 //   - 分栏布局：消息区（滚动）+ 输入区（底部）+ 状态栏（顶部，含 WS 状态）
 //   - 手写 ANSI 渲染（零新依赖；pub 缓存无 TUI 库且国内网络下载不稳）
 //   - 后台 WS 实时监听（复用 shared WsClient，断线自动重连）
-//   - 逐键输入（raw 模式），Ctrl+C 或 /exit 退出
+//   - 逐键输入（raw 模式），聊天态 Ctrl+C 或 /exit 退出；**提问/向导问答时不认
+//     /exit 等命令**（老板 2026-10-13）——唯一的退出/取消手段是直接回车（见 _prompt）
 //
 // 用法：
 //   dart run bin/einz_tui.dart --store demo/store-a.json --server http://127.0.0.1:3901
@@ -132,12 +133,6 @@ class _TuiState {
   /// 退出标志。
   bool running = true;
 
-  /// 等待通道码输入（/auth 未登记引导）：输入循环的下一次输入按通道码处理。
-  bool pendingJoinToken = false;
-
-  /// 等待共享口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
-  bool pendingSpaceKey = false;
-
   /// member_id → memberName（GET /space 拉取，消息前缀显示 memberName 用）。
   Map<String, String> memberNames = {};
 
@@ -156,16 +151,73 @@ class _TuiState {
 
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
-  bool pendingGuideRequired = false; // 当前引导问答是否必填（留空回车不提交）
+
+  /// 当前问答是"没有上一问可回退的门"（启动锁屏码、向导首问 c/j）：
+  /// **空回车 = 退出整个 TUI**。其余问答的空回车由调用方自行解释——回退上一步
+  /// / 跳过 / 取消动作（老板 2026-10-13 统一规则：要求输入时不认 /exit 等命令，
+  /// 唯一的"退出"就是直接回车）。
+  bool pendingExitOnEmpty = false;
+
   bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
+
+  /// Tab 补全的反馈消息（方案 C）：候选列表或错误提示（目录读不了/无匹配）。
+  /// 重复 Tab 时替换上一条，否则连按十次就把消息流刷成十条差不多的列表、
+  /// 报错也刷屏；二者共用同一槽——候选顶掉错误、错误顶掉候选，都是"上一条
+  /// 补全反馈已过时"。
+  ChatMessage? completionMsg;
+
+  /// 内置文件浏览器（方案 B，老板 2026-10-17）处于活动态时非 null——**模态**：
+  /// 输入循环的按键全部分发给浏览器，消息区改画目录列表，输入行实时预览光标
+  /// 所在条目。系统文件选择窗口不可用（纯 SSH / 缺 zenity）时由 `/attach`、
+  /// `/avatar` 不带参数自动落入；也可用 EINZ_TUI_PICKER=browser 强制使用。
+  _FileBrowser? browser;
+}
+
+/// 内置文件浏览器的一个条目（目录或文件；`..` 是虚拟的上级条目）。
+class _FileEntry {
+  _FileEntry(this.name, {required this.isDir, this.size});
+
+  final String name;
+  final bool isDir;
+  final int? size; // 文件字节数（目录为 null）
+}
+
+/// 内置文件浏览器状态（方案 B）：纯键盘的目录浏览 + 选文件。
+///
+/// 为什么除了系统选择窗口还要它：系统窗口依赖 GUI 会话（macOS AppleScript /
+/// Linux zenity 都要有显示服务器），SSH 进 TUI 的用户完全没有；而且 TUI 用户
+/// 本就生活在键盘里，能不离屏选文件是一致的体验（老板 2026-10-17 拍板 A+B）。
+class _FileBrowser {
+  _FileBrowser(
+      {required this.commandPrefix, required this.imagesOnly, required String startDir})
+      : dir = startDir;
+
+  /// 选中后拼进输入行的命令（'/attach' / '/avatar'）——用户回车即执行。
+  final String commandPrefix;
+
+  /// 只允许选图片（/avatar）：目录照样进，选文件时按 [kImageFileExtension] 拦。
+  final bool imagesOnly;
+
+  /// 当前目录（绝对路径）。
+  String dir;
+
+  /// 当前目录条目：`..`（有父目录时）→ 目录 → 文件，目录/文件各自按名称排序。
+  List<_FileEntry> entries = [];
+
+  /// 光标下标（0..entries.length-1）；空目录为 0。
+  int cursor = 0;
+
+  /// 列表滚动窗口顶部下标（渲染时按光标校正，保证光标可见）。
+  int scrollTop = 0;
+
+  /// 是否显示点文件（默认不显示；h 切换——配置/密钥常藏在点目录里）。
+  bool showHidden = false;
+
+  /// 目录读取失败原因（无权限等）：显示在列表头部，不影响继续浏览。
+  String? error;
 }
 
 _TuiState? _state;
-
-/// 首条通道 create 时询问的性别（我的/同伴）：仅接受 男/女（否则重新询问），
-/// 登记时随名字一并提交服务端（person_gender/peer_gender）。
-String? myGender;
-String? peerGender;
 
 /// 性别提交规范化：中文 男/女 → 服务端规范值 male/female（与 App 一致；
 /// 服务端 meta person_gender:* 以 male/female 为规范，旧 TUI 直传中文导致
@@ -182,6 +234,11 @@ bool _onboarded = false;
 /// 入网收尾（向导态→聊天态的切换）是否已执行（只跑一次）。
 bool _onboardingFinalized = false;
 
+/// 身份未揭示（老板 2026-10-13）：设了锁屏码的空间启动后、PIN 验证通过前，
+/// 标题栏两侧一律渲染中性占位「?」——本地缓存的成员名称表（store.memberNames /
+/// peerName / memberName 兜底）此时不得上屏，否则锁屏期间真实名字直接暴露在标题栏。
+bool _identityHidden = false;
+
 /// 入网向导收尾：向导完成后作为最后一条 system 消息出现，随后自动
 /// 倒计时（屏幕上跳动显示剩余秒数）进入聊天态——倒计时结束清空全部 system
 /// 消息、只留真实对话（老板 2026-09-15 定稿：不再要求按回车，自动倒计时更直观）。
@@ -194,6 +251,21 @@ StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（�
 
 /// 出厂主域名（候选列表的第一个，也是全不通时的兜底）。
 const String _kPrimaryServer = 'https://einz.tic.cc';
+
+/// 启动探测期（进 TUI 前）缓冲的 DNS 污染警报文本。
+///
+/// 污染判定在启动探测阶段（`_defaultServer`/`_probeRevoked`，见 shared 的
+/// `probeWithDohFallback`：**只有系统解析与 DoH 分歧才算**——一致/回环/内网
+/// 都是本机正确配置，不报警），那时全屏 TUI 还没起来，stderr 打一行会被随后
+/// 的清屏渲染冲掉——老板 2026-10-13 反馈「一闪而过等于没提示」。改为：启动期
+/// 先缓冲，进聊天态后作为系统消息补显（main 里 loadHistory 之后统一 flush）；
+/// 会话期（WS 重连再触发）直接进消息流。
+final List<String> _dnsPoisonNotes = [];
+
+/// TUI 聊天态是否就绪（loadHistory 之后）：就绪后污染警报直接进消息流；
+/// 之前（含探测期）一律先进 _dnsPoisonNotes 缓冲——那时连 session 都还没有，
+/// 且 loadHistory 开头会 clear messages，提前加进去也会被抹掉。
+bool _tuiReady = false;
 
 /// 出厂域名候选（按优先级，第一个是主域名）——与 App 端 `kServerCandidates`
 /// 同构：同一服务的**多个入口**，不是多台服务器；主域名失效时客户端自己连上备用入口
@@ -495,9 +567,11 @@ Future<bool> _verifyPin(String hash, String pin) async {
 }
 
 /// 入网最后一步：询问设置 锁屏码（直接回车跳过 = 不设置；以后可以 /pin 设置）。
+/// **明文输入**（设置机密 = 明文回显——老板 2026-10-13 策略：只有"验证"机密才
+/// 隐藏回显且不认 /exit，见 _unlockPin）。空间已建立后的普通设置：空回车 =
+/// 取消设置（老板 2026-10-13 确认口径）。
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
-  // 明文输入（与解锁一致——引导中也可输入 /exit）
   while (true) {
     if (!_state!.running) return;
     final pin = await _prompt(session,
@@ -523,10 +597,71 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
   _scheduleRender();
 }
 
-/// 启动进对话前：store 已设 PIN 则校验解锁（错误重试，/exit 可退出）；未设直接进。
+/// 启动进对话前：store 已设 PIN 则校验解锁（错误重试）；未设直接进。
+///
+/// **这一步只认两种输入**（老板 2026-10-13 定，与 App 锁屏页同口径）：
+/// - 输入内容 → 当锁屏码校验。`/exit` 等命令在此**不识别**（只是错码）；
+/// - 直接回车（空）→ 退出整个 TUI（[_TuiState.pendingExitOnEmpty]：输入循环
+///   落地完整退出序列；启动期没有"取消后回到哪里"，退个干净）。
+///
+/// PIN **不明文回显**（hidden：输入行回显 *）——TUI 整体策略（老板 2026-10-13）：
+/// **设置**机密时明文回显、随时可 /exit（[_askSetPin]、/pin、入网口令问答）；
+/// **验证**机密时隐藏回显、不认 /exit、直接回车=取消/退出（相当于 App 弹窗
+/// 里按取消按钮）。
+///
+/// 为什么走消息流问答（[_prompt]）而不是循环外同步读行：旧实现用同步
+/// readByteSync，"中止"（/exit / EOF）只把 running 置 false 就返回，main 不
+/// 检查便继续 loadHistory → _render → _runInputLoop——**没验证的历史被全屏
+/// 渲染出来**，随后输入循环因 running=false 吞掉所有按键（含 Ctrl+C）挂死，
+/// 只能强杀进程（老板 2026-10-13 实测的 bug）。现在中止统一走输入循环的退出
+/// 序列，main 见 running=false 直接收尾：历史一行都不加载、一帧都不渲染。
+/// 验证成功的确认消息由 **main 在 loadHistory 之后**补（这里不加）：微任务里的
+/// 渲染不落地，且 loadHistory 开头会 clear messages——加在这里只会被抹掉
+/// （2026-10-13 实测）。
+/// 返回 true = 验证通过（false = 解锁期退出，running 已为 false）。
+Future<bool> _unlockPin(ChatSession session) async {
+  final hash = session.store.pinHash;
+  if (hash == null) return true; // 未设置：直接进入
+  // 身份未揭示：解锁前标题栏两侧、状态栏一律只显示产品名——名字/通道/WS
+  // 状态/命令提示一概不上屏（老板 2026-10-13：验证通过前屏幕上一个身份
+  // 字节都不该出现）。提示语只在消息流里（下面的 _prompt），不占状态栏。
+  _identityHidden = true;
+  while (_state!.running) {
+    _state!.pendingExitOnEmpty = true;
+    final pin = await _prompt(session, '❓ 输入锁屏码（直接回车退出）:',
+        hidden: true, exitOnEmpty: true);
+    if (!_state!.running) return false; // 解锁期 Ctrl+C / EOF：退出序列已由输入循环跑完
+    final answer = pin.trim();
+    if (answer.isEmpty) return false; // 空回车 = 退出整个 TUI（输入循环已落地退出序列）
+    // argon2id 校验约几十毫秒：期间置 processing 忽略误按键（防被当命令执行）
+    _state!.processing = true;
+    bool ok;
+    try {
+      ok = await _verifyPin(hash, answer); // str 哈希自含盐，true = 验证通过
+    } catch (e) {
+      _state!.processing = false;
+      session.messages.add(
+          _systemMessage(session, '⚠️ 锁屏码校验失败: $e（直接回车退出）'));
+      _scheduleRender();
+      continue;
+    }
+    _state!.processing = false;
+    if (ok) {
+      _identityHidden = false; // 解锁成功：标题栏/状态栏恢复真实身份显示
+      return true; // 成功消息由 main 在 loadHistory 之后补（见函数文档）
+    }
+    session.messages.add(
+        _systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入（直接回车退出）'));
+    _scheduleRender();
+  }
+  return false;
+}
+
 /// 同步读一行（兼容 \r / \n / \r\n）：部分终端回车只发 \r，readLineSync 在
 /// macOS/Linux 上单独 \r 不算行结束会挂起等 \n（表现"需按两次回车"）；
 /// 逐字节读到任一换行符即返回。EOF 返回 null。
+/// 仅用于**进 TUI 前**的 cooked 模式问答（[_onboard] 的服务器地址）——TUI 里
+/// raw 模式的 stdin 归输入循环所有，任何地方都不能再同步读行抢字节。
 String? _readLineCompat() {
   final buf = StringBuffer();
   while (true) {
@@ -534,43 +669,6 @@ String? _readLineCompat() {
     if (b < 0) return buf.isEmpty ? null : buf.toString(); // EOF
     if (b == 10 || b == 13) return buf.toString(); // \n 或 \r 均算行结束
     buf.writeCharCode(b);
-  }
-}
-
-Future<void> _unlockPin(ChatSession session) async {
-  final hash = session.store.pinHash;
-  if (hash == null) return; // 未设置：直接进入
-  // 解锁在 main 中提前于输入循环（_runInputLoop）——不能走 _prompt
-  // （completer 由输入循环 complete，此时尚未启动会永久挂起——老板实测
-  // "提示后直接退出"）：改为同步读行（明文 echo；可输入 /exit 退出）
-  while (_state!.running) {
-    session.messages.add(_systemMessage(session, '❓ 输入锁屏码:'));
-    _render(); // 同步渲染提示（_scheduleRender 异步——readLineSync 阻塞期间不会执行）
-    final line = _readLineCompat();
-    if (line == null) {
-      _state!.running = false; // EOF（终端关闭/重定向）：退出
-      return;
-    }
-    // readByteSync 之后紧随的 stdout.write 会同步抛 "StreamSink is bound to a
-    // stream"（Dart 已知行为：阻塞读会绑定 stdin/stdout 共享的 StreamSink），
-    // 被 _render 的 try-catch 吞掉 → 错误反馈渲染丢失，界面"冻结"到下一次
-    // 输入才出现（老板实测）。让步一个事件循环轮次（Timer）恢复可写再渲染。
-    await Future<void>.delayed(Duration.zero);
-    final pin = line.trim();
-    if (pin.isEmpty) continue; // 空行（如 CRLF 残留 \n）：跳过，不判错
-    if (pin == '/exit' || pin == '/quit') {
-      _state!.running = false;
-      return;
-    }
-    if (!_state!.running) return;
-    // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
-    if (await _verifyPin(hash, pin)) {
-      session.messages.add(_systemMessage(session, '✅ 锁屏码验证成功'));
-      _render();
-      return;
-    }
-    session.messages.add(_systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入（/exit 可退出）'));
-    _render();
   }
 }
 
@@ -589,10 +687,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     while (true) {
       if (!_state!.running) return;
       // 一条系统消息内多行（\n 分隔）：整体被消息间空行隔开、又不会
-      // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）
+      // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）。
+      // c/j 是向导问答链的**首问**：空回车 = 退出整个 TUI（没有上一问可回退；
+      // 老板 2026-10-13）。无效输入原地重问。
       final choice = (await _prompt(
-              session, '❓ 秘境向导\n   c: 创建秘境\n   j: 加入秘境',
-              required: true)) // 必填：留空回车不接受
+              session,
+              '❓ 秘境向导\n   c: 创建秘境\n   j: 加入秘境\n（直接回车退出）',
+              exitOnEmpty: true))
           .trim()
           .toLowerCase();
       if (!_state!.running) return;
@@ -601,25 +702,28 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         session.messages.add(_systemMessage(session, '----------------'));
         await _spaceCreate(session, store, storePath);
         if (_onboarded) break; // 创建成功进入会话
-        continue; // 创建失败：循环可重试
+        continue; // 创建失败/回退：重问秘境入口
       }
       if (choice == 'j' || choice == 'join' || choice == '2') {
         session.messages.add(_systemMessage(session, '✅ 加入秘境'));
         session.messages.add(_systemMessage(session, '----------------'));
-        // 加入流程：token 错误被拒后直接重输 token（不回到 create/join 首问——
-        // 老板 2026-09-10）
+        // 加入流程的问答链：通道码 →（invite 时名字/性别，在 _spaceJoin 内）→
+        // 验证口令。token 错误被拒后原地重输（不回到 c/j 首问——老板 2026-09-10）；
+        // **空回车 = 回退到 c/j 首问**（老板 2026-10-13 回退模型）。
         while (true) {
-          // 必填（老板 2026-09-15）：留空回车不接受，继续等待输入
-          final token =
-              (await _prompt(session, '❓ 输入通道码或邀请链接:', required: true)).trim();
+          if (!_state!.running) return;
+          final token = (await _prompt(session,
+                  '❓ 输入通道码或邀请链接（直接回车返回上一步）:'))
+              .trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 请输入通道码或邀请链接（可由任意一条已开通的通道生成）'));
+            session.messages.add(_systemMessage(session, '↩️ 已返回秘境入口'));
             _scheduleRender();
-            continue;
+            break; // 回退到 c/j 首问
           }
           await _spaceJoin(session, store, storePath, token);
           if (_onboarded) break; // 加入成功进入会话
+          // _spaceJoin 内回退（口令步空回车等）也会走到这：重问通道码
         }
         if (_onboarded) break; // 跳出外层引导循环进入会话
       }
@@ -644,29 +748,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   }
 
   // 已绑定但未进入空间（无 Space Key，如重启的第二条通道）：自动进入口令
-  // 接入流程（输错反复重输直到成功——成功获得 Space Key 才能收发密文）
+  // 接入流程（输错反复重输直到成功——成功获得 Space Key 才能收发密文）。
+  // 单问链：**空回车 = 退出整个 TUI**（首问即末问，没有上一问可回退；
+  // 老板 2026-10-13）；口令不认 /exit 等命令（只是错码）。
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 输入共享口令，才能查看秘境内容：', required: true);
-      if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
+      final passphrase = await _prompt(
+          session, '❓ 输入共享口令，才能查看秘境内容（直接回车退出）:',
+          exitOnEmpty: true);
+      if (!_state!.running) break; // 退出中（Ctrl+C/EOF——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
         // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
-        session.messages.add(_systemMessage(session, '⚠️ 请输入共享口令（/exit 可退出）'));
-        _scheduleRender();
-        continue;
-      }
-      if (passphrase.startsWith('/')) {
-        // / 开头的输入（输入循环 / 检查被绕过时的兜底）：/exit、/quit 按退出
-        // 处理（逃生门——不能提示"非法口令"重输而困住用户）；其他 / 不当口令发送核对
-        if (passphrase == '/exit' || passphrase == '/quit') {
-          _state!.running = false;
-          break; // running=false 后由 main 收尾 + 2 秒兜底退出（exit(0) 死代码已移除）
-        }
-        session.messages.add(_systemMessage(session, '⚠️ 共享口令不能以 / 开头，请重新输入（/exit 可退出）'));
-        _scheduleRender();
-        continue;
+        break;
       }
       try {
         await _busy(session, '⏳ 共享口令核对中......', () => session.accessByEscrow(passphrase));
@@ -678,7 +773,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _scheduleRender();
         break;
       } catch (e3) {
-        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: 请重新输入口令'));
+        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: 请重新输入口令（直接回车退出）'));
         _scheduleRender();
       }
     }
@@ -688,7 +783,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记但口令密保箱未上传（创建者引导中断）：重启再进引导设置口令。
   // （判据用 slot == 0 = 创建者/第一人；v1 时代的 memberId == 'memberA'
   //   在 v2 下恒不成立，会让这条恢复路径永不触发）
-  // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
+  // （running 检查：口令阶段退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.slot == 0 && !store.escrowUploaded) {
     // 先问服务端：本地没标记 ≠ 服务端没有箱。创建空间时密保箱是随 `POST /spaces`
     // 一并上传的（此前没记 escrowUploaded），老 store 重启后会走到这里 —— 直接再问
@@ -704,7 +799,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // /exit 退出后（口令/其他引导步骤触发 running=false）：立即结束引导，
+  // 退出后（口令/其他引导步骤触发 running=false）：立即结束引导，
   // 不再认证/同步/起 WS（由 main 收尾退出）
   if (!_state!.running) return;
 
@@ -768,6 +863,18 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
       await ApiClient(server).updateEntranceName(store.entranceName!, store.sessionToken!);
     } catch (e) {
       _state!.status = '通道名称同步失败（稍后重试）: $e';
+    }
+  }
+
+  // 客户端信息上报（POST /entrances/client，幂等）：TUI 只报**类型标记**——
+  // AOT 二进制拿不到自身版本（buildTui.sh 的时间戳只写进产物文件名，没注入
+  // 编译期常量），报不了 yymm.ddhh.mm。「我的设备通道」/本命令的通道列表据此
+  // 把本机显示为 TUI 而不是 App。best-effort：老服务端没这个端点也不影响启动。
+  if (store.sessionToken != null && server.isNotEmpty) {
+    try {
+      await ApiClient(server).reportClientInfo('tui', store.sessionToken!);
+    } catch (_) {
+      // 忽略：纯展示字段
     }
   }
 
@@ -839,7 +946,7 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
   if (_onboarded) {
     // 入网收尾：致欢迎辞 → 等用户回车 → 清空 system 消息切到聊天态
     await _finalizeOnboarding(session);
-    if (!_state!.running) return; // 回车期间 /exit：不再继续
+    if (!_state!.running) return; // 回车期间退出：不再继续
     // 已显性进入聊天态：此时才补同步 + 启 WS（入网期间对方发的消息在此一次补齐，
     // 不再插进向导消息之间）
     await startupSync();
@@ -853,7 +960,7 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
 /// 「向导态 → 聊天态」的切换点：清空全部 system 消息（向导日志 + 欢迎辞），
 /// 只留真实对话并滚到最新。此前的"等用户按回车"实测不好理解（用户不知道
 /// 要按回车、也不知道按了会发生什么），自动倒计时无需学习成本。倒计时期间
-/// 忽略普通按键（Ctrl+C / /exit 仍可退出），回车等输入不会变成消息。
+/// 忽略全部按键（Ctrl+C 仍可退出），回车等输入不会变成消息。
 Future<void> _finalizeOnboarding(ChatSession session) async {
   if (_onboardingFinalized) return;
   _onboardingFinalized = true;
@@ -872,7 +979,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   _scheduleRender();
   for (var remain = _kWelcomeCountdownSeconds - 1; remain >= 1; remain--) {
     await Future<void>.delayed(const Duration(seconds: 1));
-    if (!_state!.running) return; // 倒计时期间 /exit / Ctrl+C：立即结束
+    if (!_state!.running) return; // 倒计时期间 Ctrl+C：立即结束
     // 读秒消息：不替换原消息，在文本尾部追加数字（同一条内 "5 4 3 …" 逐秒延长）
     countdownMsg = _systemMessage(
         session, _welcomeCountdownText(countdownMsg, remain));
@@ -880,7 +987,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
     _scheduleRender();
   }
   await Future<void>.delayed(const Duration(seconds: 1));
-  if (!_state!.running) return; // 倒计时期间 /exit：不再继续
+  if (!_state!.running) return; // 倒计时期间退出：不再继续
   _state!.processing = false;
   // 切换到聊天态：清空全部 system 消息，只留真实对话（对方预发 / 自己发出的）
   session.messages.removeWhere((m) => m.isSystem);
@@ -909,6 +1016,10 @@ String _newCliSpaceId() {
 /// Multiverse：/space create 新建空间（POST /spaces——创建者登记 + session +
 /// 首个 join token 一并返回；Space Key 由客户端生成，口令加密 sealed 包随
 /// 创建提交，服务端只存密文）。
+///
+/// 问答链（老板 2026-10-13 回退模型）：名字 → 性别 → 秘境类型 → 共享口令。
+/// 无效输入原地重问；**空回车 = 退回上一问**（名字步空回车 = 回到秘境入口 c/j，
+/// 由 _runGuide 重问）；store 已有 memberName 的老通道从性别步起。
 Future<void> _spaceCreate(ChatSession session, EntranceStore store, String storePath) async {
   final server = session.server;
   if (server.isEmpty) {
@@ -920,104 +1031,122 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
         _systemMessage(session, '✅ 当前通道已绑定秘境（不重复创建）——/space address 查看'));
     return;
   }
+  // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）；
+  // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，最长 32。
   var displayName = store.memberName ?? '';
-  if (displayName.isEmpty) {
-    // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）
-    while (true) {
-      displayName =
-          (await _prompt(session, '❓ 我的名字（后期可改）:', required: true)).trim();
-      if (!_state!.running) return;
-      // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，最长 32
-      final violation = checkMemberNamePolicy(displayName);
-      if (violation == MemberNameViolation.empty) {
-        session.messages.add(_systemMessage(session, '❌ 名字必填，请输入'));
-        _scheduleRender();
-        continue;
-      }
-      if (violation != null) {
-        session.messages.add(_systemMessage(session, _memberNameRuleHint(violation)));
-        _scheduleRender();
-        continue;
-      }
-      session.messages.add(_systemMessage(session, '✅ ${displayName}'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      break;
+  final firstStep = displayName.isEmpty ? 0 : 1; // 老通道已有名字：跳过名字步
+  var step = firstStep; // 0=名字 1=性别 2=秘境类型 3=共享口令
+  String? myGender;
+  var spaceMode = 'duo';
+  var passphrase = '';
+  while (_state!.running && step < 4) {
+    switch (step) {
+      case 0:
+        final input = (await _prompt(session,
+                '❓ 我的名字（后期可改）（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (input.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回秘境入口'));
+          _scheduleRender();
+          return; // 回到 c/j 首问（_runGuide 的入口循环重问）
+        }
+        final violation = checkMemberNamePolicy(input);
+        if (violation != null) {
+          session.messages.add(_systemMessage(session,
+              violation == MemberNameViolation.empty ? '❌ 名字必填，请输入' : _memberNameRuleHint(violation)));
+          _scheduleRender();
+        } else {
+          displayName = input;
+          session.messages.add(_systemMessage(session, '✅ $displayName'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 1;
+        }
+      break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+      case 1:
+        // 我的性别（本地记录；Multiverse create 暂不提交——服务端不收 gender）。
+        // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
+        final g = (await _prompt(session,
+                '❓ 我的性别是\n  1: 男\n  2: 女\n（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (g.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+          _scheduleRender();
+          step = 0;
+        } else if (g == '1') {
+          myGender = '男';
+          session.messages.add(_systemMessage(session, '✅ 男'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 2;
+        } else if (g == '2') {
+          myGender = '女';
+          session.messages.add(_systemMessage(session, '✅ 女'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 2;
+        } else {
+          session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
+          _scheduleRender();
+        }
+      break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+      case 2:
+        // 秘境类型（2026-10-08 对齐 App 向导第 2 步）：duo/group **创建时定死、之后
+        // 不可改**（老板拍板：不支持升格）。此前 TUI 从不询问——ApiClient 缺省 'duo'
+        // 把 TUI 的创建入口悄悄锁死双人（能加入 group 却不能创建）。
+        // 只接受数字 1/2（与性别问答同风格：不接受文字输入）
+        final k = (await _prompt(session,
+                '❓ 秘境类型（创建后不可更改）\n  1: 双人秘境：仅限两人，永远没有其他人。\n  2: 群组秘境：多人群组，每个成员都可以添加新人。\n（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (k.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+          _scheduleRender();
+          step = 1;
+        } else if (k == '1') {
+          spaceMode = 'duo';
+          session.messages.add(_systemMessage(session, '✅ 双人秘境（2 人）'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 3;
+        } else if (k == '2') {
+          spaceMode = 'group';
+          session.messages.add(_systemMessage(session, '✅ 群组秘境（多人）'));
+          session.messages.add(_systemMessage(session, '----------------'));
+          step = 3;
+        } else {
+          session.messages.add(_systemMessage(session, '⚠️ 请输入 1（双人）或 2（群组）'));
+          _scheduleRender();
+        }
+      break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+      case 3:
+        // 群聊一期（2026-10-03，v3）：create **不再预置同伴**——只录创建者自己。
+        // 同伴（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
+        // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
+        // ② 群空间里"对方"不止一人，预置两人身份的协议本身不成立。
+        // 原"同伴的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
+        // 留着就是白问 + 顶部条显示一个服务端根本不存在的名字）。
+        // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让同伴无法
+        // 凭口令加入、本机也没有口令密保箱可用）
+        final p = (await _prompt(session,
+                '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）（直接回车返回上一步）:'))
+            .trim();
+        if (!_state!.running) return;
+        if (p.isEmpty) {
+          session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+          _scheduleRender();
+          step = 2;
+        } else {
+          final policyError = _passphrasePolicyError(p);
+          if (policyError != null) {
+            session.messages.add(_systemMessage(session, policyError));
+            _scheduleRender();
+          } else {
+            passphrase = p;
+            step = 4; // 问答链完成
+          }
+        }
     }
   }
-  // 我的性别（本地记录；Multiverse create 暂不提交——服务端不收 gender）。
-  // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
-  while (myGender == null) {
-    final g = (await _prompt(session, '❓ 我的性别是\n  1: 男\n  2: 女',
-            required: true))
-        .trim();
-    if (!_state!.running) return;
-    if (g == '1') {
-      myGender = '男';
-      session.messages.add(_systemMessage(session, '✅ 男'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    } else if (g == '2') {
-      myGender = '女';
-      session.messages.add(_systemMessage(session, '✅ 女'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    } else {
-      session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
-      _scheduleRender();
-    }
-  }
-  // 秘境类型（2026-10-08 对齐 App 向导第 2 步）：duo/group **创建时定死、之后
-  // 不可改**（老板拍板：不支持升格）。此前 TUI 从不询问——ApiClient 缺省 'duo'
-  // 把 TUI 的创建入口悄悄锁死双人（能加入 group 却不能创建）。
-  // 只接受数字 1/2（与性别问答同风格：不接受文字输入）
-  String spaceMode;
-  while (true) {
-    final k = (await _prompt(session, '❓ 秘境类型（创建后不可更改）\n  1: 双人秘境：仅限两人，永远没有其他人。\n  2: 群组秘境：多人群组，每个成员都可以添加新人。）',
-            required: true))
-        .trim();
-    if (!_state!.running) return;
-    if (k == '1') {
-      spaceMode = 'duo';
-      session.messages.add(_systemMessage(session, '✅ 双人秘境（2 人）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-      break;
-    }
-    if (k == '2') {
-      spaceMode = 'group';
-      session.messages.add(_systemMessage(session, '✅ 群组秘境（多人）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-      break;
-    }
-    session.messages
-        .add(_systemMessage(session, '⚠️ 请输入 1（双人）或 2（群组）'));
-    _scheduleRender();
-  }
-  // 群聊一期（2026-10-03，v3）：create **不再预置同伴**——只录创建者自己。
-  // 同伴（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
-  // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
-  // ② 群空间里"对方"不止一人，预置两人身份的协议本身就不成立。
-  // 原"同伴的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
-  // 留着就是白问 + 顶部条显示一个服务端根本不存在的名字）。
-  // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让同伴无法
-  // 凭口令加入、本机也没有口令密保箱可用）
-  String passphrase;
-  while (true) {
-    if (!_state!.running) return; // 口令阶段 /exit：不继续创建
-    passphrase = (await _prompt(session,
-            '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）:',
-            required: true))
-        .trim();
-    if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
-    final policyError = _passphrasePolicyError(passphrase);
-    if (policyError != null) {
-      session.messages.add(_systemMessage(session, policyError));
-      _scheduleRender();
-      continue;
-    }
-    break;
-  }
+  if (!_state!.running) return; // 问答链中退出（Ctrl+C/EOF）：不继续创建
   try {
     final s = await sodium();
     final spaceKeyB64 = base64Encode(s.randombytes.buf(32));
@@ -1133,82 +1262,113 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     session.messages.add(_systemMessage(session, '----------------'));
     String? myName;
     String? myGender;
-    if (isInvite) {
-      // 新成员自填名字（与 create 里"我的名字"同一条白名单）
-      while (true) {
-        myName = (await _prompt(session, '❓ 你的名字（后期可改）:', required: true)).trim();
-        if (!_state!.running) return;
-        if (myName.isEmpty) continue; // 防御：required 已拦空回车
-        final nameViolation = checkMemberNamePolicy(myName);
-        if (nameViolation != null) {
-          session.messages.add(_systemMessage(session, _memberNameRuleHint(nameViolation)));
-          _scheduleRender();
-          continue;
-        }
-        break;
-      }
-      // 性别（只接受 1/2，与 create 同口径——气泡配色用）
-      while (true) {
-        final g = (await _prompt(session, '❓ 你的性别是\n  1: 男\n  2: 女', required: true)).trim();
-        if (!_state!.running) return;
-        if (g == '1') {
-          myGender = '男';
-          break;
-        }
-        if (g == '2') {
-          myGender = '女';
-          break;
-        }
-        session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
-        _scheduleRender();
-      }
-      session.messages.add(_systemMessage(session, '✅ ${myName}'));
-      session.messages.add(_systemMessage(session, '----------------'));
-    }
-    // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
-    // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
-    // 被踢回「输入通道码」。改为用 preflight 已拿到的 spaceId 先调
-    // /spaces/{id}/key-escrow 验口令（不消费 token），错了就停在口令环节重输，
-    // 直到正确或 /exit（老板 2026-09-12）。
+    // 加入问答链（老板 2026-10-13 回退模型）：invite 时 名字 → 性别 → 验证口令；
+    // attach 时直接验证口令。无效输入原地重问；**空回车 = 退回上一问**（链首步
+    // 空回车 = 回到通道码提问，由 _runGuide 重问）。
+    final firstStep = isInvite ? 0 : 2; // 0=名字 1=性别 2=验证口令
+    var step = firstStep;
     EscrowPayload? verified;
-    while (true) {
-      if (!_state!.running) return;
-      final input =
-          (await _prompt(session, '❓ 验证共享口令:', hidden: false, required: true))
+    while (_state!.running && step < 3) {
+      switch (step) {
+        case 0:
+          // 新成员自填名字（与 create 里"我的名字"同一条白名单）
+          final n = (await _prompt(session,
+                  '❓ 你的名字（后期可改）（直接回车返回上一步）:'))
               .trim();
-      // 留空（含 /exit 中止）→ 重问；输入循环 required 已拦截留空回车
-      if (input.isEmpty) continue;
-      try {
-        final file = await _busy(session, '⏳ 核对口令中......',
-            () => api.fetchSpaceEscrow(pre.spaceId, input));
-        if (file == null) {
-          session.messages.add(_systemMessage(
-              session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
-          return;
-        }
-        // 连同解包一起验：口令对但包不匹配也按口令错误处理，避免白烧 token
-        verified =
-            await KeyEscrowService(api).openPackage(passphrase: input, envelope: file);
-        break;
-      } on ApiException catch (e) {
-        if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
-        // 404 = 该空间根本没有托管口令密保箱（不是口令输错，重输也没用）→ 明确提示后
-        // 退出；401 才是口令错 → 停在口令环节重输（老板 2026-09-12）
-        if (e.httpStatus == 404) {
-          session.messages.add(_systemMessage(
-              session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
-          return;
-        }
-        session.messages.add(
-            _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
-        _scheduleRender();
-      } on FormatException {
-        session.messages.add(
-            _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
-        _scheduleRender();
+          if (!_state!.running) return;
+          if (n.isEmpty) {
+            session.messages.add(_systemMessage(session, '↩️ 已返回上一步（通道码）'));
+            _scheduleRender();
+            return; // 回到通道码提问（_runGuide 的加入循环重问）
+          }
+          final nameViolation = checkMemberNamePolicy(n);
+          if (nameViolation != null) {
+            session.messages.add(_systemMessage(session, _memberNameRuleHint(nameViolation)));
+            _scheduleRender();
+          } else {
+            myName = n;
+            step = 1;
+          }
+        break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+        case 1:
+          // 性别（只接受 1/2，与 create 同口径——气泡配色用）
+          final g = (await _prompt(session,
+                  '❓ 你的性别是\n  1: 男\n  2: 女\n（直接回车返回上一步）:'))
+              .trim();
+          if (!_state!.running) return;
+          if (g.isEmpty) {
+            session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+            _scheduleRender();
+            step = 0;
+          } else if (g == '1') {
+            myGender = '男';
+            session.messages.add(_systemMessage(session, '✅ ${myName}'));
+            session.messages.add(_systemMessage(session, '----------------'));
+            step = 2;
+          } else if (g == '2') {
+            myGender = '女';
+            session.messages.add(_systemMessage(session, '✅ ${myName}'));
+            session.messages.add(_systemMessage(session, '----------------'));
+            step = 2;
+          } else {
+            session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
+            _scheduleRender();
+          }
+        break; // 回 while 按新 step 分发（Dart switch 默认穿透，回退靠它刹车）
+        case 2:
+          // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
+          // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
+          // 被踢回「输入通道码」。改为用 preflight 已拿到的 spaceId 先调
+          // /spaces/{id}/key-escrow 验口令（不消耗 token），错了就停在口令环节重输。
+          final entered = (await _prompt(session,
+                  '❓ 验证共享口令（直接回车返回上一步）:', hidden: false))
+              .trim();
+          if (!_state!.running) return;
+          if (entered.isEmpty) {
+            session.messages.add(_systemMessage(session, '↩️ 已返回上一步'));
+            _scheduleRender();
+            if (firstStep == 0) {
+              step = 1;
+            } else {
+              return; // attach 流：口令是链首步，回退 = 回到通道码提问
+            }
+          } else {
+            try {
+              final file = await _busy(session, '⏳ 核对口令中......',
+                  () => api.fetchSpaceEscrow(pre.spaceId, entered));
+              if (file == null) {
+                session.messages.add(_systemMessage(
+                    session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
+                return;
+              }
+              // 连同解包一起验：口令对但包不匹配也按口令错误处理，避免白烧 token
+              verified = await KeyEscrowService(api)
+                  .openPackage(passphrase: entered, envelope: file);
+              step = 3; // 口令验证通过
+            } on ApiException catch (e) {
+              if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
+              // 404 = 该空间根本没有托管口令密保箱（不是口令输错，重输也没用）→ 明确提示后
+              // 退出；401 才是口令错 → 停在口令环节重输（老板 2026-09-12）
+              if (e.httpStatus == 404) {
+                session.messages.add(_systemMessage(
+                    session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
+                return;
+              }
+              session.messages.add(_systemMessage(
+                  session, '⚠️ 口令错误，请重新输入（直接回车返回上一步）'));
+              _scheduleRender();
+            } on FormatException {
+              session.messages.add(_systemMessage(
+                  session, '⚠️ 口令错误，请重新输入（直接回车返回上一步）'));
+              _scheduleRender();
+            }
+          }
       }
     }
-    final payload = verified; // 循环内 break 前必已赋值（分析期已提升为非空）
+    if (!_state!.running) return;
+    // verified 在口令步验证通过时赋值；走到这里 step 已 =3（必已赋值）
+    final payload = verified;
+    if (payload == null) return; // 防御：理论不可达（问答链未完成就退出）
     // 口令已通过 → 此时才真正 join（消费 token，只做一次）
     final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
@@ -1279,10 +1439,27 @@ Future<void> main(List<String> args) async {
   if (Platform.environment['EINZ_UNITTEST'] == '1') return;
   await sodium();
 
-  // DNS 污染警报：DoH 兜底触发 = 当前网络在被注入。TUI 直接打一行可见警告
-  // （污染事件极少发生，偶尔打断一帧渲染值得换取确定性提示）。
-  onDnsPoisonDetected = (host, ip) =>
-      stderr.writeln('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip（已上报服务器）');
+  // DNS 污染警报：系统解析与 DoH 分歧（= 真·劫持，判定见 shared）。启动探测期
+  // （进 TUI 前）先
+  // 缓冲、聊天态就绪后作为系统消息补显；会话期触发直接进消息流（不再打 stderr
+  // ——raw 模式下那会花屏，且一闪而过没有持久提示，老板 2026-10-13）。
+  // **真 IP 不展示**（老板 2026-10-13：要保护）：只说"DoH 已自动修复"；假 IP
+  // （被劫持成的假地址）展示，让用户看清污染是什么样。
+  onDnsPoisonDetected = (host, pinnedIp, poisonedIp) {
+    final fake = poisonedIp == null ? '' : '（假 IP $poisonedIp）';
+    final text = '⚠️ DNS 污染：$host 域名解析被劫持$fake，'
+        'DoH 已自动修复（已上报服务器）';
+    final s = _state;
+    if (_tuiReady && s != null && s.running) {
+      s.session.messages.add(_systemMessage(s.session, text));
+      _scheduleRender();
+      return;
+    }
+    // 连续的同一事件只留一条（探测重试不刷屏）；不同域名各留一条
+    if (_dnsPoisonNotes.isEmpty || _dnsPoisonNotes.last != text) {
+      _dnsPoisonNotes.add(text);
+    }
+  };
 
   var storePath = '';
   var server = '';
@@ -1357,56 +1534,81 @@ Future<void> main(List<String> args) async {
   // → 立即清盘退出：撤销语义在"所有已开通的通道"上一致（老板 2026-09-16）。
   // FORBIDDEN（库被重置/未登记）不会走这里，只在消息流里警告。
   session.onEntranceRevoked = () => _exitRevoked(storePath);
-  // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
+  // 全局状态提前初始化：_unlockPin / 输入循环都用 _state!——解锁与输入循环必须在
   // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
   _state = _TuiState(session, storePath);
   // 展示缓存变化即重绘：离线发送时乐观上屏的消息在补发网络等待前就刷新到屏幕
   // （老板 2026-09-13：App 能立刻显示离线消息，TUI 之前要等网络超时回来才显示）
   session.onChanged = _scheduleRender;
-  // 锁屏码：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
-  // 刚入网的 _askSetPin 仍在 _runGuide 内处理）
+  // 锁屏码：已有 PIN 时先解锁——**先起输入循环**（raw 模式 + stdin 订阅），
+  // 解锁问答作为消息流里的隐藏回显提示进行（_unlockPin 走 _prompt）。历史消息
+  // 在解锁成功前不加载/不显示（防泄漏；刚入网的 _askSetPin 仍在 _runGuide 内处理）。
+  //
+  // 解锁期退出（空回车 / Ctrl+C / EOF）→ running=false → 下方整段启动被跳过，
+  // 直接走收尾退出——**绝不在未验证时加载或渲染历史**（2026-10-13 bug 根因：
+  // 旧实现中止后 main 不检查 running，把没验证的历史全屏渲染出来，再因输入循环
+  // 吞掉所有按键挂死，只能强杀进程）。
+  Future<void>? inputLoop;
+  var justUnlocked = false;
   if (store.pinHash != null) {
-    await _unlockPin(session);
+    inputLoop = _runInputLoop();
+    justUnlocked = await _unlockPin(session);
   }
-  await session.loadHistory();
-  // 引导阶段提示（自举/托管/通道码指引）作为 system 消息进入对话流——
-  // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
-  for (final note in _guidanceNotes) {
-    session.messages.add(_systemMessage(session, note));
-  }
-  _guidanceNotes.clear();
-  _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
-  _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
-  // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
-  // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
-  _state!.memberNames = Map.of(store.memberNames);
-  _state!.memberGenders = Map.of(store.memberGenders);
-  _state!.memberSlots = Map.of(store.memberSlots);
-  _refreshMemberNames(_state!); // 认证后刷新（保持最新，并回写缓存）
+  if (_state!.running) {
+    await session.loadHistory();
+    if (justUnlocked) {
+      // 解锁成功的确认放这里（_unlockPin 里加会被 loadHistory 的 clear 抹掉，
+      // 微任务渲染也不落地——2026-10-13 实测）：作为聊天态首条消息出现。
+      session.messages.add(_systemMessage(session, '✅ 锁屏码验证成功'));
+    }
+    // DNS 污染警报补显（启动探测期触发，见 _dnsPoisonNotes）：必须排在
+    // loadHistory 之后（它开头会 clear messages），作为聊天态系统消息持久可见
+    for (final note in _dnsPoisonNotes) {
+      session.messages.add(_systemMessage(session, note));
+    }
+    _dnsPoisonNotes.clear();
+    _tuiReady = true; // 此后（含 WS 重连）再触发就直接进消息流
+    // 引导阶段提示（自举/托管/通道码指引）作为 system 消息进入对话流——
+    // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
+    for (final note in _guidanceNotes) {
+      session.messages.add(_systemMessage(session, note));
+    }
+    _guidanceNotes.clear();
+    _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
+    _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
+    // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
+    // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
+    _state!.memberNames = Map.of(store.memberNames);
+    _state!.memberGenders = Map.of(store.memberGenders);
+    _state!.memberSlots = Map.of(store.memberSlots);
+    _refreshMemberNames(_state!); // 认证后刷新（保持最新，并回写缓存）
 
-  // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
-  // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
-  final guide =
-      _runGuide(session, storePath, server);
+    // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
+    // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
+    final guide =
+        _runGuide(session, storePath, server);
 
-  _render();
+    _render();
 
-  // 终端窗口尺寸变化（SIGWINCH，macOS/Linux）→ 防抖后全量重绘：
-  // 否则缩窗后旧折行仍残留（终端物理重排了显示内容，但我们的布局未按新列数重算）。
-  // Windows 无 SIGWINCH，watch 会抛 UnsupportedError → try-catch 兜底。
-  try {
-    _sigwinchSub = ProcessSignal.sigwinch.watch().listen((_) {
-      _resizeTimer?.cancel();
-      _resizeTimer = Timer(const Duration(milliseconds: 120), () {
-        if ((_state?.running ?? false)) _render();
+    // 终端窗口尺寸变化（SIGWINCH，macOS/Linux）→ 防抖后全量重绘：
+    // 否则缩窗后旧折行仍残留（终端物理重排了显示内容，但我们的布局未按新列数重算）。
+    // Windows 无 SIGWINCH，watch 会抛 UnsupportedError → try-catch 兜底。
+    try {
+      _sigwinchSub = ProcessSignal.sigwinch.watch().listen((_) {
+        _resizeTimer?.cancel();
+        _resizeTimer = Timer(const Duration(milliseconds: 120), () {
+          if ((_state?.running ?? false)) _render();
+        });
       });
-    });
-  } catch (_) {
-    // 非 POSIX 平台忽略：尺寸变化不自动重绘，下次输入/消息会触发
-  }
+    } catch (_) {
+      // 非 POSIX 平台忽略：尺寸变化不自动重绘，下次输入/消息会触发
+    }
 
-  await _runInputLoop();
-  await guide; // 引导任务收尾（启动同步/WS 已在其内部完成；异常已内部处理）
+    await (inputLoop ?? _runInputLoop());
+    await guide; // 引导任务收尾（启动同步/WS 已在其内部完成；异常已内部处理）
+  } else if (inputLoop != null) {
+    await inputLoop; // 解锁期退出：输入循环的退出序列已跑完，这里等它收尾
+  }
   _exitRaw();
   session.stopWs();
   _sigwinchSub?.cancel(); // 取消终端尺寸监听：否则 event loop 不空闲，进程挂起回不到命令行
@@ -1507,8 +1709,8 @@ String _expandHomePath(String path) {
 
 /// `/switch <store路径>`：不退出进程切换到另一个空间的 store（老板 2026-10-08）。
 ///
-/// 流程：加载目标 store → 目标有 PIN 先解锁（会话内 _prompt 隐藏输入——不能复用
-/// 启动期 _unlockPin 的同步 readByteSync，会与 raw 模式 stdin 订阅抢字节；
+/// 流程：加载目标 store → 目标有 PIN 先解锁（会话内问答走 _prompt 隐藏输入——
+/// raw 模式下 stdin 归输入循环所有，任何地方都不能同步读行抢字节；
 /// **进来才解锁、离开不设卡**——当前空间已解锁过，切换=离开，无再验理由）→
 /// 复用 _resetToFreshStart 的换装四件套（停旧 WS/轮询 → 换 _state → 重启轮询）→
 /// loadHistory → 清屏重绘。任一步失败保持原会话不动（不半切换）。
@@ -1534,8 +1736,9 @@ Future<void> _execSwitch(_TuiState s, String path) async {
     _scheduleRender();
     var ok = false;
     while (_state!.running) {
-      final pin = await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true);
-      if (!_state!.running) return; // /exit：中止一切
+      final pin =
+          await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true);
+      if (!_state!.running) return; // 退出（Ctrl+C/EOF）：中止一切
       if (pin.trim().isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '✅ 已取消切换（未做任何改动）'));
         _scheduleRender();
@@ -1750,6 +1953,14 @@ String _titleBarThree(String left, String center, String right, int cols) {
   return _barLine(_bgBlack, content, cols);
 }
 
+/// 纯文本按显示宽度居中（两侧补空格）——解锁前状态栏的产品名定位用。
+/// 超宽（w >= cols）原样返回（调用方 _barLine 会截齐）。
+String _centerText(String text, int cols) {
+  final w = _displayWidth(text);
+  if (w >= cols) return text;
+  return '${' ' * ((cols - w) ~/ 2)}$text';
+}
+
 /// 终端行数（非终端/pty 下 terminalLines 可能抛异常，兜底 24）。
 /// 终端行数：stty size 优先（真实终端尺寸最可靠，raw 模式/stdout.terminalLines
 /// 失效时仍准确——此前兜底 24 与用户实际行数不符时渲染定位超出屏幕导致滚动、
@@ -1793,9 +2004,13 @@ int _termCols() {
   return null;
 }
 
+/// 输入行提示符：聊天态 `[我] `；文件浏览器态（方案 B）`📂 `——那行此时是
+/// 光标条目的路径预览，不是待发消息，提示符必须换掉才不会误导。
+String _inputPrompt(_TuiState s) =>
+    s.browser != null ? '${_cyan}📂${_reset} ' : '${_cyan}[我]${_reset} ';
+
 /// 输入内容折行：每行最大宽度 = cols - prompt 显示宽度（最后一行行首带 prompt）。
-List<String> _wrapInput(String input, int cols) {
-  final prompt = '${_cyan}[我]${_reset} ';
+List<String> _wrapInput(String input, int cols, {required String prompt}) {
   return _wrapByWidth(input, cols - _displayWidth(prompt));
 }
 
@@ -1839,7 +2054,8 @@ void _render() {
   final cols = _termCols();
   // 输入区折行行数：超长输入自动多行，消息区高度动态让位
   final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
-  final inputWrapped = _wrapInput(display, cols);
+  final prompt = _inputPrompt(s);
+  final inputWrapped = _wrapInput(display, cols, prompt: prompt);
   s.inputLines = inputWrapped.length;
   final msgArea = rows - 2 - s.inputLines; // 顶部标题栏 1 行 + 底部状态行 1 行 + 输入区 N 行
 
@@ -1858,24 +2074,39 @@ void _render() {
     WsStatus.reconnecting => '$_red✗$_white',
     WsStatus.stopped => '$_gray○$_white',
   };
-  final peerName = _peerNameOf(s);
-  // 对方灯三态（老板 2026-10-08：撤销是独立状态，绝不同于离线）：
-  // 绿●=有在线通道 灰⊘=通道全被撤销 红○=离线（含对方未加入）
-  final peerDot = s.peerOnline
-      ? '$_green●$_white'
-      : (s.peerAllRevoked ? '$_gray⊘$_white' : '$_red○$_white');
-  // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
-  // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
-  // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
-  // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
-  // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
+  // 解锁前（老板 2026-10-13）：标题栏**只显示中间的产品名**——两侧的对方/我的
+  // 名字、通道列表、WS 状态灯一概不渲染（连占位的「?」都不要：验证通过前，
+  // 屏幕上一个身份字节都不该出现）。左右两段留空即可，_titleBarThree 自然
+  // 把品牌名摆在正中。
   final String leftSeg;
-  if (s.isGroupSpace) {
-    leftSeg = _groupMemberListLabel(s);
+  final String rightSeg;
+  if (_identityHidden) {
+    leftSeg = '';
+    rightSeg = '';
   } else {
-    final peerEntrances = _peerEntranceLabel(s);
-    leftSeg = '$peerDot $peerName'
-        '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}$peerEntrances';
+    final peerName = _peerNameOf(s);
+    // 对方灯三态（老板 2026-10-08：撤销是独立状态，绝不同于离线）：
+    // 绿●=有在线通道 灰⊘=通道全被撤销 红○=离线（含对方未加入）
+    final peerDot = s.peerOnline
+        ? '$_green●$_white'
+        : (s.peerAllRevoked ? '$_gray⊘$_white' : '$_red○$_white');
+    // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
+    // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
+    // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
+    // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
+    // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
+    leftSeg = s.isGroupSpace
+        ? _groupMemberListLabel(s)
+        : '$peerDot $peerName'
+            '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}'
+            '${_peerEntranceLabel(s)}';
+    // 右段（我）：`灯 名字 @本机名 #n/m#其它在线通道…`（老板 2026-09-16）——
+    // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
+    // 后面的 #n/m 与通道列表**扣除本机**，两者严格一一对应。
+    rightSeg = '$myDot ${_memberLabel(s.session.store, s.memberNames)}'
+        '${_myEntranceTag(s)}'
+        '${_entranceCountLabel(s.myOtherOnlineSince.length, s.myOtherEntranceTotal)}'
+        '${_myOtherEntrancesLabel(s)}';
   }
   // 三段式标题栏：对方状态贴左缘、我的状态贴右缘（与消息左右分栏一致——
   // 对方消息在左、我的消息在右）、品牌名 "Einz" 居中。
@@ -1887,13 +2118,7 @@ void _render() {
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
     '${_bold}Einz\x1B[22m$_white',
-    // 右段（我）：`灯 名字 @本机名 #n/m#其它在线通道…`（老板 2026-09-16）——
-    // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
-    // 后面的 #n/m 与通道列表**扣除本机**，两者严格一一对应。
-    '$myDot ${_memberLabel(s.session.store, s.memberNames)}'
-        '${_myEntranceTag(s)}'
-        '${_entranceCountLabel(s.myOtherOnlineSince.length, s.myOtherEntranceTotal)}'
-        '${_myOtherEntrancesLabel(s)}',
+    rightSeg,
     cols,
   );
   buf.write(titleText);
@@ -1903,27 +2128,51 @@ void _render() {
   // 滚动窗口由 scrollTop 决定：贴底（scrollTop == lastMaxStart）时跟随最新，
   // 翻页浏览（PgUp/PgDn/滚轮）时停留在浏览位置，新消息到达不打断（自动跟随
   // 只发生在贴底状态）。
+  // 文件浏览器态（方案 B）整体接管这一区：列目录而不是消息，滚动窗口归
+  // 浏览器自己的 scrollTop（光标可见即可），不动消息的 scrollTop——退出浏览
+  // 器后消息区停回原处，不丢浏览位置。
+  final browser = s.browser;
   final lines = <String>[];
-  final msgs = s.session.messages;
-  // 附件固定序号表每帧预计算一次（formatMessage 逐条复用，避免 O(n²) 扫描）
-  final attachmentNos = _attachmentNos(s.session);
-  for (var i = 0; i < msgs.length; i++) {
-    lines.addAll(formatMessage(msgs[i], cols, attachmentNos: attachmentNos));
-    // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
-    // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
-    lines.add('');
+  List<String> visible;
+  if (browser != null) {
+    final all = _browserLines(browser, cols);
+    // 头部占 2~3 行（目录行 + 提示行 + 可能的错误行），列表从其后开始
+    final headerRows = 2 + (browser.error != null ? 1 : 0);
+    final listRows = (msgArea - headerRows).clamp(1, 1 << 20);
+    final listStart = headerRows;
+    final total = all.length - headerRows;
+    var top = browser.scrollTop;
+    if (browser.cursor < top) top = browser.cursor;
+    if (browser.cursor >= top + listRows) top = browser.cursor - listRows + 1;
+    top = top.clamp(0, total > listRows ? total - listRows : 0);
+    browser.scrollTop = top;
+    final from = listStart + top;
+    final to = (from + listRows).clamp(from, all.length);
+    visible = all.sublist(0, from) + all.sublist(from, to);
+    s.lastMaxStart = 0; // 状态行不走"历史浏览"分支（浏览器有自己的提示）
+    s.lastMsgArea = msgArea;
+  } else {
+    final msgs = s.session.messages;
+    // 附件固定序号表每帧预计算一次（formatMessage 逐条复用，避免 O(n²) 扫描）
+    final attachmentNos = _attachmentNos(s.session);
+    for (var i = 0; i < msgs.length; i++) {
+      lines.addAll(formatMessage(msgs[i], cols, attachmentNos: attachmentNos));
+      // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
+      // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
+      lines.add('');
+    }
+    final maxStart = lines.length > msgArea ? lines.length - msgArea : 0;
+    if (s.scrollTop >= s.lastMaxStart) {
+      s.scrollTop = maxStart; // 上次贴底（或首次渲染）：跟随到底部
+    } else if (s.scrollTop > maxStart) {
+      s.scrollTop = maxStart; // 消息变少导致越界：钳制回底部
+    }
+    s.lastMaxStart = maxStart;
+    s.lastMsgArea = msgArea;
+    final end =
+        s.scrollTop + msgArea < lines.length ? s.scrollTop + msgArea : lines.length;
+    visible = lines.sublist(s.scrollTop, end);
   }
-  final maxStart = lines.length > msgArea ? lines.length - msgArea : 0;
-  if (s.scrollTop >= s.lastMaxStart) {
-    s.scrollTop = maxStart; // 上次贴底（或首次渲染）：跟随到底部
-  } else if (s.scrollTop > maxStart) {
-    s.scrollTop = maxStart; // 消息变少导致越界：钳制回底部
-  }
-  s.lastMaxStart = maxStart;
-  s.lastMsgArea = msgArea;
-  final end =
-      s.scrollTop + msgArea < lines.length ? s.scrollTop + msgArea : lines.length;
-  final visible = lines.sublist(s.scrollTop, end);
   final bottom = rows - s.inputLines - 1; // 输入条上方第一行（消息区底部）
   // 先清空整个消息区（第 2 行到输入行上方）：连续渲染时旧行残留可能覆盖新消息
   // （表现为"连续两个 system 消息第二个不显示"）
@@ -1941,7 +2190,6 @@ void _render() {
   // 与 _renderInputLine 的定位计算完全一致——否则消息少时输入区被画在
   // 屏幕中间，与局部重绘的底部定位不一致 → you> 跳动、上下重复。
   // 逐行定位 + 清行（\x1B[K），避免残留旧行。
-  final prompt = '${_cyan}[我]${_reset} ';
   final top = rows - inputWrapped.length; // 输入区顶部行号（状态行占最底一行）
   for (var i = 0; i < inputWrapped.length; i++) {
     buf.write('\x1B[${top + i};1H'); // 定位输入区各行第 1 列
@@ -1961,7 +2209,25 @@ void _render() {
   // 滚动通知（发送结果/同步进度/下载进度等瞬时状态）独占整行显示；
   // 空状态显示常用命令提示。
   buf.write('\x1B[$rows;1H\x1B[K');
-  if (s.scrollTop < s.lastMaxStart) {
+  if (_identityHidden) {
+    // 解锁前（老板 2026-10-13）：状态栏同样只显示产品名——命令提示、瞬时
+    // status、历史浏览提示在验证通过前一律不上屏（与标题栏同一策略：
+    // 屏幕上一个身份/状态字节都不出现）。
+    buf.write(_barLine(_bgBlack, _centerText('Einz', cols), cols));
+  } else if (browser != null) {
+    // 文件浏览器态：有 status（如"头像只能是图片"的即时提示）时优先显示——
+    // 否则路径预览会把它挤掉，用户选了非图片却看不到为什么没反应；
+    // 无 status 时显示光标条目的完整路径（消息区那行可能被截断，长路径在这儿看全）
+    if (s.status.isNotEmpty) {
+      buf.write(_barLine(_bgBlack, '⚙ ${_truncateByWidth(s.status, cols - 4)}', cols));
+    } else {
+      final preview = s.input.toString();
+      buf.write(_barLine(
+          _bgBlack,
+          '📂 ${_truncateByWidth(preview.isEmpty ? '(空目录)' : preview, cols - 4)}',
+          cols));
+    }
+  } else if (s.scrollTop < s.lastMaxStart) {
     // 历史浏览模式：正在看更早的消息（未贴底），提示翻页键；到底后自动回正常状态
     buf.write(_barLine(_bgBlack, '📜 历史浏览（PgUp/PgDn, Shift+↑/↓ 或鼠标滚轮；翻到底自动回到最新）', cols));
   } else if (s.status.isNotEmpty) {
@@ -2167,6 +2433,7 @@ class _EntranceRow {
     required this.when,
     required this.isMe,
     required this.revoked,
+    this.clientLabel,
   });
 
   final int no; // 1 基序号（与 /entrances 输出一致；/revoke 按它选通道）
@@ -2180,11 +2447,18 @@ class _EntranceRow {
   final bool isMe;
   final bool revoked;
 
+  /// 客户端段（2026-10-14）：App → `v2610.1409.00`；TUI → `TUI`；存量行/旧
+  /// 客户端（没上报过）→ null（不显示）。与 App 卡片第二行同一 shared 判定。
+  final String? clientLabel;
+
   /// 列表行文本（/entrances 与 /revoke 的列表、确认提示共用，保证逐字一致）。
   /// 圈标三态（与标题栏灯同语义，老板 2026-10-08）：🟢=在线 ⊘=已撤销（独立态，
   /// 区别于离线）⚪=离线。消息流是纯文本（不渲染 ANSI），故此处只用符号不带颜色。
-  String get line =>
-      '\n  $no) ${online ? '🟢' : (revoked ? '⊘' : '⚪')} $label [$memberName] $tag$when';
+  /// 客户端段接在时间后面（与 App 卡片第二行「时间 · 版本」同序）。
+  String get line {
+    final client = clientLabel != null ? ' · $clientLabel' : '';
+    return '\n  $no) ${online ? '🟢' : (revoked ? '⊘' : '⚪')} $label [$memberName] $tag$when$client';
+  }
 }
 
 /// 拉取**同空间全部通道**（我 + 对方，不只是自己的通道）并格式化为带序号的行。
@@ -2234,6 +2508,8 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
       when: when,
       isMe: isMe,
       revoked: revoked,
+      // 客户端段（App 版本/TUI）：与 App 卡片第二行同一 shared 判定
+      clientLabel: entranceClientLabel(d),
     ));
   }
   return rows;
@@ -2638,12 +2914,12 @@ void _renderInputLine() {
   final rows = _termLines();
   final cols = _termCols();
   final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
-  final inputWrapped = _wrapInput(display, cols);
+  final prompt = _inputPrompt(s);
+  final inputWrapped = _wrapInput(display, cols, prompt: prompt);
   if (inputWrapped.length != s.inputLines) {
     _render(); // 行数变化 → 消息区让位 → 全量重绘
     return;
   }
-  final prompt = '${_cyan}[我]${_reset} ';
   final promptW = _displayWidth(prompt);
   final top = rows - inputWrapped.length; // 输入区顶部行号（状态行占最底一行）
 
@@ -2690,6 +2966,46 @@ Future<void> _runInputLoop() async {
   // 终端转义序列缓冲：raw 模式下方向键等到达为 ESC [ A 等多个字节（可能跨 chunk），
   // 需在此拼合完整后再解释，避免 '[' 与字母被当成普通字符打进输入（曾显示 [D[C[A[B）。
   var esc = '';
+  // 裸 Esc 检测（文件浏览器要用 Esc 取消）：终端对"只按 Esc"只发一个 0x1B，
+  // 与转义序列首字节无法区分——只能等一小会儿，没有后续字节才算单独按下。
+  // 窗口内来了字节 → 定时器作废（那是序列的一部分），不影响方向键等。
+  // 150ms（老板 2026-10-18 复查放宽，原 50ms）：SSH/高负载下转义序列可能跨
+  // chunk 到达、字节间隔超过 50ms，窗口太窄会把 \x1B[A 拆散——Esc 误取消
+  // 浏览器、'[A' 落进输入行。150ms 仍远低于人手两次按键间隔，裸 Esc 不觉迟滞。
+  Timer? escTimer;
+  void armEscTimer() {
+    escTimer?.cancel();
+    escTimer = Timer(const Duration(milliseconds: 150), () {
+      escTimer = null;
+      if (esc != '\x1B') return; // 已进入/完成序列：不是裸 Esc
+      esc = '';
+      final s = _state;
+      if (s?.running != true) return; // 已退出：不再渲染（终端已恢复）
+      if (s?.browser != null) {
+        // 浏览器态：Esc = 取消（与 q 等价）
+        try {
+          _browserCancel(s!);
+        } catch (e, st) {
+          _inputLoopCrash(e, st);
+        }
+      }
+      // 聊天态：Esc 无绑定动作（保留给将来），不影响输入
+    });
+  }
+  // 退出序列（Ctrl+C / 无上一问的问答空回车 / 命令处理后 !running 三处共用）：
+  // 置退出标志 → 释放引导/解锁问答等待（否则 _runGuide/_unlockPin 的 await 挂起）
+  // → 恢复终端（必须在 sub.cancel 之前，否则 fd 失效设不了 echoMode）→ 取消监听
+  // → 结束主流程（否则 await 永远挂起）→ 兜底 2 秒强退（main 收尾在部分场景如
+  // WS 连接中会挂起到不了 exit(0)——进程退出自动关闭连接）。
+  void exitNow() {
+    _state!.running = false;
+    escTimer?.cancel();
+    _abortPendingGuide();
+    _restoreTerminal();
+    sub.cancel();
+    if (!completer.isCompleted) completer.complete();
+    _scheduleExitWithWipe();
+  }
   // utf8.decoder：raw 模式下多字节字符（如中文）可能被拆成多个字节到达，
   // 由解码器缓冲拼合后再逐字符处理（避免中文乱码）。
   sub = stdin.transform(utf8.decoder).listen((chunk) {
@@ -2703,6 +3019,7 @@ Future<void> _runInputLoop() async {
       if (esc.isNotEmpty || code == 27) {
         if (esc.isEmpty) {
           esc = '\x1B';
+          armEscTimer(); // 窗口内没有后续字节 → 按裸 Esc 处理
           continue;
         }
         final seq = esc + ch;
@@ -2713,7 +3030,14 @@ Future<void> _runInputLoop() async {
         final isFinal = code >= 0x40 && code <= 0x7E; // CSI 终止字节
         if (!isFinal) {
           if (esc == '\x1B') {
-            esc = ''; // ESC 后跟非 [ / O：死亡序列，整体丢弃
+            // ESC 后跟非 [ / O：浏览器态视为 Esc（用户按了 Esc 又顺手敲了个键），
+            // 聊天态保持原语义整体丢弃
+            final wasLoneEsc = esc == '\x1B';
+            esc = '';
+            if (wasLoneEsc && _state?.browser != null) {
+              _browserCancel(_state!);
+              inputChanged = true;
+            }
           } else if (seq.length >= 32) {
             esc = ''; // 兜底：异常长参数序列丢弃（上限放宽以容纳 SGR 鼠标序列）
           } else {
@@ -2722,9 +3046,37 @@ Future<void> _runInputLoop() async {
           continue;
         }
         esc = '';
+        escTimer?.cancel();
         final action = _escAction(seq);
         if (action == null) continue; // 未知序列：整体丢弃（不进输入）
         final s = _state!;
+        // 文件浏览器态（方案 B）：方向键/翻页/滚轮全部归浏览器
+        if (s.browser != null) {
+          switch (action) {
+            case 'up':
+              _browserMove(s, -1);
+            case 'down':
+              _browserMove(s, 1);
+            case 'left':
+              _browserParent(s);
+            case 'pgup':
+              _browserMove(s, -(s.lastMsgArea - 3).clamp(1, 1 << 20));
+            case 'pgdn':
+              _browserMove(s, (s.lastMsgArea - 3).clamp(1, 1 << 20));
+            case 'home':
+              _browserMove(s, -s.browser!.entries.length);
+            case 'end':
+              _browserMove(s, s.browser!.entries.length);
+            case 'wheelup':
+              _browserMove(s, -3);
+            case 'wheeldown':
+              _browserMove(s, 3);
+            default:
+              break; // right/delete/shift* 在浏览器里无意义
+          }
+          inputChanged = true;
+          continue;
+        }
         switch (action) {
           case 'up':
             _historyUp(s);
@@ -2759,61 +3111,38 @@ Future<void> _runInputLoop() async {
         continue;
       }
       if (code == 3) {
-        // Ctrl+C → 退出（先恢复终端，再取消监听，见 _restoreTerminal 注释）
-        _state!.running = false;
-        _abortPendingGuide(); // 释放引导问答等待，避免 _runGuide 挂起
-        _restoreTerminal();
-        sub.cancel();
-        if (!completer.isCompleted) completer.complete();
-        // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
-        // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-        _scheduleExitWithWipe();
+        // Ctrl+C → 退出（exitNow：先恢复终端，再取消监听，见 _restoreTerminal 注释）
+        exitNow();
         return;
       }
       if (code == 13 || code == 10) {
+        // 文件浏览器态（方案 B）：回车 = 进入目录 / 选中文件（绝不提交输入）
+        if (_state!.browser != null) {
+          _browserEnter(_state!);
+          inputChanged = true;
+          continue;
+        }
         // 回车：提交输入
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
           final answer = _state!.input.toString().trim();
-          if (answer.startsWith('/')) {
-            // / 开头的输入按命令处理，不当作口令/通道码回答提交（用户：要求
-            // 输入口令时 /exit 被当口令发送核对进"口令对接中"——应直接退出）
+          // 没有上一问可回退的"门"（启动锁屏码、向导首问 c/j）：空回车 = 退出
+          // 整个 TUI（老板 2026-10-13：这一步只认"输内容"与"空回车退出"两种）
+          if (answer.isEmpty && _state!.pendingExitOnEmpty) {
             _state!.input.clear();
-            _state!.cursor = 0; // 同步复位光标：否则下个字符 _insertAtCursor 越界崩溃
-            if (answer == '/exit' || answer == '/quit') {
-              // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
-              // 用户困在通道码/口令重试循环无法退出
-              _state!.running = false;
-              _abortPendingGuide();
-              _restoreTerminal();
-              sub.cancel();
-              if (!completer.isCompleted) completer.complete();
-              inputChanged = true;
-              // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
-              // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-              _scheduleExitWithWipe();
-              return;
-            }
-            final cur = _state!.session; // 用当前的（/reset 会换掉 _state）
-            cur.messages.add(_systemMessage(cur, '⚠️ 引导中仅支持 /exit 退出（输入未提交）'));
-            _scheduleRender();
-            inputChanged = true;
-            continue;
+            _state!.cursor = 0;
+            exitNow();
+            return;
           }
-          if (answer.isEmpty && (_state?.pendingGuideRequired ?? false)) {
-            // 必填问答留空回车：**静默拒绝**——不提交，也**不往消息流里加提示**。
-            // 老板 2026-09-23：早先会打一条"⚠️ 请输入内容"，每按一次回车就把提问往上顶
-            // 一行、屏幕跟着跳；其实提示还在上面、光标还在输入行，用户自然知道要继续输。
-            _state!.input.clear();
-            _state!.cursor = 0; // 同步复位光标，避免越界崩溃
-            inputChanged = true; // 只重绘输入行（清掉可能输入过的全角空格时可见）
-            continue;
-          }
+          // 提交回答（含留空）。**任何输入都不再当命令解析**（老板 2026-10-13：
+          // TUI 里所有"要求输入"的地方都不认 /exit 等命令——输入只是输入，唯一的
+          // "退出"就是直接回车；空回车交给调用方解释：回退上一步 / 跳过 / 取消动作）
           _state!.input.clear();
           _state!.cursor = 0;
-          // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
+          // 引导问答回答：提交（含留空——调用方自行判定回退/跳过/取消）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
+          _state!.pendingExitOnEmpty = false;
           if (!gc.isCompleted) gc.complete(answer);
           try {
             _render(); // complete 后立即全量渲染（界面即时响应，不等 _runGuide continuation）
@@ -2844,10 +3173,8 @@ Future<void> _runInputLoop() async {
         final line = _state!.input.toString().trim();
         _state!.input.clear();
         _state!.cursor = 0;
-        // 输入历史（↑↓ 浏览复用）：口令/通道码等机密输入不进历史
+        // 输入历史（↑↓ 浏览复用）：隐藏回显的机密输入不进历史
         if (!_state!.hiddenInput &&
-            !_state!.pendingJoinToken &&
-            !_state!.pendingSpaceKey &&
             line.isNotEmpty &&
             (_state!.inputHistory.isEmpty || _state!.inputHistory.last != line)) {
           _state!.inputHistory.add(line);
@@ -2862,29 +3189,17 @@ Future<void> _runInputLoop() async {
         busy = true;
         // 命令回显（老板 2026-10-08）：聊天态输入的 /xxx 也按"我的消息"入列——
         // 纯本地展示（不加密/不入队/不上服务器/重启不留痕），结果消息紧随其后。
-        // 口令/通道码输入分支不回显（机密输入不留痕）；引导期问答不经此处
-        if (line.startsWith('/') &&
-            !_state!.pendingJoinToken &&
-            !_state!.pendingSpaceKey) {
+        // 引导期问答不经此处（隐藏输入不回显）
+        if (line.startsWith('/')) {
           _state!.session.addCommandEcho(line);
         }
-        final future = (_state!.pendingJoinToken)
-            ? (line.startsWith('/') ? _execCommand(line) : _handleJoinTokenInput(line)) // / 开头按命令（/exit 退出），否则按邀请链接
-            : (_state!.pendingSpaceKey)
-                ? (line.startsWith('/') ? _execCommand(line) : _handleSpaceKeyInput(line)) // / 开头按命令（/exit 退出），否则按口令
-                : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
+        final future = line.startsWith('/') ? _execCommand(line) : _sendText(line);
         future.whenComplete(() {
           busy = false;
           if (!(_state?.running ?? false)) {
-            // /exit 或 /quit：先恢复终端（必须在 sub.cancel 之前，否则 fd 失效
-            // 无法设 echoMode），再取消监听并结束主流程（否则 await 永远挂起）
-            _abortPendingGuide(); // 释放引导问答等待，避免 _runGuide 挂起（await guide 卡死）
-            _restoreTerminal();
-            sub.cancel();
-            if (!completer.isCompleted) completer.complete();
-            // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
-            // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-            _scheduleExitWithWipe();
+            // 命令触发退出：exitNow（先恢复终端——必须在 sub.cancel 之前，
+            // 否则 fd 失效设不了 echoMode——再取消监听并结束主流程）
+            exitNow();
           } else {
             // busy 期间的「稍后再发」提示退场（若还挂着——后续 handler 自己写的状态不动）
             if (_state!.status == _kBusyResendHint) _state!.status = '';
@@ -2893,13 +3208,37 @@ Future<void> _runInputLoop() async {
         });
         continue;
       }
+      if (code == 9) {
+        // Tab：路径补全（方案 C）。只在聊天态补——浏览器是模态态（Tab 无意义）、
+        // 引导问答/机密输入是纯文本输入（补全会把答案搅乱）、隐藏回显不补。
+        final s = _state!;
+        if (s.browser == null &&
+            s.pendingGuideCompleter == null &&
+            !s.hiddenInput) {
+          _completePathAtCursor(s);
+          inputChanged = true;
+        }
+        continue;
+      }
       if (code == 127 || code == 8) {
+        // 文件浏览器态（方案 B）：退格 = 回上级目录
+        if (_state!.browser != null) {
+          _browserParent(_state!);
+          inputChanged = true;
+          continue;
+        }
         // 退格：删除光标前一个字符（支持光标中途编辑）
         _backspaceAt(_state!);
         inputChanged = true;
         continue;
       }
       if (code >= 32) {
+        // 文件浏览器态（方案 B）：只认 q / h，其余字符不进输入
+        if (_state!.browser != null) {
+          _browserChar(_state!, ch);
+          inputChanged = true;
+          continue;
+        }
         _insertAtCursor(_state!, ch);
         inputChanged = true;
       }
@@ -2915,8 +3254,11 @@ Future<void> _runInputLoop() async {
       _inputLoopCrash(e, st);
     }
   }, onDone: () {
+    // stdin EOF（终端关闭/重定向）：置退出标志并**释放引导/解锁问答等待**
+    // （否则 _runGuide/_unlockPin 的 await 永远挂起，main 收不了尾），结束循环。
     if (!completer.isCompleted) {
       _state!.running = false;
+      _abortPendingGuide();
       completer.complete();
     }
   });
@@ -3093,6 +3435,559 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
   }
 }
 
+/// 后台上传头像（老板 2026-10-17）：与 [_uploadAttachmentInBackground] 同款**不
+/// await**——头像上传不占输入循环。进度走状态栏（⏳），结果/失败进消息流。
+/// 本地校验（存在/图片/≤2MB）失败时状态栏不闪，直接给 ❌ 提示。
+Future<void> _uploadAvatarInBackground(ChatSession session, String path) async {
+  final s = _state;
+  try {
+    s?.status = '⏳ 正在上传头像……';
+    _scheduleRender();
+    await session.setAvatar(path);
+    session.messages.add(_systemMessage(session, '✅ 头像已更新（对方下次拉取即可看到）'));
+    if (s != null) s.status = '';
+  } catch (e) {
+    session.messages.add(_systemMessage(session, '❌ 头像上传失败: $e'));
+    if (s != null) s.status = '';
+  } finally {
+    _scheduleRender();
+  }
+}
+
+/// 系统文件选择窗口的结果（决定要不要落内置浏览器）。
+enum _PickOutcome {
+  /// 选中了文件，已填进输入行。
+  picked,
+
+  /// 用户主动取消（静默，不落浏览器——取消就是"改主意了"）。
+  cancelled,
+
+  /// 系统选择窗口用不了（无 GUI / 缺工具 / EINZ_TUI_PICKER=browser）→ 落内置浏览器。
+  unavailable,
+}
+
+// ---------- 内置文件浏览器（方案 B：纯键盘，SSH 也能用）----------
+
+/// 路径拼接（无 path 依赖）：两端都不带分隔符时补一个；已带则不重复。
+String _pathJoin(String dir, String name) {
+  if (dir.isEmpty) return name;
+  final sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '/';
+  return '$dir$sep$name';
+}
+
+/// 父目录；已在根（'/' 或盘符根）返回 null。
+String? _pathParent(String path) {
+  if (path.isEmpty) return null;
+  var p = path;
+  while (p.isNotEmpty && (p.endsWith('/') || p.endsWith('\\'))) {
+    p = p.substring(0, p.length - 1); // 去掉尾部分隔符（根目录会剩空）
+  }
+  if (p.isEmpty) return null; // 原本就是根
+  final last = p.lastIndexOf('/');
+  final lastBack = p.lastIndexOf('\\');
+  final cut = last > lastBack ? last : lastBack;
+  if (cut < 0) return null; // 相对路径且无分隔符：没有可去的上级
+  if (cut == 0) return '/'; // 父目录是文件系统根
+  return p.substring(0, cut);
+}
+
+/// 打开内置文件浏览器：起始目录取用户主目录（图片/下载都在这儿），
+/// 主目录不可读（容器/权限）时退当前工作目录。
+void _openFileBrowser({required String commandPrefix, required bool imagesOnly}) {
+  final s = _state;
+  if (s == null) return;
+  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final start = (home != null && Directory(home).existsSync())
+      ? home
+      : Directory.current.path;
+  s.browser = _FileBrowser(
+      commandPrefix: commandPrefix, imagesOnly: imagesOnly, startDir: start);
+  s.input.clear();
+  s.cursor = 0;
+  _browserLoad(s);
+  _render();
+}
+
+/// 读取当前目录条目（目录在前、各自按名排序；`..` 作为首项当有父目录时）。
+/// 读取失败（无权限/被删）不退出浏览器：记下原因显示在头部，条目清空。
+void _browserLoad(_TuiState s) {
+  final b = s.browser!;
+  b.error = null;
+  try {
+    final dirs = <_FileEntry>[];
+    final files = <_FileEntry>[];
+    for (final e in Directory(b.dir).listSync(followLinks: false)) {
+      final name = e.path.replaceAll('\\', '/').split('/').last;
+      if (name.isEmpty) continue;
+      if (!b.showHidden && name.startsWith('.')) continue;
+      if (e is Directory) {
+        dirs.add(_FileEntry(name, isDir: true));
+      } else if (e is File) {
+        try {
+          files.add(_FileEntry(name, isDir: false, size: e.lengthSync()));
+        } catch (_) {
+          files.add(_FileEntry(name, isDir: false)); // 取不到大小不阻断列出
+        }
+      }
+    }
+    int byName(_FileEntry a, _FileEntry z) =>
+        a.name.toLowerCase().compareTo(z.name.toLowerCase());
+    dirs.sort(byName);
+    files.sort(byName);
+    b.entries = [
+      if (_pathParent(b.dir) != null) _FileEntry('..', isDir: true),
+      ...dirs,
+      ...files,
+    ];
+    b.cursor = 0;
+    b.scrollTop = 0;
+  } catch (e) {
+    b.error = '读不了该目录：$e';
+    b.entries = [];
+    b.cursor = 0;
+    b.scrollTop = 0;
+  }
+  _browserSyncPreview(s);
+}
+
+/// 输入行实时预览光标所在条目（选中后这里会变成 `<命令> <路径>`，
+/// 所以浏览时就让用户先看见路径长什么样）。
+void _browserSyncPreview(_TuiState s) {
+  final b = s.browser!;
+  final e = (b.cursor >= 0 && b.cursor < b.entries.length) ? b.entries[b.cursor] : null;
+  final preview = e == null
+      ? ''
+      : e.name == '..'
+          ? (_pathParent(b.dir) ?? b.dir)
+          : _pathJoin(b.dir, e.name);
+  s.input
+    ..clear()
+    ..write(preview);
+  s.cursor = s.input.length;
+}
+
+/// 移动光标（钳在条目范围内），并按需滚动窗口保持光标可见。
+void _browserMove(_TuiState s, int delta) {
+  final b = s.browser!;
+  if (b.entries.isEmpty) return;
+  s.status = ''; // 上一条提示（如"只能选图片"）已处置：移动光标即翻篇
+  final next = (b.cursor + delta).clamp(0, b.entries.length - 1);
+  if (next == b.cursor) return;
+  b.cursor = next;
+  // 可见行数：消息区减去头部（目录行 + 提示行 + 可能的错误行）
+  final visibleRows = (s.lastMsgArea - 3).clamp(1, 1 << 20);
+  if (b.cursor < b.scrollTop) b.scrollTop = b.cursor;
+  if (b.cursor >= b.scrollTop + visibleRows) b.scrollTop = b.cursor - visibleRows + 1;
+  _browserSyncPreview(s);
+  _render(); // 光标高亮在消息区：必须全量重绘（只重绘输入行只会动预览）
+}
+
+/// 回车：目录 → 进入；文件 → 选中（图片模式先按扩展名拦）。
+void _browserEnter(_TuiState s) {
+  final b = s.browser!;
+  if (b.cursor < 0 || b.cursor >= b.entries.length) return;
+  final e = b.entries[b.cursor];
+  final target = e.name == '..' ? _pathParent(b.dir) : _pathJoin(b.dir, e.name);
+  if (target == null) return;
+  if (e.isDir) {
+    b.dir = target;
+    _browserLoad(s);
+    _render();
+    return;
+  }
+  if (b.imagesOnly && !kImageFileExtension.hasMatch(target)) {
+    // 不退出浏览器：只提示，光标还在原处，换个文件继续（q 取消）
+    s.status = '⚠️ 头像只能是图片（png/jpg/gif/webp/heic）——换个文件，或按 q 取消';
+    _render();
+    return;
+  }
+  _browserFinish(s, target);
+}
+
+/// 选中完成：退出浏览器，把 `<命令> <路径>` 放进输入行（**不自动发送**）。
+void _browserFinish(_TuiState s, String path) {
+  final b = s.browser!;
+  s.browser = null;
+  s.status = '';
+  s.input
+    ..clear()
+    ..write('${b.commandPrefix} $path');
+  s.cursor = s.input.length;
+  _render();
+}
+
+/// 上级目录（Backspace / ←）。
+void _browserParent(_TuiState s) {
+  final b = s.browser!;
+  final parent = _pathParent(b.dir);
+  if (parent == null) {
+    s.status = '⚠️ 已经在文件系统根目录了';
+    _render();
+    return;
+  }
+  b.dir = parent;
+  _browserLoad(s);
+  _render();
+}
+
+/// 取消（q / Esc）：退出浏览器，清空输入行（浏览期间它是预览，不是用户的字）。
+void _browserCancel(_TuiState s) {
+  s.browser = null;
+  s.status = '';
+  s.input.clear();
+  s.cursor = 0;
+  _render();
+}
+
+/// 浏览器里的字符键：q 取消、h 切换隐藏文件（其余忽略——模态态不打字）。
+void _browserChar(_TuiState s, String ch) {
+  final b = s.browser!;
+  switch (ch) {
+    case 'q':
+      _browserCancel(s);
+    case 'h':
+      b.showHidden = !b.showHidden;
+      _browserLoad(s);
+      _render();
+  }
+}
+
+// ---------- Tab 路径补全（方案 C：记得前缀，用键盘敲完）----------
+
+/// 第一个参数是**路径**的命令：其后即使是裸名字也按路径补全
+/// （`/open` 收序号，不补；其余命令的参数不是路径）。
+const Set<String> _kPathArgCommands = {'/attach', '/avatar', '/backup', '/switch'};
+
+/// 光标所在 token 是不是"该按路径补全"的样子：含 `/` 或以 `~` 开头（显然是
+/// 路径），或整行是路径命令、这是它的参数（裸名字 = 相对当前目录的路径）。
+/// 行首 token 一律不补——那是命令本身（`/attach` 含 `/`，不排除会把敲命令名
+/// 当成敲路径，Tab 下去只会得到"没有匹配"的噪音）。
+bool _tokenLooksLikePath(String token, String line, int tokenStart) {
+  if (tokenStart <= 0) return false;
+  if (token.startsWith('~') || token.contains('/')) return true;
+  final head = line.substring(0, tokenStart).trim();
+  return head.isNotEmpty && _kPathArgCommands.contains(head.split(RegExp(r'\s+')).first);
+}
+
+/// 文件系统实体的 basename（兼容 Windows 反斜杠）。
+String _baseName(FileSystemEntity e) => e.path.replaceAll('\\', '/').split('/').last;
+
+/// Tab 补全（老板 2026-10-17，方案 C）：补全光标所在的路径 token。
+///
+/// 语义对齐 shell：唯一匹配 → 直接补全（目录补到带 `/`，接着 Tab 就能进下一层）；
+/// 多个匹配 → 扩展到**最长公共前缀**（通常再按一两次 Tab 就唯一了），并列出了候选
+/// （替换上一条候选消息，不刷屏）；没有匹配/目录读不了 → **消息流**给一句提示
+/// （老板 2026-10-18：路径相关的错误不落底部通知条，免得被下一条瞬时状态冲掉，
+/// 也可滚动回看），不改输入。
+/// `~` 形式在输入行里保留原样（展开只用于查目录）——用户敲什么风格就还他什么风格。
+void _completePathAtCursor(_TuiState s) {
+  final text = s.input.toString();
+  if (s.cursor <= 0 || s.cursor > text.length) return;
+  // 词边界（空白分隔）：光标前扫到空白、光标后扫到空白
+  var start = s.cursor;
+  while (start > 0 && !RegExp(r'\s').hasMatch(text[start - 1])) {
+    start--;
+  }
+  var end = s.cursor;
+  while (end < text.length && !RegExp(r'\s').hasMatch(text[end])) {
+    end++;
+  }
+  final token = text.substring(start, end);
+  if (token.isEmpty) return;
+  if (!_tokenLooksLikePath(token, text, start)) return;
+
+  // ~ 展开（仅用于查目录；展示路径折回 ~ 形式，见 toDisplay）
+  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final expanded = (token.startsWith('~') && home != null)
+      ? home + token.substring(1)
+      : token;
+  String toDisplay(String p) {
+    if (token.startsWith('~') && home != null && p.startsWith(home)) {
+      return '~' + p.substring(home.length);
+    }
+    return p;
+  }
+
+  // 目录段 / 名字段：以最后一个 / 切分（结尾带 / = 名字段为空，列整个目录）
+  final cut = expanded.lastIndexOf('/');
+  final dirPart = cut >= 0 ? expanded.substring(0, cut + 1) : '';
+  final namePart = cut >= 0 ? expanded.substring(cut + 1) : expanded;
+  final searchDir = dirPart.isEmpty ? Directory.current.path : dirPart;
+
+  final List<FileSystemEntity> entries;
+  try {
+    entries = Directory(searchDir).listSync(followLinks: false);
+  } catch (_) {
+    // 目录读不了：提示进消息流（老板 2026-10-18，路径类错误不落底部通知条）。
+    // 复用候选那条的替换槽——连按 Tab 不堆积，上一条提示被顶掉。
+    _showCompletionFeedback(s, '⚠️ 目录不存在或读不了：$searchDir');
+    _render();
+    return;
+  }
+  // 点文件只在用户自己敲了点时才候选（shell 惯例）
+  final showHidden = namePart.startsWith('.');
+  final matches = <FileSystemEntity>[];
+  for (final e in entries) {
+    final name = _baseName(e);
+    if (name.isEmpty) continue;
+    if (!showHidden && name.startsWith('.')) continue;
+    if (!name.startsWith(namePart)) continue;
+    matches.add(e);
+  }
+  if (matches.isEmpty) {
+    // 同上：无匹配提示进消息流（替换槽），不走底部通知条
+    _showCompletionFeedback(
+        s, '⚠️ ${toDisplay(searchDir)} 下没有以「$namePart」开头的项');
+    _render();
+    return;
+  }
+  // 目录在前、各自按名排序（与内置浏览器一致，候选列表顺序可预期）
+  matches.sort((a, b) {
+    final aDir = a is Directory;
+    final bDir = b is Directory;
+    if (aDir != bDir) return aDir ? -1 : 1;
+    return _baseName(a).toLowerCase().compareTo(_baseName(b).toLowerCase());
+  });
+  final names = [for (final e in matches) _baseName(e)];
+  // 最长公共前缀（多个候选时至少不会补错）
+  var lcp = names.first;
+  for (final n in names.skip(1)) {
+    var i = 0;
+    while (i < lcp.length && i < n.length && lcp[i] == n[i]) {
+      i++;
+    }
+    lcp = lcp.substring(0, i);
+  }
+  final unique = matches.length == 1;
+  var completed = dirPart + (unique ? names.first : lcp);
+  if (unique && matches.first is Directory) completed += '/'; // 目录补到可继续进
+  final newToken = toDisplay(completed);
+  s.input
+    ..clear()
+    ..write(text.substring(0, start))
+    ..write(newToken)
+    ..write(text.substring(end));
+  s.cursor = start + newToken.length;
+  if (!unique) {
+    // 候选列表（老板 2026-10-18）：每个条目前加类型图标——目录 📁、文件 📄。
+    // 堆成一行纯文件名时分不清哪个是目录（还能接着 Tab 进），图标 + 目录名
+    // 自带 / 与内置浏览器（_browserLines）同款，两处列表风格一致。
+    final list = [
+      for (final e in matches)
+        '${e is Directory ? '📁' : '📄'} ${_baseName(e)}${e is Directory ? '/' : ''}'
+    ].join('  ');
+    _showCompletionFeedback(
+        s, '📂 ${toDisplay(searchDir)} 匹配 ${matches.length} 项（再补几个字符按 Tab）：\n  $list');
+  }
+  _render();
+}
+
+/// Tab 补全的反馈（候选列表 / 错误提示）作为一条 system 消息进消息流（可滚动
+/// 回看）；重复 Tab **替换**上一条——否则连按十次就把消息流刷成十条差不多的
+/// 列表，报错也会刷屏（老板 2026-10-18：错误提示同样走这里）。
+void _showCompletionFeedback(_TuiState s, String text) {
+  if (s.completionMsg != null) s.session.messages.remove(s.completionMsg);
+  s.completionMsg = _systemMessage(s.session, text);
+  s.session.messages.add(s.completionMsg!);
+}
+
+/// 文件大小的人读格式（1.2 MB / 843 B）。
+String _humanSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+}
+
+/// 浏览器态的消息区内容：头部（当前目录 + 统计 + 提示）+ 条目列表（光标行高亮）。
+/// 每行都按显示宽度截到 [cols]——消息区是逐行定位重绘，超宽会触发终端自动折行
+/// 把画面糊掉。
+List<String> _browserLines(_FileBrowser b, int cols) {
+  final out = <String>[];
+  final hasParent = b.entries.isNotEmpty && b.entries.first.name == '..';
+  final dirCount = b.entries.where((e) => e.isDir && e.name != '..').length;
+  final fileCount = b.entries.length - dirCount - (hasParent ? 1 : 0);
+  out.add(_truncateByWidth(
+      '${_bold}📂 ${b.dir}${_reset}  '
+      '${_gray}${dirCount} 目录 / ${fileCount} 文件'
+      '${b.showHidden ? ' · 含隐藏' : ''}${_reset}',
+      cols));
+  if (b.error != null) out.add(_truncateByWidth('${_yellow}⚠️ ${b.error}${_reset}', cols));
+  out.add(_truncateByWidth(
+      '${_gray}↑↓ 移动 · Enter 进入/选中 · Backspace 上级 · h 隐藏文件 · q 取消'
+      '${b.imagesOnly ? ' · 只选图片' : ''}${_reset}',
+      cols));
+  final icon = (e) => e.isDir ? '📁 ' : '🖼 '; // 图片/文件不细分：列表要短，认图标不如认名字
+  for (final e in b.entries) {
+    final selected = b.cursor >= 0 &&
+        b.cursor < b.entries.length &&
+        identical(e, b.entries[b.cursor]);
+    // `..` 不带斜杠（它本身就是"上级"的写法，加斜杠变成 "../" 反而怪）
+    final name = (e.isDir && e.name != '..') ? '${e.name}/' : e.name;
+    final size = (!e.isDir && e.size != null) ? '  ${_gray}${_humanSize(e.size!)}${_reset}' : '';
+    // 光标行：反显（终端通用高亮，不依赖颜色支持）
+    final body = '${icon(e)}$name$size';
+    out.add(_truncateByWidth(selected ? '${_esc}[7m$body${_esc}[27m' : '  $body', cols));
+  }
+  if (b.entries.isEmpty && b.error == null) {
+    out.add(_truncateByWidth('${_gray}（空目录）${_reset}', cols));
+  }
+  return out;
+}
+
+/// 系统文件选择窗口（老板 2026-10-17）：`/attach` / `/avatar` 不带参数时弹出，
+/// 用户选中确认后把 `<命令> <路径>` 填进输入行——**不自动发送**，让人先看见路径
+/// 再回车执行（发错文件/头像没有撤回，宁可多一次确认）。
+///
+/// 平台实现（按优先级探测，缺工具/无图形会话时明确告知并退回手敲路径）：
+/// - macOS：`osascript choose file`（UTI 过滤）
+/// - Linux：`zenity --file-selection`（备选 `kdialog --getopenfilename`）
+/// - Windows：PowerShell `OpenFileDialog`（-STA）
+///
+/// **取消 vs 出错的区分**：用户按取消时三种工具的共同表现是"无输出"，此时**静默**
+/// （输入行本是空的，不发消息最不易被误解）；但只要 stderr 有内容且不是取消语
+/// （osascript 的 "User canceled. (-128)"），就是真故障——TCC 未授权、GTK 打不开
+/// 显示等——必须说出来，否则用户以为命令没反应（排查半天）。
+///
+/// 终端配合：选择器与 TUI 共用同一个 tty，raw 模式下它往屏幕写会把 TUI 画面糊掉，
+/// 故弹窗前后成对切换——先 `_restoreTerminal`（cooked + 显示光标 + 关鼠标上报），
+/// 选完 `_enterRaw` + 全量重绘（_render 开头即清屏，选择器残留一笔勾销）。期间置
+/// processing：模态窗口前的误敲不进输入行（Ctrl+C 仍可退出，不锁死）。
+///
+/// 返回 picked = 路径已填入输入行；cancelled = 用户主动取消（静默）；
+/// unavailable = 系统选择窗口用不了（SSH/缺工具/被 EINZ_TUI_PICKER=browser 指定）
+/// ——调用方据此落入内置文件浏览器（方案 B）。
+Future<_PickOutcome> _pickFileIntoInput(String commandPrefix,
+    {bool imagesOnly = false}) async {
+  final s = _state;
+  if (s == null) return _PickOutcome.unavailable;
+
+  // 选择器模式（环境变量 EINZ_TUI_PICKER）：
+  //   auto（默认）= 有 GUI 用系统窗口，用不了就落内置浏览器
+  //   browser     = 一律用内置浏览器（偏爱键盘 / pty 测试固定走这条路径）
+  //   system      = 一律系统窗口，用不了只报错、不落浏览器
+  final pickerMode = Platform.environment['EINZ_TUI_PICKER'] ?? 'auto';
+  if (pickerMode == 'browser') return _PickOutcome.unavailable;
+
+  String? picked;
+  String? failReason;
+  /// stderr 是"用户取消"的标准语吗（osascript 取消文案 / -128 错误码）？
+  /// 是 → 静默；否 → 当故障报出来（见上方说明）。
+  bool isCancelNoise(String err) =>
+      err.isEmpty || err.contains('User canceled') || err.contains('-128');
+  try {
+    if (Platform.isMacOS) {
+      // public.image = png/jpg/gif/heic/webp 等（UTI 体系，勿逐扩展名列举）
+      final typeClause = imagesOnly ? ' of type {"public.image"}' : '';
+      final r = await Process.run(
+          'osascript', ['-e', 'POSIX path of (choose file$typeClause)']);
+      final out = r.stdout.toString().trim();
+      final err = r.stderr.toString().trim();
+      if (r.exitCode == 0 && out.isNotEmpty) {
+        picked = out;
+      } else if (!isCancelNoise(err)) {
+        // 典型：macOS TCC 未授权发 Apple 事件（系统设置→隐私与安全性→自动化）
+        failReason = '系统选择窗口未能打开（$err）';
+      }
+    } else if (Platform.isLinux) {
+      // 无图形会话（纯 SSH）：zenity/kdialog 必然失败，提前说明，别让用户对黑屏干等
+      final hasGui = Platform.environment['DISPLAY']?.isNotEmpty == true ||
+          Platform.environment['WAYLAND_DISPLAY']?.isNotEmpty == true;
+      if (!hasGui) {
+        failReason = '当前是无图形会话（SSH），无法弹出文件选择窗口，请直接输入路径';
+      } else {
+        final filter = imagesOnly
+            ? ['--file-filter=图片 | *.png *.jpg *.jpeg *.gif *.webp *.heic']
+            : const <String>[];
+        try {
+          final r = await Process.run('zenity', ['--file-selection', ...filter]);
+          final out = r.stdout.toString().trim();
+          final err = r.stderr.toString().trim();
+          if (r.exitCode == 0 && out.isNotEmpty) {
+            picked = out;
+          } else if (!isCancelNoise(err)) {
+            failReason = 'zenity 未能打开选择窗口（$err）';
+          }
+        } on ProcessException {
+          // zenity 缺失（很多发行版默认不装）→ 试 kdialog（KDE 系）
+          try {
+            final r = await Process.run('kdialog', ['--getopenfilename', '.']);
+            final out = r.stdout.toString().trim();
+            final err = r.stderr.toString().trim();
+            if (r.exitCode == 0 && out.isNotEmpty) {
+              picked = out;
+            } else if (!isCancelNoise(err)) {
+              failReason = 'kdialog 未能打开选择窗口（$err）';
+            }
+          } on ProcessException {
+            failReason = '未找到 zenity / kdialog，无法弹出文件选择窗口，请直接输入路径';
+          }
+        }
+      }
+    } else if (Platform.isWindows) {
+      // 5.1/pwsh 通用：-STA 是 OpenFileDialog 的硬要求（WPF/WinForms 对话框要单线程单元）
+      final ps = imagesOnly
+          ? "Add-Type -AssemblyName System.Windows.Forms;"
+            "\$f=New-Object System.Windows.Forms.OpenFileDialog;"
+            "\$f.Filter='图片 (*.png;*.jpg;*.jpeg;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.gif;*.webp|所有文件 (*.*)|*.*';"
+            "if (\$f.ShowDialog() -eq 'OK') { \$f.FileName }"
+          : "Add-Type -AssemblyName System.Windows.Forms;"
+            "\$f=New-Object System.Windows.Forms.OpenFileDialog;"
+            "if (\$f.ShowDialog() -eq 'OK') { \$f.FileName }";
+      final r = await Process.run('powershell',
+          ['-NoProfile', '-STA', '-Command', ps]);
+      final out = r.stdout.toString().trim();
+      if (out.isNotEmpty) picked = out;
+    } else {
+      failReason = '当前平台不支持系统文件选择窗口，请直接输入路径';
+    }
+  } on ProcessException catch (e) {
+    failReason = '无法启动文件选择窗口（${e.message}），请直接输入路径';
+  }
+
+  if (picked == null) {
+    if (failReason != null) {
+      s.session.messages.add(_systemMessage(s.session, 'ℹ️ $failReason'));
+      return pickerMode == 'system'
+          ? _PickOutcome.cancelled // 指定了只用系统窗口：不落浏览器
+          : _PickOutcome.unavailable;
+    }
+    // 用户主动取消：静默即可（输入行本是空的，什么都不做最不易被误解）
+    return _PickOutcome.cancelled;
+  }
+  // 填入输入行（含命令本身，回车即执行）；光标落在行尾，可继续手工改路径
+  _setInput(s, '$commandPrefix $picked');
+  return _PickOutcome.picked;
+}
+
+/// 弹出系统文件选择窗口并在选完后恢复 TUI 画面（[_pickFileIntoInput] 的终端配合
+/// 包装）：raw → cooked → 选择器 → raw + 全量重绘。返回 [_PickOutcome]。
+Future<_PickOutcome> _pickFileIntoInputWithTerminal(String commandPrefix,
+    {bool imagesOnly = false}) async {
+  final s = _state;
+  if (s == null) return _PickOutcome.unavailable;
+  s.processing = true; // 模态窗口期间忽略键入（Ctrl+C 仍可退出）
+  _restoreTerminal();
+  try {
+    return await _pickFileIntoInput(commandPrefix, imagesOnly: imagesOnly);
+  } finally {
+    _enterRaw();
+    s.processing = false;
+    _render();
+  }
+}
+
+/// 选文件的统一入口（老板 2026-10-17，方案 A+B）：先试系统文件选择窗口，
+/// 用不了（SSH/缺 zenity/被 EINZ_TUI_PICKER=browser 指定）就落内置文件浏览器。
+/// 两条路都只把 `<命令> <路径>` 填进输入行，**不自动发送**。
+Future<void> _pickFileIntoInputOrBrowser(String commandPrefix,
+    {bool imagesOnly = false}) async {
+  final outcome = await _pickFileIntoInputWithTerminal(commandPrefix,
+      imagesOnly: imagesOnly);
+  if (outcome == _PickOutcome.unavailable) {
+    _openFileBrowser(commandPrefix: commandPrefix, imagesOnly: imagesOnly);
+  }
+}
+
 /// `/reset`：重置本通道——三道闸门过后清本地数据，然后**原地回到全新入网向导**
 /// （老板 2026-09-23：以前是清完就退出进程，得自己重新敲命令启动）。
 ///
@@ -3186,8 +4081,11 @@ Future<void> _execCommand(String line) async {
       // 按命令字母序输出（老板 2026-10-08）：列表 + sort，新增命令时只需往列表
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
       const helpEntries = <(String, String)>[
-        ('/attach <文件路径>', '上传文件'),
-        ('/auth', '激活/续期当前服务器的机密线路（换服务器用 /server）'),
+        ('/attach <文件路径>', '上传文件（不带参数 = 选文件：有 GUI 弹系统窗口，SSH 自动用内置浏览器；'
+            '选中后把路径填进输入行，回车才发。敲路径时按 Tab 可补全）'),
+        ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
+        ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像；'
+            '不带参数 = 选图片，只列图片；Tab 补全路径）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -3247,24 +4145,28 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/auth':
-      // 未绑定（entranceId null，如引导时跳过/加入失败）→ 引导加入秘境后再认证
+      // 未绑定（entranceId null，如引导时跳过/加入失败）→ 带参直接加入：
+      // /auth <通道码或邀请链接>（老板 2026-10-13：不再有"下一行输入"的子模式——
+      // TUI 里所有要求输入的地方都不认 /exit 命令，统一用命令自带参数）
       if (s.session.store.entranceId == null) {
-        // 提示作为 system 消息进消息流；邀请链接由输入循环接管输入——
-        // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
-        s.pendingJoinToken = true;
+        if (arg.trim().isNotEmpty) {
+          await _spaceJoin(s.session, s.session.store, s.storePath, arg.trim());
+          break;
+        }
         s.session.messages.add(_systemMessage(
             s.session,
             '❓ 本通道尚未绑定秘境\n'
-            '   输入通道码（或邀请链接）加入同伴的秘境；\n'
-            '   新建秘境请先 /space create'));
-        s.status = '⌛️ 等待通道码输入…';
+            '   /auth <通道码或邀请链接> 👉 加入同伴的秘境\n'
+            '   /space create 👉 新建秘境'));
+        s.status = '';
         break;
       }
-      // 已经带了地址 = 想换服务器——那不是 /auth 的活（换服务器用 /server）
+      // 已绑定：带参不是 /auth 的活（加入别的秘境用 /space join，换服务器用 /server）
       if (arg.isNotEmpty) {
         s.session.messages.add(_systemMessage(
             s.session,
             'ℹ️ /auth 是对**当前**服务器激活/续期（不带参数）。\n'
+            '   加入其他秘境请用: /space join <通道码或邀请链接>\n'
             '   换服务器请用: /server $arg'));
         s.status = '';
         break;
@@ -3344,7 +4246,7 @@ Future<void> _execCommand(String line) async {
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前通道尚未绑定秘境'));
         }
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间'));
+        s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
         break;
       }
       {
@@ -3435,7 +4337,7 @@ Future<void> _execCommand(String line) async {
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
       // 选通道（序号/通道名）→ **抄一遍目标通道名** → 输入口令。任一步取消都不做任何改动。
       // **任一步留空回车即取消**（老板 2026-09-23：此前 required 拦空回车，用户被困，
-      // 只剩"输乱码报无效"和 /exit 两条别扭的路）。
+      // 只剩"输乱码报无效"一条别扭的路——空回车取消是 2026-09-23 补的）。
       // 第二步由 `yes` 改成抄名字（老板 2026-09-26）：`yes` 太机械、闭着眼也能敲过去，
       // 抄名字逼人看清"撤的是哪一台"。
       try {
@@ -3586,12 +4488,29 @@ Future<void> _execCommand(String line) async {
       break;
     case '/attach':
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /attach <文件路径> [描述]'));
+        // 不带参数 = 选文件（老板 2026-10-17）：有 GUI 弹系统窗口，没有（SSH）
+        // 自动落内置浏览器；选中后把 `/attach <路径>` 填进输入行待确认
+        await _pickFileIntoInputOrBrowser('/attach');
       } else {
         // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
         // 2026-09-14）；这里**不 await**——回车即交还输入（否则输入循环 busy 到上传结束，
         // 中途打不了字）；结果/失败只在消息区体现，状态栏不占（老板要求状态栏保持干净）。
         unawaited(_uploadAttachmentInBackground(s.session, arg));
+      }
+    case '/avatar':
+      // 设置我的头像（老板 2026-10-17）：/avatar <图片路径> → 读图 → POST /avatar。
+      // TUI 本身不渲染头像，但头像是 per-member 的共享资料：这里设的就是对方 App /
+      // TUI 里看到的我的头像（与 App「我的资料」弹层同一个服务端存储）。
+      if (arg.isEmpty) {
+        // 不带参数 = 选图片：系统窗口（只列图片）优先，不可用落内置浏览器
+        await _pickFileIntoInputOrBrowser('/avatar', imagesOnly: true);
+      } else if (s.session.store.sessionToken == null) {
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
+        s.status = '';
+      } else {
+        // 与 /attach 同款**不 await**：上传期间输入照常可用；进度走状态栏，
+        // 结果/失败进消息流（头像上传通常一两秒，不阻塞打字更重要）。
+        unawaited(_uploadAvatarInBackground(s.session, arg));
       }
     case '/entoken':
       // 生成通道码（join token——24h 一次性）。三种签法（老板 2026-10-07 定名）：
@@ -3988,52 +4907,6 @@ Future<void> _execOpen(List<String> parts) async {
   }
 }
 
-/// 输入循环接管的"邀请链接加入"（/auth 未绑定时的引导）。
-///
-/// 走 `/space join` 的同一条路径（`_spaceJoin`）：preflight 校验 → 口令取钥 →
-/// joinSpace 登记通道 + 签发空间会话 + 取 Space Key。**v1 的通道码登记已随
-/// Multiverse 收敛删除**（2026-09-15 P1）：通道登记不再有单独的入口。
-Future<void> _handleJoinTokenInput(String token) async {
-  final s = _state!;
-  s.pendingJoinToken = false;
-  if (token.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供通道码，无法绑定到秘境'));
-    return;
-  }
-  s.status = '';
-  await _spaceJoin(s.session, s.session.store, s.session.storePath, token);
-}
-
-/// 输入循环接管的共享口令接入（/space 未接入引导）：口令 → accessByEscrow。
-Future<void> _handleSpaceKeyInput(String passphrase) async {
-  final s = _state!;
-  s.pendingSpaceKey = false;
-  if (passphrase.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法存取秘境内容'));
-    return;
-  }
-  if (passphrase.startsWith('/')) {
-    // / 开头的输入：/exit、/quit 按退出处理；其他 / 不当口令发送核对
-    if (passphrase == '/exit' || passphrase == '/quit') {
-      _state!.running = false;
-      return;
-    }
-    s.session.messages.add(_systemMessage(s.session, '共享口令不能以 / 开头，接入取消（可再输 /space 重试）'));
-    return;
-  }
-  try {
-    await s.session.accessByEscrow(passphrase);
-    s.session.messages.add(_systemMessage(
-        s.session,
-        '✅ 口令核对成功，本通道能够访问秘境内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
-    s.session.store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
-    s.session.store.save(s.session.storePath);
-  } catch (e) {
-    // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？秘境已有口令密保箱？）'));
-  }
-}
-
 /// 退出兜底：立即清屏（不留 TUI 残骸），2 秒后强制退出。
 /// main 收尾（farewell→exit(0)）在部分场景（WS/同步挂起）到不了，统一走这里。
 void _scheduleExitWithWipe() {
@@ -4053,7 +4926,7 @@ void _wipeScreen() {
 }
 
 void _printFarewell(ChatSession session) {
-  // /exit 后 stdout 流可能已关闭（pty 下 stdin/stdout 共享 fd，退出流程副作用），
+  // 退出后 stdout 流可能已关闭（pty 下 stdin/stdout 共享 fd，退出流程副作用），
   // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃。
   // 写 stderr（pty 实测 stdout 在清屏后已不可写，farewell 会被静默吞掉；
   // stderr 独立 sink 必达——与 _wipeScreen / _exitRevoked 同口径）
@@ -4107,8 +4980,9 @@ Future<int> _probeRevoked(EntranceStore store, String server) async {
 /// 无从校验旧口令，跳过校验直接用新口令重建（与 App 同口径）。
 /// 口令输入**故意明文回显**（`hidden: false`）——老板 2026-09-14 要求：隐藏回显时
 /// 看不见自己敲的内容（连 `/exit` 这类控制命令都看不见），而口令提交后只用于本地
-/// 加密上传、不会进入消息流，明文回显的风险可接受。（对比：`_spaceJoin` 的接入
-/// 口令校验用 `hidden: true`。）
+/// 加密上传、不会进入消息流，明文回显的风险可接受。这也符合老板 2026-10-13 定的
+/// 整体策略：**设置/修改**机密时明文回显、随时可 /exit；只有**验证**机密（锁屏码
+/// 解锁、/switch、/reset、/revoke、/entoken 的口令授权）才隐藏回显且不认 /exit。
 /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
 /// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
 Future<void> _checkEscrowRotated(ChatSession session) async {
@@ -4233,7 +5107,6 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
   }
 }
 
-/// 设置托管口令（单次输入：口令不在消息流回显，留空回车由输入循环拦截不提交、
 /// 服务端是否已有本空间的口令密保箱（只问有没有，不解包）。
 /// 返回 `true`=确认有箱、`false`=确认无箱、**`null`=查不到**（网络/会话失效）。
 ///
@@ -4252,16 +5125,19 @@ Future<bool?> _serverHasEscrow(EntranceStore store, String server) async {
   }
 }
 
-/// 继续输入；成功标记 store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
+/// 设置托管口令（创建者引导中断后的恢复步，单问链）：口令不在消息流回显，
+/// **空回车 = 退出整个 TUI**（首问即末问，没有上一问可回退——老板 2026-10-13；
+/// 与 2026-09-23"口令必须给值"旧规则的区别：那时唯一的出路是 /exit，现在 /exit
+/// 不识别，空回车成为统一的退出/取消手段）。中断（Ctrl+C）后重启会再进此引导。
 Future<void> _setupEscrowPassphrase(EntranceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    // 向导里的一步（不是"动作"）：**只有锁屏码可以空回车跳过**（老板 2026-09-23 定），
-    // 共享口令必须给值 → required（留空回车被输入循环静默拒绝，停在原地继续等）
     final p1 = await _prompt(
-        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）:',
-        required: true);
+        session,
+        '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）（直接回车退出）:',
+        exitOnEmpty: true);
     if (!_state!.running) break;
+    if (p1.isEmpty) break; // 防御：空串（_abortPendingGuide 的 complete('')）不发送
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
       session.messages.add(_systemMessage(session, policyError));
@@ -4454,22 +5330,29 @@ ChatMessage _systemMessage(ChatSession session, String text) {
   );
 }
 
-/// 引导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
+/// 引导/向导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
 ///
-/// **选哪个提示函数**（2026-09-23 定的规则）：
-/// - **向导必填**（秘境入口 c/j、名字、性别、通道码、身份选择、共享口令、口令接入）
-///   → 用本函数 + `required: true`：留空回车**静默拒绝**（不提交、也不打提示，原地继续等）。
-///   向导里**唯一允许空回车跳过的是锁屏码**（`_askSetPin` 不带 `required`）。
-///   这里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit` / Ctrl+C。
-/// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase` 这类可从聊天里放弃的操作）
-///   → 用 [_promptAction]：留空回车 = 放弃这个动作。
+/// **空回车语义由调用方决定**（老板 2026-10-13 统一规则：TUI 里所有"要求输入"
+/// 的地方都**不识别 /exit 等命令**——输入只是输入；唯一的"退出"就是直接回车）：
+/// - `exitOnEmpty: true`（没有上一问可回退的门：启动锁屏码、向导首问 c/j）
+///   → 空回车 = 退出整个 TUI（输入循环落地退出序列，本函数不会返回）；
+/// - 其余（向导中间步骤）→ 空回车把空串交还给调用方，由步骤机**回退上一问**；
+/// - 动作内一步（[_promptAction]）→ 空回车 = 放弃当前动作（返回 null）。
+///
+/// **选哪个提示函数**：
+/// - **向导问答**（建/加空间的问答链、口令接入）→ 本函数，按上文决定空回车语义；
+/// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase`、`/switch`、`/entoken`
+///   这类可从聊天里放弃的操作）→ 用 [_promptAction]；
+/// - **机密验证**（启动解锁、/switch、/reset、/revoke、/entoken 的 PIN/口令授权）
+///   → `hidden: true`：不明文回显。设置机密（`/pin`、`_askSetPin`、入网口令）
+///   不隐藏：那些明文回显（老板 2026-09-14：隐藏时连自己敲了什么都看不见）。
 Future<String> _prompt(ChatSession session, String message,
-    {bool hidden = false, bool required = false}) {
+    {bool hidden = false, bool exitOnEmpty = false}) {
   final s = _state!;
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
-  s.pendingGuideRequired = required; // 必填问答：留空回车由输入循环拦截不提交
+  s.pendingExitOnEmpty = exitOnEmpty; // 空回车 = 退出整个 TUI（无上一问可回退的门）
   session.messages.add(_systemMessage(session, message));
   _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
   final completer = Completer<String>();
@@ -4485,9 +5368,11 @@ Future<String> _prompt(ChatSession session, String message,
 /// 重试循环，提示语自己写着"（或 /exit 退出）"。
 ///
 /// 与 [_prompt] 的差别只在意图：调用方拿到 null 就"已取消 + 不做任何改动"，无需再判空串。
-/// 退出（`/exit`）时 [_abortPendingGuide] 也会 complete 空回答 → 这里同样返回 null，
-/// 故调用方**必须先判 `running`**，否则退出时会多打一条"已取消"。
-Future<String?> _promptAction(ChatSession session, String message, {bool hidden = false}) async {
+/// 退出（Ctrl+C / EOF）时 [_abortPendingGuide] 也会 complete 空回答 → 这里同样返回
+/// null，故调用方**必须先判 `running`**，否则退出时会多打一条"已取消"。
+/// 2026-10-13 起这里同样不认 /exit——空回车即取消，返回 null。
+Future<String?> _promptAction(ChatSession session, String message,
+    {bool hidden = false}) async {
   final answer = (await _prompt(session, message, hidden: hidden)).trim();
   return answer.isEmpty ? null : answer;
 }
@@ -4498,6 +5383,7 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
+  _state?.pendingExitOnEmpty = false;
 }
 
 /// 新通道的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如

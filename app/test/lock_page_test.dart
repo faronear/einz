@@ -16,6 +16,7 @@ import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
+import 'package:einz/widgets/about_sheet.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 import 'real_async_settle.dart';
@@ -162,5 +163,50 @@ void main() {
 
     expect(find.byType(LockPage), findsNothing, reason: '严格锁屏挡的是返回，不是解锁');
     expect(find.text('下层页'), findsOneWidget);
+  });
+
+  testWidgets('顶栏左上角 Logo 可点 → 打开「关于秘境」弹层（未设 PIN 的兜底页同样有效）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: LockPage(db: db),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AboutSheet), findsNothing);
+    await tester.tap(find.descendant(
+        of: find.byType(Tooltip), matching: find.byType(BrandLogo)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AboutSheet), findsOneWidget,
+        reason: '锁屏态点左上角 Logo = 看版本/服务器地址/连接状态');
+  });
+
+  testWidgets('锁屏已激活（有解锁表单）时顶栏 Logo 同样能打开「关于秘境」',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await AppLockService(db).setPin('123456',
+        payload: const AppLockPayload(
+          spaceKeyB64: 'dGhlLXNwYWNlLWtleQ==',
+          spaceId: 'space-test',
+          entranceId: 'dev-a',
+          keyVersion: 1,
+          token: 'tok-123',
+        ));
+
+    await _pushLockPage(tester, db, canDismiss: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.descendant(
+        of: find.byType(Tooltip), matching: find.byType(BrandLogo)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AboutSheet), findsOneWidget);
   });
 }

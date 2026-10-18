@@ -265,6 +265,21 @@ class ApiClient {
     await _post(Api.installUid, {'install_uid': installUid}, token: token);
   }
 
+  /// 上报本通道的客户端信息（POST /entrances/client，幂等）：[client] = `'app'` /
+  /// `'tui'`；[appVersion] 仅 App 上报（`yymm.ddhh.mm`；TUI 二进制拿不到自身
+  /// 版本，只报类型标记）。每次冷启动调一次——App 升级后下次启动自动跟上。
+  ///
+  /// 只写本会话那一行；/entrances 响应带出，「我的设备通道」卡片与 TUI 通道行
+  /// 据此显示各设备跑的客户端/版本。纯展示字段，失败 best-effort（同
+  /// registerInstallUid），不影响聊天。
+  Future<void> reportClientInfo(String client, String token,
+      {String? appVersion}) async {
+    await _post(Api.clientInfo, {
+      'client': client,
+      if (appVersion != null && appVersion.isNotEmpty) 'app_version': appVersion,
+    }, token: token);
+  }
+
   /// 获取空间信息（space_id + 通道列表，含 member_id 映射，PROTOCOL.md §7.3）。
   Future<SpaceResult> getSpace(String token) async {
     final res = await _get(Api.space, token: token);

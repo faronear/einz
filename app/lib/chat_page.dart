@@ -23,11 +23,14 @@ import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'widgets/about_sheet.dart';
+import 'widgets/cancel_button.dart';
 import 'brand_logo.dart';
+import 'widgets/burn_duration_sheet.dart';
+import 'widgets/version_gate.dart';
 import 'data/attachment_storage_settings.dart';
+import 'data/tombstone_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
-import 'data/notify_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/server_config.dart';
@@ -55,6 +58,7 @@ import 'widgets/emoji_panel.dart';
 import 'widgets/immersive_fullscreen.dart';
 import 'widgets/passphrase_field.dart';
 import 'widgets/option_picker_sheet.dart';
+import 'widgets/labeled_checkbox.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
 import 'widgets/clickable.dart';
@@ -157,6 +161,11 @@ const double _bubbleTimeRowControlHeight = 28;
 /// 「我的通道」弹层标题行右端「刷新」按钮的占位/按钮边长（标题居中靠它配平）。
 const double _entranceRefreshSize = 40;
 
+/// 「我的资料」弹层的最大宽度（老板 2026-10-17）：BottomSheet 默认铺满窗口，
+/// 桌面端宽屏下这张身份卡会被拉成一条空旷的长带——限到 480 后居中停在窗口底部，
+/// 手机端本就比它窄，不受影响。
+const double kMyProfileSheetMaxWidth = 480;
+
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -247,6 +256,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _inputFocusNode = FocusNode(); // 回车发送后重新聚焦（与图标发送一致保持焦点）
   final _lockTimer = LockTimer();
+  // —— 锁屏（前台无操作 + 后台超时，共用 [kLockSeconds]，将来做成可调菜单项）——
+  // 前台无操作锁屏：超过 30s 没任何交互（点/滑/滚/打字）也进锁屏。
+  // 一次性 Timer：每次交互 cancel+重排到"现在+阈值"；空闲时 Timer 睡着零唤醒，
+  // 且用 Dart 逻辑时钟，widget 测试可 tester.pump(30s) 推进（无需 runAsync 实睡）。
+  // 「聊天页在栈顶」用 ModalRoute.isCurrent 判（真实路由状态），**不用** FocusNode
+  // hasFocus——后者只在焦点链经过本子树时为 true，手机上无输入焦点时恒 false，
+  // 会漏锁。到点若被弹层/锁屏盖着：不硬锁，重排一个新窗口（关掉弹层后最多
+  // 30s 内必锁，安全方向不变）。锁屏页 pop 回聊天（Future 完成）重排新窗口。
+  Timer? _idleTimer; // 一次性：每次交互重排到"现在+kLockSeconds"，空闲时睡着零唤醒
+  bool _lockOverlayShown = false; // 锁屏覆盖页是否已 push（防重复 push 竞态）
   // 插件懒构造：AudioRecorder()/AudioPlayer() 构造即触发原生平台通道，
   // 仅在实际录音/播放时才实例化（widget 测试环境无原生实现，渲染路径不触碰）。
   AudioRecorder? _recorder;
@@ -262,6 +281,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 视频首帧缩略图缓存（messageId → Future<bytes>）：长按菜单/引用块/引用条共用。
   final Map<String, Future<Uint8List>> _videoThumbCache = {};
   List<HistoryMessage> _messages = [];
+
+  /// 消息流**显示**用的列表：[_tombstoneDisplay] = 'hide'（彻底隐藏）时滤掉
+  /// 墓碑（已删除/已焚毁）行——它们整条不显示；'keep'（保留消息状态，默认）
+  /// 时原样返回。数据层的 [_messages] 不动（墓碑行仍是 recall/跳转/在途补发
+  /// 的判断依据），只影响 ListView 的渲染。
+  List<HistoryMessage> get _displayMessages =>
+      _tombstoneDisplay == 'hide'
+          ? [for (final m in _messages) if (!m.deleted) m]
+          : _messages;
+
   Timer? _ticker;
   // 分页加载（UI 懒渲染）：上滑到顶部加载更早历史；ticker 只增量追加新增
   final ScrollController _scrollController = ScrollController();
@@ -381,6 +410,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
   StreamSubscription<Amplitude>? _ampSub; // 录音振幅流订阅（波形驱动）
   Timer? _recordTimer; // 录音秒数计时（60s 上限自动停）
+  // 首次录音会先弹 macOS/Android 授权框：hasPermission() 等待期间用户早已松手
+  // （onLongPressEnd 先于授权回调触发），授权成功后 recorder.start() 才真正开录，
+  // 此后再松手没人会去停它——只能等 60s 上限自动停。用该标记让 _stopVoice 在
+  // 「还没进录音态但正在启动」时也能执行取消，而不是被 inputMode 检查直接放过。
+  bool _voiceStarting = false;
   int _recordSeconds = 0;
   bool _previewPlaying = false; // 预览态试听播放中
   String? _playingMessageId; // 播放意图（点按即置：含下载解密等待期，按钮变停止）
@@ -394,6 +428,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // （老板要求 2026-09-13：菜单里也能播/停并看到波形进度）。
   final ValueNotifier<int> _audioPlaybackVersion = ValueNotifier(0);
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+  /// 墓碑消息显示模式（'keep'=保留消息状态 / 'hide'=彻底隐藏；默认 keep）。
+  /// 只影响消息流里墓碑（已删除/已焚毁）的呈现，数据行为不变。
+  String _tombstoneDisplay = 'keep';
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
@@ -419,6 +456,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   VoiceCallService? _voiceCall; // 语音通话（前台通话；信令走 WS，PROTOCOL.md §8.4）
   late String _myMemberName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
+  /// 本机 App 版本号（`yymm.ddhh.mm`；_registerClientInfo 启动时读一次）——
+  /// 「我的设备通道」本机卡片的版本段用。读不到（包信息不可用）为空串 →
+  /// 不显示该段。**不在弹层里现读**：PackageInfo 是平台调用，测试环境无 mock
+  /// 时 future 永不完成，会把弹层的打开整个卡死（2026-10-14 回归教训）。
+  String _myAppVersion = '';
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
   int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
@@ -518,25 +560,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
-  /// 阅后即焚档位文案（l10n 映射）。
-  String _burnOptionLabel(int seconds, AppLocalizations l10n) {
-    switch (seconds) {
-      case 0:
-        return l10n.burnOptionOff;
-      case 60:
-        return l10n.burnOption1Minute;
-      case 300:
-        return l10n.burnOption5Minutes;
-      case 3600:
-        return l10n.burnOption1Hour;
-      case 86400:
-        return l10n.burnOption1Day;
-      case 604800:
-        return l10n.burnOption7Days;
-      default:
-        return '$seconds s';
-    }
-  }
+  /// 阅后即焚时长文案：天/时/分可读组合（0 = 关闭）。老版本的固定档位映射
+  /// 已删——2026-10-16 起任意时长，formatBurnDuration 对整点值输出相同的干净文案。
+  String _burnOptionLabel(int seconds, AppLocalizations l10n) =>
+      formatBurnDuration(seconds, l10n);
 
   /// 顶栏阅后即焚标记的档位文字：**只用量纲单位** d/h/m/s（老板 2026-09-24：
   /// 不用中文单位——横向更省，也不随界面语言变化）。取能整除的最大单位。
@@ -917,8 +944,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _scrollController.addListener(_maybeLoadOlder);
     _scrollController.addListener(_onScrollForRead);
     _inputFocusNode.addListener(_onInputFocusChanged);
+    // 前台无操作锁屏：输入框持焦时打字（软键盘，onPointerDown 抓不到）也算交互，
+    // 监听控制器文本变化刷新最近交互时刻。
+    _input.addListener(_onInputInteraction);
     _loadBurnLabel();
+    _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
     _refreshPinStatus();
+    // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
+    // 交互信号由 build 根的 Listener（点/滑）+ 滚动通知（滚轮）+ 输入框监听（打字）
+    // 喂给 _armIdleLock；解锁/关弹层 pop 回聊天时由 push Future（_pushLockOverlay）
+    // 重排。
+    _armIdleLock();
     _refreshNotifyEmail(); // 菜单项「邮件通知」的当前值（拉不到就保持 null，不显示）
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
     // 随后用持久化值校正（_loadUiStyle 异步）
@@ -933,6 +969,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(_tickerInterval);
     _registerPushToken();
     _registerInstallUid();
+    _registerClientInfo(); // 客户端信息（App + 版本）：设备通道卡片显示用
     _startRealtime();
     // 其它空间的未读：30s 问一次（WS 只管当前空间，别的收不到实时事件）
     _unreadTimer = Timer.periodic(
@@ -1093,6 +1130,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方改名/换头像（Server 广播 profile.updated）：立即更新顶部条对方名；
   /// 头像则让缓存失效重拉（广播由改名或 POST /avatar 触发）。
   void _onProfileUpdated(WsProfileUpdatedEvent event) {
+    // 自己触发的广播要排除：改名/换头像会广播给同空间全部在线通道（含我自己的
+    // 其它通道），广播里是"我的"新资料，落进 _peerName/_peerGender 就是错的。
+    // （注：切空间卡片错显我的名字的主犯是 saveProfile 覆盖写抹掉 peerJoined——
+    // 见 app_lock.dart；这里是同一症状的另一条污染路径，一并堵上。）
+    // 两条判据：memberId 比对（权威，但重启路径 _myMemberId 要等首次 /space 才
+    // 回填，可能还是 null）；名字比对兜底（改名 UI 禁止与对方同名
+    // `chatPageRenameSameAsPeerError` → 空间内名字唯一，等名必是自己）。
+    final isSelf = (event.memberId != null && event.memberId == _myMemberId) ||
+        ((event.memberName ?? '').isNotEmpty && event.memberName == _myMemberName);
+    if (isSelf) return;
     // 头像：无论改名还是换头像都刷一次（同一 per-member 头像文件可能已变）
     _MessageAvatarState.invalidate(event.memberId);
     unawaited(_loadPeerAvatar()); // 状态条那份（自己存 bytes，不走上面那个缓存）
@@ -1420,6 +1467,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _burnSeconds = seconds);
   }
 
+  /// 加载墓碑消息显示模式（每设备、每空间独立，纯本地）。
+  Future<void> _loadTombstoneDisplay() async {
+    final s = TombstoneSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
+    final mode = await s.load();
+    if (mounted) setState(() => _tombstoneDisplay = mode);
+  }
+
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
   Future<void> _showLocalePicker() async {
     final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
@@ -1436,7 +1490,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           for (final option in kLocaleOptions)
             OptionPickerItem(value: option, label: kLocaleLabels[option]!),
         ],
-        onApply: (value) async {
+        onApply: (value, {bool scopeAll = false}) async {
           picked = value;
           await settings.save(value);
         },
@@ -1494,18 +1548,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
   /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
+  /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
+  /// 会立刻删掉已留存的明文，是有害操作。提交后还要过一道**确认弹窗**（标题=选项名
+  /// 「远程托管」、内容=删除警示，老板 2026-10-15）：用户确认才真正执行。
+  ///
+  /// 「远程托管」在 onApply 里**只记录意图、不落地**——弹层关后才错峰弹确认窗；
+  /// 确认 → 保存 + 清明文（勾了"所有秘境"= saveAll + 全局 clear；否则 save +
+  /// clearSpace）；取消 → 什么都不做。内联红色警示随之撤掉（被确认弹窗取代）。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
+    var pendingSecured = false; // 选了远程托管、等确认
+    var pendingScopeAll = false;
     await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageMenuAttachmentStorage,
+        note: l10n.chatPageAttachmentStorageNote,
         selected: _attachmentStorage,
         submitLabel: l10n.chatPageAttachmentStorageSubmit,
-        // 只在"准备切回远程托管、且当前不是它"时提示（真要删数据）
-        warningFor: (v) => (v == 'secured' && _attachmentStorage != 'secured')
-            ? l10n.chatPageAttachmentStorageWarnClear
-            : null,
+        // 「应用于本机所有秘境」勾选框（老板 2026-10-15；提交按钮上方）。
+        // 单秘境时不传 = 整个不渲染（没有可作用的对象，老板 2026-10-17）
+        scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
         options: [
           for (final mode in kAttachmentStorageOptions)
             OptionPickerItem(
@@ -1514,15 +1577,203 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               description: _attachmentStorageDesc(mode, l10n),
             ),
         ],
-        onApply: (mode) async {
-          await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId).save(mode);
+        onApply: (mode, {bool scopeAll = false}) async {
           if (mode == 'secured') {
-            // 切回远程托管：把本机留存的明文附件全部清除
-            await AttachmentStore.clear();
+            // 有害操作：不在这里落地，等确认弹窗（见方法尾）
+            pendingSecured = true;
+            pendingScopeAll = scopeAll;
+            return;
+          }
+          final settings = AttachmentStorageSettings(
+              widget.db ?? LocalDatabase.shared,
+              spaceId: widget.spaceId);
+          if (scopeAll) {
+            // 所有秘境：写全局键 + 清除各空间 per-space 覆盖
+            await settings.saveAll(mode);
+          } else {
+            await settings.save(mode);
           }
         },
       ),
     );
+    if (!pendingSecured || !mounted) return;
+    // 与弹层关闭动画错开再开 dialog（Overlay 交叉卸载断言，同 _menuAction）
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题 = 选项名「远程托管」（复用同一个 l10n 键，老板 2026-10-15）
+          title: Center(child: Text(l10n.chatPageAttachmentStorageSecured)),
+          // 内容 = 原弹层里那条红色警示（撤掉内联版后搬到这里）
+          content: Text(
+            l10n.chatPageAttachmentStorageWarnClear,
+            style: TextStyle(
+                fontSize: 12, color: Theme.of(ctx).colorScheme.error),
+          ),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.confirm),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    // 确认：保存 + 清明文。作用域与勾选框对齐——勾了"所有秘境"就清**全部空间**
+    // 的留存明文（全局 clear），否则只清当前空间（全局 clear 会把别的空间的明文
+    // 缓存一并误删，与其设置矛盾——老板 2026-10-14 指出；撤销/删空间也走
+    // clearSpace）。
+    final settings = AttachmentStorageSettings(
+        widget.db ?? LocalDatabase.shared,
+        spaceId: widget.spaceId);
+    if (pendingScopeAll) {
+      await settings.saveAll('secured');
+      await AttachmentStore.clear();
+    } else {
+      await settings.save('secured');
+      await AttachmentStore.clearSpace(widget.spaceId);
+    }
+  }
+
+  /// 「更多设置」弹层（老板 2026-10-15）：把原先顶层菜单的「附件存储」与新的
+  /// 「墓碑消息」收到一个二级弹层里（顶层菜单只留一个带设置图标的入口）。
+  /// 行式样仿「高级安全」弹层（ListTile + pop 值），尾部带当前值。
+  Future<void> _showMoreSettingsSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      // 允许用满窗高（与「高级安全」「我的设备通道」等弹层同口径）
+      isScrollControlled: true,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final valueStyle = TextStyle(fontSize: 12, color: scheme.outline);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 标题居中（与其它选项弹层口径一致）
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Center(
+                  child: Text(l10n.chatPageMoreSettingsTitle,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
+              ),
+              // 行尾当前值 + >：> 与顶层菜单的二级入口标识同款（老板 2026-10-15），
+              // 暗示点进去还有下一级（各自的选择器）
+              ListTile(
+                leading: const Icon(Icons.attach_file_outlined),
+                title: Text(l10n.chatPageMoreSettingsStorage),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                        _attachmentStorageLabel(_attachmentStorage, l10n),
+                        style: valueStyle),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
+                onTap: () => Navigator.of(ctx).pop('storage'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: Text(l10n.chatPageMoreSettingsTombstone),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_tombstoneDisplayLabel(l10n), style: valueStyle),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
+                onTap: () => Navigator.of(ctx).pop('tombstone'),
+              ),
+              // 底部留白（同「高级安全」弹层：末行不贴屏幕底边）
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    // 与弹层关闭动画错开再开下一个弹层（Overlay 交叉卸载断言，同 _menuAction）
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    if (picked == 'storage') {
+      await _showAttachmentStoragePicker();
+    } else if (picked == 'tombstone') {
+      await _showTombstonePicker();
+    }
+  }
+
+  /// 墓碑消息显示模式当前值的展示文案（与选择器选项同名）。
+  String _tombstoneDisplayLabel(AppLocalizations l10n) =>
+      _tombstoneDisplay == 'hide'
+          ? l10n.chatPageTombstoneHide
+          : l10n.chatPageTombstoneKeep;
+
+  /// 墓碑消息显示模式：**点选即生效**（无提交按钮——纯显示开关，无副作用数据
+  /// 操作；同阅后即焚档位弹层）。选完即存即重建消息流。
+  Future<void> _showTombstonePicker() async {
+    final l10n = AppLocalizations.of(context)!;
+    var picked = _tombstoneDisplay;
+    var appliedToAll = false;
+    await showOptionPickerSheet<void>(
+      context: context,
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageTombstoneHeading,
+        note: l10n.chatPageTombstoneNote,
+        selected: _tombstoneDisplay,
+        // 单选 + 提交（老板 2026-10-15：与附件存储同构——勾选框配提交按钮才
+        // 防呆：提交前统一确认"选什么 + 作用域"）
+        submitLabel: l10n.chatPageTombstoneSubmit,
+        // 「应用于本机所有秘境」勾选框（提交按钮上方，提交时随 onApply 交出）。
+        // 单秘境时不传 = 整个不渲染（老板 2026-10-17）
+        scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
+        options: [
+          OptionPickerItem(
+            value: 'keep',
+            label: l10n.chatPageTombstoneKeep,
+            description: l10n.chatPageTombstoneKeepDesc,
+          ),
+          OptionPickerItem(
+            value: 'hide',
+            label: l10n.chatPageTombstoneHide,
+            description: l10n.chatPageTombstoneHideDesc,
+          ),
+        ],
+        onApply: (mode, {bool scopeAll = false}) async {
+          picked = mode;
+          appliedToAll = scopeAll;
+          final settings = TombstoneSettings(widget.db ?? LocalDatabase.shared,
+              spaceId: widget.spaceId);
+          if (scopeAll) {
+            // 勾了"所有秘境"：写全局键 + 清除各空间 per-space 覆盖
+            await settings.saveAll(mode);
+          } else {
+            await settings.save(mode);
+          }
+        },
+      ),
+    );
+    if (!mounted) return;
+    // 模式没变就不重建（点着玩）；但"所有秘境"的确认照给——作用域落地本身
+    // 就是效果，哪怕模式没变（勾选后点了同一个档位）
+    if (picked != _tombstoneDisplay) {
+      setState(() => _tombstoneDisplay = picked);
+    }
+    if (appliedToAll) {
+      _notice(context, l10n.settingsScopeAllDone);
+    }
   }
 
   /// 菜单行右侧「当前值」：超过 [kMenuValueMaxWidth] 即省略号、右对齐。
@@ -1594,7 +1845,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   未登记性别回退淡灰；
   /// - 有头像时可点开**全屏大图**（老板 2026-09-26）；
   /// - [icon] 覆盖"没头像时"的默认图标（群空间用 `Icons.groups_outlined`）。
-  /// - [saveName] 全屏大图里「下载」按钮保存用的文件名（通常传对方的显示名）。
+  /// - [saveName] 全屏大图「保存」图标圆钮用的文件名（通常传对方的显示名）。
   Widget _statusAvatar({
     Uint8List? bytes,
     String gender = '',
@@ -1610,8 +1861,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onTap: onTap ??
           (bytes == null
               ? null
-              : () => unawaited(
-                  _showAvatarFullscreen(bytes, saveName: saveName))),
+              : () => unawaited(_showAvatarFullscreen(bytes, saveName: saveName))),
     );
   }
 
@@ -1625,97 +1875,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return const Color(0xFFF1F1F1);
   }
 
-  /// 全屏看头像大图（点状态条上的头像触发）。
+  /// 全屏看头像大图：状态条头像入口（老板 2026-10-17 起走**共享**的
+  /// [showMyAvatarFullscreen]——与消息气泡旁头像 / 「我的资料」弹层头像同一份
+  /// 实现，不再各写一套）。
   ///
-  /// [allowReplace]：**本人的**头像为 true → 大图顶部（关闭键旁）多一个
-  /// 「更换头像」按钮（点了关掉大图再进选图流程）。这样"点头像"这一个动作
-  /// 既能看、也能换，不用再回菜单里找那一项（老板 2026-09-26）。
-  /// 对方的头像不给这个按钮——我们没有权限改别人的头像。
-  ///
-  /// 底部「保存」按钮（老板 2026-10-09）：**本人/对方头像都给**，与图片/视频
-  /// 全屏口径一致（保存动作用 [saveName] 作文件名，本人头像传自己的显示名）。
+  /// [allowReplace]：**本人的**头像为 true → 大图带「更换头像」和
+  /// 「应用于本机所有秘境」按钮（后者把这份头像扇出到本机其它秘境）。
+  /// 对方的头像不传这些回调——我们没有权限改别人的头像。
+  /// 「保存」图标圆钮三处一致都给（[saveName] 是保存用的文件名）。
   Future<void> _showAvatarFullscreen(Uint8List bytes,
       {bool allowReplace = false, String? saveName}) async {
-    await withImmersiveFullscreen(() => showDialog<void>(
-          context: context,
-          barrierDismissible: true,
-          useSafeArea: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.zero,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            child: SizedBox.expand(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(gradient: kBrandGradient),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Clickable(
-                        onTap: () => Navigator.of(ctx).pop(),
-                        child: InteractiveViewer(
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Image.memory(bytes, fit: BoxFit.contain),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 顶部一行：右上是关闭键；本人的头像再放「更换头像」
-                    // （老板 2026-10-09：底部让位给「保存」，与图片/视频全屏一致；
-                    // 按钮与「保存」同款居中横排，关闭键浮在右上角）
-                    if (allowReplace)
-                      Positioned(
-                        top: 8,
-                        left: 0,
-                        right: 0,
-                        child: SafeArea(
-                          child: Center(
-                            child: FilledButton.icon(
-                              // 先关大图再进选图：不关的话选图弹层会叠在它上面，
-                              // 取消选图后回到一张"已经没意义"的大图（头像还没换）
-                              onPressed: () {
-                                Navigator.of(ctx).pop();
-                                unawaited(_showAvatarUpload());
-                              },
-                              icon: const Icon(Icons.photo_camera_outlined),
-                              label: Text(
-                                  AppLocalizations.of(ctx)!.chatPageAvatarChange),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // 右上角关闭键（独立一层，「更换头像」居中不挤占它）
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: SafeArea(child: _FullscreenCloseButton()),
-                    ),
-                    // 底部「保存」（移动端入相册、桌面弹保存对话框）。先关大图再
-                    // 保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面会看不见。
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 32,
-                      child: Center(
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            unawaited(_saveAvatarImage(saveName, bytes));
-                          },
-                          icon: const Icon(Icons.save_alt),
-                          label:
-                              Text(AppLocalizations.of(ctx)!.chatPageActionSave),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ));
+    await showMyAvatarFullscreen(
+      context,
+      bytes: bytes,
+      onReplace:
+          allowReplace ? () => unawaited(_showAvatarUpload()) : null,
+      // 扇出用的就是全屏展示的这份 bytes（不再另读 _myAvatarBytes——状态可能
+      // 已变，扇出去的必须和用户看的一致）；单秘境时按钮不出现
+      onApplyAllSpaces: allowReplace && _hasMultipleSpaces
+          ? (b) => _applyAvatarAllSpaces(b)
+          : null,
+      onSave: (b) => _saveAvatarImage(saveName, b),
+    );
   }
 
   /// 状态灯 + 时刻（老板 2026-09-26 新设计）：**绿灯旁是上线时间、红灯旁是下线时间**。
@@ -2342,7 +2523,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [purpose]（2026-10-04 收敛）：`invite` = 开**新身份**（邀请新成员）；
   /// `attach` = 进**已有身份**（缺省=我自己换设备；指向别人 = 帮对方找回）。
   /// **必传**：两种码语义相反，share 错一种等于把对方变成我（2026-10-04 审查
-  /// 实测的 P0）。弹窗内「重新生成」必须沿用同一组参数。
+  /// 实测的 P0）。弹层内「重新生成」必须沿用同一组参数。
   ///
   /// [targetMemberId] / [passphrase]（2026-10-04 定向 token）：`attach` 指向
   /// **别人**时用——passphrase 是"对别人的身份动手"的授权因子，由调用方先向
@@ -2350,6 +2531,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// [targetName] 仅用于**找回**场景的说明文案（"把这个码发给「X」"）。调用方
   /// 已经知道要找的是谁，顺手传进来；缺省（拿不到名字）则文案退成"对方"。
+  ///
+  /// 呈现为**底部弹层**（老板 2026-10-15，原来是 AlertDialog）：无输入框，点
+  /// 遮罩/下滑即关，故底部不放「关闭」按钮，只留一个居中、不占满宽度的
+  /// 「重新生成」（可按可不按，不做成满宽提交按钮那种"必须决定"的口气）。
+  /// 布局与 OptionPickerSheet 同口径：标题+备注固定在顶部（备注归标题组、
+  /// 居中、不滚动），中部（二维码/通道码/链接）Flexible+ListView 内部滚动，
+  /// 「重新生成」固定底部——矮窗不溢出、常用入口不滚走。
   Future<void> _showInviteDialog({
     required String purpose,
     String? targetMemberId,
@@ -2392,123 +2580,176 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           : purpose == 'invite'
               ? l10n.chatPageInviteDialogHintInvite
               : l10n.chatPageInviteDialogHintAttachSelf;
-      await showDialog<void>(
+      await showModalBottomSheet<void>(
         context: context,
+        // 允许用满窗高（与「我的通道」「更多设置」等弹层同口径，老板 2026-10-02）
+        isScrollControlled: true,
         builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setLocal) => AlertDialog(
-            // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中，不居左）——
-            // 与底部弹层的标题口径一致（Center；正文/字段仍靠左）
-            title: Center(child: Text(title)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 说明文案作为大标题的补充说明，置于标题与二维码之间（老板 2026-09-13）；
-                // 靠左对齐——本弹窗除二维码外其余内容均靠左
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(hint,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ),
-                const SizedBox(height: 12),
-                // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
-                // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
-                Center(child: _InviteQrCode(data: r.link)),
-                const SizedBox(height: 12),
-                // 顺序（老板 2026-09-22）：**纯通道码在上、邀请链接在下**——
-                // 多数人是直接复制通道码；链接留给『点开看邀请页』的场景。
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(r.joinToken,
-                          // 通道码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
-                          // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                              color: Theme.of(ctx).colorScheme.onSurface)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.copy, size: 16),
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      tooltip: l10n.chatPageInviteCopyCodeTooltip,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: r.joinToken));
-                        if (!ctx.mounted) return;
-                        _notice(ctx, l10n.chatPageInviteCodeCopied);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                // 邀请链接 + 拷贝图标（点击即复制，弹窗不关闭——根 Overlay 通知
-                // 在弹窗之上可见，老板 2026-09-11）
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(r.link,
-                          // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
+          builder: (ctx, setLocal) {
+            final scheme = Theme.of(ctx).colorScheme;
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 标题居中（与其它选项弹层口径一致）
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+                    child: Center(
+                      child: Text(title,
                           style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                              fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.copy, size: 16),
-                      color: const Color(0xFF2271F7),
-                      tooltip: l10n.chatPageInviteCopyLinkTooltip,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: r.link));
-                        if (!ctx.mounted) return;
-                        _notice(ctx, l10n.chatPageInviteLinkCopied);
-                      },
+                  ),
+                  // 标题下的备注（与 OptionPickerSheet 的 note 同款口径）：
+                  // **固定不随中部滚动**——贴着标题（上 0）、离内容远一点（下
+                  // 14）、居中，表明它归标题那一组，不是内容主体（老板
+                  // 2026-10-15：各弹层口径一致，备注不滚）
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                    child: Center(
+                      child: Text(
+                        hint,
+                        // 换行后的每一行都要居中（Center 只管整块，不管行内对齐）
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12, height: 1.4, color: scheme.outline),
+                      ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-            // 只留一个「关闭」（老板 2026-09-23：原来 Copy/Close 两个纯文字按钮没有主次）。
-            // 去掉了 Copy —— 它复制的是**链接**，而上面 token / 链接两行各自都有复制图标
-            // （带 tooltip 与顶部提示），底部的 Copy 既冗余又没说清复制哪个。
-            // 点弹窗外/返回键本来就能关（showDialog 默认 barrierDismissible:true）；
-            // 留一个 Close 是给"不知道能点外面"的人一条明路。
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  if (busy) return; // 进行中：忽略重复点击
-                  setLocal(() => busy = true);
-                  try {
-                    final fresh = await _withAuth((t) => api.createJoinToken(
-                          widget.spaceId,
-                          t,
-                          purpose: purpose,
-                          targetMemberId: targetMemberId,
-                          passphrase: passphrase,
-                        ));
-                    if (!ctx.mounted) return;
-                    r = fresh; // 就地刷新：二维码 / 通道码 / 链接 ✓
-                    setLocal(() {});
-                  } on ApiException catch (e) {
-                    if (!ctx.mounted) return;
-                    _notice(
-                        ctx, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
-                  } catch (e) {
-                    if (!ctx.mounted) return;
-                    _notice(ctx, l10n.chatPageInviteFailed('$e'));
-                  } finally {
-                    if (ctx.mounted) setLocal(() => busy = false);
-                  }
-                },
-                child: Text(l10n.chatPageInviteRegenerate),
+                  ),
+                  // 中部（二维码+通道码+链接）**可滚动**：Flexible(loose) +
+                  // ListView(shrinkWrap)——内容短时贴着内容（弹层不撑高），窗口
+                  // 矮/内容超高时在这一块内部滚动，不再整体溢出（老板 2026-10-15
+                  // 实测：高度不够时 bottom overflowed 且无法滚动）。标题、备注与
+                  // 「重新生成」固定在两端：它们是随时要用的入口，滚出去找不回来
+                  // （与 ScrollableCardArea 同一套路，见其注释）。
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: Scrollbar(
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                        children: [
+                          // 自绘二维码：QrImageView 的 LayoutBuilder 会触发固有尺寸
+                          // 异常（见 _InviteQrCode 注释），此处不用它
+                          Center(child: _InviteQrCode(data: r.link)),
+                          const SizedBox(height: 12),
+                          // 顺序（老板 2026-09-22）：**纯通道码在上、邀请链接在下**——
+                          // 多数人是直接复制通道码；链接留给『点开看邀请页』的场景。
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SelectableText(r.joinToken,
+                                    // 通道码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
+                                    // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                        color: scheme.onSurface)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, size: 16),
+                                color: scheme.onSurfaceVariant,
+                                tooltip: l10n.chatPageInviteCopyCodeTooltip,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: r.joinToken));
+                                  if (!ctx.mounted) return;
+                                  _notice(ctx, l10n.chatPageInviteCodeCopied);
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          // 邀请链接 + 拷贝图标（点击即复制，弹层不关闭——根 Overlay 通知
+                          // 在弹层之上可见，老板 2026-09-11）
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SelectableText(r.link,
+                                    // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
+                                    style: const TextStyle(
+                                        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, size: 16),
+                                color: const Color(0xFF2271F7),
+                                tooltip: l10n.chatPageInviteCopyLinkTooltip,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: r.link));
+                                  if (!ctx.mounted) return;
+                                  _notice(ctx, l10n.chatPageInviteLinkCopied);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 底部只要一个「重新生成」，**居中且不占满宽度**（老板 2026-10-15）：
+                  // 附件存储那种满宽提交按钮是"必须做决定"的口气，而重新生成可按可不
+                  // 按；关闭走弹层惯例外（点遮罩/下滑），不再给「关闭」按钮。
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: TextButton(
+                      // 淡灰底+悬浮/按压变深（老板 2026-10-18）：与弹窗「取消」
+                      // 按钮共用 grayButtonStyle，同类低强调按钮观感一致
+                      style: grayButtonStyle().copyWith(
+                        overlayColor: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.pressed)) {
+                            return Colors.black.withValues(alpha: 0.09);
+                          }
+                          if (states.contains(WidgetState.hovered)) {
+                            return Colors.black.withValues(alpha: 0.05);
+                          }
+                          return Colors.transparent;
+                        }),
+                      ),
+                      onPressed: busy
+                          ? null
+                          : () async {
+                              if (busy) return; // 进行中：忽略重复点击
+                              setLocal(() => busy = true);
+                              try {
+                                final fresh = await _withAuth((t) => api.createJoinToken(
+                                      widget.spaceId,
+                                      t,
+                                      purpose: purpose,
+                                      targetMemberId: targetMemberId,
+                                      passphrase: passphrase,
+                                    ));
+                                if (!ctx.mounted) return;
+                                r = fresh; // 就地刷新：二维码 / 通道码 / 链接 ✓
+                                setLocal(() {});
+                              } on ApiException catch (e) {
+                                if (!ctx.mounted) return;
+                                _notice(
+                                    ctx, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
+                              } catch (e) {
+                                if (!ctx.mounted) return;
+                                _notice(ctx, l10n.chatPageInviteFailed('$e'));
+                              } finally {
+                                if (ctx.mounted) setLocal(() => busy = false);
+                              }
+                            },
+                      child: busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.4))
+                          : Text(l10n.chatPageInviteRegenerate),
+                    ),
+                  ),
+                ],
               ),
-              TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.close)),
-            ],
-          ),
+            );
+          },
         ),
       );
     } on ApiException catch (e) {
@@ -2545,10 +2786,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => _SetLockDialog(
-        payload: payload,
-        db: db,
-        hasPin: hasPin,
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _SetLockDialog(
+          payload: payload,
+          db: db,
+          hasPin: hasPin,
+        ),
       ),
     );
     if (ok == true && mounted) {
@@ -2563,6 +2809,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final has = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
     if (!mounted || has == _hasPin) return;
     setState(() => _hasPin = has);
+    // PIN 状态刚确定（如 initState 首读完成）→ 重排 idle 计时器：
+    // 设了 PIN 才开始计（_armIdleLock 内会判 _hasPin），没设则清空
+    _armIdleLock();
   }
 
   /// 「邮件通知」菜单项右侧的当前值（没设置/没拉到 → null，不显示）。
@@ -2611,14 +2860,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 把邮箱通知设置**扇出到本机所有空间**（老板 2026-10-01 定：通知按设备共享，
-  /// 不按空间各设各的）。逐空间走它自己的会话调 [action]（PUT/DELETE），
-  /// 全部 best-effort：某个空间会话过期/离线拉不到就跳过，不影响其它空间，
-  /// 也不打扰用户（与 _refreshNotifyEmail 同一条"装饰性功能不弹错"原则）。
-  ///
-  /// 服务端按**地址**聚合验证状态（notify_emails.verified_at），同一地址在别的
-  /// 空间已验证过时 PUT 直接返回 verified、不重发确认信——扇出因此是便宜的。
-  Future<void> _fanoutNotifyEmail(Future<void> Function(String token) action) async {
+  /// 把某个操作**扇出到本机其它空间**（2026-10-01 起的"按设备共享"一族共用：
+  /// 邮箱通知、身份/通道改名）。逐空间走它自己的会话调 [action]，全部
+  /// best-effort——某个空间会话过期/离线就跳过，不影响其它空间，也不打扰用户
+  /// （与 _refreshNotifyEmail 同一条"装饰性功能不弹错"原则）。当前空间由调用方
+  /// 自己处理，这里跳过。
+  Future<void> _fanoutOtherSpaces(Future<void> Function(String token) action) async {
     final vault = VaultSession.current;
     final spaces = vault?.spaces ?? const <AppLockPayload>[];
     if (spaces.length < 2) return;
@@ -2634,10 +2881,75 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 把本机其它空间的**本地 profile** 里某个字段改写（扇出改名用：服务端改了，
+  /// 本地各空间的 profile 也得跟着改，否则切过去/重启后还是旧名）。逐空间
+  /// loadProfile → 只替换 [memberName]/[entranceName] 之一 → saveProfile 整份
+  /// 写回——saveProfile 是覆盖写，必须把原值带回去；mode/otherMembers/
+  /// groupName 传 null = 保持原值（它们的"不知道就别抹掉"语义）。best-effort，
+  /// 单个空间失败静默。Spaces 行的名字也由 saveProfile 一并更新（切空间卡片
+  /// 显示的就是它）。
+  Future<void> _rewriteOtherSpacesProfile(
+      {String? memberName, String? entranceName}) async {
+    final vault = VaultSession.current;
+    final spaces = vault?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) return;
+    final db = widget.db ?? LocalDatabase.shared;
+    final lock = AppLockService(db);
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue; // 当前空间已由调用方处理
+      try {
+        final p = await lock.loadProfile(spaceId: space.spaceId);
+        await lock.saveProfile(
+          spaceId: space.spaceId,
+          memberName: memberName ?? (p['memberName'] as String?) ?? '',
+          peerName: (p['peerName'] as String?) ?? '',
+          entranceName: entranceName ?? (p['entranceName'] as String?) ?? '',
+          myGender: (p['myGender'] as String?) ?? '',
+          peerGender: (p['peerGender'] as String?) ?? '',
+          mySlot: (p['mySlot'] as int?),
+          peerSlot: (p['peerSlot'] as int?),
+          groupName: (p['groupName'] as String?) ?? '',
+        );
+      } catch (_) {
+        // 单个空间失败不阻塞其余空间
+      }
+    }
+  }
+
+  /// 本机是否有 ≥2 个秘境：「应用于本机所有秘境」一族控件（各弹层勾选框 /
+  /// 头像全屏按钮）只在多秘境时出现——单秘境时"应用所有"没有任何可作用的
+  /// 对象，摆着纯误导（老板 2026-10-17）。与 [_fanoutOtherSpaces] 同一个
+  /// 数据源（VaultSession 内存态，解锁后的聊天页里必然非空；取不到时按
+  /// false 处理 = 不显示，保守方向）。
+  bool get _hasMultipleSpaces =>
+      (VaultSession.current?.spaces.length ?? 0) >= 2;
+
+  /// 把当前头像扇出到本机其它秘境（老板 2026-10-17，头像全屏里的
+  /// 「应用于本机所有秘境」按钮）：逐空间用 bytes 再走一遍 uploadAvatar。
+  /// 与 _fanoutOtherSpaces 同款 best-effort——单个空间失败不影响其余，也不打扰
+  /// 用户。当前空间在上传时已经处理过，这里跳过。
+  Future<void> _applyAvatarAllSpaces(Uint8List bytes) async {
+    final spaces = VaultSession.current?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) return; // 单秘境：没什么可扇出的（按钮本就不该出现）
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue; // 当前空间已处理
+      if ((space.token ?? '').isEmpty) continue;
+      try {
+        await SpaceSessions.ofPayload(space, db: widget.db)
+            .call((t) => ApiClient(effectiveServer).uploadAvatar(bytes, t));
+      } catch (_) {
+        // 单个空间失败不阻塞其余空间
+      }
+    }
+    if (!mounted) return;
+    _notice(context, AppLocalizations.of(context)!.settingsScopeAllDone);
+  }
+
   /// 邮件通知设置（菜单项，2026-10-01）：填邮箱 → 服务端发一封确认信 → 点信里链接生效。
   ///
   /// **必须把"已填但没确认"这一档显示出来**：否则用户填完以为已经开了，其实一封也收不到。
-  /// 已设置时额外给一个「停用」（DELETE），不给"改地址"以外的第二入口（改地址＝重填再保存）。
+  /// 已设置时额外给一个「停用」（DELETE）：停用即关弹窗、顶部发一条通知（老板 2026-10-15，
+  /// 原地切回输入界面让人混淆）；改地址＝重开弹窗重填再保存。
   Future<void> _showNotifyDialog() async {
     final l10n = AppLocalizations.of(context)!;
     // 开弹窗前先拉一次最新状态：它可能已经在 App 外面被翻转（确认邮件点过了），
@@ -2650,42 +2962,55 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 红字警示（空/格式不对/后台失败）与提交中标记，都只在弹窗内有效
     final error = ValueNotifier<String?>(null);
     final busy = ValueNotifier<bool>(false);
-    // 「已设置 ↔ 未设置」两阶段（老板 2026-10-02）：已设置时输入框只读、只给「停用」；
-    // 停用成功不关弹窗，原地切成空白可编辑输入框 + 「保存」。初始值取开弹窗时的状态。
-    final active = ValueNotifier<bool>(!(before?.isNone ?? true));
-    // 应用范围勾选（老板 2026-10-02）：回显上次勾选的持久化偏好（默认勾选＝
-    // 保存/停用同步扇出到本机所有秘境，2026-10-01 起的既有行为）；不勾＝只作用于
-    // 当前秘境，且新建空间不再自动继承（_inheritNotifyEmail 读同一份偏好）。
+    // 「已设置 ↔ 未设置」两阶段（老板 2026-10-02）：已设置时输入框只读、只给「停用」。
+    // 初始值取开弹窗时的状态；停用成功后弹窗直接关闭（老板 2026-10-15），不再原地切态。
+    final active = !(before?.isNone ?? true);
+    // 邮箱输入框的焦点节点（随弹窗释放）：只读态靠 TextField 的 canRequestFocus
+    // 拦住聚焦——注意 TextField.initState 会用**自己的** canRequestFocus 覆写节点
+    // 上的同名属性，所以两个都要给，只给节点会被重置掉（老板 2026-10-15）
+    final emailFocus = FocusNode();
+    // 应用范围勾选（老板 2026-10-02）：勾选＝本次保存/停用同步扇出到本机所有
+    // 秘境；不勾＝只作用于当前秘境。**每次开弹窗都默认不勾选**（老板 2026-10-15）：
+    // 纯一次性开关，不持久化——新空间自动继承邮箱的功能已取消（服务端地址级验证，
+    // 老地址重填直接 verified、不再发确认信），扇出必须是每次显式 opt-in。
     // 服务端本来就是地址级验证 + 空间级绑定，扇不扇出纯客户端决定，不冲突。
-    final allSpaces = ValueNotifier<bool>(true);
-    unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
-        .load()
-        .then((v) => allSpaces.value = v));
+    final allSpaces = ValueNotifier<bool>(false);
     // 正文语言：服务端不知道收件人读哪种语言，按本机界面语言上报（zh / 其它一律 en）
     final lang = Localizations.localeOf(context).languageCode == 'zh' ? 'zh' : 'en';
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageNotifyTitle)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              l10n.chatPageNotifyHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(ctx).colorScheme.outline,
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Center(child: Text(l10n.chatPageNotifyTitle)),
+          // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；M3 默认标题→内容 16
+          // 对"标题+备注"的弹窗偏大，备注贴内容又偏近——老板 2026-10-15）
+          contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.chatPageNotifyHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.outline,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            // 已设置 → 只读（停用后由 active 切回可编辑）；未设置 → 正常输入
-            ValueListenableBuilder<bool>(
-              valueListenable: active,
-              builder: (_, isActive, _) => TextField(
+              const SizedBox(height: 14),
+              // 已设置 → 只读；未设置 → 正常输入
+              TextField(
                 controller: ctrl,
-                readOnly: isActive,
+                focusNode: emailFocus,
+                readOnly: active,
+                // 只读态**不许聚焦**（老板 2026-10-15）：readOnly 只挡键盘，不挡
+                // 聚焦——默认点一下边框就变蓝，像能改其实不能。必须传给 TextField
+                // 本身：它 initState 时会用自己的这个值覆写 focusNode 上的
+                // canRequestFocus（只设节点会被重置掉）
+                canRequestFocus: !active,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: l10n.chatPageNotifyEmailLabel,
@@ -2695,182 +3020,182 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   if (error.value != null) error.value = null;
                 },
               ),
-            ),
-            // 应用范围勾选（老板 2026-10-02）：默认勾选＝保存/停用同步到本机所有秘境
-            // （原静态文案「保存后应用于本机所有秘境。」升级为可选项）。
-            // 放在 Email 输入框下方（老板 2026-10-02）
-            ValueListenableBuilder<bool>(
-              valueListenable: allSpaces,
-              builder: (_, all, _) => CheckboxListTile(
-                value: all,
-                onChanged: (v) {
-                  final next = v ?? true;
-                  allSpaces.value = next;
-                  // 勾选即落盘：它是设备级默认策略（新空间继承钩子也读它），
-                  // 不等点保存——关掉弹窗也应该记住
-                  unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
-                      .save(next));
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(
-                  l10n.chatPageNotifyAllSpaces,
+              // 应用范围勾选（老板 2026-10-02）：勾选＝本次保存/停用同步到本机
+              // 所有秘境（原静态文案「保存后应用于本机所有秘境。」升级为可选项）。
+              // 放在 Email 输入框下方（老板 2026-10-02）。
+              // 2026-10-15：复用 LabeledCheckbox——与设置弹层的「应用于本机所有
+              // 秘境」同模块、同居中式样，文案也收敛到共享键 settingsScopeAll。
+              // **纯一次性开关**：不持久化、每次开弹窗默认不勾选（老板 2026-10-15；
+              // 新空间自动继承邮箱的功能已一并取消）——扇出必须是每次显式 opt-in。
+              // 单秘境时整个不渲染（没有"其它秘境"可同步，老板 2026-10-17）
+              if (_hasMultipleSpaces)
+                ValueListenableBuilder<bool>(
+                  valueListenable: allSpaces,
+                  builder: (_, all, _) => LabeledCheckbox(
+                    value: all,
+                    label: l10n.settingsScopeAll,
+                    onChanged: (v) => allSpaces.value = v,
+                  ),
+                ),
+              // 已填但还没点链接：这一档不点明，用户会以为已经生效
+              if (before?.isPending ?? false) ...[
+                const SizedBox(height: 10),
+                Text(
+                  l10n.chatPageNotifyStatePending,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(ctx).colorScheme.outline,
                   ),
                 ),
-              ),
-            ),
-            // 已填但还没点链接：这一档不点明，用户会以为已经生效
-            if (before?.isPending ?? false) ...[
-              const SizedBox(height: 10),
-              Text(
-                l10n.chatPageNotifyStatePending,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(ctx).colorScheme.outline,
-                ),
-              ),
-            ],
-            ValueListenableBuilder<String?>(
-              valueListenable: error,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              ],
+              ValueListenableBuilder<String?>(
+                valueListenable: error,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-            ),
+              ),
+            ],
+          ),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
+            if (active)
+              ValueListenableBuilder<bool>(
+                valueListenable: busy,
+                builder: (_, isBusy, _) => TextButton(
+                  // 红底白字警告色（老板 2026-10-18）：停用是警告级动作；
+                  // 不特地做小，大小与「取消」/「保存」提交按钮同款
+                  style: TextButton.styleFrom(
+                    backgroundColor: Theme.of(ctx).colorScheme.error,
+                    foregroundColor: Theme.of(ctx).colorScheme.onError,
+                    // 与「取消」/「保存」提交按钮同块头（96x50、17 号粗体，
+                    // 同 main.dart 的 FilledButton 主题），不特地做小
+                    minimumSize: const Size(96, 50),
+                    textStyle: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: isBusy
+                      ? null
+                      : () async {
+                          busy.value = true;
+                          try {
+                            final api = widget.api ?? ApiClient(effectiveServer);
+                            await _withAuth((t) => api.deleteNotifyEmail(t));
+                            if (!mounted) return;
+                            // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
+                            // 不勾＝只停当前秘境，其它秘境的绑定原样保留
+                            if (allSpaces.value) {
+                              unawaited(_fanoutOtherSpaces(
+                                  (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
+                            }
+                            await _refreshNotifyEmail();
+                            // 停用即关弹窗 + 顶部通知一句，与保存成功后的反馈一致
+                            // （老板 2026-10-15；原地切回输入界面只会让人混淆）
+                            if (ctx.mounted) Navigator.of(ctx).pop(true);
+                            if (mounted) _notice(context, l10n.chatPageNotifyRemoved);
+                          } on ApiException catch (e) {
+                            if (ctx.mounted) {
+                              error.value =
+                                  backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                            }
+                          } catch (e) {
+                            if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                          } finally {
+                            busy.value = false;
+                          }
+                        },
+                  // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
+                  child: isBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        )
+                      : Text(l10n.chatPageNotifyStop),
+                ),
+              )
+            else
+              ValueListenableBuilder<bool>(
+                valueListenable: busy,
+                builder: (_, isBusy, _) => FilledButton(
+                  onPressed: isBusy
+                      ? null
+                      : () async {
+                          final email = ctrl.text.trim();
+                          if (email.isEmpty) {
+                            error.value = l10n.chatPageNotifyEmptyError;
+                            return;
+                          }
+                          // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
+                          if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                            error.value = l10n.chatPageNotifyInvalidError;
+                            return;
+                          }
+                          busy.value = true;
+                          try {
+                            final api = widget.api ?? ApiClient(effectiveServer);
+                            final status =
+                                await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
+                            if (!mounted) return;
+                            // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
+                            // 不勾＝只绑当前秘境，其它秘境不动
+                            if (allSpaces.value) {
+                              unawaited(_fanoutOtherSpaces(
+                                  (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
+                            }
+                            await _refreshNotifyEmail();
+                            if (ctx.mounted) Navigator.of(ctx).pop(true);
+                            if (mounted) {
+                              _notice(
+                                context,
+                                status.isVerified
+                                    ? l10n.chatPageNotifyDone(email)
+                                    : l10n.chatPageNotifySent(email),
+                              );
+                            }
+                          } on ApiException catch (e) {
+                            if (ctx.mounted) {
+                              error.value =
+                                  backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                            }
+                          } catch (e) {
+                            if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                          } finally {
+                            busy.value = false;
+                          }
+                        },
+                  // busy 期间请求要好几秒才回（服务端要发确认信），换成旋转图标，
+                  // 否则按钮灰着没动静，用户会以为没点上（老板 2026-10-01）
+                  child: isBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        )
+                      : Text(l10n.chatPageEmailSubmit),
+                ),
+              ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
-          ValueListenableBuilder<bool>(
-            valueListenable: active,
-            builder: (_, isActive, _) => isActive
-                ? ValueListenableBuilder<bool>(
-                    valueListenable: busy,
-                    builder: (_, isBusy, _) => TextButton(
-                      onPressed: isBusy
-                          ? null
-                          : () async {
-                              busy.value = true;
-                              try {
-                                final api = widget.api ?? ApiClient(effectiveServer);
-                                await _withAuth((t) => api.deleteNotifyEmail(t));
-                                if (!mounted) return;
-                                // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
-                                // 不勾＝只停当前秘境，其它秘境的绑定原样保留
-                                if (allSpaces.value) {
-                                  unawaited(_fanoutNotifyEmail(
-                                      (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
-                                }
-                                await _refreshNotifyEmail();
-                                // 不关弹窗：原地切回"未设置"态（空白可编辑 + 保存）
-                                ctrl.clear();
-                                active.value = false;
-                              } on ApiException catch (e) {
-                                if (ctx.mounted) {
-                                  error.value =
-                                      backendError(l10n, l10n.chatPageNotifyFailed(e.message));
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
-                              } finally {
-                                busy.value = false;
-                              }
-                            },
-                      // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
-                      child: isBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.4),
-                            )
-                          : Text(l10n.chatPageNotifyStop),
-                    ),
-                  )
-                : ValueListenableBuilder<bool>(
-                    valueListenable: busy,
-                    builder: (_, isBusy, _) => FilledButton(
-                      onPressed: isBusy
-                          ? null
-                          : () async {
-                              final email = ctrl.text.trim();
-                              if (email.isEmpty) {
-                                error.value = l10n.chatPageNotifyEmptyError;
-                                return;
-                              }
-                              // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
-                              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-                                error.value = l10n.chatPageNotifyInvalidError;
-                                return;
-                              }
-                              busy.value = true;
-                              try {
-                                final api = widget.api ?? ApiClient(effectiveServer);
-                                final status =
-                                    await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
-                                if (!mounted) return;
-                                // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
-                                // 不勾＝只绑当前秘境，其它秘境不动
-                                if (allSpaces.value) {
-                                  unawaited(_fanoutNotifyEmail(
-                                      (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
-                                }
-                                await _refreshNotifyEmail();
-                                if (ctx.mounted) Navigator.of(ctx).pop(true);
-                                if (mounted) {
-                                  _notice(
-                                    context,
-                                    status.isVerified
-                                        ? l10n.chatPageNotifyDone(email)
-                                        : l10n.chatPageNotifySent(email),
-                                  );
-                                }
-                              } on ApiException catch (e) {
-                                if (ctx.mounted) {
-                                  error.value =
-                                      backendError(l10n, l10n.chatPageNotifyFailed(e.message));
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
-                              } finally {
-                                busy.value = false;
-                              }
-                            },
-                      // busy 期间请求要好几秒才回（服务端要发确认信），换成旋转图标，
-                      // 否则按钮灰着没动静，用户会以为没点上（老板 2026-10-01）
-                      child: isBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.4),
-                            )
-                          : Text(l10n.chatPageEmailSubmit),
-                    ),
-                  ),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（与改名弹窗同款：立刻 dispose 会触发
     // TextField 卸载后向已销毁 controller 加 listener 的红屏断言）
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
+      emailFocus.dispose();
       error.dispose();
       busy.dispose();
-      active.dispose();
       allSpaces.dispose();
     });
     if (saved == true && mounted) await _refreshNotifyEmail();
@@ -2881,17 +3206,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showChangePassphraseDialog() async {
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => _ChangePassphraseDialog(
-        server: effectiveServer,
-        spaceKeyB64: base64Encode(widget.spaceKey),
-        spaceId: widget.spaceId,
-        keyVersion: widget.keyVersion,
-        spaceMode: _isGroup ? 'group' : 'duo',
-        session: _session,
-        api: widget.api,
-        onPassphraseUpdated: (updatedAt) {
-          if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
-        },
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _ChangePassphraseDialog(
+          server: effectiveServer,
+          spaceKeyB64: base64Encode(widget.spaceKey),
+          spaceId: widget.spaceId,
+          keyVersion: widget.keyVersion,
+          spaceMode: _isGroup ? 'group' : 'duo',
+          session: _session,
+          api: widget.api,
+          onPassphraseUpdated: (updatedAt) {
+            if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
+          },
+        ),
       ),
     );
     if (changed == true && mounted) {
@@ -2961,44 +3291,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     var obscure = true;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Center(child: Text(title)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                obscureText: obscure,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  hintText: l10n.chatPagePassphraseFieldHint,
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                    tooltip: obscure
-                        ? l10n.chatPagePassphraseShow
-                        : l10n.chatPagePassphraseHide,
-                    onPressed: () => setLocal(() => obscure = !obscure),
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: Center(child: Text(title)),
+            // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+            contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    hintText: l10n.chatPagePassphraseFieldHint,
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                      tooltip: obscure
+                          ? l10n.chatPagePassphraseShow
+                          : l10n.chatPagePassphraseHide,
+                      onPressed: () => setLocal(() => obscure = !obscure),
+                    ),
                   ),
+                  onSubmitted: (_) => Navigator.of(ctx).pop(true),
                 ),
-                onSubmitted: (_) => Navigator.of(ctx).pop(true),
+              ],
+            ),
+            actions: [
+              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-            ),
-          ],
         ),
       ),
     );
@@ -3012,18 +3346,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return text;
   }
 
-  /// 空间成员弹层（**2026-10-05 重做**，老板定的版式）：
-  /// **每行一张成员卡**——底色=该成员性别色（男浅蓝 / 女浅粉 / 性别未知=中性灰）；
-  /// 左：真实头像 + 名字；右：可点的文字按钮（已有成员=「重新邀请」）。
+  /// 空间成员弹层。**group 与 duo 两套版式**（duo 2026-10-18 改版，老板定）：
+  ///
+  /// **group（我的群组）**：每行一张成员卡——底色=该成员性别色（男浅蓝 / 女浅粉 /
+  /// 性别未知=中性灰）；左：真实头像 + 名字；右：可点的文字按钮（已有成员=
+  /// 「重新邀请」）。
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
-  /// - **尚未加入**的卡：默认头像 + 淡色占位词「待加入」（`memberPending`）；
-  ///   duo 里对方还没来 = 就是那一张；
-  /// - 未满员时列表末尾追加一张「邀请」占位卡（新人还没有卡片可挂按钮）；
+  /// - 未满员时列表末尾是「邀请新同伴」大按钮；
   /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
   /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
   /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
   /// - **无退出入口**（一期：入群即不退群）。
+  ///
+  /// **duo（我的同伴）**：改走 [_showDuoPeerSheet]——与「我的资料」同款的单张
+  /// 只读身份卡（duo 只有对方一个人，成员卡列表反而零碎）。
   Future<void> _showMembersSheet() async {
+    if (!_isGroup) {
+      await _showDuoPeerSheet();
+      return;
+    }
     final l10n = AppLocalizations.of(context)!;
     // 其他成员（不含我），按加入先后（槽位升序 = 入群顺序）排
     final others = _memberSlots.entries
@@ -3052,60 +3393,69 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
-                  // 群空间：成员列表前放「群名称」标题行（老板 2026-10-11）：
-                  // **不用卡片**——白底上的标题文字（同弹层标题字号/字重），
-                  // 未设置 → 淡色占位词「群空间名称/Group space name」；
-                  // 编辑按钮紧跟文字右侧（不顶到最右）。点它打开改群名弹窗
-                  //（同状态条点群名）。
+                  // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
+                  // 「我的资料」弹层的名字胶囊同款——实底 + Material/InkWell 水波，
+                  // 文字+编辑图标一眼可点）。底色淡蓝 tertiaryContainer（老板：
+                  // 胶囊底不要粉色，淡蓝/灰皆可——两处胶囊统一淡蓝）。未设置 →
+                  // 淡色占位词；点击打开改群名弹窗（同状态条点群名）。
                   if (_isGroup)
                     Padding(
                       padding: const EdgeInsets.only(top: 2, bottom: 14),
                       child: Center(
-                        child: InkWell(
-                          // key 供测试定位群名行（状态条上可能有同文案，需区分）
-                          key: const ValueKey('membersSheetGroupNameRow'),
-                          mouseCursor: SystemMouseCursors.click,
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            // 先收起成员弹层；等它收完再弹改群名弹窗（同
-                            // 「重新邀请」的 route 交接处理，见其注释）
-                            Navigator.of(ctx).pop();
-                            _menuAction(_showGroupNameDialog);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  // 占位词与改群名弹窗标题共用同一键（老板
-                                  // 2026-10-11：合并为一个文案「群组名称/
-                                  // Group name」，不另设占位词键）
-                                  _groupName.isEmpty
-                                      ? l10n.chatPageGroupNameTitle
-                                      : _groupName,
-                                  style: TextStyle(
-                                    // 占位词单独降档（老板 2026-10-11）：字号
-                                    // 小一档 + 更浅的 outline 色，别与真群名
-                                    // 的 22/w700 深色抢眼；有名字 → 群名
-                                    // 弹层里最显眼（22/w700）
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: _groupName.isEmpty ? 18 : 22,
-                                    height: 1.2,
-                                    color: _groupName.isEmpty
-                                        ? Theme.of(ctx).colorScheme.outline
-                                        : null,
+                        child: Material(
+                          // 与「添加秘境」/「新建通道」/「邀请新同伴」大按钮同款淡灰
+                          // （老板 2026-10-17：胶囊底也统一成淡灰，不再用淡蓝）
+                          color: Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(999),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            // key 供测试定位群名行（状态条上可能有同文案，需区分）
+                            key: const ValueKey('membersSheetGroupNameRow'),
+                            mouseCursor: SystemMouseCursors.click,
+                            onTap: () {
+                              // 先收起成员弹层；等它收完再弹改群名弹窗（同
+                              // 「重新邀请」的 route 交接处理，见其注释）
+                              Navigator.of(ctx).pop();
+                              _menuAction(_showGroupNameDialog);
+                            },
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 9, 12, 9),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      // 占位词与改群名弹窗标题共用同一键（老板
+                                      // 2026-10-11：合并为一个文案「群组名称/
+                                      // Group name」，不另设占位词键）
+                                      _groupName.isEmpty
+                                          ? l10n.chatPageGroupNameTitle
+                                          : _groupName,
+                                      style: TextStyle(
+                                        // 占位词单独降档（老板 2026-10-11）：字号
+                                        // 小一档 + 更浅的 outline 色，别与真群名
+                                        // 的 20/w700 深色抢眼；有名字 → 胶囊里
+                                        // 最显眼（20/w700，与「我的资料」名字
+                                        // 胶囊同档）
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: _groupName.isEmpty ? 18 : 20,
+                                        height: 1.2,
+                                        color: _groupName.isEmpty
+                                            ? Theme.of(ctx).colorScheme.outline
+                                            : null,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(Icons.edit_outlined,
-                                    size: 18,
-                                    color: Theme.of(ctx)
-                                        .colorScheme
-                                        .onSurfaceVariant),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.edit_outlined,
+                                      size: 18,
+                                      color: Theme.of(ctx)
+                                          .colorScheme
+                                          .onSurfaceVariant),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -3125,26 +3475,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             e.key, _memberNames[e.key]));
                       },
                     ),
-                  // 未满 → 末尾一张邀请卡（duo 保留"默认头像+待加入+邀请"版式；
-                  // **群组改加号行**（老板 2026-10-06）：头像与"待加入"占位词去掉，
-                  // 与「添加秘境」/「新建通道」同款——加号图标 + 文字整体居中；
-                  // 底色暂保持原中性 tint，等老板检查）
-                  if (_canInvite && !_isGroup)
-                    _membersCard(
-                      memberId: null, // 默认头像
-                      gender: '',
-                      name: l10n.memberPending, // 占位词（"待加入"）
-                      faintName: true,
-                      actionLabel: l10n.chatPageMembersInvite,
-                      onAction: () {
-                        Navigator.of(ctx).pop();
-                        _menuAction(
-                            () => _showInviteDialog(purpose: 'invite'));
-                      },
-                    )
-                  else if (_canInvite && _isGroup)
+                  // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
+                  // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
+                  if (_canInvite)
                     Material(
-                      color: _genderTint(''), // 底色暂保持不变，等老板检查
+                      // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
+                      // 三个大按钮底色统一）；hover/按住加深同口径
+                      color: Colors.black.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(mouseCursor: SystemMouseCursors.click,
@@ -3153,8 +3490,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _menuAction(
                               () => _showInviteDialog(purpose: 'invite'));
                         },
-                        hoverColor: Colors.black.withValues(alpha: 0.05),
-                        highlightColor: Colors.black.withValues(alpha: 0.08),
+                        hoverColor: Colors.black.withValues(alpha: 0.10),
+                        highlightColor: Colors.black.withValues(alpha: 0.14),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Row(
@@ -3178,6 +3515,214 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _memberCount, _maxMembers),
                       muted: true,
                     ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// duo 的「我的同伴」弹层（老板 2026-10-18 改版）：与「我的资料」弹层**同款
+  /// 布局的单张身份卡**，但**全部只读**——不能编辑（改名/换头像是「我的资料」
+  /// 的权利，对方的资料我们没有权限动）。
+  ///
+  /// - 左：头像（粉蓝渐变细环 + surface 留白，与「我的资料」同款）。**点头像 =
+  ///   打开头像全屏**——与消息气泡旁对方头像同一份共享全屏实现（底部「保存」
+  ///   可下载；没有「更换头像」：不给改别人的图）。没头像时点它没有动作
+  ///   （[_MessageAvatarState.handleTap] 自己按图缓存决策，我们不替它猜）。
+  /// - 右两行：名字（上）+ 性别（下），左对齐。
+  ///   - 名字：对方名字；没名字时按状态给占位词——还没加入 = 「待加入」
+  ///     （`memberPending`），已加入但没命名 = 「未命名」（`chatPageMembersUnnamed`）；
+  ///   - 性别：只读性别图标（老板 2026-10-18：不显示男/女文字；性别为空
+  ///     整行不显示性别部分）。
+  /// - **邀请 / 重新邀请按钮放在性别那一行、右端对齐**（老板 2026-10-18）：
+  ///   对方已加入 = 「重新邀请」（先要共享口令，见 [_reinviteMemberIdentity]）；
+  ///   还没加入 = 「邀请」（[_showInviteDialog] purpose=invite）。原来它们挂在
+  ///   成员卡右侧 / 状态条尾部，改版后收进身份卡；状态条尾部只留语音通话。
+  ///
+  /// 桌面端限宽 [kMyProfileSheetMaxWidth]（与「我的资料」同口径：宽屏下不拉成
+  /// 空旷长带）；点按衔接同样走「先收弹层、错峰 300ms 再开下一条」。
+  Future<void> _showDuoPeerSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    // 对方 member：duo 只有一位——槽位表里除我之外那个（含未命名成员）；
+    // 槽位里没有他 = 还没加入（duo 满 2 人即永久关闭邀请，见 [_canInvite]）。
+    final others = _memberSlots.entries
+        .where((e) => e.key != _myMemberId)
+        .toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final peerId = others.isNotEmpty ? others.first.key : null;
+    final peerJoined = peerId != null;
+    // 性别配色：男女各用 Logo 里的粉/蓝（与「我的资料」、向导、改名弹窗同色）
+    final isFemale = _peerGender == 'female';
+    final isMale = _peerGender == 'male';
+    final genderColor = isFemale
+        ? const Color(0xFFD6529C)
+        : isMale
+            ? const Color(0xFF3BAFFD)
+            : scheme.outline;
+    final genderLabel =
+        isFemale ? l10n.wizardGenderFemale : isMale ? l10n.wizardGenderMale : '';
+    // 名字占位词：还没来 = 「待加入」（与状态条同一口径）；来了没命名 = 「未命名」
+    final peerName = _peerName.isNotEmpty
+        ? _peerName
+        : peerJoined
+            ? l10n.chatPageMembersUnnamed
+            : l10n.memberPending;
+    final nameIsPlaceholder = _peerName.isEmpty;
+    // 头像组件句柄：外层方形热区（头像 + 渐变环）通过它触发头像自己的点按决策
+    // （有图 → 全屏 / 没图 → 无动作），内层传 openFullscreenOnTap:false 让出
+    // 点击——与「我的资料」弹层同手法（老板 2026-10-17）。
+    final avatarKey = GlobalKey<_MessageAvatarState>();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
+      // 桌面端限宽（与「我的资料」同口径，老板 2026-10-17）：不限宽时整张
+      // 身份卡随窗口拉长，头像和名字之间会隔出一大片空白。
+      constraints: const BoxConstraints(maxWidth: kMyProfileSheetMaxWidth),
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Center(
+                      child: Text(l10n.chatPageMembersTitle('duo'),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: scheme.onSurface)),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      // 头像（左侧大图）= **一个方形热区**（与「我的资料」同款）：
+                      // 点头像、点渐变环的空白都算——去向由 _MessageAvatar 按它
+                      // 自己的图缓存决定（有图 → 全屏；没图 → 没有动作）。
+                      Clickable(
+                        behavior: HitTestBehavior.opaque, // 方角空白也算热区
+                        circle: true, // 反馈遮罩仍跟圆走，方角不染色
+                        onTap: () => avatarKey.currentState?.handleTap(),
+                        // key 供测试定位头像热区（弹层外状态条上也有头像）
+                        key: const ValueKey('duoPeerSheetAvatar'),
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: scheme.surface,
+                            ),
+                            child: _MessageAvatar(
+                              key: avatarKey,
+                              memberId: peerId,
+                              server: effectiveServer,
+                              api: widget.api,
+                              radius: 40,
+                              // 点击交给外层方形热区（统一一个动作）
+                              openFullscreenOnTap: false,
+                              // 别人的头像：只有「保存」可下载，不给换/不给扇出
+                              onSaveImage: (bytes) => _saveAvatarImage(
+                                  _senderNameOf(peerId), bytes),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      // 右侧两行：名字（上）+ 性别（下），左对齐
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 名字：纯文字（**不能编辑**，不做成「我的资料」那种
+                            // 带编辑图标的胶囊——那是在邀请点击，这里没有可点的）。
+                            // 占位词单独降档（浅色），与「我的资料」未设名同口径。
+                            Text(
+                              peerName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 20,
+                                height: 1.2,
+                                color:
+                                    nameIsPlaceholder ? scheme.outline : null,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            // 性别行：只读性别图标（老板 2026-10-18：不显示男/女
+                            // 文字）+ 右端对齐的邀请/重新邀请按钮
+                            Row(
+                              children: [
+                                if (genderLabel.isNotEmpty)
+                                  Semantics(
+                                    // 只有一枚性别图标，读屏补上「性别」二字
+                                    // （与「我的资料」弹层同口径）
+                                    label: '${l10n.chatPageGenderLabel} '
+                                        '$genderLabel',
+                                    child: Icon(
+                                      isFemale ? Icons.female : Icons.male,
+                                      size: 16,
+                                      color: genderColor,
+                                    ),
+                                  ),
+                                const Spacer(),
+                                // 已加入 = 「重新邀请」（需共享口令）；还没加入 =
+                                // 「邀请」。duo 满员后不再有邀请（_canInvite 关）。
+                                if (peerJoined || _canInvite)
+                                  TextButton(
+                                    key: const ValueKey(
+                                        'duoPeerSheetActionButton'),
+                                    onPressed: () {
+                                      // 先收起弹层；等它收完再弹下一条
+                                      // （route 交接，见 _waitRouteHandoff）
+                                      Navigator.of(ctx).pop();
+                                      if (peerJoined) {
+                                        _menuAction(() =>
+                                            _reinviteMemberIdentity(
+                                                peerId, _peerName));
+                                      } else {
+                                        _menuAction(() => _showInviteDialog(
+                                            purpose: 'invite'));
+                                      }
+                                    },
+                                    style: TextButton.styleFrom(
+                                      // 链接蓝 = 品牌深蓝，与状态条「邀请加入」
+                                      // 链接、通道码弹窗邀请链接同源
+                                      foregroundColor: const Color(0xFF2271F7),
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
+                                      textStyle: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    child: Text(peerJoined
+                                        ? l10n.chatPageMembersReinvite
+                                        : l10n.chatPageMembersInvite),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -3360,6 +3905,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               'connected_at': DateTime.now().millisecondsSinceEpoch,
               'status': 'active',
               '_local': true,
+              // 本机的客户端信息：App + 本机版本号（读不到版本 → 客户端段不显示）
+              'client': 'app',
+              'app_version': _myAppVersion,
             },
             if (loaded != null)
               for (final d in loaded)
@@ -3468,9 +4016,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 } else {
                                   stamp = rowSince(d, online: online);
                                 }
-                                // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
-                                // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
-                                final hasBadge = isLocal || revoked;
+                                // 第二行：时间靠左、客户端段（App 版本/TUI，
+                                // 老板 2026-10-14）**靠右**（老板同日要求右对齐）。
+                                // 客户端段放第二行而非名称行：名称可能很长，第二行
+                                // 才有稳定空间。时间没有可显示的值时给一个空格
+                                // （不是空串——空串在部分平台量出 0 高），否则这张卡
+                                // 会比别的矮一截（老板 2026-09-26 实测）。
+                                final clientLabel = entranceClientLabel(d);
+                                final timeText =
+                                    stamp > 0 ? _timeStampLabel(stamp) : ' ';
+                                // 右上角固定角标：已撤销 = 阻止图标（本机的编辑
+                                // 入口不在角标位——见下面第一行的可点击胶囊）
+                                // 撤销卡的名称行让出角标宽度，长名字不会钻到图标底下
+                                final hasCornerBadge = revoked;
                                 return SizedBox(
                                   // 一卡占满整行（老板 2026-10-11）；高度仍由
                                   // 内容（名称 + 状态行）自然撑出
@@ -3502,30 +4060,138 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
-                                                // 第一行：名称（角标位由右上角预留）
+                                                // 第一行：名称。**本机卡 = 名字 +
+                                                // 编辑图标组成的可点击胶囊**（老板
+                                                // 2026-10-14：图标跟在名字后，不再
+                                                // 固定卡片最右；点整颗胶囊进改名）。
+                                                // 已撤销卡的角标位由右上角预留
+                                                // （阻止图标仍固定右上角）
                                                 Padding(
-                                                  // 有角标的卡让出角标宽度，长名字不会钻到
-                                                  // 图标底下
                                                   padding: EdgeInsets.only(
-                                                      right: hasBadge ? 18 : 0),
-                                                  child: Text(
-                                                    name.isNotEmpty
-                                                        ? name
-                                                        : entranceId,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
+                                                      right: hasCornerBadge
+                                                          ? 18
+                                                          : 0),
+                                                  child: isLocal
+                                                      ? Tooltip(
+                                                          message:
+                                                              l10n.chatPageEdit,
+                                                          child: Material(
+                                                            // 胶囊底：淡灰圆角
+                                                            // （同卡片蒙版/占位那一档
+                                                            // 灰），悬浮/点击有反馈
+                                                            color: Colors.black
+                                                                .withValues(
+                                                                    alpha: 0.05),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10),
+                                                            clipBehavior:
+                                                                Clip.antiAlias,
+                                                            child: InkWell(
+                                                              mouseCursor:
+                                                                  SystemMouseCursors
+                                                                      .click,
+                                                              hoverColor: Colors
+                                                                  .black
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.05),
+                                                              highlightColor: Colors
+                                                                  .black
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.08),
+                                                              onTap: () {
+                                                                // 先收起弹层再开
+                                                                // 弹窗（与「新建
+                                                                // 通道」同款错峰，
+                                                                // 避免 Overlay
+                                                                // 交叉卸载断言）
+                                                                Navigator.of(
+                                                                        ctx)
+                                                                    .pop();
+                                                                _menuAction(
+                                                                    _showRenameEntranceDialog);
+                                                              },
+                                                              child: Padding(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal:
+                                                                            6,
+                                                                        vertical:
+                                                                            3),
+                                                                child: Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Flexible(
+                                                                      child: Text(
+                                                                        name.isNotEmpty
+                                                                            ? name
+                                                                            : entranceId,
+                                                                        maxLines: 1,
+                                                                        overflow: TextOverflow
+                                                                            .ellipsis,
+                                                                        style: const TextStyle(
+                                                                            fontSize: 13,
+                                                                            fontWeight: FontWeight.w500),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            4),
+                                                                    const Icon(
+                                                                        Icons
+                                                                            .edit,
+                                                                        size:
+                                                                            14),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        )
+                                                      : Padding(
+                                                          // 纯名字卡补上与本机
+                                                          // 胶囊相同的纵向
+                                                          // 3px：否则本机卡
+                                                          // 比别的卡高 6px
+                                                          // （老板 2026-09-26
+                                                          // 的等高要求）
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  vertical: 3),
+                                                          child: Text(
+                                                            name.isNotEmpty
+                                                                ? name
+                                                                : entranceId,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style:
+                                                                const TextStyle(
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500),
+                                                          ),
+                                                        ),
                                                 ),
                                                 const SizedBox(height: 4),
-                                                // 第二行：状态红绿灯 + 时间（绿在线/红离线/
-                                                // 灰已撤销）。时间**恒定占一行**：没有时间可显示
+                                                // 第二行：状态红绿灯 + 时间
+                                                // （绿在线/红离线/灰已撤销）。
+                                                // 时间**恒定占一行**：没有时间可显示
                                                 // 时给一个空格（不是空串——空串在部分平台量出 0
                                                 // 高），否则这张卡会比别的矮一截
-                                                // （老板 2026-09-26 实测：离线卡没有文字时矮一截）
+                                                // （老板 2026-09-26 实测：离线卡没有文字时矮一截）。
+                                                // 客户端段（App 版本/TUI）**靠右**，
+                                                // 与时间同款 11px 淡色（老板 2026-10-14）
                                                 Row(
                                                   children: [
                                                     Icon(Icons.circle, size: 8,
@@ -3541,9 +4207,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                       // 直接写时间，不带 "since" 前缀
                                                       // （老板 2026-09-26：太占地方）
                                                       child: Text(
-                                                          stamp > 0
-                                                              ? _timeStampLabel(stamp)
-                                                              : ' ',
+                                                          timeText,
                                                           maxLines: 1,
                                                           overflow: TextOverflow
                                                               .ellipsis,
@@ -3552,58 +4216,40 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                               color:
                                                                   scheme.outline)),
                                                     ),
+                                                    // 客户端段靠右：没有可显示的值
+                                                    // （存量行/旧客户端/读不到版本）
+                                                    // 时整段不占位
+                                                    if (clientLabel != null) ...[
+                                                      const SizedBox(width: 6),
+                                                      Text(
+                                                          clientLabel,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: scheme
+                                                                  .outline)),
+                                                    ],
                                                   ],
                                                 ),
                                               ],
                                             ),
                                           ),
                                         ),
-                                        if (hasBadge)
+                                        if (hasCornerBadge)
                                           Positioned(
                                             top: 6,
                                             right: 6,
-                                            // 本机 = 编辑图标（老板 2026-10-02：当前通道
-                                            // 改名从这张卡进——点击关掉弹层，错峰弹改名
-                                            // 弹窗）；已撤销 = 阻止图标。编辑角标**显式**
-                                            // Material 圆形底 + 6 内边距（老板 2026-10-02：
-                                            // IconButton 默认底衬是圆角矩形不是纯圆，
-                                            // padding 0 时图标贴边更难看）。
-                                            child: isLocal
-                                                ? Tooltip(
-                                                    message: l10n.chatPageEdit,
-                                                    child: Material(
-                                                      color:
-                                                          Colors.transparent,
-                                                      shape: const CircleBorder(),
-                                                      clipBehavior:
-                                                          Clip.antiAlias,
-                                                      child: InkWell(
-                                                        customBorder:
-                                                            const CircleBorder(),
-                                                        onTap: () {
-                                                          // 先收起弹层再开弹窗（与
-                                                          // 「新建通道」同款错峰，避免
-                                                          // Overlay 交叉卸载断言）
-                                                          Navigator.of(ctx).pop();
-                                                          _menuAction(
-                                                              _showRenameEntranceDialog);
-                                                        },
-                                                        child: const Padding(
-                                                          padding:
-                                                              EdgeInsets.all(6),
-                                                          child: Icon(
-                                                              Icons.edit,
-                                                              size: 14),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  )
-                                                : Icon(
-                                                    Icons.block,
-                                                    size: 14,
-                                                    color: Colors.black
-                                                        .withValues(alpha: 0.45),
-                                                  ),
+                                            // 已撤销 = 阻止图标（本机的编辑入口
+                                            // 2026-10-14 起搬到第一行名字后面的
+                                            // 可点击胶囊，不再占角标位）
+                                            child: Icon(
+                                              Icons.block,
+                                              size: 14,
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.45),
+                                            ),
                                           ),
                                       ],
                                     ),
@@ -3690,9 +4336,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
               ),
+              // 每行行尾 > ：与顶层菜单的二级入口标识同款（老板 2026-10-15）——
+              // 三条点进去都还有下一级弹窗，行尾给出"可进入"的暗示
               ListTile(
                 leading: const Icon(Icons.key_outlined),
                 title: Text(l10n.chatPageMenuChangePassphrase),
+                trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => Navigator.of(ctx).pop('passphrase'),
               ),
               // 「删除所有消息」（老板 2026-10-02）：清本通道的消息+附件，通道保留。
@@ -3700,11 +4349,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ListTile(
                 leading: const Icon(Icons.delete_sweep_outlined),
                 title: Text(l10n.advancedClearMessages),
+                trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => Navigator.of(ctx).pop('clear'),
               ),
               ListTile(
                 leading: Icon(Icons.warning_amber_rounded, color: red),
                 title: Text(l10n.advancedDestroyEntrance),
+                trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => Navigator.of(ctx).pop('leave'),
               ),
               // 底部留白：与「切换我的秘境」弹层一致（那边是外层 Padding 的 bottom 16），
@@ -4073,7 +4724,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 保存通道名（改名弹窗与「我的通道」弹层共用）：校验白名单 → PUT → 更新本地
   /// profile。返回 null = 成功；否则返回已本地化的错误文案（调用方自行展示——
   /// 弹窗走红字、弹层走顶部通知）。
-  Future<String?> _applyEntranceName(String rawName, AppLocalizations l10n) async {
+  ///
+  /// [allSpaces]（老板 2026-10-15）：勾了「应用于本机所有秘境」时，除当前空间外
+  /// 还把名字扇出到本机其它空间（服务端各空间会话 + 本地各空间 profile 一起改），
+  /// best-effort——单个空间失败不阻塞其余，也不打扰用户。
+  Future<String?> _applyEntranceName(String rawName, AppLocalizations l10n,
+      {bool allSpaces = false}) async {
     final name = rawName.trim();
     if (name.isEmpty) return l10n.chatPageRenameEntranceEmptyError;
     // 通道名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、数字、
@@ -4092,6 +4748,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
       // app 菜单改名后退出重进回到 memberB）
       await _saveProfile();
+      if (allSpaces) {
+        // 扇出：其它秘境的服务端通道名 + 本地 profile 一起改（best-effort）
+        unawaited(_fanoutOtherSpaces((t) => api.updateEntranceName(name, t)));
+        unawaited(_rewriteOtherSpacesProfile(entranceName: name));
+      }
       return null;
     } on ApiException catch (e) {
       return backendError(l10n, l10n.chatPageRenameFailed(e.message));
@@ -4113,95 +4774,119 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final editing = ValueNotifier<bool>(false);
     // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
     final nameFocus = FocusNode();
+    // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
+    // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
+    // 默认不勾选（与邮件通知/我的身份弹窗同策略）
+    final allSpaces = ValueNotifier<bool>(false);
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 大标题下的备注（老板 2026-10-02）：点明这里改的是什么、上限多少
-            Text(
-              l10n.chatPageRenameEntranceHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(ctx).colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 10),
-            // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-            // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
-            ValueListenableBuilder<bool>(
-              valueListenable: editing,
-              builder: (_, isEditing, _) => TextField(
-                controller: ctrl,
-                focusNode: nameFocus,
-                readOnly: !isEditing,
-                onTap: () {
-                  if (editing.value) return;
-                  editing.value = true;
-                  nameFocus.requestFocus();
-                },
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageEntranceListThisDevice,
-                  border: const OutlineInputBorder(),
-                  filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                  fillColor: Colors.white,
-                  counterText: '',
-                  suffixIcon: isEditing
-                      ? null
-                      : IconButton(
-                          tooltip: l10n.chatPageEdit,
-                          icon: const Icon(Icons.edit, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => editing.value = true,
-                        ),
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+          title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
+          // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+          contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 大标题下的备注（老板 2026-10-02）：点明这里改的是什么、上限多少
+              Text(
+                l10n.chatPageRenameEntranceHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.outline,
                 ),
-                // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
-                // 同一个常量（这里的拦截不替代提交时的白名单校验）
-                maxLength: kEntranceNameMaxLength,
-                // 开始填写即清除警示（与向导输入框一致）
-                onChanged: (_) {
-                  if (nameError.value != null) nameError.value = null;
-                },
               ),
-            ),
-            ValueListenableBuilder<String?>(
-              valueListenable: nameError,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              const SizedBox(height: 14),
+              // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+              // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
+              ValueListenableBuilder<bool>(
+                valueListenable: editing,
+                builder: (_, isEditing, _) => TextField(
+                  controller: ctrl,
+                  focusNode: nameFocus,
+                  readOnly: !isEditing,
+                  onTap: () {
+                    if (editing.value) return;
+                    editing.value = true;
+                    nameFocus.requestFocus();
+                  },
+                  decoration: InputDecoration(
+                    labelText: l10n.chatPageEntranceListThisDevice,
+                    border: const OutlineInputBorder(),
+                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
+                    fillColor: Colors.white,
+                    counterText: '',
+                    suffixIcon: isEditing
+                        ? null
+                        : IconButton(
+                            tooltip: l10n.chatPageEdit,
+                            icon: const Icon(Icons.edit, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => editing.value = true,
+                          ),
+                  ),
+                  // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
+                  // 同一个常量（这里的拦截不替代提交时的白名单校验）
+                  maxLength: kEntranceNameMaxLength,
+                  // 开始填写即清除警示（与向导输入框一致）
+                  onChanged: (_) {
+                    if (nameError.value != null) nameError.value = null;
+                  },
+                ),
+              ),
+              ValueListenableBuilder<String?>(
+                valueListenable: nameError,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
+              ),
+              // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
+              // 不勾＝只改当前秘境。每次开弹窗默认不勾选。
+              // 单秘境时整个不渲染（没有"其它秘境"可同步，老板 2026-10-17）
+              if (_hasMultipleSpaces)
+                ValueListenableBuilder<bool>(
+                  valueListenable: allSpaces,
+                  builder: (_, all, _) => LabeledCheckbox(
+                    value: all,
+                    label: l10n.settingsScopeAll,
+                    onChanged: (v) => allSpaces.value = v,
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              onPressed: () async {
+                final err = await _applyEntranceName(ctrl.text, l10n,
+                    allSpaces: allSpaces.value);
+                if (err != null) {
+                  // 错误**就地显示**：红字挂在输入框下方（与 PIN 修改弹窗同款），
+                  // 不再弹弹窗外的顶部通知条（老板 2026-10-02）
+                  nameError.value = err;
+                  return; // 校验/保存失败：留在弹窗里改
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              },
+              child: Text(l10n.chatPageRenamingSubmit),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () async {
-              final err = await _applyEntranceName(ctrl.text, l10n);
-              if (err != null) {
-                // 错误**就地显示**：红字挂在输入框下方（与 PIN 修改弹窗同款），
-                // 不再弹弹窗外的顶部通知条（老板 2026-10-02）
-                nameError.value = err;
-                return; // 校验/保存失败：留在弹窗里改
-              }
-              if (ctx.mounted) Navigator.of(ctx).pop(true);
-            },
-            child: Text(l10n.chatPageRenamingSubmit),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
@@ -4211,6 +4896,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       nameError.dispose();
       editing.dispose();
       nameFocus.dispose();
+      allSpaces.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新弹层/菜单显示的新名字
   }
@@ -4227,69 +4913,72 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final nameError = ValueNotifier<String?>(null);
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（与菜单下其它弹窗一致）
-        title: Center(child: Text(l10n.chatPageGroupNameTitle)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: l10n.chatPageGroupNameLabel,
-                border: const OutlineInputBorder(),
-                // 不显示 "3/32" 计数器（同改名弹窗：上限只是防超长）
-                counterText: '',
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（与菜单下其它弹窗一致）
+          title: Center(child: Text(l10n.chatPageGroupNameTitle)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageGroupNameLabel,
+                  border: const OutlineInputBorder(),
+                  // 不显示 "3/32" 计数器（同改名弹窗：上限只是防超长）
+                  counterText: '',
+                ),
+                // 输入框里直接拦住超长（同改名弹窗）
+                maxLength: kMemberNameMaxLength,
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
-              // 输入框里直接拦住超长（同改名弹窗）
-              maxLength: kMemberNameMaxLength,
-              onChanged: (_) {
-                if (nameError.value != null) nameError.value = null;
-              },
-            ),
-            ValueListenableBuilder<String?>(
-              valueListenable: nameError,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              ValueListenableBuilder<String?>(
+                valueListenable: nameError,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
+              ),
+            ],
+          ),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              onPressed: () {
+                final name = ctrl.text.trim();
+                // 允许清空：空 = 回到"没有名字"（状态条第一行显示编辑图标）
+                if (name.isNotEmpty) {
+                  // 用户名称白名单（与改名同源）：非空才校验
+                  final violation = checkMemberNamePolicy(name);
+                  if (violation != null) {
+                    nameError.value = violation == MemberNameViolation.tooLong
+                        ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
+                        : l10n.chatPageRenameNameInvalidError;
+                    return;
+                  }
+                }
+                Navigator.of(ctx).pop(true);
+              },
+              child: Text(l10n.chatPageRenamingSubmit),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () {
-              final name = ctrl.text.trim();
-              // 允许清空：空 = 回到"没有名字"（状态条第一行显示编辑图标）
-              if (name.isNotEmpty) {
-                // 用户名称白名单（与改名同源）：非空才校验
-                final violation = checkMemberNamePolicy(name);
-                if (violation != null) {
-                  nameError.value = violation == MemberNameViolation.tooLong
-                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
-                      : l10n.chatPageRenameNameInvalidError;
-                  return;
-                }
-              }
-              Navigator.of(ctx).pop(true);
-            },
-            child: Text(l10n.chatPageRenamingSubmit),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（同 _showRenameDialog：立即 dispose
@@ -4305,168 +4994,401 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 「我的资料」弹层（老板 2026-10-17）：左头像、右侧名字（上）+ 性别（下）。
+  /// 名字胶囊 → 现有改名弹窗；头像 → 共享的 [showMyAvatarFullscreen]
+  /// （本人的头像：更换头像/应用所有秘境/保存图标）。
+  ///
+  /// 版式（老板 2026-10-17 二次调整）：横向身份卡 —— 左边渐变环头像，右边两行
+  /// 左对齐（名字在上、性别在下），眼睛一眼就能把「人 + 资料」连起来，不再是一
+  /// 列居中的控件塔。性别用小胶囊而非整行只读输入框（后者像没填完的表单）；
+  /// 性别为空（向导未写入/老账号）整枚不显示，不留空壳。
+  /// 桌面端弹层限宽 [kMyProfileSheetMaxWidth]（老板 2026-10-17）：BottomSheet
+  /// 默认铺满窗口宽度，宽屏下这张身份卡会被拉成一条空旷的长带——限宽后居中
+  /// 停在窗口底部，仍是底部弹层的形态。
+  Future<void> _showMyProfileSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final isFemale = _myGender == 'female';
+    final isMale = _myGender == 'male';
+    // 性别配色：男女各用 Logo 里的粉/蓝（与向导、改名弹窗的原图标同色）
+    final genderColor = isFemale
+        ? const Color(0xFFD6529C)
+        : isMale
+            ? const Color(0xFF3BAFFD)
+            : scheme.outline;
+    final genderLabel =
+        isFemale ? l10n.wizardGenderFemale : isMale ? l10n.wizardGenderMale : '';
+    // 头像组件句柄：外层方形热区（头像 + 编辑角标）通过它触发头像自己的点按
+    // 决策（有图 → 全屏 / 没图 → 选图），避免外层另存一份图去猜（老板 2026-10-17）
+    final avatarKey = GlobalKey<_MessageAvatarState>();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
+      // 桌面端限宽（老板 2026-10-17）：不限宽时整张身份卡随窗口拉长，头像和
+      // 名字之间会隔出一大片空白。maxWidth 之外手机端不受影响（本就比它窄）。
+      constraints: const BoxConstraints(maxWidth: kMyProfileSheetMaxWidth),
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Center(
+                      child: Text(l10n.chatPageMenuMyProfile,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: scheme.onSurface)),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      // 头像（左侧大图）+ 编辑角标 = **一个方形热区**（老板 2026-10-17）：
+                      // 点头像、点角标、点圆的四角都是同一个动作——有头像 = 开全屏
+                      // （换头像从全屏里的「更换头像」按钮进），无头像 = 直接进选图。
+                      // 去向由 _MessageAvatar.handleTap 按它自己的图缓存决定，不再由
+                      // 外层按 _myAvatarBytes 猜——两个独立加载源不一致会错航/死区
+                      // （2026-10-17 复查修复）。内层传 openFullscreenOnTap:false 让出
+                      // 点击：否则内圈圆形手势和外层方形热区会抢同一个 tap。
+                      // 外圈粉蓝渐变细环 + 一圈 surface 留白：弹层底色也是浅粉白，
+                      // 没有环的话头像边界糊在背景里；细环颜色取自 Logo 的蓝/粉两端。
+                      Clickable(
+                        behavior: HitTestBehavior.opaque, // 方角空白也算热区
+                        circle: true, // 反馈遮罩仍跟圆走，方角不染色
+                        onTap: () => avatarKey.currentState?.handleTap(),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: scheme.surface,
+                                ),
+                                child: _MessageAvatar(
+                                  key: avatarKey,
+                                  memberId: _myMemberId,
+                                  server: effectiveServer,
+                                  api: widget.api,
+                                  radius: 40,
+                                  // 点击交给外层方形热区（统一一个动作）
+                                  openFullscreenOnTap: false,
+                                  onTapWithoutImage: () {
+                                    Navigator.of(ctx).pop();
+                                    _menuAction(_showAvatarUpload);
+                                  },
+                                  onReplaceAvatar: () {
+                                    Navigator.of(ctx).pop();
+                                    _menuAction(_showAvatarUpload);
+                                  },
+                                  onApplyAllSpaces: _hasMultipleSpaces
+                                      ? (bytes) => _applyAvatarAllSpaces(bytes)
+                                      : null,
+                                  onSaveImage: (bytes) =>
+                                      _saveAvatarImage(_myMemberName, bytes),
+                                ),
+                              ),
+                            ),
+                            // 编辑角标（老板 2026-10-17 二次调整）：原先是粉红圆徽 +
+                            // 白色铅笔，比头像还抢眼；改成 surface 底 + 细描边 + 灰蓝
+                            // 铅笔，压在环内右下角。不挂独立手势——整个方形热区共用
+                            // 头像的动作，点角标就等于点头像。
+                            Positioned(
+                              right: 4,
+                              bottom: 4,
+                              child: IgnorePointer(
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: scheme.outlineVariant),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.06),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(Icons.edit,
+                                      size: 14,
+                                      color: scheme.onSurfaceVariant),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      // 右侧两行：名字（上）+ 性别（下），左对齐
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 名字胶囊：文字 + 编辑图标组成可点击胶囊（与「我的同伴」
+                            // 弹层群名行同款交互），点击 → 收起弹层、打开改名弹窗。
+                            // 实底 + Material/InkWell：透明底看不出「可以点」；实底
+                            // 还把点击区撑到胶囊大小（只点文字太窄，桌面端不好点）。
+                            // 底色随性别调（老板 2026-10-17）：女→淡粉 / 男→淡蓝，
+                            // 与下方性别展示的粉/蓝呼应；性别未设 → 中性淡灰（与群名
+                            // 胶囊及「添加秘境」等大按钮统一）。长名字由 Expanded 给
+                            // 上限，超出省略。
+                            Material(
+                              color: _myGender.isEmpty
+                                  ? Colors.black.withValues(alpha: 0.05)
+                                  : genderColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                key: const ValueKey('myProfileNameRow'),
+                                mouseCursor: SystemMouseCursors.click,
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  _menuAction(_showRenameDialog);
+                                },
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 9, 12, 9),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          _myMemberName.isEmpty
+                                              ? l10n.chatPageNameUnset
+                                              : _myMemberName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 20,
+                                            height: 1.2,
+                                            color: _myMemberName.isEmpty
+                                                ? scheme.outline
+                                                : null,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Icon(Icons.edit_outlined,
+                                          size: 18,
+                                          color: scheme.onSurfaceVariant),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // 性别：只读——**只有图标**（老板 2026-10-18：不显示
+                            // 男/女文字，图标本身已够辨识），无底色（老板 2026-10-17：
+                            // 胶囊有背景像可点的按钮，实际只是展示）。性别为空
+                            // 不显示——留「未设置」空壳反而像缺数据待填。
+                            // 读屏仍补上「性别 男/女」：光秃图标对读屏是哑的。
+                            if (genderLabel.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Semantics(
+                                label:
+                                    '${l10n.chatPageGenderLabel} $genderLabel',
+                                child: Icon(
+                                  isFemale ? Icons.female : Icons.male,
+                                  size: 16,
+                                  color: genderColor,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// 修改我的名字（服务端同步 + 本地刷新菜单显示）。
   /// （原「当前通道」改名弹窗 2026-10-02 并入「我的通道」弹层，公钥展示一并删除。）
   Future<void> _showRenameDialog() async {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: _myMemberName);
-    // 性别只读展示（我的个人资料弹窗）：框内显示 男/女，随对话框关闭释放
-    final genderCtrl = TextEditingController(
-      text: _myGender == 'female'
-          ? l10n.wizardGenderFemale
-          : _myGender == 'male'
-              ? l10n.wizardGenderMale
-              : '',
-    );
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
     // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
     final editing = ValueNotifier<bool>(false);
     // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
     final nameFocus = FocusNode();
+    // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
+    // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
+    // 默认不勾选（与邮件通知弹窗同策略——扇出必须是每次显式 opt-in）
+    final allSpaces = ValueNotifier<bool>(false);
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageRenameNameTitle)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-            // 白底可编辑、按钮消失（老板要求 2026-09-09）。
-            // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
-            // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
-            ValueListenableBuilder<bool>(
-              valueListenable: editing,
-              builder: (_, isEditing, _) => TextField(
-                controller: ctrl,
-                focusNode: nameFocus,
-                readOnly: !isEditing,
-                onTap: () {
-                  if (editing.value) return;
-                  editing.value = true;
-                  nameFocus.requestFocus();
-                },
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageRenameNameLabel,
-                  border: const OutlineInputBorder(),
-                  filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                  fillColor: Colors.white,
-                  // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
-                  // 弹窗里不必多一行；下面 maxLength 才是硬拦
-                  counterText: '',
-                  suffixIcon: isEditing
-                      ? null
-                      : IconButton(
-                          tooltip: l10n.chatPageEdit,
-                          icon: const Icon(Icons.edit, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => editing.value = true,
-                        ),
+      // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+          title: Center(child: Text(l10n.chatPageRenameNameTitle)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+              // 白底可编辑、按钮消失（老板要求 2026-09-09）。
+              // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
+              // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
+              ValueListenableBuilder<bool>(
+                valueListenable: editing,
+                builder: (_, isEditing, _) => TextField(
+                  controller: ctrl,
+                  focusNode: nameFocus,
+                  readOnly: !isEditing,
+                  onTap: () {
+                    if (editing.value) return;
+                    editing.value = true;
+                    nameFocus.requestFocus();
+                  },
+                  decoration: InputDecoration(
+                    labelText: l10n.chatPageRenameNameLabel,
+                    border: const OutlineInputBorder(),
+                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
+                    fillColor: Colors.white,
+                    // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
+                    // 弹窗里不必多一行；下面 maxLength 才是硬拦
+                    counterText: '',
+                    suffixIcon: isEditing
+                        ? null
+                        : IconButton(
+                            tooltip: l10n.chatPageEdit,
+                            icon: const Icon(Icons.edit, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => editing.value = true,
+                          ),
+                  ),
+                  // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
+                  // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
+                  // （这里的拦截不替代提交时的白名单校验）。
+                  maxLength: kMemberNameMaxLength,
+                  // 开始填写即清除空名警示（与向导输入框一致）
+                  onChanged: (_) {
+                    if (nameError.value != null) nameError.value = null;
+                  },
                 ),
-                // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
-                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
-                // （这里的拦截不替代提交时的白名单校验）。
-                maxLength: kMemberNameMaxLength,
-                // 开始填写即清除空名警示（与向导输入框一致）
-                onChanged: (_) {
-                  if (nameError.value != null) nameError.value = null;
-                },
               ),
-            ),
-            ValueListenableBuilder<String?>(
-              valueListenable: nameError,
-              builder: (_, err, _) => err == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        err,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+              ValueListenableBuilder<String?>(
+                valueListenable: nameError,
+                builder: (_, err, _) => err == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          err,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-            ),
-            // 性别用与名字输入框同款组件（只读）——「性别」标签
-            // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
-            // （老板要求 2026-09-09）
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: genderCtrl,
-              readOnly: true,
-              style: const TextStyle(fontSize: 16),
-              decoration: InputDecoration(
-                labelText: l10n.chatPageGenderLabel,
-                border: const OutlineInputBorder(), // 与名字输入框同款边框
-                // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
-                suffixIcon: _myGender == 'male'
-                    ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
-                    : _myGender == 'female'
-                        ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
-                        : null,
               ),
+              // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境；
+              // 不勾＝只改当前秘境。每次开弹窗默认不勾选。
+              // 单秘境时整个不渲染（没有"其它秘境"可同步，老板 2026-10-17）
+              if (_hasMultipleSpaces)
+                ValueListenableBuilder<bool>(
+                  valueListenable: allSpaces,
+                  builder: (_, all, _) => LabeledCheckbox(
+                    value: all,
+                    label: l10n.settingsScopeAll,
+                    onChanged: (v) => allSpaces.value = v,
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              onPressed: () async {
+                final name = ctrl.text.trim();
+                if (name.isEmpty) {
+                  // 空/全空格：红字警示并停留（不再静默跳过）
+                  nameError.value = l10n.chatPageRenameMyselfEmptyError;
+                  return;
+                }
+                // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
+                final violation = checkMemberNamePolicy(name);
+                if (violation != null) {
+                  nameError.value = violation == MemberNameViolation.tooLong
+                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
+                      : l10n.chatPageRenameNameInvalidError;
+                  return;
+                }
+                // 不允许改成与对方相同的名字（老板 2026-09-10）
+                if (widget.peerName != null && name == widget.peerName) {
+                  nameError.value = l10n.chatPageRenameSameAsPeerError;
+                  return;
+                }
+                try {
+                  final api = widget.api ?? ApiClient(effectiveServer);
+                  await _withAuth((t) => api.updateMemberName(name, t));
+                  _myMemberName = name;
+                  // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
+                  // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
+                  // app 菜单改名后退出重进回到 memberB）
+                  await _saveProfile();
+                  if (allSpaces.value) {
+                    // 扇出：其它秘境的服务端成员名 + 本地 profile 一起改
+                    // （best-effort，单个空间失败不阻塞其余）
+                    unawaited(_fanoutOtherSpaces((t) => api.updateMemberName(name, t)));
+                    unawaited(_rewriteOtherSpacesProfile(memberName: name));
+                  }
+                  if (ctx.mounted) Navigator.of(ctx).pop(true);
+                } on ApiException catch (e) {
+                  if (ctx.mounted) {
+                    _notice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    _notice(ctx, l10n.chatPageRenameFailed('$e'));
+                  }
+                }
+              },
+              child: Text(l10n.chatPageRenamingSubmit),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () async {
-              final name = ctrl.text.trim();
-              if (name.isEmpty) {
-                // 空/全空格：红字警示并停留（不再静默跳过）
-                nameError.value = l10n.chatPageRenameMyselfEmptyError;
-                return;
-              }
-              // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
-              final violation = checkMemberNamePolicy(name);
-              if (violation != null) {
-                nameError.value = violation == MemberNameViolation.tooLong
-                    ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
-                    : l10n.chatPageRenameNameInvalidError;
-                return;
-              }
-              // 不允许改成与对方相同的名字（老板 2026-09-10）
-              if (widget.peerName != null && name == widget.peerName) {
-                nameError.value = l10n.chatPageRenameSameAsPeerError;
-                return;
-              }
-              try {
-                final api = widget.api ?? ApiClient(effectiveServer);
-                await _withAuth((t) => api.updateMemberName(name, t));
-                _myMemberName = name;
-                // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
-                // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
-                // app 菜单改名后退出重进回到 memberB）
-                await _saveProfile();
-                if (ctx.mounted) Navigator.of(ctx).pop(true);
-              } on ApiException catch (e) {
-                if (ctx.mounted) {
-                  _notice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
-                }
-              } catch (e) {
-                if (ctx.mounted) {
-                  _notice(ctx, l10n.chatPageRenameFailed('$e'));
-                }
-              }
-            },
-            child: Text(l10n.chatPageRenamingSubmit),
-          ),
-        ],
       ),
     );
     // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
     // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
-      genderCtrl.dispose();
       nameError.dispose();
       editing.dispose();
       nameFocus.dispose();
+      allSpaces.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }
@@ -4496,14 +5418,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final shouldExit = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageExitTitle)),
-        content: Text(l10n.chatPageExitMessage),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
-        ],
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+          title: Center(child: Text(l10n.chatPageExitTitle)),
+          content: Text(l10n.chatPageExitMessage),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+          ],
+        ),
       ),
     );
     if (shouldExit == true) {
@@ -4512,57 +5437,77 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 阅后即焚档位选择弹窗（右上角菜单全局 / 长按菜单单条消息共用）：
-  /// 返回选中秒数（null=取消）；[current] 为当前值（右侧勾选标记）。
-  Future<int?> _pickBurnSeconds({required int current}) async {
-    final l10n = AppLocalizations.of(context)!;
-    String? picked;
-    await showOptionPickerSheet<void>(
+  /// 阅后即焚时长选择弹层（右上角菜单全局 / 长按菜单单条消息共用）：
+  /// 返回 (秒数, 是否应用到所有秘境)；null=取消。[current] 为当前值。
+  /// 2026-10-16 起改为任意时长（对数滑动轴 1 分钟 ~ 60 天，右端「关闭」顶点，
+  /// 粒度随时长升档），见 [BurnDurationSheet]。
+  ///
+  /// [scopeAllLabel] 非空（全局设置入口）= 弹层里显示「应用于本机所有秘境」
+  /// 勾选框；逐条消息的燃焚没有空间维度，传 null。
+  Future<({int seconds, bool scopeAll})?> _pickBurnSeconds({
+    required int current,
+    String? scopeAllLabel,
+  }) async {
+    return showBurnDurationSheet(
       context: context,
-      builder: (ctx) => OptionPickerSheet(
-        title: l10n.chatPageBurnHeading,
-        // 标题下居中一行说明这层是干什么的（老板 2026-09-25）
-        note: l10n.chatPageBurnNote,
-        selected: '$current',
-        options: [
-          for (final entry in kBurnAfterOptions.entries)
-            OptionPickerItem(
-              value: '${entry.value}',
-              label: _burnOptionLabel(entry.value, l10n),
-            ),
-        ],
-        onApply: (value) async => picked = value,
-      ),
+      current: current,
+      scopeAllLabel: scopeAllLabel,
     );
-    return picked == null ? null : int.parse(picked!);
   }
 
-  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置，发送新消息时生效）。
+  /// 把阅后即焚设置写到本机**所有空间**（勾了「应用于本机所有秘境」时）：
+  /// 燃焚是纯本地设置（无服务端参与），逐空间写各自的 per-space 键。当前空间
+  /// 先落（Vault 取不到也不丢它），其余 best-effort——单个空间失败不阻塞其余。
+  Future<void> _saveBurnAllSpaces(int seconds) async {
+    final db = widget.db ?? LocalDatabase.shared;
+    await BurnAfterSettings(db, spaceId: widget.spaceId).save(seconds);
+    final spaces = VaultSession.current?.spaces ?? const <AppLockPayload>[];
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue;
+      try {
+        await BurnAfterSettings(db, spaceId: space.spaceId).save(seconds);
+      } catch (_) {
+        // 单个空间失败不阻塞其余
+      }
+    }
+  }
+
+  /// 顶栏 ⏱：选择阅后即焚时长（保存到本设备设置，发送新消息时生效）。
   Future<void> _showBurnPicker() async {
     final settings = BurnAfterSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
     final current = await settings.load();
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
-    final seconds = await _pickBurnSeconds(current: current);
-    if (seconds == null || !mounted) return;
-    await settings.save(seconds);
+    final picked = await _pickBurnSeconds(
+      current: current,
+      // 全局设置才有"所有秘境"之说；单秘境时不传 = 不渲染勾选框（老板 2026-10-17）
+      scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
+    );
+    if (picked == null || !mounted) return;
+    if (picked.scopeAll) {
+      await _saveBurnAllSpaces(picked.seconds);
+    } else {
+      await settings.save(picked.seconds);
+    }
     if (!mounted) return;
-    setState(() => _burnSeconds = seconds);
+    setState(() => _burnSeconds = picked.seconds);
     _notice(
       context,
-      seconds == 0
+      picked.seconds == 0
           ? l10n.chatPageBurnOff
-          : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n)),
+          : l10n.chatPageBurnWillDelete(_burnOptionLabel(picked.seconds, l10n)),
     );
   }
 
-  /// 长按菜单「阅后即焚」：选择档位后应用到被点击的这条消息（本机生效，
-  /// 纯本地；老板要求 2026-09-10）。可选「无限」取消已有阅后即焚、选档位
+  /// 长按菜单「阅后即焚」：选择时长后应用到被点击的这条消息（本机生效，
+  /// 纯本地；老板要求 2026-09-10）。可选「关闭」取消已有阅后即焚、选时长
   /// 新设或调整；到期由 repo.tombstoneExpired 统一打墓碑。
   Future<void> _setMessageBurn(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
-    final seconds = await _pickBurnSeconds(current: m.burnAfterSeconds);
-    if (seconds == null || !mounted) return;
+    // 不传 scopeAllLabel：单条消息的燃焚没有"所有秘境"维度
+    final picked = await _pickBurnSeconds(current: m.burnAfterSeconds);
+    if (picked == null || !mounted) return;
+    final seconds = picked.seconds;
     final ok = await _repo.setMessageBurn(m.env.messageId, seconds);
     if (!mounted) return;
     if (!ok) {
@@ -4629,6 +5574,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 上报本通道客户端信息（POST /entrances/client，幂等）：client='app' + 本机
+  /// 版本号（`yymm.ddhh.mm`，读不到就不带）。每次进聊天页调一次——升级后下次
+  /// 启动自动跟上，「我的设备通道」卡片据此显示各设备跑的版本。纯展示字段，
+  /// 离线/老服务端静默降级（同 _registerInstallUid）。
+  ///
+  /// 读到的版本顺带存进 [_myAppVersion]（本机卡片的版本段用）——**只在这里读
+  /// 一次**，弹层里直接用字段，不现读平台调用（见字段注释）。
+  Future<void> _registerClientInfo() async {
+    if (_session.token.isEmpty) return;
+    try {
+      final version = await appVersionString();
+      _myAppVersion = version;
+      await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer))
+          .reportClientInfo('app', t, appVersion: version));
+    } catch (_) {
+      // 忽略
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -4638,6 +5602,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _peerTicker?.cancel();
     _notifyTicker?.cancel(); // 邮件通知"待确认"期间的那一路轮询
     _recordTimer?.cancel();
+    _idleTimer?.cancel(); // 前台无操作锁屏
+    _input.removeListener(_onInputInteraction);
     _highlightTimer?.cancel(); // 跳转高亮定时清除（防 dispose 后 setState）
     _ampSub?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
@@ -4659,11 +5625,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// canDismiss=false：返回手势/返回键都被挡，必须输对锁屏码才能回聊天
   /// （老板 2026-09-16 要求"强化安全性"）。
   void _lockNow() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
+    _pushLockOverlay();
   }
 
   /// App 生命周期：切后台记时，回前台超过阈值 → 覆盖锁屏（保留聊天页状态）。
+  ///
+  /// **计时认「离开 resumed」**（inactive/hidden/paused 出向都记，2026-10-17 评审）：
+  /// 只认 paused 会漏掉 iOS app 切换器/通知下拉等「只到 inactive、不到 paused」的
+  /// 覆盖路径——聊天界面躺在切换器快照里几小时，回来却不用输 PIN（安全绕过）。
+  /// 而 iOS 回前台序列 `paused → inactive → resumed` 里**回程的 inactive 不可再
+  /// 记**（老板 2026-10-17 实测 bug：它会把后台开始时刻覆写成"刚回来"→ 永不锁），
+  /// 用 `_wasResumed` 区分：出向（之前还在前台）记、回程（之前已离场）不记。
   ///
   /// 两条硬规则（老板 2026-09-20 实测报的 bug）：
   /// 1. **没设锁屏码就不要锁**：`_hasPin=false` 时锁屏页只会显示"尚未设置锁屏码"
@@ -4673,16 +5645,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///    与手动锁屏同口径：必须输对 PIN 才回聊天。
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final wasResumed = _appResumed;
     _appResumed = state == AppLifecycleState.resumed; // 回执：只有前台才允许标已读
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (wasResumed && state != AppLifecycleState.resumed) {
+      // 出向前台：记录后台开始时刻（含 app 切换器/通知下拉/息屏等一切覆盖路径）
       _lockTimer.recordBackgrounded(DateTime.now());
+      // idle 锁计时器同步停掉：后台由后台锁接管，避免到点在后台触发
+      _idleTimer?.cancel();
+      _idleTimer = null;
       // 进后台（含息屏）：**主动**断开 WS，让对端几秒内就看到离线。
       // 不这么做的话要等服务端的 30s 心跳超时、再等对端 30s 轮询，最长约 90 秒里
       // 对方还以为你在线（老板 2026-09-26）。
       //
       // **通话中绝不停**：贴耳通话必然息屏，停了就直接把通话掐断——通话期间靠
       // iOS 的 audio 后台模式 + 常亮维持，本来也不会进到这里断链。
-      if (state == AppLifecycleState.paused && _voiceCall?.state.value.inCall != true) {
+      if (_voiceCall?.state.value.inCall != true) {
         unawaited(_ws?.stop());
       }
     } else if (state == AppLifecycleState.resumed) {
@@ -4697,11 +5674,88 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 两种都照常补报已读——别把"未超时不锁"顺手吞掉（原逻辑就在这个分支里报已读）
       if (!relock || !_hasPin || !mounted) {
         _scheduleReadReport();
+        // 前台无操作锁屏：回到前台重新计时（给一个完整的 idle 窗口）
+        _armIdleLock();
         return;
       }
-      Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
+      _pushLockOverlay();
     }
+  }
+
+  // ==================== 前台无操作锁屏（老板 2026-10-17）====================
+  // 一直前台亮屏、但超过 [kLockSeconds] 秒没任何交互（点/滑/滚/打字）也进锁屏。
+  // 与后台锁共用同一阈值（kLockSeconds，将来统一做成用户可调菜单项）。
+  //
+  // 用「一次性 Timer + 每次交互重排」而非周期 Timer：
+  //  · 空闲时 Timer 睡着，零唤醒——比每秒醒一次查墙钟更省资源（老板关注点）；
+  //  · 用 Dart 逻辑时钟（Timer 由 FakeAsync 驱动），widget 测试可直接
+  //    tester.pump(Duration(seconds: 30)) 推进到触发点，无需 runAsync 实睡。
+  // 交互信号：build 根的 Listener（点/滑/拖，onPointerDown）+ 根 ScrollNotification
+  //（桌面滚轮/触控板滚动，不产生 pointer down）+ 输入框控制器监听（打字）。
+  // 「在栈顶」信号：ModalRoute.isCurrent（真实路由状态），**不用** FocusNode
+  // hasFocus——后者只在焦点链经过本子树时为 true，手机上无输入焦点时恒 false，
+  // 会漏锁（2026-10-17 评审揪出）。到点若被弹层/锁屏盖着：不硬锁，重排一个
+  // 新窗口——关掉弹层后最多 30s 内必锁，安全方向不变，也免去弹层期间误锁。
+  // 锁屏页 pop 回聊天：push Future 完成（_pushLockOverlay）重排新窗口。
+
+  /// 安排/重排 idle 锁屏计时器到"现在+[kLockSeconds]"。交互、回前台、解锁回
+  /// 聊天、PIN 状态确定后都调它。不满足锁条件时直接清掉计时器（不排）。
+  void _armIdleLock() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    if (!_hasPin) return; // 没设 PIN 不锁（与后台锁同一条硬规则）
+    if (!_appResumed) return; // 后台中：交给后台锁路径，回前台再排
+    if (_voiceCall?.state.value.inCall == true) return; // 通话中不锁
+    if (_lockOverlayShown) return; // 锁屏已盖着：等解锁 pop 再排
+    _idleTimer = Timer(const Duration(seconds: kLockSeconds), _fireIdleLock);
+  }
+
+  /// 交互信号刷新：点/滑/拖都走这里（build 根 Listener）。滚动走
+  /// [_onScrollInteraction]，打字走 [_onInputInteraction]，都落到 _armIdleLock。
+  void _onPointerInteraction() {
+    _armIdleLock();
+  }
+
+  /// 滚动（桌面滚轮/触控板、移动端惯性滚动）也算交互——只看消息列表持续滚动
+  /// 的用户不该被锁。
+  void _onScrollInteraction() {
+    _armIdleLock();
+  }
+
+  /// 输入框文本变化 → 也算交互（打字）。
+  void _onInputInteraction() {
+    _armIdleLock();
+  }
+
+  /// 推严格锁屏覆盖页（手动锁/后台锁/idle 锁共用入口）。防重复 push 竞态；
+  /// pop 回聊天（解锁成功）后重排 idle 计时，给一个完整的新窗口。
+  void _pushLockOverlay() {
+    if (_lockOverlayShown) return;
+    _lockOverlayShown = true;
+    _idleTimer?.cancel(); // 锁屏盖着期间不计时
+    _idleTimer = null;
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+            builder: (_) => const LockPage(asOverlay: true, canDismiss: false)))
+        .whenComplete(() {
+      _lockOverlayShown = false;
+      _armIdleLock(); // 解锁成功回到聊天：重新计时
+    });
+  }
+
+  /// 到点触发：前置条件在 _armIdleLock 已挡过；这里兜底复查"期间状态是否变了"
+  ///（如来电、被弹层盖住、切后台）。被盖着时重排新窗口而非硬锁——弹层关闭后
+  /// 自然触发下一次判定，安全方向不变。
+  void _fireIdleLock() {
+    if (!mounted) return;
+    if (!_appResumed || !_hasPin) return;
+    if (_voiceCall?.state.value.inCall == true) return;
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      // 被弹层/对话框盖着：重排新窗口，等它关掉后自然重判
+      _armIdleLock();
+      return;
+    }
+    _pushLockOverlay();
   }
 
   /// 首次载入：先用本地缓存秒开（离线/慢网也能立刻看到历史）→ 再同步全量 →
@@ -4987,12 +6041,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 触发目标附近构建 → 目标项 GlobalKey ensureVisible 精确校正」两步（懒构建
   /// 下远处 item 无元素，直接 ensureVisible 会找不到）。
   Future<void> _jumpToMessage(String messageId) async {
-    if (messageId.isEmpty || !mounted) return;
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    // 引用快照缺 messageId（异常数据）：也按"原消息不存在"给反馈——点引用卡
+    // 必须有回响，不能静默无操作（老板 2026-10-14）。
+    if (messageId.isEmpty) {
+      _notice(context, l10n.chatPageQuoteGoneNotice);
+      return;
+    }
     var index = _messages.indexWhere((m) => m.env.messageId == messageId);
     if (index < 0) {
       // 目标未加载：往前分页补载直到覆盖目标（或历史已到顶）
       final targetSeq = await _repo.sequenceOfMessage(messageId);
-      if (targetSeq == null) return; // 原消息不存在（非本空间/已清理）
+      // 原消息不存在（非本空间/本机已清屏）：通知用户，不再静默返回
+      // （老板 2026-10-14）。墓碑消息保持显示的最初动因就是"跳转要有东西
+      // 可落"；真落不了时，至少把结果说清楚。
+      if (targetSeq == null) {
+        if (!mounted) return;
+        _notice(context, l10n.chatPageQuoteGoneNotice);
+        return;
+      }
       while (index < 0 && mounted) {
         final first = _messages.isEmpty ? null : _messages.first.env.serverSequence;
         if (first == null || first <= targetSeq) break;
@@ -5005,7 +6073,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         });
         index = _messages.indexWhere((m) => m.env.messageId == messageId);
       }
-      if (index < 0) return;
+      // 分页到顶仍未覆盖目标（极端：seq 在、行不在）——同样给反馈
+      if (index < 0) {
+        if (!mounted) return;
+        _notice(context, l10n.chatPageQuoteGoneNotice);
+        return;
+      }
     }
     if (!mounted) return;
     setState(() => _jumpTargetId = messageId);
@@ -5558,7 +6631,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        AppLocalizations.of(context)!.chatPageDeletedMessage,
+        AppLocalizations.of(context)!.chatPageQuotedTombMessage,
         style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -5683,25 +6756,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
-        content: Text(l10n.chatPageDeleteConfirmMessage),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.chatPageDeleteCancel),
-          ),
-          // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
-          // 用实体样式，不再是纯文字）
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              foregroundColor: Colors.white,
+      // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
+          content: Text(l10n.chatPageDeleteConfirmMessage),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false), label: l10n.chatPageDeleteCancel),
+            // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
+            // 用实体样式，不再是纯文字）
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.chatPageDeleteConfirmOk),
             ),
-            child: Text(l10n.chatPageDeleteConfirmOk),
-          ),
-        ],
+          ],
+        ),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -5726,23 +6801,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 不做二次确认容易误触
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
-        content: Text(l10n.chatPageRecallConfirmBody),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              foregroundColor: Colors.white,
+      // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
+          content: Text(l10n.chatPageRecallConfirmBody),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.chatPageRecallConfirmOk),
             ),
-            child: Text(l10n.chatPageRecallConfirmOk),
-          ),
-        ],
+          ],
+        ),
       ),
     );
     if (ok != true) return;
@@ -6050,6 +7127,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     // 录音时收起键盘（输入框被录音条覆盖，键盘占屏无意义）
     FocusManager.instance.primaryFocus?.unfocus();
+    _voiceStarting = true;
     try {
       // 重新录音（预览态再长按）：先清掉上一次未发送的临时文件
       final old = _recordingPath;
@@ -6069,6 +7147,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 否则无权限设备上 AudioRecord 初始化失败：要么 start 抛错（无波形），
       // 要么读到全零数据（波形极小、文件 0 字节发不出）。
       if (!await recorder.hasPermission()) {
+        _voiceStarting = false;
         if (!mounted) return;
         _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
@@ -6087,6 +7166,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
         path: path,
       );
+      // 上面 hasPermission() 等待授权弹窗期间用户可能已松手（_voiceStarting 已被
+      // _stopVoice 清掉）：此时录制已开但无人会再去停它，直接停掉并丢弃本次启动
+      if (!_voiceStarting) {
+        await recorder.stop();
+        return;
+      }
+      _voiceStarting = false;
       // 振幅流：实时驱动录音条波形（record 插件内部无订阅者时不做事）
       _voiceSamples.clear();
       _recordSeconds = 0;
@@ -6119,7 +7205,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 松手 / 60s 到点：停录音 → 文件有效进预览态（不自动发送），空录音直接取消回输入框。
   Future<void> _stopVoice() async {
-    if (_inputMode != _InputMode.recording) return;
+    if (_inputMode != _InputMode.recording) {
+      // 录音尚未真正开始（首次授权弹窗期间已松手）：只标记「本次启动作废」，
+      // _startVoice 在 recorder.start() 完成后看到标记会自行停掉并丢弃。
+      _voiceStarting = false;
+      return;
+    }
     final path = _recordingPath;
     _recordTimer?.cancel();
     _recordTimer = null;
@@ -6765,51 +7856,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final files = payload.files;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
-        // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"
-        title: Text(switch (payload.kind) {
-          'image' => l10n.chatPagePasteSendImageTitle,
-          'video' => l10n.chatPagePasteSendVideoTitle(files!.length),
-          'audio' => l10n.chatPagePasteSendAudioTitle(files!.length),
-          _ => l10n.chatPagePasteSendFilesTitle(files!.length),
-        }),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
-          child: bytes != null
-              ? Image.memory(bytes, fit: BoxFit.contain)
-              // 名单用 SingleChildScrollView + Column(min)：对话框要算内容
-              // 固有宽度，ListView(shrinkWrap) 会抛 intrinsic dimensions 异常
-              : SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final f in files!)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          // 图标也按类型：视频/音频不该挂个通用文件图标
-                          leading: Icon(switch (payload.kind) {
-                            'video' => Icons.movie,
-                            'audio' => Icons.music_note,
-                            _ => Icons.insert_drive_file,
-                          }),
-                          title: Text(f.name,
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ),
-                    ],
+      // 破坏性确认（粘贴发送不可轻点）：禁误触关闭（点外面/系统返回都不行），
+      // 必须点按钮（老板 2026-10-15）
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
+          // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"
+          title: Text(switch (payload.kind) {
+            'image' => l10n.chatPagePasteSendImageTitle,
+            'video' => l10n.chatPagePasteSendVideoTitle(files!.length),
+            'audio' => l10n.chatPagePasteSendAudioTitle(files!.length),
+            _ => l10n.chatPagePasteSendFilesTitle(files!.length),
+          }),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280, maxHeight: 320),
+            child: bytes != null
+                ? Image.memory(bytes, fit: BoxFit.contain)
+                // 名单用 SingleChildScrollView + Column(min)：对话框要算内容
+                // 固有宽度，ListView(shrinkWrap) 会抛 intrinsic dimensions 异常
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final f in files!)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            // 图标也按类型：视频/音频不该挂个通用文件图标
+                            leading: Icon(switch (payload.kind) {
+                              'video' => Icons.movie,
+                              'audio' => Icons.music_note,
+                              _ => Icons.insert_drive_file,
+                            }),
+                            title: Text(f.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+          ),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.send),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.send),
-          ),
-        ],
       ),
     );
     return confirmed ?? false;
@@ -7980,10 +9074,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showLocalePicker);
                 case 'style':
                   _menuAction(_showStylePicker);
-                case 'storage':
-                  _menuAction(_showAttachmentStoragePicker);
                 case 'burn':
                   _menuAction(_showBurnPicker);
+                case 'more':
+                  _menuAction(_showMoreSettingsSheet);
                 case 'advanced':
                   _menuAction(_showAdvancedSheet);
                 case 'notify':
@@ -7992,10 +9086,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showSetLockDialog);
                 case 'about':
                   _menuAction(_openAboutPage);
-                case 'name':
-                  _menuAction(_showRenameDialog);
-                case 'avatar':
-                  _menuAction(_showAvatarUpload);
+                case 'profile':
+                  _menuAction(_showMyProfileSheet);
                 case 'members':
                   _menuAction(_showMembersSheet);
                 case 'entrancelist':
@@ -8030,7 +9122,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 菜单分组（老板 2026-09-24 定；2026-09-25 删「生成通道码」项，
                 // 改由「通道列表」弹层里的「新建通道」按钮承担）：
                 //   ① 外观与锁：界面语言 / 界面主题 / 锁屏码
-                //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 通道列表 /
+                //   ② 身份·通道·内容：我的资料（聚合原我的身份/我的头像）/ 当前通道 / 通道列表 /
                 //      阅后即焚 / 附件存储 / 高级安全
                 //   ③ 结尾：关于秘境 / 切换我的秘境 / 退出本应用
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
@@ -8074,24 +9166,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight),
+                // 「我的资料」（老板 2026-10-17，聚合原「我的身份/我的头像」两项）：
+                // 右侧人名+头像小图；点击 → 「我的资料」弹层（头像/名字/性别）
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
-                  value: 'name',
+                  value: 'profile',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMyNameLabel, style: captionStyle),
-                      const Spacer(),
-                      _menuValue(_myMemberName.isEmpty ? l10n.chatPageNameUnset : _myMemberName, valueStyle),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'avatar',
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(l10n.chatPageMenuAvatar, style: labelStyle)),
-                      const SizedBox(width: 10),
+                      Text(l10n.chatPageMenuMyProfile, style: labelStyle),
+                      // 人名（空 → 「未设置」占位）；长名截断，与头像小图间留 6。
+                      // 结构注意（老板 2026-10-17，两种失败各实测过）：
+                      // - 纯 [Spacer] + [_menuValue]：PopupMenu 的内在宽度测量会把
+                      //   本行报成最宽行、实际布局却给不满 → 溢出 6.4px（长名时）；
+                      // - [Flexible] 包值：内在宽度失真使 Spacer 吸不到右缘 →
+                      //   头像缩进 16.5px，不与其他行齐右。
+                      // 最终形：Expanded 紧贴占满（不溢出）+ Align 右对齐 +
+                      // [_menuValue] 的 180 上限（与整菜单共用同一截断规则），
+                      // 头像恒在行最右缘。
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _menuValue(
+                            _myMemberName.isEmpty
+                                ? l10n.chatPageNameUnset
+                                : _myMemberName,
+                            valueStyle,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       CircleAvatar(
                         radius: 12,
                         backgroundImage:
@@ -8104,7 +9207,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，用邮件把离线的
-                // 人拉回来。2026-10-02 起挪到「我的头像」之后（老板定），属分组②
+                // 人拉回来。2026-10-02 起挪到「我的资料」之后（老板定），属分组②
                 // （身份·通道·内容）。
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
@@ -8192,14 +9295,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                // 更多设置（二级弹层：附件存储 + 墓碑消息；老板 2026-10-15）
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
-                  value: 'storage',
+                  value: 'more',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuAttachmentStorage, style: captionStyle),
+                      Text(l10n.chatPageMenuMoreSettings, style: captionStyle),
                       const Spacer(),
-                      _menuValue(_attachmentStorageLabel(_attachmentStorage, l10n), valueStyle),
+                      // 通用设置图标（18 = 与 burn 沙漏/devices 图标同尺寸）
+                      Icon(Icons.settings_outlined, size: 18, color: labelStyle.color),
+                      // 右侧 > ：与「高级安全」同款二级入口标识（老板 2026-10-15）
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
                   ),
                 ),
@@ -8211,6 +9319,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.advancedMenuTitle, style: labelStyle),
                       const Spacer(),
+                      // 危险/警告图标（老板 2026-10-15）：弹层里是改口令/删全部
+                      // 消息/销毁通道这类破坏性操作，入口先给一个警示标识。**菜单里
+                      // 不用红色**——太引人注意，红色留给弹层内部那一行
+                      Icon(Icons.warning_amber_rounded,
+                          size: 18, color: labelStyle.color),
+                      const SizedBox(width: 2),
                       Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
                   ),
@@ -8446,7 +9560,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 bytes: _myAvatarBytes,
                                 gender: _myGender,
                                 // 空头像：点它没有大图可看 → 直接进换头像流程；
-                                // 有头像：开大图，顶部「更换头像」+ 底部「保存」
+                                // 有头像：开大图（「更换头像」+「应用于本机所有
+                                // 秘境」+「保存」图标，三处一致）
                                 onTap: _myAvatarBytes == null
                                     ? () => unawaited(_showAvatarUpload())
                                     : () => unawaited(_showAvatarFullscreen(
@@ -8468,12 +9583,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 时出现——正常发送时 pending 只存在百毫秒，不会闪。
           _buildOfflineHint(),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(12),
-              itemCount: _messages.length,
-              itemBuilder: (context, i) {
-                final m = _messages[i];
+            // Builder：_displayMessages 只算一次给 itemCount/itemBuilder 共用
+            // （getter 每次访问都重建过滤列表，逐项调用会 O(n²)）
+            child: Builder(
+              builder: (context) {
+                final displayMessages = _displayMessages;
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: displayMessages.length,
+                  itemBuilder: (context, i) {
+                    final m = displayMessages[i];
                 final mine = m.sender == 'me';
                 // 发送者 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底。
                 // 群聊一期：group 空间的**气泡配色**与**发送者名字**都要它，不能只在
@@ -8615,7 +9735,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           ],
                                           Text(_messageTimeLabel(m),
                                               style: TextStyle(
-                                                  fontSize: 12,
+                                                  fontSize: 11,
                                                   color: _uiStyle == 'gradient'
                                                       ? Colors.white70
                                                       : Colors.grey)),
@@ -8821,19 +9941,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                       if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
-                        // 自己的头像大图也给「保存」（老板 2026-10-09：与对方头像
-                        // 一致——气泡旁点开的头像只是"查看"，保存动作与"我"无关）
+                        // 自己的头像也给「更换头像」「应用于本机所有秘境」
+                        // （老板 2026-10-17：气泡旁/状态条/「我的资料」三处
+                        // 同一份"我的头像全屏"）；「保存」人人都有
                         _MessageAvatar(
                             memberId: senderMemberId,
                             server: effectiveServer,
                             api: widget.api,
                             radius: kMessageAvatarDiameter / 2,
+                            onReplaceAvatar: () => unawaited(_showAvatarUpload()),
+                            onApplyAllSpaces: _hasMultipleSpaces
+                                ? (bytes) => _applyAvatarAllSpaces(bytes)
+                                : null,
                             onSaveImage: (bytes) => _saveAvatarImage(
                                 _senderNameOf(senderMemberId), bytes)),
                       ],
                     ],
                   ),
                 );
+              },
+            );
               },
             ),
           ),
@@ -8999,6 +10126,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 桌面端拖入文件的高亮浮层（覆盖整页，松手即发送）
           if (_fileDragHover) const Positioned.fill(child: _DropHintOverlay()),
         ],
+      ),
+    );
+    // 前台无操作锁屏（老板 2026-10-17）：整页套两层（包在最内层，后面的
+    // CallbackShortcuts/DropTarget 不消费指针事件，都能正常收到）。
+    // ① Listener：点/滑/拖都在 onPointerDown 抓到 → 重排 idle 计时器。
+    //    打字由输入框控制器监听兜底（软键盘在 Flutter 视图外，点不到）。
+    // ② 通知：滚轮/触控板/惯性滚动不产生 pointer down，用 ScrollNotification
+    //    兜住（持续滚动看消息的用户不该被锁）。
+    // 「在栈顶」守卫不在 build：用 ModalRoute.isCurrent（见 _fireIdleLock）。
+    page = NotificationListener<ScrollUpdateNotification>(
+      onNotification: (_) {
+        _onScrollInteraction();
+        return false;
+      },
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _onPointerInteraction(),
+        child: page,
       ),
     );
     // 桌面端：整页套一个投递区，从访达/资源管理器拖文件进来即发送；移动端不挂
@@ -9188,13 +10333,24 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: Center(child: Text(l10n.chatPageClearLockTitle)),
-          content: Text(l10n.chatPageClearLockMessage),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
-          ],
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: Center(child: Text(l10n.chatPageClearLockTitle)),
+            content: Text(l10n.chatPageClearLockMessage),
+            actions: [
+              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+              // 确认按钮与「删除所有消息」弹窗同款红底白字，但文案用「清除」
+              // （与删除消息的「删除」措辞区分，老板 2026-10-18）
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(l10n.chatPageLockClearConfirm),
+              ),
+            ],
+          ),
         ),
       );
       if (confirmed != true) return; // 取消：留在本弹窗（不执行清除）
@@ -9247,6 +10403,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Center(child: Text(l10n.chatPageSetLockTitle)),
+      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
@@ -9260,7 +10418,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               color: Theme.of(context).colorScheme.outline,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           // 已设锁屏码：先输当前锁屏码（修改/清空都要验证）
           if (_hasPin) ...[
             TextField(
@@ -9305,7 +10463,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
+        CancelButton(onPressed: () => Navigator.of(context).pop()),
         FilledButton(onPressed: _busy ? null : _submit, child: Text(l10n.setPinDialogSetPin)),
       ],
     );
@@ -9479,6 +10637,8 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Center(child: Text(l10n.chatPageChangePassphraseTitle)),
+      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -9492,7 +10652,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
               color: Theme.of(context).colorScheme.outline,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           // 旧口令/新口令可临时查看明文（点眼睛，3 秒后自动回暗码）；
           // **确认新口令不给眼睛**——确认框是用来复核的，给"看一眼"反而容易顺手点开
           // （老板 2026-09-15）。
@@ -9522,7 +10682,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
+        CancelButton(onPressed: () => Navigator.of(context).pop(false)),
         FilledButton(
           onPressed: _busy ? null : _submit,
           child: Text(l10n.chatPageChangePassphraseSubmit),
@@ -9941,14 +11101,157 @@ class _PastePayload {
   final String kind;
 }
 
+/// 头像全屏页（**唯一实现**，老板 2026-10-17 要求三处共享）：状态条头像 /
+/// 消息气泡旁头像 / 「我的资料」弹层头像共用。品牌渐变背景 + 轻触关闭 + 右上
+/// 关闭键；底部按钮按回调组合（都**先关大图再执行**）：
+/// - [onReplace]：「更换头像」（顶部居中；本人的头像才传）；
+/// - [onApplyAllSpaces]：「应用于本机所有秘境」（字号小一档分主次；本人的
+///   头像才传，参数 = 要扇出的 bytes，即本页展示的那张）；
+/// - [onSave]：「保存」——与 [onApplyAllSpaces] **并排时**缩成图标圆钮
+///   （我的头像 = 下载图标 + 应用所有秘境）；[onApplyAllSpaces] 为 null
+///   （对方头像）时独占一行，用与消息图片全屏同款的「图标+保存」完整按钮。
+Future<void> showMyAvatarFullscreen(
+  BuildContext context, {
+  required Uint8List bytes,
+  VoidCallback? onReplace,
+  Future<void> Function(Uint8List bytes)? onApplyAllSpaces,
+  Future<void> Function(Uint8List bytes)? onSave,
+}) async {
+  await withImmersiveFullscreen(() => showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        useSafeArea: false,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          child: SizedBox.expand(
+            child: DecoratedBox(
+              decoration: const BoxDecoration(gradient: kBrandGradient),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Clickable(
+                      onTap: () => Navigator.of(ctx).pop(),
+                      child: InteractiveViewer(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Image.memory(bytes, fit: BoxFit.contain),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 顶部「更换头像」（SafeArea 内居中；关闭键独立一层浮右上角，
+                  // 不挤占居中按钮）。先关大图再进选图——不关的话取消选图会
+                  // 回到一张"已经没意义"的大图（头像还没换）。
+                  if (onReplace != null)
+                    Positioned(
+                      top: 8,
+                      left: 0,
+                      right: 0,
+                      child: SafeArea(
+                        child: Center(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              onReplace();
+                            },
+                            icon: const Icon(Icons.photo_camera_outlined),
+                            label: Text(AppLocalizations.of(ctx)!
+                                .chatPageAvatarChange),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // 右上角关闭键（独立一层，居中按钮不挤占它）
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: SafeArea(child: _FullscreenCloseButton()),
+                  ),
+                  // 底部一行（SafeArea 内居中，bottom:32）：
+                  // - **本人的头像**：「保存」图标圆钮 +「应用于本机所有秘境」
+                  //   并排（老板 2026-10-17：下载图标不抢戏，悬停有 tooltip）；
+                  // - **对方头像**（无 apply 回调）：与普通图片全屏同款的
+                  //   「图标+保存」完整按钮。
+                  // 先关大图再执行——顶部提示/加载是聊天页的覆盖层，压在
+                  // Dialog 下面看不见。
+                  if (onSave != null || onApplyAllSpaces != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 32,
+                      child: SafeArea(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (onSave != null && onApplyAllSpaces != null) ...[
+                              // 我的头像：图标圆钮版
+                              Tooltip(
+                                message:
+                                    AppLocalizations.of(ctx)!.chatPageActionSave,
+                                child: IconButton.filled(
+                                  onPressed: () {
+                                    Navigator.of(ctx).pop();
+                                    unawaited(onSave(bytes));
+                                  },
+                                  icon: const Icon(Icons.save_alt),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            if (onApplyAllSpaces != null)
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  textStyle: const TextStyle(fontSize: 13),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  unawaited(onApplyAllSpaces(bytes));
+                                },
+                                icon: const Icon(Icons.layers_outlined),
+                                label: Text(
+                                    AppLocalizations.of(ctx)!.settingsScopeAll),
+                              ),
+                            // 对方头像（无 apply）：完整「图标+保存」按钮，
+                            // 与消息图片全屏同款（老板 2026-10-17）
+                            if (onSave != null && onApplyAllSpaces == null)
+                              FilledButton.icon(
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  unawaited(onSave(bytes));
+                                },
+                                icon: const Icon(Icons.save_alt),
+                                label: Text(
+                                    AppLocalizations.of(ctx)!.chatPageActionSave),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ));
+}
+
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar(
-      {this.memberId,
+      {super.key,
+      this.memberId,
       required this.server,
       this.api,
       this.radius = 16,
       this.openFullscreenOnTap = true,
-      this.onSaveImage});
+      this.onSaveImage,
+      this.onReplaceAvatar,
+      this.onApplyAllSpaces,
+      this.onTapWithoutImage});
 
   final String? memberId;
   final String server;
@@ -9966,6 +11269,25 @@ class _MessageAvatar extends StatefulWidget {
   /// null = 不放按钮（如状态条头像条：它压根不开全屏）。存哪儿由聊天页决定
   /// （移动端入相册、桌面弹保存对话框）。
   final Future<void> Function(Uint8List bytes)? onSaveImage;
+
+  /// 顶部「更换头像」按钮的回调（老板 2026-10-17：本人的头像才给——「我的资料」
+  /// 弹层/状态条用，点「我的头像」大图能直接去换头像）。null = 不放按钮
+  /// （别人的头像，没有权限改）。
+  final VoidCallback? onReplaceAvatar;
+
+  /// 「应用于本机所有秘境」按钮的回调（老板 2026-10-17：把这份头像扇出到本机
+  /// 其它秘境）。与 [onReplaceAvatar] 同源——都是本人的头像才给。
+  /// 参数 = 全屏里实际展示的 bytes（扇出去的必须就是用户看的那张）。
+  final Future<void> Function(Uint8List bytes)? onApplyAllSpaces;
+
+  /// **没有头像图片**时点头像的动作（如「我的资料」弹层：直接进选图流程）。
+  ///
+  /// 为什么由本组件自己决定：图在不在，只有本组件的静态缓存说了算
+  /// （[_MessageAvatarState._load] 独立加载）。调用方另存一份 bytes
+  /// （如 `_myAvatarBytes`）来猜，两次独立加载不一致时会**错航**（有图却进
+  /// 选图）或**死区**（没图却不开全屏）——2026-10-17 代码复查发现的竞态，
+  /// 故把决策权收回到唯一的数据源。
+  final VoidCallback? onTapWithoutImage;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -10022,73 +11344,48 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     }
   }
 
-  /// 全屏查看头像（品牌粉蓝渐变大图 + 右上角关闭；隐藏系统状态栏 = 沉浸感）。
-  /// 背景 = kBrandGradient，与图片全屏一致（老板 2026-09-15）。
-  /// 底部「保存」按钮（老板 2026-10-08）：仅在调用方给了 [onSaveImage] 时出现
-  /// （别人的头像可下载；状态条头像条不开全屏、也没给回调）。
-  /// 轻触关闭（老板 2026-10-12）：点屏幕任何地方返回聊天页（Image.memory 的
-  /// hitTestSelf 恒真，整块 fill 区域都接得住轻触），与图片/视频全屏一致。
+  /// 全屏查看头像：走共享的 [showMyAvatarFullscreen]（老板 2026-10-17：
+  /// 状态条/「我的资料」/本头像三处必须同一份全屏实现）。按钮集合由回调决定：
+  /// 「更换头像」「应用于本机所有秘境」仅本人头像有（调用方传）；「保存」
+  /// 人人都有（[onSaveImage]，本人是图标圆钮、对方是完整按钮——见共享页注释）。
   Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
+    final onReplace = widget.onReplaceAvatar;
+    final onApplyAll = widget.onApplyAllSpaces;
     final onSave = widget.onSaveImage;
-    await withImmersiveFullscreen(() => showDialog<void>(
-          context: context,
-          barrierDismissible: true,
-          useSafeArea: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.zero,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            child: SizedBox.expand(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(gradient: kBrandGradient),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Clickable(
-                        onTap: () => Navigator.of(ctx).pop(),
-                        child: Image.memory(bytes, fit: BoxFit.contain),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: SafeArea(child: _FullscreenCloseButton()),
-                    ),
-                    // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见
-                    if (onSave != null)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 32,
-                        child: Center(
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              unawaited(onSave(bytes));
-                            },
-                            icon: const Icon(Icons.save_alt),
-                            label: Text(
-                                AppLocalizations.of(ctx)!.chatPageActionSave),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ));
+    await showMyAvatarFullscreen(
+      context,
+      bytes: bytes,
+      onReplace: onReplace,
+      onApplyAllSpaces: onApplyAll,
+      onSave: onSave,
+    );
+  }
+
+  /// 点按动作：本组件唯一的「去向」决策——有图 → 全屏大图；没图 → 调用方的
+  /// [onTapWithoutImage]。
+  ///
+  /// 对外公开是给「我的资料」弹层用的（老板 2026-10-17）：那里把头像和编辑角标
+  /// 包成一个方形热区，点在角标或圆的四角也要落到和图像同一动作上——外层热区
+  /// 直接调这个方法，内层则传 `openFullscreenOnTap: false` 让出点击，避免两个
+  /// 手势识别器抢同一个 tap。
+  void handleTap() {
+    if (_bytes != null) {
+      _showFullscreen();
+    } else {
+      widget.onTapWithoutImage?.call();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
+    // 点按去向由**本组件**决定（有图 → 全屏；没图 → 调用方的 onTapWithoutImage），
+    // 不靠调用方从外部猜缓存状态（见 onTapWithoutImage 注释）。
+    final onTap = widget.openFullscreenOnTap ? handleTap : null;
     return Clickable(
-      onTap: (widget.openFullscreenOnTap && bytes != null)
-          ? _showFullscreen
-          : null,
+      onTap: onTap,
       circle: true,
       child: CircleAvatar(
         radius: widget.radius,

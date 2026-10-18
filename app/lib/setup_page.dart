@@ -11,6 +11,7 @@ import 'package:einz_shared/einz_shared.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'widgets/about_sheet.dart';
+import 'widgets/cancel_button.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
@@ -1247,14 +1248,17 @@ class _SetupPageState extends State<SetupPage> {
     final shouldExit = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
-        title: Center(child: Text(l10n.chatPageExitTitle)),
-        content: Text(l10n.chatPageExitMessage),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
-        ],
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+          title: Center(child: Text(l10n.chatPageExitTitle)),
+          content: Text(l10n.chatPageExitMessage),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+          ],
+        ),
       ),
     );
     if (shouldExit == true) {
@@ -2317,35 +2321,38 @@ class _SetupPageState extends State<SetupPage> {
     final start = await showDialog<bool>(
       context: context,
       barrierDismissible: false, // 只有一个按钮：开始聊天
-      builder: (ctx) => AlertDialog(
-        // 标题左侧放品牌 Logo（替代通用 🎉 庆祝图标，老板 2026-09-13）；
-        // 整行**居中**（老板 2026-09-25：弹窗标题一律居中，不居左）
-        title: Center(
-          child: Row(
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题左侧放品牌 Logo（替代通用 🎉 庆祝图标，老板 2026-09-13）；
+          // 整行**居中**（老板 2026-09-25：弹窗标题一律居中，不居左）
+          title: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BrandLogo(size: 26),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                      isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
+                ),
+              ],
+            ),
+          ),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const BrandLogo(size: 26),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                    isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
-              ),
+              Text(l10n.welcomeDialogMessage),
             ],
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.welcomeDialogMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.welcomeDialogStart),
+            ),
           ],
         ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.welcomeDialogStart),
-          ),
-        ],
       ),
     );
     if (start == true && mounted) {

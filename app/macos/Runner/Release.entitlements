@@ -4,6 +4,14 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- 麦克风（语音消息/语音通话）。hardened runtime（Developer ID 分发必开）下
+	     TCC 要求 hardened runtime app 声明此 entitlement 才有弹授权框的资格，
+	     缺了直接静默拒绝、系统设置麦克风列表里也不出现（老板 2026-10-13 实测，
+	     TCC 日志："Prompting policy for hardened runtime ... requires
+	     entitlement com.apple.security.device.audio-input but it is missing"）。
+	     与 Info.plist 的 NSMicrophoneUsageDescription 缺一不可。 -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 	<!-- 出站网络（探测/WS/附件传输）。沙盒默认理论允许出站，但实测
 	     networkd settings 读取被拒时 HttpClient 会间歇失败，显式声明 -->
 	<key>com.apple.security.network.client</key>

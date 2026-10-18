@@ -1,7 +1,10 @@
 // 选项弹层（OptionPickerSheet）的可滚动性回归。
 //
 // 老板 2026-09-24：档位多（阅后即焚 6 档）+ 窗口不高时，原先的死 Column 会被裁掉
-// 底部并报 RenderFlex overflow；改为标题/提交按钮固定、中间选项区可滚动。
+// 底部并报 RenderFlex overflow；改为标题/提交按钮固定，中间选项区可滚动。
+//
+// 2026-10-15：scopeAllLabel 勾选框（「应用于本机所有秘境」）回归——固定位渲染、
+// 点选即生效模式下勾选态随 onApply 的 scopeAll 交出。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,7 +36,7 @@ void main() {
                 for (var i = 0; i < n; i++)
                   OptionPickerItem(value: '$i', label: '选项$i'),
               ],
-              onApply: (_) async {},
+              onApply: (_, {bool scopeAll = false}) async {},
             ),
           ),
           child: const Text('开'),
@@ -67,7 +70,7 @@ void main() {
                 OptionPickerItem(value: '0', label: '选项0'),
                 OptionPickerItem(value: '1', label: '选项1'),
               ],
-              onApply: (_) async {},
+              onApply: (_, {bool scopeAll = false}) async {},
             ),
           ),
           child: const Text('开'),
@@ -100,7 +103,7 @@ void main() {
                 for (var i = 0; i < n; i++)
                   OptionPickerItem(value: '$i', label: '选项$i'),
               ],
-              onApply: (_) async {},
+              onApply: (_, {bool scopeAll = false}) async {},
             ),
           ),
           child: const Text('开'),
@@ -114,5 +117,132 @@ void main() {
     final sheetHeight = tester.getSize(find.byType(OptionPickerSheet)).height;
     expect(sheetHeight, greaterThan(400), reason: '应能占掉大半屏（远高于 337.5）');
     expect(sheetHeight, lessThanOrEqualTo(600.0), reason: '上限 = 满窗高（不再卡 90%）');
+  });
+
+  testWidgets('scopeAllLabel：勾选框固定渲染在选项区上方（阅读顺序=交互顺序），勾选态随 onApply 交出',
+      (WidgetTester tester) async {
+    // 记录 onApply 收到的 (value, scopeAll)
+    final applied = <(String, bool)>[];
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showOptionPickerSheet<void>(
+            context: ctx,
+            builder: (_) => OptionPickerSheet(
+              title: '选项弹层',
+              selected: 'a',
+              scopeAllLabel: '应用于本机所有秘境',
+              options: const [
+                OptionPickerItem(value: 'a', label: '甲'),
+                OptionPickerItem(value: 'b', label: '乙'),
+              ],
+              onApply: (value, {bool scopeAll = false}) async {
+                applied.add((value, scopeAll));
+              },
+            ),
+          ),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await tester.pumpAndSettle();
+
+    // 勾选框在（选项「甲/乙」都在它**下面**——先定作用域再选，点选即生效的
+    // 弹层里若放选项下方，用户先点到选项就关闭了，没机会改范围）
+    expect(find.text('应用于本机所有秘境'), findsOneWidget);
+    final optionTop = tester.getTopLeft(find.text('甲')).dy;
+    final checkboxTop = tester.getTopLeft(find.text('应用于本机所有秘境')).dy;
+    expect(checkboxTop, lessThan(optionTop), reason: '勾选框应固定在选项区上方');
+
+    // 不勾 → 点选：scopeAll = false
+    await tester.tap(find.text('乙'));
+    await tester.pumpAndSettle();
+    expect(applied, [('b', false)]);
+
+    // 勾上 → 再点同一个选项：scopeAll = true（点选即生效模式下重点选也重新触发）
+    await tester.tap(find.text('开'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('应用于本机所有秘境')); // 整行可点
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('乙'));
+    await tester.pumpAndSettle();
+    expect(applied.last, ('b', true));
+  });
+
+  testWidgets('不传 scopeAllLabel：不渲染勾选框', (WidgetTester tester) async {
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showOptionPickerSheet<void>(
+            context: ctx,
+            builder: (_) => OptionPickerSheet(
+              title: '选项弹层',
+              selected: 'a',
+              options: const [
+                OptionPickerItem(value: 'a', label: '甲'),
+              ],
+              onApply: (_, {bool scopeAll = false}) async {},
+            ),
+          ),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Checkbox), findsNothing);
+  });
+
+  testWidgets('提交模式：勾选框在提交按钮上方；只勾范围不改选项也能提交',
+      (WidgetTester tester) async {
+    final applied = <(String, bool)>[];
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showOptionPickerSheet<void>(
+            context: ctx,
+            builder: (_) => OptionPickerSheet(
+              title: '选项弹层',
+              selected: 'a',
+              submitLabel: '提交',
+              scopeAllLabel: '应用于本机所有秘境',
+              options: const [
+                OptionPickerItem(value: 'a', label: '甲'),
+                OptionPickerItem(value: 'b', label: '乙'),
+              ],
+              onApply: (value, {bool scopeAll = false}) async {
+                applied.add((value, scopeAll));
+              },
+            ),
+          ),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await tester.pumpAndSettle();
+
+    // 位置：选项 → 勾选框 → 提交按钮（自上而下）
+    final optionTop = tester.getTopLeft(find.text('甲')).dy;
+    final checkboxTop = tester.getTopLeft(find.text('应用于本机所有秘境')).dy;
+    final submitTop = tester.getTopLeft(find.text('提交')).dy;
+    expect(optionTop, lessThan(checkboxTop));
+    expect(checkboxTop, lessThan(submitTop),
+        reason: '提交模式下勾选框应在提交按钮上方（防呆：提交前统一确认）');
+
+    // 提交按钮初始不可用（选项与作用域都没动）
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull);
+
+    // 只勾范围、不改选项 → 提交按钮可用，提交后 scopeAll=true（作用域本身是
+    // 有效操作：把当前模式推广到所有空间）
+    await tester.tap(find.text('应用于本机所有秘境'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull);
+    await tester.tap(find.text('提交'));
+    await tester.pumpAndSettle();
+    expect(applied, [('a', true)]);
   });
 }

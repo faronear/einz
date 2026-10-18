@@ -4,14 +4,17 @@
 //
 // 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + 时间。
 // 时间**不带 "since" 前缀**（老板 2026-09-26：太占地方），且所有卡片等高
-// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。
-// 右上角固定角标（老板 2026-09-26）：本机 = 绿勾（原先紧贴名称，位置随名字跑）、
-// 已撤销 = 阻止图标 + 整卡蒙版；两者互斥，共用一个角标位。
+// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。第二行还有**客户端段**
+// （老板 2026-10-14：App 版本 `v2610.1409.00` / TUI 类型标记 / 存量行没有，
+// **靠右对齐**——老板同日要求）。
+// 右上角固定角标（老板 2026-09-26）：已撤销 = 阻止图标 + 整卡蒙版（本机的改名
+// 入口 2026-10-14 起搬到第一行名字后面的可点击胶囊，不再占角标位）。
 // 离线时刻 = max(last_seen, offline_since)：服务端干净断开时 last_seen 归零，
 // 断线时刻只落在 offline_since —— 见 `chat_page._showEntranceListSheet`。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
@@ -32,10 +35,20 @@ class _FakeEntranceApi extends ApiClient {
   /// 所以测试里比的是**增量**，不是绝对值）。
   int listCalls = 0;
 
+  /// reportClientInfo（启动上报）收到的（client, appVersion）——本机卡片版本段/
+  /// 上报行为断言用。
+  final List<({String client, String? appVersion})> clientReports = [];
+
   @override
   Future<List<Map<String, dynamic>>> listEntrances(String token) async {
     listCalls++;
     return entranceRows;
+  }
+
+  @override
+  Future<void> reportClientInfo(String client, String token,
+      {String? appVersion}) async {
+    clientReports.add((client: client, appVersion: appVersion));
   }
 
   @override
@@ -158,8 +171,8 @@ Finder sheetDot(Color color) => find.descendant(
           w is Icon && w.icon == Icons.circle && w.color == color),
     );
 
-/// 弹层内的**本机角标**（Icons.edit，2026-10-02 起「本机」那张卡右上角是"改名"入口；
-/// 与状态灯的实心圆是两个图标，不会撞）。
+/// 弹层内的**本机编辑胶囊**里的编辑图标（Icons.edit；2026-10-14 起「本机」那张卡
+/// 的改名入口是名字后面的可点击胶囊，不再占右上角角标位）。
 Finder sheetLocalCheck() => find.descendant(
       of: find.byType(BottomSheet),
       matching: find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.edit),
@@ -173,6 +186,7 @@ Finder sheetRevokedMark() => find.descendant(
 
 /// 弹层内的**时间文本**（卡片第二行；无 "since" 前缀，故按时间格式匹配）：
 /// 当天 `HH:MM` / 当年 `MM-DD HH:MM` / 跨年 `YYYY-MM-DD HH:MM`。
+/// （客户端段 2026-10-14 起是**独立的靠右 Text**，不并进时间文本。）
 Finder sheetTimeText() => find.descendant(
       of: find.byType(BottomSheet),
       matching: find.byWidgetPredicate((w) =>
@@ -234,6 +248,139 @@ void main() {
 
   // 会话注册表是进程级静态的：逐用例复位，别让上一个用例的会话（含旧 token）串进来
   setUp(() => SpaceSessions.clear());
+
+  // ┓ 客户端段（老板 2026-10-14：App 版本 / TUI 类型标记） ┓
+  // 本机版本用例必须排在**本文件第一个**：appVersionString() 的版本缓存是进程级
+  // 静态（version_gate.dart 的 _cachedAppVersion），谁先调用谁落值——这里第一个
+  // 跑，package_info 的 mock 才吃得进缓存（后续用例的本机卡也因此都带版本段，
+  // sheetTimeText 的匹配已兼容该后缀）。
+  testWidgets('本机卡片第二行显示 App 版本；启动时上报 client=app+版本',
+      (tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const channel = MethodChannel('dev.fluttercommunity.plus/package_info');
+    messenger.setMockMethodCallHandler(channel,
+        (call) async => call.method == 'getAll'
+            ? {
+                'appName': 'Einz',
+                'packageName': 'cc.tic.einz',
+                'version': '2610.1409.00',
+                'buildNumber': '1',
+              }
+            : null);
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    // 启动上报：client='app' + 本机版本（升级后下次启动自动跟上）
+    expect(api.clientReports, isNotEmpty, reason: '进聊天页应上报客户端信息');
+    expect(api.clientReports.last.client, 'app');
+    expect(api.clientReports.last.appVersion, '2610.1409.00');
+    // 本机卡片第二行：时间靠左、版本段**靠右**（老板 2026-10-14 要求右对齐）
+    expect(find.text('v2610.1409.00'), findsOneWidget,
+        reason: '本机卡片应显示 App 版本段');
+    final cardRect = cardOf(tester, 'iPhone');
+    final versionRect = tester.getRect(find.text('v2610.1409.00'));
+    expect(
+      versionRect.right,
+      closeTo(cardRect.right - 8, 2),
+      reason: '版本段应靠右（卡片右内边距 8）',
+    );
+    // 时间是独立 Text（左），不并进版本文本
+    expect(sheetTimeText(), findsOneWidget);
+  });
+
+  testWidgets('其他设备的卡片按上报显示客户端段：App 版本 / TUI / 存量无',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      // 当前通道（dev-a，本机）——服务端行被排除，本机卡另建
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      // 我的另一台设备：App 报了版本
+      {
+        'entrance_id': 'dev-b2',
+        'entrance_name': 'iPad',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+        'client': 'app',
+        'app_version': '2610.1409.00',
+      },
+      // 我的另一台设备：TUI（只报类型，二进制拿不到自身版本）
+      {
+        'entrance_id': 'dev-tui',
+        'entrance_name': 'Terminal',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': now - 3600 * 1000,
+        'status': 'active',
+        'client': 'tui',
+      },
+      // 存量行：没上报过客户端信息 → 不显示该段
+      {
+        'entrance_id': 'dev-legacy',
+        'entrance_name': '旧Mac',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': now - 2 * 3600 * 1000,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    Finder cardFinder(String name) => find
+        .ancestor(of: sheetText(name), matching: find.byType(Container))
+        .first;
+    // iPad：App 版本段
+    expect(
+        find.descendant(
+            of: cardFinder('iPad'),
+            matching: find.textContaining('v2610.1409.00')),
+        findsOneWidget,
+        reason: 'App 设备的卡片应显示版本段');
+    // Terminal：TUI 类型段
+    expect(
+        find.descendant(
+            of: cardFinder('Terminal'), matching: find.textContaining('TUI')),
+        findsOneWidget,
+        reason: 'TUI 设备的卡片应显示类型段（拿不到版本）');
+    // 旧Mac：存量行，两字段都没有 → 不显示客户端段
+    expect(
+        find.descendant(
+            of: cardFinder('旧Mac'), matching: find.textContaining('TUI')),
+        findsNothing);
+    expect(
+        find.descendant(
+            of: cardFinder('旧Mac'), matching: find.textContaining('v2610')),
+        findsNothing);
+  });
 
   testWidgets('只列本人其他通道：对方的通道不列、当前通道不列', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
@@ -299,7 +446,7 @@ void main() {
     expect(sheetText('iPad'), findsOneWidget);
     expect(sheetText('MacBook'), findsOneWidget);
     expect(sheetText('旧手机'), findsOneWidget);
-    // 本机绿勾只在当前通道那张卡上（恒列第一位）
+    // 本机的编辑胶囊（图标）只在当前通道那张卡上（恒列第一位）
     expect(sheetLocalCheck(), findsOneWidget);
     // 第一张卡就是本机那张（老板 2026-09-25：恒列首位，作为区分依据之一）。
     // 一卡占满整行（老板 2026-10-11）→ 排序体现在**纵向**：本机卡在 iPad 上方
@@ -331,48 +478,41 @@ void main() {
         .right;
     expect(cardOf(tester, 'MacBook').right, closeTo(contentRight, 3),
         reason: '一行 3 张应铺满弹层内容宽度（最多差向下取整的那 2px）');
-    // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：右上角绿勾、不蒙版
+    // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：名字后带编辑胶囊、不蒙版
     expect(sheetRevokedMark(), findsOneWidget);
     expect(dimmedCardOf('旧手机'), findsOneWidget, reason: '已撤销卡应有蒙版（整卡降透明度）');
     expect(dimmedCardOf('iPad'), findsNothing, reason: '正常卡不该蒙版');
-    // 角标**固定在卡片右上角**（与名称长短无关；老板 2026-09-26：绿勾原先紧贴
-    // 名称，位置随名字跑）。
-    //
-    // 注：两种角标的**图标**到卡边距离天然差 6px——本机那个是可点的"改名"按钮
-    // （2026-10-02 起，Material 圆底 + 6px 内边距，图标因此内缩 6），已撤销那个
-    // 是裸图标。两者**锚点**（Positioned 6,6）一致，差的是按钮自身的 padding。
-    // 所以这里放宽到 7 兜住这 6px；仍能拦住"角标跟着名字跑"的回归（那样差值会是
-    // 几十像素，因为两张卡的名字长短不同：'iPhone' vs '旧手机'）。
-    final checkRect = tester.getRect(sheetLocalCheck());
-    final markRect = tester.getRect(sheetRevokedMark());
+    // 本机卡的编辑入口 = 名字后面的**可点击胶囊**（老板 2026-10-14：图标跟在
+    // 名字后，不再固定卡片最右）；已撤销卡的阻止图标仍固定右上角（Positioned 6,6）。
+    final editRect = tester.getRect(sheetLocalCheck());
+    final nameRect = tester.getRect(sheetText('iPhone'));
     final phoneCard = cardOf(tester, 'iPhone');
+    // 图标在名字右侧、同一行（纵向中心对齐）
+    expect(editRect.left, greaterThan(nameRect.right),
+        reason: '编辑图标应跟在名字后面');
+    expect((editRect.center.dy - nameRect.center.dy).abs(), lessThan(4),
+        reason: '图标与名字同一行');
+    // 不再固定卡片最右：图标右缘离卡片右缘远大于角标位的 6px
+    expect(phoneCard.right - editRect.right, greaterThan(20),
+        reason: '编辑图标不该再固定在卡片最右角');
+    // 已撤销卡的阻止图标仍在右上角
+    final markRect = tester.getRect(sheetRevokedMark());
     final oldCard = cardOf(tester, '旧手机');
-    double insetRight(double cardRight, Rect badge) => cardRight - badge.right;
-    double insetTop(double cardTop, Rect badge) => badge.top - cardTop;
-    expect(
-      insetRight(phoneCard.right, checkRect),
-      closeTo(insetRight(oldCard.right, markRect), 7),
-      reason: '两种角标都固定在右上角（差 6px = 改名按钮自带的内边距，不是跟着名字跑）',
-    );
-    expect(
-      insetTop(phoneCard.top, checkRect),
-      closeTo(insetTop(oldCard.top, markRect), 7),
-      reason: '同上：两种角标都固定在右上角',
-    );
-    // 角标该在右上角：位于卡片右上象限，且在名称右侧
-    expect(checkRect.right, greaterThan(phoneCard.center.dx));
-    expect(checkRect.top, lessThan(phoneCard.center.dy));
-    expect(checkRect.right, greaterThan(tester.getRect(sheetText('iPhone')).right),
-        reason: '本机角标不该再贴名称右缘');
+    expect(oldCard.right - markRect.right, closeTo(6, 1),
+        reason: '阻止图标应固定在已撤销卡右上角');
+    expect(markRect.top - oldCard.top, closeTo(6, 1));
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
     // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
-    // 再弹出生成通道码弹窗（老板 2026-09-25）
+    // 再弹出生成通道码弹层（老板 2026-09-25；2026-10-15 起弹窗改底部弹层）
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
     await tester.tap(sheetText(_zh.chatPageEntranceListNew));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     expect(find.text(_zh.chatPageInviteDialogTitleAttachSelf), findsOneWidget);
-    expect(find.byType(BottomSheet), findsNothing,
+    // 按弹层**标题**判定"通道列表弹层已收起"——不能用 byType(BottomSheet)（邀请
+    // 弹层也是 BottomSheet，2026-10-15 起会撞车），也不能用「添加我的新通道」
+    // （它同时是邀请弹层的标题 chatPageInviteDialogTitleAttachSelf，同文不同键）
+    expect(sheetText(_zh.chatPageMenuEntranceList), findsNothing,
         reason: '点「新建通道」后通道列表弹层应已收起');
   });
 
@@ -393,7 +533,7 @@ void main() {
 
     await _openEntranceListSheet(tester, db, api);
 
-    // 只有一张卡：当前通道 + 绿勾 + 绿灯 + 时间
+    // 只有一张卡：当前通道 + 编辑胶囊 + 绿灯 + 时间
     expect(sheetText(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetLocalCheck(), findsOneWidget);
@@ -402,6 +542,37 @@ void main() {
     expect(sheetTimeText(), findsOneWidget);
     // 「新建通道」按钮在
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
+  });
+
+  testWidgets('本机卡：点名字+编辑图标胶囊 → 开通道改名弹窗（老板 2026-10-14）',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    // 点胶囊里的**名字**（整颗胶囊可点，不止图标）→ 弹层收起、错峰后开改名弹窗
+    await tester.tap(sheetText('iPhone'));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget,
+        reason: '点名字胶囊应开通道改名弹窗');
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.byType(TextField)),
+        findsWidgets,
+        reason: '改名弹窗应有名称输入框');
   });
 
   testWidgets('没有时间可显示的卡片也与别的等高（时间行恒占一行，老板 2026-09-26）',

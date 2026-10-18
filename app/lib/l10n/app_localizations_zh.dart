@@ -28,6 +28,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
+  String get settingsScopeAll => '应用于本机所有秘境';
+
+  @override
+  String get settingsScopeAllDone => '已应用到本机所有秘境';
+
+  @override
   String get skip => '跳过';
 
   @override
@@ -351,7 +357,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
-  String get setPinDialogSetPin => '提交';
+  String get setPinDialogSetPin => '启用';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 6 位数字';
@@ -385,7 +391,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可删除当前锁屏码。';
+  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。';
 
   @override
   String get chatPageSetLockHintNoPin => '设置后，每次进入秘境都要解锁，更安全。';
@@ -406,13 +412,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
 
   @override
-  String get chatPageSetLockCleared => '已删除锁屏码，下次启动应用可直接进入秘境。';
+  String get chatPageSetLockCleared => '已清除锁屏码，下次启动应用可直接进入秘境。';
 
   @override
-  String get chatPageClearLockTitle => '删除锁屏码？';
+  String get chatPageClearLockTitle => '清除锁屏码？';
 
   @override
-  String get chatPageClearLockMessage => '确定要删除锁屏码吗？删除后下次启动将直接进入聊天。';
+  String get chatPageClearLockMessage => '确定要清除锁屏码吗？清除后下次启动将直接进入聊天。';
+
+  @override
+  String get chatPageLockClearConfirm => '清除';
 
   @override
   String get chatPageInviteDialogTitleInvite => '邀请';
@@ -469,7 +478,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuChangePassphrase => '修改共享口令';
 
   @override
-  String get chatPageMenuAvatar => '我的头像';
+  String get chatPageMenuMyProfile => '我的资料';
 
   @override
   String get chatPageAvatarUploaded => '✅ 我的头像已更新';
@@ -489,13 +498,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuExit => '退出本应用';
 
   @override
-  String get chatPageMenuMore => '菜单';
+  String get chatPageMenuMore => '主菜单';
 
   @override
   String get chatPageMsgMoreActions => '更多操作';
 
   @override
-  String get chatPageRenameNameTitle => '我的身份';
+  String get chatPageRenameNameTitle => '我的名字';
 
   @override
   String get chatPageRenameNameLabel => '名字';
@@ -626,6 +635,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => '附件存储';
 
   @override
+  String get chatPageMenuMoreSettings => '更多设置';
+
+  @override
+  String get chatPageMoreSettingsTitle => '更多设置';
+
+  @override
+  String get chatPageMoreSettingsStorage => '附件存储';
+
+  @override
+  String get chatPageMoreSettingsTombstone => '墓碑消息';
+
+  @override
+  String get chatPageAttachmentStorageNote => '图片、视频、音频、文件等附件存放在哪里？';
+
+  @override
   String get chatPageAttachmentStorageSecured => '远程托管';
 
   @override
@@ -640,10 +664,11 @@ class AppLocalizationsZh extends AppLocalizations {
       '第一次下载时保存明文副本，以后本机可直接打开，更方便。';
 
   @override
-  String get chatPageAttachmentStorageSubmit => '提交';
+  String get chatPageAttachmentStorageSubmit => '启用';
 
   @override
-  String get chatPageAttachmentStorageWarnClear => '切到“远程托管”会立即删除本机已留存的附件明文';
+  String get chatPageAttachmentStorageWarnClear =>
+      '切到“远程托管”会立即删除本机已留存的附件明文。真的要切换吗？';
 
   @override
   String get chatPageMenuStyleLabel => '界面主题';
@@ -664,10 +689,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuBurnLabel => '阅后即焚';
 
   @override
-  String get chatPageMenuMyNameLabel => '我的身份';
-
-  @override
-  String get chatPageMenuEntranceList => '我的通道';
+  String get chatPageMenuEntranceList => '我的设备通道';
 
   @override
   String wizardJoinInviteHint(String name, int count) {
@@ -772,9 +794,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNotifyHint => '你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。';
 
   @override
-  String get chatPageNotifyAllSpaces => '应用于本机所有秘境。';
-
-  @override
   String get chatPageNotifyEmailLabel => '邮箱';
 
   @override
@@ -820,10 +839,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageBurnHeading => '阅后即焚';
 
   @override
-  String get chatPageBurnNote => '倒计时删除已阅读的新消息';
+  String get chatPageBurnNote => '倒计时自动删除已阅读的新消息';
 
   @override
-  String get chatPageBurnOff => '阅后即焚已关闭（这一消息将会保留）';
+  String get chatPageTombstoneHeading => '消息留痕';
+
+  @override
+  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否留痕？';
+
+  @override
+  String get chatPageTombstoneKeep => '占位留痕';
+
+  @override
+  String get chatPageTombstoneKeepDesc => '显示为消息墓碑：正文隐藏，时间记录仍在，不打破消息流水';
+
+  @override
+  String get chatPageTombstoneHide => '彻底消失';
+
+  @override
+  String get chatPageTombstoneHideDesc => '完全不再显示，从消息流中彻底消失';
+
+  @override
+  String get chatPageTombstoneSubmit => '启用';
+
+  @override
+  String get chatPageBurnOff => '已对这一个消息取消了阅后即焚';
 
   @override
   String get chatPageBurnFailed => '设置阅后即焚失败';
@@ -855,7 +895,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRecallFailed => '撤回失败，请稍后重试';
 
   @override
-  String get chatPageDeletedMessage => '（该消息已不存在）';
+  String get chatPageQuotedTombMessage => '（该消息已不存在）';
+
+  @override
+  String get chatPageQuoteGoneNotice => '被引用消息已不存在';
 
   @override
   String get chatPageActionQuote => '引用';
@@ -953,7 +996,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceUnrecognized =>
-      '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
+      '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。';
 
   @override
   String get chatPageMsgsSyncing => '等待同步中… 暂时无法收发，仅可查看本地消息';
@@ -1087,22 +1130,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清除，请重新配置';
 
   @override
-  String get burnOptionOff => '关闭（不再自动焚毁）';
+  String get burnOptionOff => '不再自动焚毁';
 
   @override
-  String get burnOption1Minute => '1 分钟';
+  String get burnSubmit => '启用';
 
   @override
-  String get burnOption5Minutes => '5 分钟';
+  String burnPreviewDelay(String duration) {
+    return '$duration';
+  }
 
   @override
-  String get burnOption1Hour => '1 小时';
+  String burnUnitDays(int count) {
+    return '$count 天';
+  }
 
   @override
-  String get burnOption1Day => '1 天';
+  String burnUnitHours(int count) {
+    return '$count 小时';
+  }
 
   @override
-  String get burnOption7Days => '7 天';
+  String burnUnitMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String burnUnitSeconds(int count) {
+    return '$count 秒';
+  }
+
+  @override
+  String get burnAxisOffLabel => '关闭';
 
   @override
   String get lockPageTitle => '我的秘境';
@@ -1164,6 +1223,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutStatusUnreachable => '无法连接';
+
+  @override
+  String get aboutDnsPoisonLabel => 'DNS 污染';
+
+  @override
+  String aboutDnsPoisonValue(String host, String ip) {
+    return '$host 被劫持到 $ip';
+  }
+
+  @override
+  String get aboutDnsPoisonUnknownIp => '未知';
+
+  @override
+  String get aboutDnsPoisonNote =>
+      '当前网络在劫持该域名的解析（上面是它给出的假地址）；连接已由加密解析（DoH）自动修复，事件已上报服务器。真地址已保护不展示';
 
   @override
   String get advancedMenuTitle => '高级安全';

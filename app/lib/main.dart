@@ -7,6 +7,7 @@ import 'package:einz_shared/einz_shared.dart' show onDnsPoisonDetected;
 import 'brand_logo.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
+import 'data/dns_poison_notice.dart';
 import 'data/launch_args.dart';
 import 'data/local_database.dart';
 import 'data/local_reset.dart';
@@ -16,6 +17,7 @@ import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/version_gate.dart';
+import 'widgets/cancel_button.dart';
 
 /// Einz 移动端（及桌面端）入口。
 ///
@@ -31,13 +33,17 @@ Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
   WidgetsFlutterBinding.ensureInitialized();
-  // DNS 污染警报（debug 可见）：DoH 兜底触发 = 当前网络在被注入。
-  // 正式包走静默上报（dns_fallback 内 fire-and-forget），不需要打扰用户。
-  assert(() {
-    onDnsPoisonDetected = (host, ip) =>
-        debugPrint('⚠️ DNS 污染：$host 系统解析被注入，DoH 已钉扎 $ip');
-    return true;
-  }());
+  // DNS 污染记录（2026-10-13 老板需求）：DoH 兜底触发 = 当前网络在被注入。
+  // 写进 dnsPoisonNotice（About 页「连接状态」下方展示）；debug 另打一份日志。
+  // 正式包也挂——静默上报之外，用户该知道「连接是被自动修好的」。
+  // 上报本身在 shared 的 dns_fallback 内 fire-and-forget，不依赖这里。
+  // 真 IP（pinnedIp）不记不展示（老板：要保护），只留域名与假 IP。
+  onDnsPoisonDetected = (host, pinnedIp, poisonedIp) {
+    debugPrint('⚠️ DNS 污染：$host 域名解析被劫持'
+        '${poisonedIp == null ? '' : '（假 IP $poisonedIp）'}，DoH 已自动修复');
+    dnsPoisonNotice.value = DnsPoisonNotice(
+        host: host, poisonedIp: poisonedIp, at: DateTime.now());
+  };
   // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
   effectiveServer = await resolveServer(parseServerArg(await readLaunchArgs()));
   runApp(const EinzApp());
@@ -134,7 +140,9 @@ class _EinzAppState extends State<EinzApp> {
           style: FilledButton.styleFrom(
             minimumSize: const Size(96, 50),
             textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            // 全圆角胶囊（老板 2026-10-18）：与取消按钮（TextButton 默认
+            // StadiumBorder）同款四角弧度，弹窗里两颗按钮弧度一致
+            shape: const StadiumBorder(),
           ).copyWith(
             mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
           ),
@@ -253,23 +261,23 @@ class _StartupGateState extends State<StartupGate> {
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
-        title: Center(child: Text(l10n.startupInitClearDataTitle)),
-        content: Text(l10n.startupInitClearDataMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+          title: Center(child: Text(l10n.startupInitClearDataTitle)),
+          content: Text(l10n.startupInitClearDataMessage),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.startupInitClearData),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.startupInitClearData),
-          ),
-        ],
+          ],
+        ),
       ),
     );
     if (ok != true || !mounted) return;
