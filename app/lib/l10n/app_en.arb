@@ -226,8 +226,13 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space. Changing the PIN requires the current PIN; leaving it blank only adjusts the auto-lock duration (clear via the tab above).",
-  "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you enter the space.",
+  "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you open the app afer inactivity of a specified period.",
+  "chatPageSetLockRowVerify": "Verify",
+  "chatPageSetLockRowSet": "Set",
+  "chatPageSetLockRowConfirm": "Confirm",
+  "chatPageSetLockNewPinLabel": "New PIN or leave blank",
+  "chatPageSetLockNewPinLabelNoPin": "New PIN (at least 6 digits)",
+  "chatPageSetLockSubmitChange": "Change",
   "chatPageSetLockDurationLabel": "Auto-lock after inactivity",
   "chatPageSetLockTabChange": "Change PIN",
   "chatPageSetLockClearButton": "Clear PIN",
@@ -247,22 +252,12 @@
       }
     }
   },
-  "lockDurationHour": "{n} hr",
-  "@lockDurationHour": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
   "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
   "chatPageSetLockNoPinNotice": "No PIN set. Next launch goes straight into the space.",
   "chatPageSetLockDone": "PIN set. You must enter PIN to unlock the space at next launch.",
   "chatPageSetLockCleared": "PIN cleared. You can enter the space directly at next launch.",
-  "chatPageClearLockTitle": "Clear PIN?",
-  "chatPageClearLockMessage": "Clear the PIN? After clearing, next app launch will go straight into chat.",
   "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
   "chatPageInviteDialogTitleAttachSelf": "Add my new entrance",
@@ -496,7 +491,7 @@
   "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
-  "chatPagePinSetValue": "Set",
+  "chatPagePinMenuValue": "Set · {duration}",
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
   "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification will be sent to your email address.",
@@ -975,5 +970,12 @@
   "chatPageAttachmentTooLargeUnknown": "The file is too large and was rejected by the server",
   "@chatPageAttachmentTooLargeUnknown": {
     "description": "Oversized attachment rejected by the server, but the client does not know the limit (old server)"
+  },
+  "@chatPagePinMenuValue": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }

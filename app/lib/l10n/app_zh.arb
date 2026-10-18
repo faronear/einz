@@ -205,8 +205,13 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockClearHint": "设置后，每次进入秘境都要解锁。修改需先输入当前锁屏码；新码留空则不改锁屏码，只调整自动锁屏时长（清除用上方标签页）。",
-  "chatPageSetLockHintNoPin": "设置后，每次进入秘境都要解锁，更安全。",
+  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后重新打开秘境都要解锁，更安全。",
+  "chatPageSetLockRowVerify": "验证",
+  "chatPageSetLockRowSet": "设置",
+  "chatPageSetLockRowConfirm": "确认",
+  "chatPageSetLockNewPinLabel": "新 PIN 或者留空则不变",
+  "chatPageSetLockNewPinLabelNoPin": "新 PIN（至少 6 位数字）",
+  "chatPageSetLockSubmitChange": "更换",
   "chatPageSetLockDurationLabel": "无操作多久后自动锁屏",
   "chatPageSetLockTabChange": "更换锁屏码",
   "chatPageSetLockClearButton": "清除锁屏码",
@@ -226,22 +231,12 @@
       }
     }
   },
-  "lockDurationHour": "{n} 小时",
-  "@lockDurationHour": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
   "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",
   "chatPageSetLockNoPinNotice": "锁屏码仍然为空，下次启动应用可直接进入秘境。",
   "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
   "chatPageSetLockCleared": "已清除锁屏码，下次启动应用可直接进入秘境。",
-  "chatPageClearLockTitle": "清除锁屏码？",
-  "chatPageClearLockMessage": "确定要清除锁屏码吗？清除后下次启动将直接进入聊天。",
   "chatPageLockClearConfirm": "清除",
   "chatPageInviteDialogTitleInvite": "邀请",
   "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
@@ -451,7 +446,7 @@
   "chatPageEntranceListRefresh": "刷新",
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
-  "chatPagePinSetValue": "已设置",
+  "chatPagePinMenuValue": "已设置 · {duration}",
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
   "chatPageNotifyHint": "你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。",
@@ -909,5 +904,12 @@
   "chatPageAttachmentTooLargeUnknown": "文件太大，服务器拒收了",
   "@chatPageAttachmentTooLargeUnknown": {
     "description": "附件超限被服务器拒绝，但客户端不知道具体上限（旧服务端）"
+  },
+  "@chatPagePinMenuValue": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }

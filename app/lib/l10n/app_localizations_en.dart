@@ -423,12 +423,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockTitle => 'Set PIN';
 
   @override
-  String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space. Changing the PIN requires the current PIN; leaving it blank only adjusts the auto-lock duration (clear via the tab above).';
+  String get chatPageSetLockHintNoPin =>
+      'Once set, you\'ll unlock every time you open the app afer inactivity of a specified period.';
 
   @override
-  String get chatPageSetLockHintNoPin =>
-      'Once set, you\'ll unlock every time you enter the space.';
+  String get chatPageSetLockRowVerify => 'Verify';
+
+  @override
+  String get chatPageSetLockRowSet => 'Set';
+
+  @override
+  String get chatPageSetLockRowConfirm => 'Confirm';
+
+  @override
+  String get chatPageSetLockNewPinLabel => 'New PIN or leave blank';
+
+  @override
+  String get chatPageSetLockNewPinLabelNoPin => 'New PIN (at least 6 digits)';
+
+  @override
+  String get chatPageSetLockSubmitChange => 'Change';
 
   @override
   String get chatPageSetLockDurationLabel => 'Auto-lock after inactivity';
@@ -447,11 +461,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String lockDurationMin(int n) {
     return '$n min';
-  }
-
-  @override
-  String lockDurationHour(int n) {
-    return '$n hr';
   }
 
   @override
@@ -475,13 +484,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatPageSetLockCleared =>
       'PIN cleared. You can enter the space directly at next launch.';
-
-  @override
-  String get chatPageClearLockTitle => 'Clear PIN?';
-
-  @override
-  String get chatPageClearLockMessage =>
-      'Clear the PIN? After clearing, next app launch will go straight into chat.';
 
   @override
   String get chatPageLockClearConfirm => 'Clear';
@@ -863,7 +865,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageLockNow => 'Lock now';
 
   @override
-  String get chatPagePinSetValue => 'Set';
+  String chatPagePinMenuValue(String duration) {
+    return 'Set · $duration';
+  }
 
   @override
   String get chatPageNotifyLabel => 'My email alerts';

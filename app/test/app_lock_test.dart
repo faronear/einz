@@ -209,16 +209,16 @@ void main() {
     expect(await db.select(db.spaces).get(), hasLength(1), reason: '空 Vault 不动表');
   });
 
-  test('锁屏时长：默认 30s，保存后读回，越界值钳到档位首尾', () async {
+  test('锁屏时长：默认 30s，保存后读回，越界值钳到范围首尾', () async {
     // 未设置 → 默认 kLockSeconds（前台闲置锁与后台锁共用，老板 2026-10-18）
     expect(await lock.loadLockSeconds(), kLockSeconds);
-    // 保存 1 小时档 → 读回
-    await lock.saveLockSeconds(3600);
-    expect(await lock.loadLockSeconds(), 3600);
-    // 越界/非法值钳到档位首尾，不崩
+    // 保存 10 分钟档 → 读回
+    await lock.saveLockSeconds(600);
+    expect(await lock.loadLockSeconds(), 600);
+    // 越界/非法值钳到范围首尾（30 秒~30 分钟），不崩
     await lock.saveLockSeconds(99999);
-    expect(await lock.loadLockSeconds(), kLockSecondsChoices.last);
+    expect(await lock.loadLockSeconds(), kLockMaxSeconds);
     await lock.saveLockSeconds(1);
-    expect(await lock.loadLockSeconds(), kLockSecondsChoices.first);
+    expect(await lock.loadLockSeconds(), kLockMinSeconds);
   });
 }

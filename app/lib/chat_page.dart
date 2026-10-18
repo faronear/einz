@@ -2800,6 +2800,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 设置或清空成功：不再猜结果（此前写死 _hasPin=true，清空后菜单仍显示
       // 「已设置」——老板 2026-09-15 实测），按落盘后的真实状态刷新菜单
       await _refreshPinStatus();
+      // 时长也可能刚被改（弹窗里的时长轴；只调时长也会回 true）——重载一遍，
+      // 菜单右侧「已设置 · 时长」的显示随弹窗关闭即时刷新（老板 2026-10-18）
+      await _loadLockSeconds();
     }
   }
 
@@ -8919,13 +8922,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPagePinLabel, style: captionStyle),
                       const Spacer(),
-                      // 右簇：锁屏图标恒显；已设置再加「已设置」文字（图标在前、
-                      // 文字在后，与「我的通道」devices 行同风格）；未设置只有图标，
-                      // 不显示「未设置」尾缀（老板 2026-09-15）
+                      // 右簇：锁屏图标恒显；已设置再显示「已设置 · 时长」（老板
+                      // 2026-10-18：右侧顺带显示当前锁屏时长，例如「已设置 · 1 分钟」）。
+                      // 时长格式与阅后即焚一致（formatBurnDuration：整点值输出干净
+                      // 文案，20 秒/1 分钟/5 分钟…）。未设置只有图标，不显示尾缀
+                      // （老板 2026-09-15）
                       Icon(Icons.lock_outline, size: 18, color: labelStyle.color),
                       if (_hasPin) ...[
                         const SizedBox(width: 4),
-                        _menuValue(l10n.chatPagePinSetValue, valueStyle),
+                        _menuValue(
+                          l10n.chatPagePinMenuValue(
+                            formatBurnDuration(_lockSeconds, l10n),
+                          ),
+                          valueStyle,
+                        ),
                       ],
                     ],
                   ),
@@ -10019,11 +10029,55 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   // 已设锁屏码 → 出「当前锁屏码」验证框（老板 2026-09-14）
   bool get _hasPin => widget.hasPin;
   bool _busy = false; // 当前锁屏码校验中（Argon2id）：防连点重复提交
-  // 锁屏时长（前台闲置锁与后台锁共用，老板 2026-10-18 定）：滚动轴档位
-  // （kLockSecondsChoices）。initState 异步读持久化值；读回前按默认渲染
-  // （同 _loadUiStyle 套路）。_initialSeconds = 打开弹窗时的值，提交时判"是否真改过"。
-  int _lockSeconds = kLockSeconds;
+  // 锁屏时长（前台闲置锁与后台锁共用，老板 2026-10-18 定）：对数刻度轴
+  // （30 秒~30 分钟，仿阅后即焚 burn_duration_sheet）。initState 异步读持久化值
+  // 换成轴位置；读回前按默认 30 秒渲染（同 _loadUiStyle 套路）。
+  // _initialSeconds = 打开弹窗时的档位，提交时判"是否真改过"。
+  double _axisT = 0.0; // 轴位置 t∈[0,1]（对数刻度）
   int? _initialSeconds;
+
+  /// 轴位置 → 当前档位（秒）。档位吸附：≤1 分钟吸附 10 秒（20/30/…/60 都能停），
+  /// >1 分钟吸附整分钟——拖出来永远是 "30 秒 / 5 分钟" 这样的干净值，超过 1 分钟
+  /// 不显示秒数（与焚毁轴同策略）。
+  static int _lockSecondsFromT(double t) {
+    final raw = kLockMinSeconds *
+        math.pow(kLockMaxSeconds / kLockMinSeconds, t.clamp(0.0, 1.0));
+    final snapped = raw <= 60 ? (raw / 10).round() * 10 : (raw / 60).round() * 60;
+    return snapped.clamp(kLockMinSeconds, kLockMaxSeconds);
+  }
+
+  /// 秒数 → 轴位置（对数刻度；越界先钳）。
+  static double _lockTFromSeconds(int seconds) {
+    final clamped = seconds.clamp(kLockMinSeconds, kLockMaxSeconds);
+    return math.log(clamped / kLockMinSeconds) /
+        math.log(kLockMaxSeconds / kLockMinSeconds);
+  }
+
+  int get _axisSeconds => _lockSecondsFromT(_axisT);
+
+  // —— 弹窗宽度策略（老板 2026-10-18）——
+  // 手机版：与其它弹窗一致——Dialog 默认 insetPadding（左右各 40），宽度吃满
+  // 可用宽度。minWidth 360 是兜底：本弹窗没有长文案，内容 intrinsic 很窄，
+  // 不兜底会缩到 Dialog 默认 minWidth 280，比邻居们还窄（老板 2026-10-18
+  // 早前嫌过的"太窄"正是这么来的）。
+  // 桌面版：再放宽一档（屏宽 ≥ 600 时 min/max 都取 560）。
+  // 轴下标注的定位几何依赖这套值（见 [_setLockAxisWidth]），改宽策略要同步。
+  static const double _kDialogInsetH = 40;
+  static const double _kDialogMinWidthPhone = 360;
+  static const double _kDialogWidthDesktop = 560;
+  static const double _kDialogWideBreakpoint = 600;
+  // 内容/卡片的水平边距：轴宽几何要从弹窗宽里减掉它们（两处 padding 用同常量，防漂移）
+  static const double _kDialogContentPadH = 24;
+  static const double _kCardPadH = 14;
+
+  /// 分组卡片内宽（轴下标注 [_lockAxisLabels] 定位用）。
+  /// 弹窗宽 = min(屏幕可用宽, minWidth)：内容 intrinsic 远小于 minWidth，Dialog 的
+  /// IntrinsicWidth+tighten 正好把内容定到 minWidth；可用宽更小则吃满可用宽
+  /// （BoxConstraints.enforce 会把 minWidth clamp 到可用宽，不会溢出）。
+  double _setLockAxisWidth(double screenWidth, double dialogMinWidth) {
+    final dialogWidth = math.min(screenWidth - 2 * _kDialogInsetH, dialogMinWidth);
+    return dialogWidth - 2 * _kDialogContentPadH - 2 * _kCardPadH;
+  }
   // 已设锁屏码时的标签页：0=更换锁屏码，1=清除锁屏码（老板 2026-10-18 定，
   // 标题行双标签取代上一轮的「清除锁屏码」文字按钮；未设 PIN 时无标签页）。
   int _setLockTab = 0;
@@ -10034,8 +10088,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     AppLockService(widget.db).loadLockSeconds().then((value) {
       if (!mounted) return;
       setState(() {
-        _lockSeconds = value;
-        _initialSeconds ??= value;
+        _axisT = _lockTFromSeconds(value);
+        // 吸附后的档位作初始值：老库存值（如 45 秒这种非整档）不会因归一化
+        // 被误判成"改过"而白写一次盘
+        _initialSeconds ??= _axisSeconds;
       });
     });
   }
@@ -10099,10 +10155,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活）
     final overlay = Overlay.of(context, rootOverlay: true);
     // 时长是否真的动过（初始值还没异步读回时不写盘）
-    final secondsChanged = _initialSeconds != null && _lockSeconds != _initialSeconds;
+    final secondsChanged = _initialSeconds != null && _axisSeconds != _initialSeconds;
     Future<void> saveSecondsIfChanged() async {
       if (secondsChanged) {
-        await AppLockService(widget.db).saveLockSeconds(_lockSeconds);
+        await AppLockService(widget.db).saveLockSeconds(_axisSeconds);
       }
     }
 
@@ -10157,12 +10213,15 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     if (!mounted) return;
     if (!_hasPin) {
       // 本来就没设锁屏码：没有可清的东西——只提示一句（老板 2026-09-14）；
-      // 先关弹窗再顶部提示（老板 2026-09-23）：通知浮在弹窗上不合理
+      // 先关弹窗再顶部提示（老板 2026-09-23）：通知浮在弹窗上不合理。
+      // 未设 PIN 时菜单右侧不显示时长，改时长也不需要刷新菜单
       Navigator.of(context).pop(); // 无改动：不回 true（菜单不做无谓刷新）
       showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice, extraTop: kNoticeExtraTopBelowStatusBar);
       return;
     }
-    Navigator.of(context).pop(); // PIN 没变：不回 true（菜单不做无谓刷新）
+    // PIN 没变但时长动过 → 回 true：调用方要重载时长，菜单右侧的「已设置 · 时长」
+    // 显示随弹窗关闭即时刷新（老板 2026-10-18）；啥都没动才不回 true
+    Navigator.of(context).pop(secondsChanged ? true : null);
   }
 
   /// 「清除锁屏码」标签页的执行（老板 2026-10-18）：验旧码 → 直接清除。
@@ -10188,20 +10247,193 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     }
   }
 
-  /// 锁屏时长档位 → 人读标签（30 秒 / 5 分钟 / 1 小时）。
+  /// 锁屏时长档位 → 人读标签。超过 1 分钟只显示分钟、不显示秒数
+  /// （老板 2026-10-18；轴上界 30 分钟，走不到小时）。
   String _formatLockSeconds(int seconds, AppLocalizations l10n) {
-    if (seconds >= 3600) return l10n.lockDurationHour(seconds ~/ 3600);
     if (seconds >= 60) return l10n.lockDurationMin(seconds ~/ 60);
     return l10n.lockDurationSecs(seconds);
   }
 
+  /// 轴下的阶段性可点标注（老板 2026-10-18，仿阅后即焚轴）：20 秒（最左）/
+  /// 1 分钟 / 5 分钟 / 20 分钟（最右），点了立刻把轴跳到该点。默认就带一层
+  /// 淡背景色提示可点（与焚毁轴的标注同款：primary 6% 淡底 + InkWell 反馈）。
+  ///
+  /// 标签 x 用与 Slider thumb 完全相同的几何（`trackLeft + t × trackWidth`，
+  /// 见 burn_duration_sheet._axisLabels 同款算法），保证对准刻度。
+  ///
+  /// **两个坑都踩过，别再踩**：
+  /// 1. 宽度不量：AlertDialog 被 Dialog 包在 `IntrinsicWidth` 里，intrinsic 尺寸
+  ///    计算会遍历整棵子树，子树中出现 LayoutBuilder 就抛
+  ///    "LayoutBuilder does not support returning intrinsic dimensions"，
+  ///    **整个弹窗直接打不开**（2026-10-18 实测）。所以轴宽由调用方按弹窗自身
+  ///    几何算好传进来（[_setLockAxisWidth]），标注方法自己不再量。
+  /// 2. [axisWidth] 必须与分组卡片的实际内宽一致：改 build() 里的
+  ///    insetPadding / contentPadding 或卡片 padding 时，[_setLockAxisWidth]
+  ///    里的减法要同步改，否则标注对不准刻度。
+  Widget _lockAxisLabels(
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    double axisWidth,
+  ) {
+    final theme = SliderTheme.of(context);
+    final thumbWidth = theme.thumbShape?.getPreferredSize(true, false).width ?? 0;
+    final overlayWidth = theme.overlayShape?.getPreferredSize(true, false).width ?? 0;
+    final trackLeft = math.max(overlayWidth / 2, thumbWidth / 2);
+    final trackInset = math.max(thumbWidth, overlayWidth);
+    final width = axisWidth;
+    final marks = <({double t, String label, bool rightAligned})>[
+      (t: 0.0, label: l10n.lockDurationSecs(kLockMinSeconds), rightAligned: false),
+      (t: _lockTFromSeconds(60), label: l10n.lockDurationMin(1), rightAligned: false),
+      (t: _lockTFromSeconds(300), label: l10n.lockDurationMin(5), rightAligned: false),
+      (t: 1.0, label: l10n.lockDurationMin(kLockMaxSeconds ~/ 60), rightAligned: true),
+    ];
+    return SizedBox(
+      height: 26,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (final mark in marks)
+            Align(
+              alignment: Alignment(
+                  mark.rightAligned
+                      ? 1
+                      : 2 * (trackLeft + mark.t * (width - trackInset)) / width - 1,
+                  -1),
+              child: Material(
+                color: scheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  mouseCursor: SystemMouseCursors.click,
+                  borderRadius: BorderRadius.circular(8),
+                  hoverColor: Colors.black.withValues(alpha: 0.05),
+                  highlightColor: Colors.black.withValues(alpha: 0.08),
+                  onTap: () => setState(() => _axisT = mark.t),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Text(
+                      mark.label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.2,
+                        color: scheme.outline,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 弹窗分组卡片（老板 2026-10-18：老码、新码、时长轴必须有醒目的分组区分，
+  /// 不能几个框竖着堆成一坨、看不出谁管谁）。白底 + 细描边，从弹窗粉底上"浮"
+  /// 出来。标题行可选：有时长卡的「标题 + 右侧当前值」，也有只有标签行的
+  /// 「验证 / 设置 / 确认」卡（老板 2026-10-18：老码与新码再分两组）。
+  Widget _setLockGroup({
+    String? title,
+    Widget? trailing,
+    required List<Widget> children,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      // 无标题行（纯输入行卡）时上下padding撑开一点，别显得空
+      padding: EdgeInsets.fromLTRB(_kCardPadH, title == null ? 14 : 12, _kCardPadH, 14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest, // 白卡：与弹窗粉底分层
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Row(
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface,
+                  ),
+                ),
+                if (trailing != null) ...[const Spacer(), trailing],
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// 分组卡内的「标签 + 输入框」同行行（老板 2026-10-18）：标签占固定宽度列
+  /// （中英标签宽度不一，固定列才能让各行的输入框左右对齐），输入框 Expanded
+  /// 占满剩余宽度。obscure + 纯数字是锁屏码输入框的共性，抽在这里少写三遍。
+  Widget _setLockPinRow({
+    required String label,
+    required TextEditingController controller,
+    required String fieldLabel,
+    bool autofocus = false,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 56, // 标签列：en 最长的 "Confirm"（13px w600）放得下
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: colors.onSurface,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: autofocus,
+            decoration: InputDecoration(
+              labelText: fieldLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 标题行双标签（更换 / 清除，老板 2026-10-18）：胶囊分段控件——外层淡色圆角
-  /// 轨道 + 选中项实心药丸（更换页用主题色、清除页用警示红，语义跟着颜色走），
-  /// AnimatedContainer 平滑滑动。M3 SegmentedButton 默认样式生硬（高、方、灰），
+  /// 轨道 + 选中项实心药丸。每个标签常驻自己的色系（更换=蓝、清除=粉），激活 /
+  /// 未激活只是同色系的深 / 浅：选中=实心深色，未激活=同色系浅底 + 同色系深字。
+  /// 蓝=品牌天蓝 #3BAFFD（新 Logo「粉蓝图标」里的那个蓝）+ 浅蓝 tertiaryContainer；
+  /// 粉=Logo 粉系强调 secondary 深粉 + secondaryContainer 浅粉。天蓝是与主按钮
+  /// 的 primary 深蓝明确区分开的"粉蓝里的蓝"（老板 2026-10-18：标签色不能和
+  /// 主按钮一样深蓝）。不激活也看得出哪边是危险操作。
+  /// AnimatedContainer 平滑过渡。M3 SegmentedButton 默认样式生硬（高、方、灰），
   /// 老板嫌不好看，改用与全局 StadiumBorder 按钮同语言的胶囊。
   Widget _buildSetLockTabs(BuildContext context, AppLocalizations l10n) {
     final colors = Theme.of(context).colorScheme;
-    Widget segment(int index, String label, Color activeBg, Color activeFg) {
+    Widget segment(
+      int index,
+      String label, {
+      required Color activeBg,
+      required Color activeFg,
+      required Color idleBg,
+      required Color idleFg,
+    }) {
       final selected = _setLockTab == index;
       return Expanded(
         child: GestureDetector(
@@ -10219,7 +10451,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             padding: const EdgeInsets.symmetric(vertical: 9),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: selected ? activeBg : Colors.transparent,
+              // 选中：本页色系实心深色；未激活：同色系浅底
+              color: selected ? activeBg : idleBg,
               borderRadius: BorderRadius.circular(999),
               boxShadow: selected
                   ? [
@@ -10236,7 +10469,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                color: selected ? activeFg : colors.onSurfaceVariant,
+                color: selected ? activeFg : idleFg,
               ),
             ),
           ),
@@ -10252,8 +10485,22 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       padding: const EdgeInsets.all(4),
       child: Row(
         children: [
-          segment(0, l10n.chatPageSetLockTabChange, colors.primary, colors.onPrimary),
-          segment(1, l10n.chatPageSetLockClearButton, colors.error, Colors.white),
+          segment(
+            0,
+            l10n.chatPageSetLockTabChange,
+            activeBg: const Color(0xFF3BAFFD), // 品牌天蓝（Logo 粉蓝图标）
+            activeFg: Colors.white,
+            idleBg: colors.tertiaryContainer, // 浅蓝
+            idleFg: colors.onTertiaryContainer,
+          ),
+          segment(
+            1,
+            l10n.chatPageSetLockClearButton,
+            activeBg: colors.secondary, // 深粉（Logo 粉系强调）
+            activeFg: colors.onSecondary,
+            idleBg: colors.secondaryContainer, // 浅粉
+            idleFg: colors.onSecondaryContainer,
+          ),
         ],
       ),
     );
@@ -10262,121 +10509,137 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
     final clearing = _hasPin && _setLockTab == 1; // 当前在「清除锁屏码」标签页
+    // 弹窗宽度（老板 2026-10-18）：手机版与其它弹窗一致（Dialog 默认
+    // insetPadding 左右各 40 + minWidth 兜底吃满可用宽度）；桌面端（屏宽
+    // ≥ 600）再放宽一档到 560。几何推导见 [_setLockAxisWidth]。
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final dialogMinWidth = screenWidth >= _kDialogWideBreakpoint
+        ? _kDialogWidthDesktop
+        : _kDialogMinWidthPhone;
     return AlertDialog(
       // 已设锁屏码：标题行换成双标签（更换锁屏码 / 清除锁屏码，老板 2026-10-18）；
       // 未设锁屏码：保持原「设置锁屏码」单标题（没有可清除的东西）
       title: _hasPin
           ? _buildSetLockTabs(context, l10n)
           : Center(child: Text(l10n.chatPageSetLockTitle)),
-      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
-      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      // 标签页模式下标题行就是胶囊轨道：底部留 12 再进第一张分组卡片；
+      // 未设锁屏码仍是「标题→备注 4 / 备注→内容 14」的老节奏（老板 2026-10-15）
+      titlePadding: _hasPin ? const EdgeInsets.fromLTRB(24, 24, 24, 12) : null,
+      contentPadding: _hasPin
+          ? EdgeInsets.fromLTRB(_kDialogContentPadH, 0, _kDialogContentPadH, 24)
+          : const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      // 手机版 insetPadding 与 Dialog 默认一致（左右各 40）；minWidth 兜底理由
+      // 见 [_setLockAxisWidth]，maxWidth 防桌面端被内容 intrinsic 无限拉宽。
+      insetPadding: const EdgeInsets.symmetric(horizontal: _kDialogInsetH, vertical: 24),
+      constraints: BoxConstraints(minWidth: dialogMinWidth, maxWidth: _kDialogWidthDesktop),
+      // 三组卡片比旧的"提示+三框+轴"高：小屏（或键盘弹起挤压高度）时允许滚动，
+      // 不出 RenderFlex overflow（默认 scrollable: false 会直接溢出）
+      scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (clearing) ...[
-            // 「清除锁屏码」标签页 = 原警告弹窗的内容搬进来（老板 2026-10-18）：
-            // 标签本身就是警示，不再叠二次确认弹窗。验旧码仍然必须（2026-09-14 定：
-            // 否则手机被他人短暂拿到就能清锁再装自己的 PIN）。
-            Text(
-              l10n.chatPageClearLockMessage,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _oldCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              autofocus: true, // 本页唯一输入框
-              decoration: InputDecoration(
-                labelText: l10n.chatPageSetLockOldLabel,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ] else ...[
-            // 提示：设置后，每次进入秘境都要解锁，更安全。已设锁屏码时另有说明（修改需验旧码）。大标题下、输入框上方——老板要求
-            Text(
-              _hasPin ? l10n.chatPageSetLockClearHint : l10n.chatPageSetLockHintNoPin,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 14),
-            // 已设锁屏码：先输当前锁屏码（修改要验证）
-            if (_hasPin) ...[
-              TextField(
-                controller: _oldCtrl,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                autofocus: _hasPin, // 已设锁屏码时这是第一个框
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageSetLockOldLabel,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _pinCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
-              decoration: InputDecoration(
-                labelText: l10n.setPinDialogPinLabel,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _confirmCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: l10n.setPinDialogConfirmLabel,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            // 锁屏时长滚动轴：前台闲置锁与后台锁共用（老板 2026-10-18 定，
-            // 30 秒~1 小时按档位吸附）。改它不需要验当前锁屏码。
-            Row(
+            // 「清除锁屏码」标签页（老板 2026-10-18）：红色「清除」主按钮本身就是
+            // 警示，页面不再叠备注/警告文案，只留旧码验证框——与更换页第一组同款
+            // 的「验证」行卡片，保持结构一致。验旧码仍然必须（2026-09-14 定：否则
+            // 手机被他人短暂拿到就能清锁再装自己的 PIN）。
+            _setLockGroup(
               children: [
-                Text(
-                  l10n.chatPageSetLockDurationLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatLockSeconds(_lockSeconds, l10n),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                _setLockPinRow(
+                  label: l10n.chatPageSetLockRowVerify,
+                  controller: _oldCtrl,
+                  fieldLabel: l10n.chatPageSetLockOldLabel,
+                  autofocus: true, // 本页唯一输入框
                 ),
               ],
             ),
-            Slider(
-              value: kLockSecondsChoices
-                  .indexOf(_lockSeconds)
-                  .clamp(0, kLockSecondsChoices.length - 1)
-                  .toDouble(),
-              min: 0,
-              max: (kLockSecondsChoices.length - 1).toDouble(),
-              divisions: kLockSecondsChoices.length - 1,
-              label: _formatLockSeconds(_lockSeconds, l10n),
-              onChanged: (value) =>
-                  setState(() => _lockSeconds = kLockSecondsChoices[value.round()]),
+          ] else ...[
+            // 未设锁屏码：一句"为什么要设"（老板 2026-09-14）。已设锁屏码时页面
+            // 自解释（分组卡片标签 + 主按钮），不再放备注（老板 2026-10-18）
+            if (!_hasPin) ...[
+              Text(
+                l10n.chatPageSetLockHintNoPin,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colors.outline,
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            // 第一组：验证当前锁屏码（老码独占一组，只读"验证"标签行；
+            // 已设锁屏码才有——没设就没什么可验证的）
+            if (_hasPin) ...[
+              _setLockGroup(
+                children: [
+                  _setLockPinRow(
+                    label: l10n.chatPageSetLockRowVerify,
+                    controller: _oldCtrl,
+                    fieldLabel: l10n.chatPageSetLockOldLabel,
+                    autofocus: true, // 已设锁屏码时这是第一个框
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            // 第二组：新 PIN（设置 / 确认 两行同卡——新码的两行归一组）
+            _setLockGroup(
+              children: [
+                _setLockPinRow(
+                  label: l10n.chatPageSetLockRowSet,
+                  controller: _pinCtrl,
+                  // 首设（未设 PIN）与更换两个场景的文案不同：首设要讲清位数要求，
+                  // 更换要讲清"留空=只调时长"——两个 hint 各自独立键（老板 2026-10-18）
+                  fieldLabel: _hasPin
+                      ? l10n.chatPageSetLockNewPinLabel
+                      : l10n.chatPageSetLockNewPinLabelNoPin,
+                  autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
+                ),
+                const SizedBox(height: 12),
+                _setLockPinRow(
+                  label: l10n.chatPageSetLockRowConfirm,
+                  controller: _confirmCtrl,
+                  // 确认行与设置行同文案，靠左侧 设置/确认 标签区分
+                  // （老板 2026-10-18 原话："第一行标签设置、第二行标签确认"）
+                  fieldLabel: _hasPin
+                      ? l10n.chatPageSetLockNewPinLabel
+                      : l10n.chatPageSetLockNewPinLabelNoPin,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 第三组：自动锁屏时长（对数轴 30 秒~30 分钟，老板 2026-10-18：仿阅后
+            // 即焚轴，档位吸附 + 轴下可点标注）。前台闲置锁与后台回来锁共用同一值；
+            // 改它不需要验当前锁屏码，与前两组互不干扰。
+            _setLockGroup(
+              title: l10n.chatPageSetLockDurationLabel,
+              // 当前档位：标题行右侧大字醒目显示（拖轴时的即时反馈）
+              trailing: Text(
+                _formatLockSeconds(_axisSeconds, l10n),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
+                ),
+              ),
+              children: [
+                Slider(
+                  value: _axisT,
+                  min: 0,
+                  max: 1,
+                  label: _formatLockSeconds(_axisSeconds, l10n),
+                  onChanged: (value) => setState(() => _axisT = value),
+                ),
+                // 轴下阶段性可点标注：20 秒 / 2 分钟 / 5 分钟 / 20 分钟
+                _lockAxisLabels(
+                  l10n,
+                  colors,
+                  _setLockAxisWidth(screenWidth, dialogMinWidth),
+                ),
+              ],
             ),
           ],
           if (_error != null) ...[
@@ -10387,8 +10650,9 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       ),
       actions: [
         CancelButton(onPressed: () => Navigator.of(context).pop()),
-        // 主按钮按标签页切换：更换页=「启用」（设置/修改）；清除页=红底白字「清除」
-        // （与删除消息弹窗同款警示配色，文案与「删除」措辞区分——老板 2026-10-18）
+        // 主按钮按标签页切换：更换页=「更换」（老板 2026-10-18：从"启用"改，
+        // 只改已设 PIN 的更换场景；未设 PIN 的首次设置仍是「启用」）；
+        // 清除页=红底白字「清除」（与删除消息弹窗同款警示配色——老板 2026-10-18）
         if (clearing)
           FilledButton(
             style: FilledButton.styleFrom(
@@ -10398,7 +10662,12 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             child: Text(l10n.chatPageLockClearConfirm),
           )
         else
-          FilledButton(onPressed: _busy ? null : _submit, child: Text(l10n.setPinDialogSetPin)),
+          FilledButton(
+            onPressed: _busy ? null : _submit,
+            child: Text(
+              _hasPin ? l10n.chatPageSetLockSubmitChange : l10n.setPinDialogSetPin,
+            ),
+          ),
       ],
     );
   }

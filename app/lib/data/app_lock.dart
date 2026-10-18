@@ -436,18 +436,17 @@ class AppLockService {
   }
 
   /// 用户自选的锁屏时长（秒，前台闲置锁与后台锁共用；app_state 明文键，非秘密）。
-  /// 未设置或非法值 → 默认 [kLockSeconds]；越界钳到 [kLockSecondsChoices] 首尾。
+  /// 未设置或非法值 → 默认 [kLockSeconds]；越界钳到 [kLockMinSeconds]~[kLockMaxSeconds]。
   static const _kLockSeconds = 'app_lock.lock_seconds';
 
   Future<int> loadLockSeconds() async {
     final v = int.tryParse(await _get(_kLockSeconds) ?? '');
     if (v == null) return kLockSeconds;
-    if (kLockSecondsChoices.isEmpty) return kLockSeconds;
-    return v.clamp(kLockSecondsChoices.first, kLockSecondsChoices.last);
+    return v.clamp(kLockMinSeconds, kLockMaxSeconds);
   }
 
-  /// 保存用户自选的锁屏时长。调用方保证 [seconds] 是 [kLockSecondsChoices] 之一
-  /// （滚动轴按档位吸附，产生不了别的值）。
+  /// 保存用户自选的锁屏时长。调用方保证 [seconds] 在
+  /// [kLockMinSeconds]~[kLockMaxSeconds] 内（时长轴按档位吸附，产生不了别的值）。
   Future<void> saveLockSeconds(int seconds) async {
     await _set(_kLockSeconds, '$seconds');
   }

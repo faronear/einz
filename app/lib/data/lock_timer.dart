@@ -1,14 +1,16 @@
 /// 锁屏无操作/后台超时阈值（秒）。
 ///
 /// 后台切回锁屏（[LockTimer]）与前台无操作锁屏（chat_page 的 idle ticker）
-/// 共用同一阈值。默认 [kLockSeconds]；用户可在「设置锁屏码」弹窗里从
-/// [kLockSecondsChoices] 中自选（持久化在 AppLockService 的 app_state，见
+/// 共用同一阈值。默认 [kLockSeconds]；用户可在「设置锁屏码」弹窗的时长轴上
+/// 自选（对数刻度 30 秒~30 分钟，持久化在 AppLockService 的 app_state，见
 /// loadLockSeconds / saveLockSeconds），chat_page 加载后回填这两处。
 const int kLockSeconds = 30;
 
-/// 可调锁屏时长的档位（秒）：30 秒到 1 小时（老板 2026-10-18 定）。
-/// 滚动轴按档位吸附，不做连续秒数——展示与理解都按整档来。
-const List<int> kLockSecondsChoices = [30, 60, 120, 300, 600, 1800, 3600];
+/// 可调锁屏时长范围（秒）：20 秒 ~ 20 分钟（老板 2026-10-18 定，由 30 秒~30 分钟
+/// 收窄而来）。弹窗里的时长轴仿阅后即焚（burn_duration_sheet）：对数刻度、
+/// 档位吸附（≤1 分钟吸附 10 秒、>1 分钟吸附整分钟）、轴下可点阶段标注。
+const int kLockMinSeconds = 20;
+const int kLockMaxSeconds = 20 * 60;
 
 /// 后台锁定计时（纯逻辑，可单测）。
 ///
