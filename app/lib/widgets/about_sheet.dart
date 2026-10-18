@@ -1,9 +1,16 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../brand_logo.dart';
+import '../data/dns_poison_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
+import 'clickable.dart';
+import 'version_gate.dart';
+
+/// 链接色：品牌深蓝 #2271F7（与 LinkifiedText / 「邀请加入」链接同源）。
+const Color _kLinkColor = Color(0xFF2271F7);
 
 /// 「关于」弹层要展示的版本信息（版本号 + 构建号）。
 typedef AboutInfo = ({String version, String buildNumber});
@@ -50,17 +57,20 @@ class _AboutSheetState extends State<AboutSheet> {
   /// 只探测**启动时定下的活地址** [effectiveServer]（2026-10-12 老板决策）：
   /// About 是状态展示，不是连接管理器——重新去连其他候选没有意义（候选切换/
   /// 兜底是启动探测的事，App 的实际连接也一直走 effectiveServer）。断开就如实
-  /// 显示断开，不尝试其他地址。true = 可达。
-  late final Future<bool> _reachable = _probeEffective();
+  /// 显示断开，不尝试其他地址。
+  ///
+  /// 存**整个 [ServerHealth]**（不只是可达性）：下载入口的 URL 也从这里出
+  /// （`app_download_url`，见 [_DownloadRow]）——一次探测，两处消费。
+  late final Future<ServerHealth> _health = _probeEffective();
 
   Future<AboutInfo> _load() async {
     final pkg = await PackageInfo.fromPlatform();
     return (version: pkg.version, buildNumber: pkg.buildNumber);
   }
 
-  Future<bool> _probeEffective() async {
+  Future<ServerHealth> _probeEffective() async {
     final probe = widget.probe ?? probeServer;
-    return (await probe(effectiveServer)).ok;
+    return probe(effectiveServer);
   }
 
   @override
@@ -112,6 +122,12 @@ class _AboutSheetState extends State<AboutSheet> {
                             : '${info.version} (${info.buildNumber})',
                       ),
                       const SizedBox(height: 14),
+                      // 下载入口（版本号下一项，老板 2026-10-12）：整行可点 →
+                      // 外部浏览器打开；打不开（无浏览器/地址非法）静默——URL
+                      // 原样展示在行里，用户能手抄（同 version_gate 口径）。
+                      // URL 服务端优先、硬编码兜底（见 [_DownloadRow]）。
+                      _DownloadRow(health: _health),
+                      const SizedBox(height: 14),
                       // 服务器地址可长按选中复制（排查连不上时最常问的就是这个）。
                       // 非出厂域名（--server / 编译期覆盖）时标注，避免把开发包当正式包。
                       _InfoRow(
@@ -120,11 +136,11 @@ class _AboutSheetState extends State<AboutSheet> {
                         note: isDevServer ? l10n.aboutServerDevNote : null,
                       ),
                       const SizedBox(height: 14),
-                      FutureBuilder<bool>(
-                        future: _reachable,
+                      FutureBuilder<ServerHealth>(
+                        future: _health,
                         builder: (context, snap) {
-                          // 判定用 connectionState 而非 hasData：探测结果是
-                          // bool，全部路径都有数据；不可达是 false——若按
+                          // 判定用 connectionState 而非 hasData：探测结果必带
+                          // ok（bool），全部路径都有数据；不可达是 false——若按
                           // hasData 判定会把"无法连接"显示成"检测中"
                           // （首版实现的真实 bug，测试抓出）。
                           final String value;
@@ -132,17 +148,52 @@ class _AboutSheetState extends State<AboutSheet> {
                           if (snap.connectionState == ConnectionState.waiting) {
                             value = l10n.aboutStatusChecking;
                             valueColor = null;
-                          } else if (snap.data == true) {
+                          } else if (snap.data?.ok == true) {
                             value = l10n.aboutStatusConnected;
                             valueColor = Theme.of(context).colorScheme.primary;
                           } else {
                             value = l10n.aboutStatusUnreachable;
                             valueColor = Theme.of(context).colorScheme.error;
                           }
-                          return _InfoRow(
-                            label: l10n.aboutStatusLabel,
-                            value: value,
-                            valueColor: valueColor,
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _InfoRow(
+                                label: l10n.aboutStatusLabel,
+                                value: value,
+                                valueColor: valueColor,
+                              ),
+                              // DNS 污染提示（老板 2026-10-13）：紧贴连接状态
+                              // 下方——本次会话若发生过 DoH 兜底（系统解析被
+                              // 注入、已钉扎真 IP），让用户知道"已连接"是自动
+                              // 修好的结果。无事件不占位。
+                              ValueListenableBuilder<DnsPoisonNotice?>(
+                                valueListenable: dnsPoisonNotice,
+                                builder: (context, notice, _) {
+                                  if (notice == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 14),
+                                    child: _InfoRow(
+                                      label: l10n.aboutDnsPoisonLabel,
+                                      // 假 IP 展示、真 IP 不展示（老板 2026-10-13：
+                                      // 要保护）——只说被注入成什么、已自动修复。
+                                      // 假 IP 没能当场捕获（系统解析此刻查不到）
+                                      // 时降级"未知"。
+                                      value: l10n.aboutDnsPoisonValue(
+                                          notice.host,
+                                          notice.poisonedIp ??
+                                              l10n.aboutDnsPoisonUnknownIp),
+                                      note: l10n.aboutDnsPoisonNote,
+                                      valueColor: Theme.of(context)
+                                          .colorScheme
+                                          .error,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -158,11 +209,59 @@ class _AboutSheetState extends State<AboutSheet> {
   }
 }
 
+/// 下载入口行：URL 走**全 App 唯一的解析** [resolveAppDownloadUrl]（服务端
+/// 优先、硬编码兜底，老板 2026-10-13 定；与版本闸升级窗同一逻辑，别在这里
+/// 另写一套）：
+///
+/// - 服务端 `/health` 下发 `app_download_url`（serverConfig.json 的
+///   [ServerHealth.appDownloadUrl]）→ 用它：改下载地址只改服务端一处，
+///   已发的旧 App 无需更新；
+/// - 服务端没给（旧服务端没这字段 / 配置没写 / 探测不通）→ 回退到编译期
+///   硬编码的 [kAppDownloadUrlFallback]——下载入口相对固定，不能因为服务端
+///   没说就没有。
+///
+/// 整行可点 → 外部浏览器打开；打不开（无浏览器/地址非法）静默——URL 原样展示
+/// 在行里，用户能手抄（同 version_gate 的 [openAppDownloadUrl] 口径）。
+/// 探测中摆 '…' 占位：探通后行内弹出会把下方的行往下推，占位让布局一次到位。
+class _DownloadRow extends StatelessWidget {
+  const _DownloadRow({required this.health});
+
+  final Future<ServerHealth> health;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return FutureBuilder<ServerHealth>(
+      future: health,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return _InfoRow(label: l10n.aboutDownloadLabel, value: '…');
+        }
+        // 服务端优先；空（null / 空串 / 探测失败无 data）→ 硬编码兜底
+        final url = resolveAppDownloadUrl(snap.data?.appDownloadUrl);
+        return _InfoRow(
+          label: l10n.aboutDownloadLabel,
+          value: url,
+          onTap: () => openAppDownloadUrl(context, url),
+        );
+      },
+    );
+  }
+}
+
 /// 一行「标签左 --- 值右」（老板 2026-10-12：标签与值放同一行，不再上下两行），
 /// 值可长按选中复制；补充说明仍在下方独占一行。
+///
+/// [onTap] 非空 = 这一行是入口（如「下载」）：整块可点（老板口径：别让用户去点
+/// 中某个小控件），值渲染成 app 统一链接样式（蓝字 #2271F7 + 下划线）且文字
+/// 本身也可点——点哪都是同一个动作。
 class _InfoRow extends StatelessWidget {
   const _InfoRow(
-      {required this.label, required this.value, this.note, this.valueColor});
+      {required this.label,
+      required this.value,
+      this.note,
+      this.valueColor,
+      this.onTap});
 
   final String label;
   final String value;
@@ -173,10 +272,13 @@ class _InfoRow extends StatelessWidget {
   /// 值的颜色（连接状态语义色），null = 默认。
   final Color? valueColor;
 
+  /// 行点击动作，null = 普通展示行（值可选中复制）。
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
+    final row = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // baseline 对齐：标签小字（labelMedium）与值大字（bodyLarge）字基线一致
@@ -191,10 +293,31 @@ class _InfoRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: SelectableText(value,
-                  textAlign: TextAlign.right,
-                  style:
-                      theme.textTheme.bodyLarge?.copyWith(color: valueColor)),
+              child: onTap == null
+                  // 普通行：值可长按选中复制（排查连不上时最常问的就是服务器地址）
+                  ? SelectableText(value,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodyLarge
+                          ?.copyWith(color: valueColor))
+                  // 入口行：链接样式 + 文字本身可点（与整行 Clickable 同一动作）
+                  : Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: value,
+                            style: (theme.textTheme.bodyLarge ??
+                                    const TextStyle())
+                                .copyWith(
+                              color: _kLinkColor,
+                              decoration: TextDecoration.underline,
+                              decorationColor: _kLinkColor,
+                            ),
+                            recognizer: TapGestureRecognizer()..onTap = onTap,
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
             ),
           ],
         ),
@@ -216,5 +339,7 @@ class _InfoRow extends StatelessWidget {
         ],
       ],
     );
+    // 入口行整块可点（含标签与留白）；普通行不包，少一层无关手势
+    return onTap == null ? row : Clickable(onTap: onTap, child: row);
   }
 }

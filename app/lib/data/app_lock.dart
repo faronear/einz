@@ -573,29 +573,38 @@ class AppLockService {
     var effectiveMode = mode;
     List<Map<String, String>>? effectiveMembers = otherMembers;
     String? effectiveGroupName = groupName;
-    if (effectiveMode == null || effectiveMembers == null || effectiveGroupName == null) {
-      final raw = await _get(key);
-      if (raw != null) {
-        try {
-          final m = jsonDecode(raw) as Map<String, dynamic>;
-          effectiveMode ??= m['mode'] as String?;
-          effectiveGroupName ??= m['groupName'] as String?;
-          if (effectiveMembers == null) {
-            final list = m['otherMembers'];
-            if (list is List) {
-              effectiveMembers = [
-                for (final e in list)
-                  if (e is Map)
-                    {
-                      'id': (e['id'] as String?) ?? '',
-                      'name': (e['name'] as String?) ?? '',
-                    },
-              ];
-            }
-          }
-        } catch (_) {
-          // 坏 JSON：当作没记过（下面回退 'duo' / 空名单）
+    // peerJoined/peerMemberId 不在参数里——由 savePeerPresence 单独维护（它才拿得
+    // 到服务端通道表的结论）。这里是整份覆盖写，必须先把旧值读出来带上，否则会把
+    // "对方尚未加入"的记录抹掉：卡片退成正常态、peerName 又空 → 错显我的名字
+    // （老板 2026-10-16 实测：对方未加入的空间，改名后卡片显示我的名字而非「待加入」）。
+    String? effectivePeerMemberId;
+    bool? effectivePeerJoined;
+    final raw = await _get(key);
+    if (raw != null) {
+      try {
+        final m = jsonDecode(raw) as Map<String, dynamic>;
+        effectiveMode ??= m['mode'] as String?;
+        effectiveGroupName ??= m['groupName'] as String?;
+        // 旧记录里记过这两个键才透传（没记过 = savePeerPresence 还没跑过，缺省即可）
+        if (m['peerJoined'] is bool) effectivePeerJoined = m['peerJoined'] as bool;
+        if (m['peerMemberId'] is String) {
+          effectivePeerMemberId = m['peerMemberId'] as String;
         }
+        if (effectiveMembers == null) {
+          final list = m['otherMembers'];
+          if (list is List) {
+            effectiveMembers = [
+              for (final e in list)
+                if (e is Map)
+                  {
+                    'id': (e['id'] as String?) ?? '',
+                    'name': (e['name'] as String?) ?? '',
+                  },
+            ];
+          }
+        }
+      } catch (_) {
+        // 坏 JSON：当作没记过（下面回退 'duo' / 空名单）
       }
     }
     await _set(key, jsonEncode({
@@ -609,6 +618,10 @@ class AppLockService {
       'mode': effectiveMode ?? 'duo',
       'otherMembers': effectiveMembers ?? const <Map<String, String>>[],
       'groupName': effectiveGroupName ?? '',
+      // 「对方是否已加入」的结论透传：null = 旧记录本来就没记过（savePeerPresence
+      // 下次刷新会落下来），有值就原样带回，别在覆盖写里丢掉
+      'peerJoined': ?effectivePeerJoined,
+      'peerMemberId': ?effectivePeerMemberId,
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(

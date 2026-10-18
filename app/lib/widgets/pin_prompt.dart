@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'cancel_button.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_lock.dart';
@@ -23,11 +25,15 @@ Future<String?> promptLockCode(
   final l10n = AppLocalizations.of(context)!;
   return showDialog<String>(
     context: context,
+    // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
     barrierDismissible: false,
-    builder: (ctx) => _LockCodeDialog(
-      db: db,
-      title: title ?? l10n.promptLockCodeTitle,
-      hint: hint ?? l10n.promptLockCodeHint,
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: _LockCodeDialog(
+        db: db,
+        title: title ?? l10n.promptLockCodeTitle,
+        hint: hint ?? l10n.promptLockCodeHint,
+      ),
     ),
   );
 }
@@ -97,6 +103,8 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
     return AlertDialog(
       // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
       title: Center(child: Text(widget.title)),
+      // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+      contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +113,7 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
             widget.hint,
             style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           TextField(
             controller: _ctrl,
             obscureText: true,
@@ -125,9 +133,8 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
         ],
       ),
       actions: [
-        TextButton(
+        CancelButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,

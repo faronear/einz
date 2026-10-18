@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'widgets/about_sheet.dart';
+import 'widgets/cancel_button.dart';
 import 'brand_logo.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
@@ -235,6 +236,38 @@ class _LockPageState extends State<LockPage> {
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
+  /// 顶栏标题：Logo（点它 = 打开「关于秘境」弹层）+ 页面标题。
+  ///
+  /// Logo 可点（老板 2026-10-17）：锁屏态也能看版本号/服务器地址/一句话说明——
+  /// 顶栏菜单里的「关于秘境」之外，左上角 Logo 本身就是第二个入口（与对话页顶栏
+  /// 同款：Tooltip + InkWell + 四周留白）。绕开 AppBar 的 leading：严格锁屏下
+  /// 不显示返回箭头，Logo 是标题栏里唯一稳定的常驻图标。
+  Widget _buildAppBarTitle(AppLocalizations l10n) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: l10n.chatPageMenuAbout,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            borderRadius: BorderRadius.circular(10),
+            onTap: _openAboutPage,
+            child: const Padding(
+              // 给按住/长按的半透明高亮留出边距（否则会紧贴 logo 边缘）
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: BrandLogo(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(l10n.lockPageTitle,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
+    );
+  }
+
   /// 打开「关于秘境」底部弹层（版本号 / 服务器地址 / 一句话说明）。
   /// 地址不进锁包，锁屏态与解锁后读的是同一个 [effectiveServer]，无需附注。
   void _openAboutPage() {
@@ -247,14 +280,17 @@ class _LockPageState extends State<LockPage> {
     final shouldExit = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
-        title: Center(child: Text(l10n.chatPageExitTitle)),
-        content: Text(l10n.chatPageExitMessage),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
-        ],
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+          title: Center(child: Text(l10n.chatPageExitTitle)),
+          content: Text(l10n.chatPageExitMessage),
+          actions: [
+            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+          ],
+        ),
       ),
     );
     if (shouldExit == true) {
@@ -273,17 +309,7 @@ class _LockPageState extends State<LockPage> {
       return Scaffold(
         appBar: AppBar(
           // 与其他页面一致：Logo 在标题栏左侧 + 标题（页面中间不再放大 Logo）
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const BrandLogo(),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(l10n.lockPageTitle,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
+          title: _buildAppBarTitle(l10n),
           actions: [_buildMenu(l10n)],
         ),
         body: Padding(
@@ -311,17 +337,7 @@ class _LockPageState extends State<LockPage> {
           // 严格锁屏不显示返回箭头（点了也会被挡，留着只会误导）
           automaticallyImplyLeading: canDismiss,
           // 与其他页面一致：Logo 在标题栏左侧 + 标题（页面中间不再放大 Logo）
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const BrandLogo(),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(l10n.lockPageTitle,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
+          title: _buildAppBarTitle(l10n),
           actions: [_buildMenu(l10n)],
         ),
         body: Padding(

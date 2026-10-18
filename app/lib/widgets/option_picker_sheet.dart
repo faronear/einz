@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'labeled_checkbox.dart';
+
 /// 打开选项弹层（界面语言 / 阅后即焚 / 附件存储共用的入口）。
 ///
 /// `isScrollControlled`：解除默认 9/16 屏高上限，允许弹层用到满窗高——桌面窗口
@@ -35,6 +37,8 @@ class OptionPickerSheet extends StatefulWidget {
     this.submitLabel,
     this.warningFor,
     this.note,
+    this.scopeAllLabel,
+    this.initialScopeAll = false,
   });
 
   /// 标题（弹层顶部居中/左对齐的一行）。
@@ -47,6 +51,15 @@ class OptionPickerSheet extends StatefulWidget {
   /// 标题那一组，而不是内容主体。
   final String? note;
 
+  /// 「作用于本机所有空间」勾选框的标签（null = 不显示勾选框；老板 2026-10-15）。
+  ///
+  /// 勾选态由本弹层持有（[_OptionPickerSheetState._scopeAll]），点选选项时随
+  /// [onApply] 的 `scopeAll` 一并交出——调用方据此决定写 per-space 键还是全局键。
+  final String? scopeAllLabel;
+
+  /// 勾选框的初始态（每次开弹层都是 false：默认只作用于当前空间）。
+  final bool initialScopeAll;
+
   /// 可选项（按给定顺序展示）。
   final List<OptionPickerItem> options;
 
@@ -54,7 +67,8 @@ class OptionPickerSheet extends StatefulWidget {
   final String selected;
 
   /// 生效回调：点选（或提交）后调用，执行完弹层自动关闭。
-  final Future<void> Function(String value) onApply;
+  /// [scopeAll] = 「作用于本机所有空间」勾选框的当前态（未显示勾选框时恒 false）。
+  final Future<void> Function(String value, {bool scopeAll}) onApply;
 
   /// 非空 = 需要底部「提交」按钮（不点选即生效）；为空 = 点选即生效。
   final String? submitLabel;
@@ -81,17 +95,19 @@ class OptionPickerItem {
 
 class _OptionPickerSheetState extends State<OptionPickerSheet> {
   late String _picked;
+  late bool _scopeAll;
 
   @override
   void initState() {
     super.initState();
     _picked = widget.selected;
+    _scopeAll = widget.initialScopeAll;
   }
 
   bool get _needsSubmit => widget.submitLabel != null;
 
   Future<void> _apply(String value) async {
-    await widget.onApply(value);
+    await widget.onApply(value, scopeAll: _scopeAll);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -137,9 +153,17 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
                   ),
                 ),
               ),
+            // 「作用于本机所有空间」勾选框（老板 2026-10-15）。位置按弹层模式分化：
+            // - **点选即生效**（无提交按钮）：放选项区**上方**（标题+备注下）——
+            //   选项即"提交"，放下方用户先点到选项、sheet 随即关闭，没机会改范围；
+            // - **单选+提交**：放**提交按钮上方**（选项区下方）——提交前统一确认
+            //   "选什么 + 作用域"，防呆（老板 2026-10-15 体验后拍板）。
+            // 两种情况下都固定不随选项滚动；不传 scopeAllLabel 的弹层整个不渲染。
+            if (widget.scopeAllLabel != null && !_needsSubmit)
+              _scopeAllCheckbox(),
             // 选项区可滚动：档位多（阅后即焚 6 档）+ 窗口不高时，原先是死 Column →
             // 底部内容被裁掉并报 RenderFlex overflow（老板 2026-09-24 要求改可滚动）。
-            // 标题与底部「提交」按钮固定，只有中间这几行滚。
+            // 标题/勾选框与底部「提交」按钮固定，只有中间这几行滚。
             Flexible(
               child: SingleChildScrollView(
                 child: Column(
@@ -167,15 +191,22 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
                 ),
               ),
             ),
+            // 单选+提交模式下，勾选框放**提交按钮上方**（选项区下方）
+            if (widget.scopeAllLabel != null && _needsSubmit)
+              _scopeAllCheckbox(),
             if (_needsSubmit)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    // 没改动：不必提交
-                    onPressed:
-                        _picked == widget.selected ? null : () => _apply(_picked),
+                    // 选项与作用域都没动：不必提交。**勾选态也算改动**——只勾
+                    // "所有秘境"不改选项同样是有效操作（把当前模式推广到所有
+                    // 空间），必须能提交（老板 2026-10-15）。
+                    onPressed: (_picked == widget.selected &&
+                            _scopeAll == widget.initialScopeAll)
+                        ? null
+                        : () => _apply(_picked),
                     child: Text(widget.submitLabel!),
                   ),
                 ),
@@ -187,6 +218,17 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
       ),
     );
   }
+
+  /// 「作用于本机所有空间」勾选框行（两个位置共用：选项区上方 / 提交按钮上方）。
+  Widget _scopeAllCheckbox() => Padding(
+        // 底部 4：与下方内容（选项行 / 提交按钮）之间留出分组感
+        padding: const EdgeInsets.only(bottom: 4),
+        child: LabeledCheckbox(
+          label: widget.scopeAllLabel!,
+          value: _scopeAll,
+          onChanged: (v) => setState(() => _scopeAll = v),
+        ),
+      );
 }
 
 /// 单选项行：**选中项有背景高亮**（浅 tint 圆角 + 对勾）——几个设置弹层统一。

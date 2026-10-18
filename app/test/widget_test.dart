@@ -5,6 +5,8 @@
 // 空间入口页（新建/加入选择）→ create：名字→口令→PIN；join：
 // token（preflight）→名字→口令→PIN。
 
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,7 +108,14 @@ void main() {
 
     // join token 输入页（标题 setupTokenTitle「验证通道码」+ 扫码）
     expect(find.text(_zh.setupTokenTitle), findsOneWidget);
-    expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
+    // 扫码入口按平台：Linux 无 mobile_scanner 实现 → 不摆（setup_page 平台
+    // 分支，feat/linux）；其余平台有。CI 在 ubuntu 上跑，两个分支都会走到
+    if (Platform.isLinux) {
+      expect(find.byIcon(Icons.qr_code_scanner), findsNothing,
+          reason: 'Linux 没有相机扫码实现，入口应隐藏');
+    } else {
+      expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
+    }
   });
 
   testWidgets('join：token 校验通过（preflight）→ 直接进入名字页（群聊一期）',

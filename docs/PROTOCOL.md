@@ -96,6 +96,7 @@
 | GET | /messages/unread | 未读条数（服务端派生：消息 + 我的读取水位；多空间列表角标用） | Bearer |
 | POST | /entrances/name | 改本通道显示名 | Bearer |
 | POST | /entrances/install-uid | 补登安装级标识 `install_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
+| POST | /entrances/client | 上报本通道客户端信息 `client`（`app`/`tui`）+ `app_version`（仅 App；每次冷启动一次，幂等，仅写本会话那一行） | Bearer |
 | POST | /members/name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
 | POST | /avatar | 上传本人头像 | Bearer |
 | GET | /avatar/:memberId | 取头像（免认证，公开可读） | — |
@@ -318,7 +319,8 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 { "entrances": [
     { "entrance_id": "…", "member_id": "…", "status": "active", "last_seen": 1787900000000,
       "offline_since": null, "entrance_name": "MacBook",
-      "connected_at": 1787900000000, "online_since": 1787900000000 }
+      "connected_at": 1787900000000, "online_since": 1787900000000,
+      "client": "app", "app_version": "2610.1409.00" }
 ] }
 ```
 
@@ -332,6 +334,10 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
   `offline_since` 只在断开那一刻落一次。**显示层取 `max(last_seen, offline_since)` 当离线
   时刻**：干净断开时只剩 `offline_since` 有值（否则离线通道没有时间可显示）；服务端重启这类
   "close 事件没跑到"的情况反倒是 `last_seen` 更新。两者都为 0/null 才不显示。
+- `client`/`app_version` = 客户端信息（`POST /entrances/client` 上报，每次冷启动一次）：
+  `client` ∈ `app`/`tui`；`app_version` 仅 App 上报（`yymm.ddhh.mm`，TUI 二进制拿不到
+  自身版本只报类型）。**对端可见**——这正是用途：「我的设备通道」里看每台设备跑的什么
+  客户端、什么版本。存量行/旧客户端为 null（显示层不显示该段）。
 
 ### 7.2 撤销通道 POST /entrances/:id/revoke
 

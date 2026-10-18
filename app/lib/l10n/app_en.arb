@@ -6,18 +6,41 @@
   "confirm": "Confirm",
   "delete": "Delete",
   "settings": "Settings",
+  "settingsScopeAll": "Apply to all spaces on this device",
+  "settingsScopeAllDone": "Applied to all spaces on this device",
   "skip": "Skip",
   "close": "Close",
   "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.",
-  "@setupPageEnvelopeKeyHint": {"placeholders": {"mode": {"type": "String"}}},
+  "@setupPageEnvelopeKeyHint": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "setupPageNeedPassphrase": "Enter a shared passphrase",
   "upgradeFrozenTitle": "Update required",
   "upgradeFrozenBody": "Your app version {current} is no longer supported, you need at least {min}. Please update to continue.",
-  "@upgradeFrozenBody": {"placeholders": {"min": {"type": "String"}, "current": {"type": "String"}}},
+  "@upgradeFrozenBody": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "current": {
+        "type": "String"
+      }
+    }
+  },
   "upgradeFrozenDownload": "Download update",
   "upgradeCoolingTitle": "Update available",
   "upgradeCoolingBody": "Your app version is old, the newest version {latest} is available for download. Please update at your convenient time.",
-  "@upgradeCoolingBody": {"placeholders": {"latest": {"type": "String"}}},
+  "@upgradeCoolingBody": {
+    "placeholders": {
+      "latest": {
+        "type": "String"
+      }
+    }
+  },
   "upgradeCoolingDownload": "Download update",
   "upgradeCoolingLater": "Later",
   "wizardJoinPassphraseRequired": "Enter the shared passphrase",
@@ -78,13 +101,25 @@
     }
   },
   "wizardPassphraseHint": "The passphrase is the secret key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Memorize it and never leak it!",
-  "@wizardPassphraseHint": {"placeholders": {"mode": {"type": "String"}}},
+  "@wizardPassphraseHint": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "wizardPassphraseMinLengthHint": "At least 8 characters",
   "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
   "wizardJoinPassphraseHint": "The passphrase is the secret key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Don't know it? Ask {mode, select, duo{your companion} other{your companions}}.",
-  "@wizardJoinPassphraseHint": {"placeholders": {"mode": {"type": "String"}}},
+  "@wizardJoinPassphraseHint": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "wizardJoinPassphraseWrong": "Wrong passphrase.",
   "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
   "wizardSwitchToPassphrase": "Use a shared passphrase instead",
@@ -102,7 +137,7 @@
     }
   },
   "setupEntryTitle": "Einz wizard",
-  "setupEntryHint": "Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.",
+  "setupEntryHint": "Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
   "setupEntryLegacyServer": "Server version too old — please upgrade",
@@ -174,7 +209,7 @@
   "setPinDialogPinHint": "At least 6 digits",
   "setPinDialogConfirmLabel": "Confirm new PIN",
   "setPinDialogConfirmHint": "Type it again to confirm",
-  "setPinDialogSetPin": "Submit",
+  "setPinDialogSetPin": "Apply",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
   "setPinDialogPinMismatch": "PINs do not match",
@@ -191,16 +226,17 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space. You can also leave the new PIN blank to delete the current PIN.",
+  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.",
   "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you enter the space.",
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
   "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
   "chatPageSetLockNoPinNotice": "No PIN set. Next launch goes straight into the space.",
   "chatPageSetLockDone": "PIN set. You must enter PIN to unlock the space at next launch.",
-  "chatPageSetLockCleared": "PIN deleted. You can enter the space directly at next launch.",
-  "chatPageClearLockTitle": "Delete PIN?",
-  "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
+  "chatPageSetLockCleared": "PIN cleared. You can enter the space directly at next launch.",
+  "chatPageClearLockTitle": "Clear PIN?",
+  "chatPageClearLockMessage": "Clear the PIN? After clearing, next app launch will go straight into chat.",
+  "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
   "chatPageInviteDialogTitleAttachSelf": "Add my new entrance",
   "chatPageInviteDialogTitleReinvite": "Re-invite",
@@ -231,8 +267,8 @@
   },
   "chatPageTitleBrand": "My Einz",
   "chatPageMenuChangePassphrase": "Change shared passphrase",
-  "chatPageMenuAvatar": "My avatar",
-  "chatPageAvatarUploaded": "✅ Avatar updated",
+  "chatPageMenuMyProfile": "My profile",
+  "chatPageAvatarUploaded": "✅ My avatar updated",
   "chatPageAvatarTooLarge": "Image too large (max 2MB)",
   "chatPageAvatarFailed": "Avatar upload failed: {error}",
   "@chatPageAvatarFailed": {
@@ -244,9 +280,9 @@
   },
   "chatPageNameUnset": "Unset",
   "chatPageMenuExit": "Quit app",
-  "chatPageMenuMore": "Menu",
+  "chatPageMenuMore": "Main menu",
   "chatPageMsgMoreActions": "More actions",
-  "chatPageRenameNameTitle": "My identity",
+  "chatPageRenameNameTitle": "My name",
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",
   "chatPageGroupNameEditTooltip": "Change group name",
@@ -302,7 +338,13 @@
   "chatPageChangePassphraseOldRequired": "Enter your current passphrase first",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
   "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new entrances must use the new one",
-  "@chatPageChangePassphraseDone": {"placeholders": {"mode": {"type": "String"}}},
+  "@chatPageChangePassphraseDone": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
@@ -312,14 +354,25 @@
     }
   },
   "chatPageEscrowRotatedNotice": "{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create entrance tokens or change it",
-  "@chatPageEscrowRotatedNotice": {"placeholders": {"mode": {"type": "String"}}},
+  "@chatPageEscrowRotatedNotice": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageMenuLocaleLabel": "Language",
   "chatPageMenuAttachmentStorage": "Attachment storage",
+  "chatPageMenuMoreSettings": "More settings",
+  "chatPageMoreSettingsTitle": "More settings",
+  "chatPageMoreSettingsStorage": "Attachment storage",
+  "chatPageMoreSettingsTombstone": "Tombstone messages",
+  "chatPageAttachmentStorageNote": "Where are attachments — images, videos, audio, files — stored?",
   "chatPageAttachmentStorageSecured": "Remote only",
   "chatPageAttachmentStorageSecuredDesc": "Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.",
   "chatPageAttachmentStorageStored": "Keep locally",
   "chatPageAttachmentStorageStoredDesc": "Keeps a plaintext copy after the first download, so you can open it directly on this device. More convenient.",
-  "chatPageAttachmentStorageSubmit": "Submit",
+  "chatPageAttachmentStorageSubmit": "Apply",
   "chatPageAttachmentStorageWarnClear": "Switching to “Remote only” immediately deletes locally stored attachments",
   "chatPageMenuStyleLabel": "Theme",
   "chatPageUiStylePlain": "Plain",
@@ -327,15 +380,29 @@
   "chatPageUiStyleGradient": "Gradient",
   "chatPageUiStyleGradientDesc": "Pink-blue gradient in the brand colors",
   "chatPageMenuBurnLabel": "Burn-after-read",
-  "chatPageMenuMyNameLabel": "My identity",
   "chatPageMenuEntranceList": "My entrances",
   "wizardJoinInviteHint": "Invited by “{name}”",
   "wizardJoinInviteHintNoName": "Invited to join a space",
   "wizardJoinAttachHint": "Add a new entrance of “{name}”",
   "wizardJoinReinviteHint": "Invited by “{name}” to add a new entrance of “{target}”",
   "wizardJoinReinviteHintNoName": "Invited to add a new entrance of “{target}”",
-  "@wizardJoinReinviteHint": {"placeholders": {"name": {"type": "String"}, "target": {"type": "String"}}},
-  "@wizardJoinReinviteHintNoName": {"placeholders": {"target": {"type": "String"}}},
+  "@wizardJoinReinviteHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "@wizardJoinReinviteHintNoName": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
   "@wizardJoinInviteHint": {
     "placeholders": {
       "name": {
@@ -360,15 +427,26 @@
       }
     }
   },
-  "chatPageMembersHint": "",
   "chatPageMembersTitle": "{mode, select, duo{My companion} group{My group} other{My space}}",
-  "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
+  "@chatPageMembersTitle": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvite": "Invite",
   "chatPageMembersReinvite": "Re-invite",
   "chatPageReinvitePassphraseTitle": "Verify passphrase",
   "chatPageReinvitePassphraseHint": "After verification you can re-invite “{name}”",
-  "@chatPageReinvitePassphraseHint": {"placeholders": {"name": {"type": "String"}}},
+  "@chatPageReinvitePassphraseHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatPagePassphraseFieldHint": "Shared passphrase",
   "chatPagePassphraseShow": "Show",
   "chatPagePassphraseHide": "Hide",
@@ -395,7 +473,6 @@
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
   "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification will be sent to your email address.",
-  "chatPageNotifyAllSpaces": "Apply this setting to all spaces on this device.",
   "chatPageNotifyEmailLabel": "Email",
   "chatPageNotifyEmptyError": "Enter an email address first",
   "chatPageNotifyInvalidError": "That doesn't look like an email address",
@@ -437,8 +514,15 @@
     }
   },
   "chatPageBurnHeading": "Burn-after-read",
-  "chatPageBurnNote": "New messages are deleted on a countdown once read",
-  "chatPageBurnOff": "Burn-after-read is off (this message will be kept)",
+  "chatPageBurnNote": "Delete new messages automatically once read on a countdown",
+  "chatPageTombstoneHeading": "Tombstone messages",
+  "chatPageTombstoneNote": "How deleted/burned/recalled messages appear?",
+  "chatPageTombstoneKeep": "Keep message status",
+  "chatPageTombstoneKeepDesc": "Show a placeholder: content hidden, time and record kept, message flow unbroken",
+  "chatPageTombstoneHide": "Hide completely",
+  "chatPageTombstoneHideDesc": "Tombstones disappear from the message flow entirely",
+  "chatPageTombstoneSubmit": "Apply",
+  "chatPageBurnOff": "Burn-after-read is disabled on this message",
   "chatPageBurnFailed": "Failed to set burn-after-read",
   "chatPageBurnWillDelete": "New messages auto-delete after {duration}",
   "@chatPageBurnWillDelete": {
@@ -455,7 +539,8 @@
   "chatPageRecallConfirmOk": "Recall",
   "chatPageRecallBlocked": "Already delivered, can't recall",
   "chatPageRecallFailed": "Recall failed, try again later",
-  "chatPageDeletedMessage": "(This message is no longer available)",
+  "chatPageQuotedTombMessage": "(This message is no longer available)",
+  "chatPageQuoteGoneNotice": "The quoted message is no longer available",
   "chatPageActionQuote": "Quote",
   "chatPageActionSave": "Save",
   "chatPageAttachmentSaved": "Saved.",
@@ -465,6 +550,32 @@
   "chatPageDeleteConfirmMessage": "Removed only on this device (the others aren't affected), and it can't be undone. Delete?",
   "chatPageDeleteCancel": "Cancel",
   "chatPageDeleteConfirmOk": "Delete",
+  "chatPagePasteSendImageTitle": "Send this image?",
+  "chatPagePasteSendVideoTitle": "{count, plural, one {Send this video?} other {Send these {count} videos?}}",
+  "@chatPagePasteSendVideoTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteSendAudioTitle": "{count, plural, one {Send this audio?} other {Send these {count} audio files?}}",
+  "@chatPagePasteSendAudioTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteSendFilesTitle": "{count, plural, one {Send this file?} other {Send these {count} files?}}",
+  "@chatPagePasteSendFilesTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPagePasteEmpty": "Clipboard is empty",
   "chatPageSendFailed": "Send failed: {error}",
   "@chatPageSendFailed": {
     "placeholders": {
@@ -478,16 +589,16 @@
   "chatPageMsgDelivered": "Delivered",
   "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageMsgFailedTap": "Tap to resend",
-  "chatPageOfflineUnsent": "Offline · {count} unsent",
-  "@chatPageOfflineUnsent": {
+  "chatPageMsgsUnsent": "Waiting to sync… {count} unsent, will retry when back online",
+  "@chatPageMsgsUnsent": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
-  "chatPageOfflineLocalOnly": "Offline · local messages only, cannot send or receive",
+  "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.",
+  "chatPageMsgsSyncing": "Waiting to sync… Send/receive temporarily unavailable, local messages only",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
@@ -521,6 +632,7 @@
   },
   "chatPageAttachEmoji": "Emoji",
   "chatPageEmojiKeyboard": "Keyboard",
+  "chatPageAttachPaste": "Paste",
   "chatPageAttachPhoto": "Take photo",
   "chatPageAttachGalleryImage": "Gallery image",
   "chatPageAttachVideoCamera": "Record video",
@@ -564,6 +676,7 @@
   },
   "chatPageAttachmentTapToDownload": "Not on this device — tap to download again",
   "chatPageVideoLoadFailed": "Video failed to load — tap to retry",
+  "chatPageVideoUnsupportedPlatform": "This device can't play video — tap to save it",
   "chatPageFileOpenFailed": "Could not open file: {error}",
   "@chatPageFileOpenFailed": {
     "placeholders": {
@@ -573,12 +686,49 @@
     }
   },
   "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
-  "burnOptionOff": "Off (Do not burn anymore)",
-  "burnOption1Minute": "1 minute",
-  "burnOption5Minutes": "5 minutes",
-  "burnOption1Hour": "1 hour",
-  "burnOption1Day": "1 day",
-  "burnOption7Days": "7 days",
+  "burnOptionOff": "Do not auto-burn",
+  "burnSubmit": "Apply",
+  "burnPreviewDelay": "{duration}",
+  "@burnPreviewDelay": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "burnUnitDays": "{count}d",
+  "@burnUnitDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitHours": "{count}h",
+  "@burnUnitHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitMinutes": "{count}m",
+  "@burnUnitMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnUnitSeconds": "{count}s",
+  "@burnUnitSeconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "burnAxisOffLabel": "Off",
   "lockPageTitle": "My Einz",
   "lockPagePinPrompt": "Enter PIN to unlock",
   "lockPageLockedSeconds": "Locked for {seconds}s",
@@ -609,14 +759,29 @@
   },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",
-  "aboutIntro": "Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.",
+  "aboutIntro": "Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.",
   "aboutVersionLabel": "Version",
+  "aboutDownloadLabel": "Download",
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address for debugging only",
   "aboutStatusLabel": "Connection",
   "aboutStatusChecking": "Checking…",
   "aboutStatusConnected": "Connected",
   "aboutStatusUnreachable": "Unreachable",
+  "aboutDnsPoisonLabel": "DNS poisoning",
+  "aboutDnsPoisonValue": "{host} hijacked to {ip}",
+  "@aboutDnsPoisonValue": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "ip": {
+        "type": "String"
+      }
+    }
+  },
+  "aboutDnsPoisonUnknownIp": "unknown",
+  "aboutDnsPoisonNote": "Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown",
   "advancedMenuTitle": "Advanced security",
   "advancedDestroyEntrance": "Destroy this entrance",
   "advancedClearMessages": "Delete all messages",

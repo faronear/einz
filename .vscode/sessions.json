@@ -42,11 +42,19 @@
         ]
       },
       {
+        "name": "MacOS--本机",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz",
+          "npm run app-mac-run-local"
+        ]
+      },
+      {
         "name": "安卓--本机",
         "autoExecuteCommands": true,
         "commands": [
           "cd ~/einz",
-          "if [ $(hostname) = 'DoomBase' ]; then npm run app-apk-boot2run --mode=local; fi;"
+          "if [ $(hostname) = 'DoomBase' ]; then npm run app-apk-boot2run --mode=local; else exit; fi;"
         ]
       },
       {
@@ -54,15 +62,7 @@
         "autoExecuteCommands": true,
         "commands": [
           "cd ~/einz",
-          "if [ $(hostname) = 'DoomBase' ]; then npm run app-ios-boot && npm run app-ios-run-local; fi;"
-        ]
-      },
-      {
-        "name": "MacOS--本机",
-        "autoExecuteCommands": true,
-        "commands": [
-          "cd ~/einz",
-          "npm run app-mac-run-local"
+          "if [ $(hostname) = 'DoomBase' ]; then npm run app-ios-boot && npm run app-ios-run-local; else exit; fi;"
         ]
       },
       {
@@ -73,10 +73,10 @@
         ]
       },
       {
-        "name": "tui-oddsgame--远端",
+        "name": "tui--远端",
         "autoExecuteCommands": true,
         "commands": [
-          "cd ~/einz/cli && dart bin/einz_tui.dart --store ~/.einz/oddsgame.json"
+          "cd ~/einz/cli && dart bin/einz_tui.dart"
         ]
       }
     ]

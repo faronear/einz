@@ -299,6 +299,13 @@ export function openDb(path?: string): Database.Database {
   } catch {
     // 列已存在（新库）→ 忽略
   }
+  // 迁移：entrances 表补充 client/app_version（客户端信息上报；存量行留 NULL）
+  try {
+    db.exec(`ALTER TABLE entrances ADD COLUMN client TEXT`);
+    db.exec(`ALTER TABLE entrances ADD COLUMN app_version TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
   // 迁移：entrances 表补充 offline_since（最后断开时刻；App/CLI 显示"离线 since 时刻"用）
   try {
     db.exec(`ALTER TABLE entrances ADD COLUMN offline_since INTEGER`);

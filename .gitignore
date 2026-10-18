@@ -53,6 +53,9 @@ node_modules/
 # 生成物仍保持忽略。
 !app/macos/Runner/*.swift
 !app/macos/RunnerTests/*.swift
+# www 介绍站的 logoslogan.png 生成脚本（Swift/AppKit，对标参照站的 .psd 源文件），
+# 同样被上面的 *.sw* 误伤——显式放行，换机器靠它重新出图。
+!www/images/theme/*.swift
 *.sln
 *.suo
 .gitattributes
@@ -140,6 +143,8 @@ turnserver.*.conf
 # 模型由 scripts/fetchVoiceModel.sh 在构建前拉取，随 App 打包分发；
 # 忽略目录**内容**而非目录本身（git 否定规则救不回已排除目录里的文件），
 # 保住 .gitkeep——否则新克隆缺目录，pubspec 声明资产会直接构建失败
-# （"unable to find directory entry"）。
+# （"unable to find directory entry"）。与 feat/voice-transcript 逐字一致，
+# 两分支合并时同内容相加不冲突。本分支（feat/linux）同样要防：
+# 工作区里这 239MB 是 voice 分支带过来的，一条 git add -A 就会进历史。
 app/assets/voice_model/*
 !app/assets/voice_model/.gitkeep

@@ -15,6 +15,7 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/space_session.dart';
 import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
@@ -86,12 +87,14 @@ class _FakeApi extends ApiClient {
 
   @override
   Future<void> updateMemberName(String memberName, String token) async {
-    // 改名成功（无网络，供保存路径测试）
+    // 改名成功（无网络，供保存路径测试）；记录调用供扇出断言
+    memberNameUpdates.add((name: memberName, token: token));
   }
 
   @override
   Future<void> updateEntranceName(String entranceName, String token) async {
-    // 改通道名成功（无网络，供保存路径测试）
+    // 改通道名成功（无网络，供保存路径测试）；记录调用供扇出断言
+    entranceNameUpdates.add((name: entranceName, token: token));
   }
 
   /// 邮件通知（菜单项，2026-10-01）：内存里存一份状态，默认"没设置"。
@@ -101,6 +104,26 @@ class _FakeApi extends ApiClient {
   String? savedNotifyEmail;
   String? savedNotifyLang;
   bool notifyEmailDeleted = false;
+
+  /// 改名调用记录（name + token）：「我的身份/当前通道」弹窗的范围选择扇出断言用
+  /// （token 区分是哪个空间的会话发起的）。
+  final List<({String name, String token})> memberNameUpdates = [];
+  final List<({String name, String token})> entranceNameUpdates = [];
+
+  /// 「我的通道」弹层的入口行（本机卡片 + 时间行）；测试可固定返回一条本机通道。
+  List<Map<String, dynamic>> entranceRows = const [
+    {
+      'entrance_id': 'dev-a',
+      'entrance_name': 'iPhone',
+      'member_id': 'member-me',
+      'connected_at': 1,
+      'last_seen': 1,
+      'status': 'active',
+    },
+  ];
+
+  @override
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async => entranceRows;
 
   @override
   Future<NotifyEmailStatus> getNotifyEmail(String token) async => notifyEmailStatus;
@@ -205,6 +228,99 @@ Future<void> _openCurrentEntranceRename(WidgetTester tester) async {
   );
 }
 
+// ---- 「我的身份 / 当前通道」弹窗的范围选择（老板 2026-10-15）----
+
+/// 发布一个两空间内存 Vault：当前空间 space-demo（tok-a）+ 另一个 space-b
+/// （tok-b）。调用方负责 addTearDown 里 publish(null) 收尾。
+void _publishTwoSpaceVault() {
+  SpaceSessions.clear(); // 清进程级会话注册表，避免别处遗留的条目干扰
+  VaultSession.publish(const VaultPayload(
+    spaces: [
+      AppLockPayload(
+        spaceKeyB64: 'a2V5LWE=',
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        token: 'tok-a',
+      ),
+      AppLockPayload(
+        spaceKeyB64: 'a2V5LWI=',
+        spaceId: 'space-b',
+        entranceId: 'dev-b',
+        token: 'tok-b',
+      ),
+    ],
+    activeSpaceId: 'space-demo',
+  ));
+}
+
+/// 给 space-b 预置一份本地 profile（扇出断言"其余字段原样保留"用）。
+Future<void> _seedSpaceBProfile(LocalDatabase db) async {
+  await AppLockService(db).saveProfile(
+    spaceId: 'space-b',
+    memberName: '旧名B',
+    peerName: 'PeerB',
+    entranceName: 'iPhoneB',
+    myGender: 'male',
+    peerGender: 'female',
+    mySlot: 0,
+    peerSlot: 1,
+    groupName: '群B',
+  );
+}
+
+/// 扇出是 unawaited 的后台任务：推几轮真实事件循环 + 帧让它落地再断言。
+Future<void> _settleFanout(WidgetTester tester) async {
+  for (var i = 0; i < 3; i++) {
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  await tester.pumpAndSettle();
+}
+
+/// 菜单 → 「我的资料」弹层 → 点名字胶囊 → 改名弹窗（_menuAction 有 300ms
+/// 错峰延迟，两段都要等）。
+Future<void> _openMyNameDialog(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.menu));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text(_zh.chatPageMenuMyProfile));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(_zh.chatPageMenuMyProfile));
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+  // 「我的资料」弹层 → 点名字胶囊 → 改名弹窗（同样错峰）
+  await tester.tap(find.byKey(const ValueKey('myProfileNameRow')));
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+}
+
+/// 菜单 → 「我的通道」弹层 → 点本机卡名字胶囊 → 通道改名弹窗（两段错峰）。
+Future<void> _openEntranceRenameDialog(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.menu));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text(_zh.chatPageMenuEntranceList));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(_zh.chatPageMenuEntranceList));
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+  await tester.tap(find.descendant(
+      of: find.byType(BottomSheet), matching: find.text('iPhone')));
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+}
+
+/// 弹窗内第一个输入框（名字/通道名；性别框是 TextFormField 不计）先进编辑态
+/// （初始只读，点一下才可输入）再填字。
+Future<void> _enterDialogName(WidgetTester tester, String name) async {
+  final field = find
+      .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+      .first;
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.enterText(field, name);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   // 菜单里的翻转沙漏（_HourglassFlip）是常驻动画，关掉它免得 pumpAndSettle 超时
   disableAnimationsInTests();
@@ -258,11 +374,10 @@ void main() {
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
     expect(find.text(_zh.advancedMenuTitle), findsOneWidget);
-    // 我的身份/当前通道（未传 → 显示「未设置」）+ 退出本应用
-    expect(find.text('我的身份'), findsOneWidget);
+    // 我的资料（聚合原我的身份/我的头像两项，未传名 → 右侧「未设置」）+ 退出本应用
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget);
     expect(find.text(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(find.text('退出本应用'), findsOneWidget);
-    expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text(_zh.advancedMenuTitle), findsOneWidget);
     expect(find.text(_zh.chatPagePinLabel), findsOneWidget);
     // 点"PIN: 未设置"菜单项
@@ -312,7 +427,7 @@ void main() {
     await tester.enterText(pinFields.at(0), '123456');
     await tester.enterText(pinFields.at(1), '123456');
     // 点"提交"→ 直接设置（不再有二次确认弹窗——老板 2026-09-14 删除）
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
 
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
@@ -362,14 +477,14 @@ void main() {
     expect(fields.evaluate().length, 3);
 
     // 1) 旧码留空 → 红字要求先输入旧码，不动锁
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('请先输入当前锁屏码'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
 
     // 2) 旧码填错 → 红字"当前锁屏码错误"，不动锁
     await tester.enterText(fields.at(0), '000000');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('当前锁屏码错误'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
@@ -378,7 +493,7 @@ void main() {
     await tester.enterText(fields.at(0), '123456');
     await tester.enterText(fields.at(1), '123456');
     await tester.enterText(fields.at(2), '123456');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('新锁屏码与当前锁屏码相同，未作修改'), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
@@ -386,9 +501,9 @@ void main() {
     // 4) 旧码正确 + 新码留空 → 才进清空确认；点取消不动锁
     await tester.enterText(fields.at(1), '');
     await tester.enterText(fields.at(2), '');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
-    expect(find.text('删除锁屏码？'), findsOneWidget);
+    expect(find.text(_zh.chatPageClearLockTitle), findsOneWidget);
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
@@ -435,10 +550,10 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     // 旧码正确 + 新码两栏留空 → 清空确认 → 确认
     await tester.enterText(fields.at(0), '123456');
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
+    await tester.tap(find.descendant(of: confirmDialog, matching: find.text(_zh.chatPageLockClearConfirm)));
     await tester.pumpAndSettle();
 
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '清空成功后设置弹窗应关闭');
@@ -473,12 +588,13 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 点「我的身份」（未传 memberName → 显示"我的身份: 未设置"）
+    // 打开菜单 → 我的资料弹层 → 名字胶囊 → 改名弹窗（未传名 → 右侧「未设置」）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.textContaining(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
-    // 弹窗内含两个输入框：可编辑名字在前、只读性别在后 → 取 .first
+    // 弹窗内只剩一个可编辑名字输入框（性别只读框 2026-10-17 已移到「我的资料」弹层）
     await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
@@ -523,6 +639,8 @@ void main() {
       await tester.tap(find.byIcon(Icons.menu));
       await tester.pumpAndSettle();
       await tapDeferred(tester, find.textContaining(menuItem));
+      // 「我的资料」是弹层：先点名字胶囊进改名弹窗（两段错峰）
+      await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
       // 初始只读：先点「编辑」进可编辑态（只读态不接键盘输入）
       await tester.tap(find.byIcon(Icons.edit));
       await tester.pumpAndSettle();
@@ -560,7 +678,7 @@ void main() {
     }
 
     // 我的名字（member_name：按**码点**算，与 shared member_name_policy 同一常量）
-    final mine = await typeInto('我的身份', 'x' * 40);
+    final mine = await typeInto(_zh.chatPageMenuMyProfile, 'x' * 40);
     expect(mine.length, kMemberNameMaxLength, reason: '第 33 个字符应敲不进去');
 
     // 我的通道名（entrance_name：同样 32）——当前通道名没有独立菜单项，
@@ -594,7 +712,8 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.textContaining(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
     // 点名字输入框本身（不是右侧编辑图标）→ 也应切到编辑态
     await tester.tap(
@@ -716,7 +835,7 @@ void main() {
     expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget); // 弹窗标题
     // 两空点「提交」：本来就没设 PIN → 直接返回（老板 2026-09-14）——不弹清空确认、
     // 不调后台、不做任何写盘，只在顶部通知里说一句
-    await tester.tap(find.text('提交'));
+    await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text('删除锁屏码？'), findsNothing);
     expect(find.text('锁屏码仍然为空，下次启动应用可直接进入秘境。'), findsOneWidget); // 顶部通知
@@ -827,13 +946,14 @@ void main() {
     // initState loadProfile 补名（memberB——顶部条/菜单显示）
     expect(find.text('memberB'), findsWidgets);
 
-    // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
+    // 菜单 → 「我的资料」弹层 → 点名字胶囊 → 改名弹窗 → 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
-        .first; // 弹窗内可编辑名字框在前、只读性别框在后
+        .first; // 弹窗内只有一个名字输入框（性别框已移入「我的资料」弹层）
     await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
     await tester.pumpAndSettle();
     await tester.enterText(renameField, 'Alice');
@@ -974,22 +1094,20 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync + profile load 完成
 
-    // 菜单 → 我的身份（打开个人资料弹窗）
+    // 菜单 → 我的资料弹层 → 点名字胶囊 → 改名弹窗（两段错峰）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.chatPageRenameNameTitle));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
+    await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
 
-    // 标题「我的身份」、输入框标签「名字」、名字框下性别彩色图标（男高亮）
-    expect(find.text('我的身份'), findsOneWidget, reason: '弹窗标题应为「我的身份」');
+    // 标题「我的名字」（2026-10-17 由「我的身份」改）、输入框标签「名字」；
+    // 性别展示已从本弹窗删除（只在「我的资料」弹层显示）
+    expect(find.text(_zh.chatPageRenameNameTitle), findsOneWidget,
+        reason: '弹窗标题应为「我的名字」');
     expect(find.text('名字'), findsWidgets, reason: '输入框标签应为「名字」');
-    expect(find.text('性别'), findsOneWidget, reason: '名字框下应显示性别标签');
-    expect(find.byIcon(Icons.female), findsNothing,
-        reason: '只显示本人性别图标，不应显示女图标');
-    final maleIcon = tester.widget<Icon>(find.byIcon(Icons.male));
-    expect(maleIcon.color, const Color(0xFF3BAFFD), reason: '本人为男：显示天蓝色男图标');
+    expect(find.text('性别'), findsNothing, reason: '改名弹窗不再展示性别');
 
-    // 清空名字 → 保存 → 红字警示并停留（弹窗内含两个输入框：可编辑名字在前、
-    // 只读性别在后 → 取 .first）
+    // 清空名字 → 保存 → 红字警示并停留（弹窗内只剩一个可编辑名字输入框）
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first;
@@ -1023,7 +1141,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('我的身份'), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
+    expect(find.text(_zh.chatPageRenameNameTitle), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
   });
 
   testWidgets('长按菜单预览行对齐：我的消息靠右、对方消息靠左', (WidgetTester tester) async {
@@ -1742,5 +1860,414 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull, reason: '菜单：长名字不应溢出行宽');
+  });
+
+  testWidgets('邮件通知弹窗：应用范围勾选复用 LabeledCheckbox（共享文案、切换即落盘）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault(); // 多秘境才有「所有秘境」一说（2026-10-17）
+    addTearDown(() => VaultSession.publish(null));
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 邮件通知（_menuAction 有 300ms 错峰延迟）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageNotifyLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageNotifyLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 勾选框在，文案 = 共享键 settingsScopeAll（与设置弹层的「应用于本机所有
+    // 秘境」同模块、同居中式样——老板 2026-10-15）
+    expect(find.text(_zh.settingsScopeAll), findsOneWidget);
+
+    // 每次开弹窗都默认**不勾选**（老板 2026-10-15）：扇出必须是每次显式 opt-in
+    // （纯一次性开关，不持久化；新空间自动继承已取消）
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+
+    // 点一下勾上 → 勾选框翻成 true（仅本次保存生效，不落任何设备偏好）
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+  });
+
+  testWidgets('邮件通知弹窗：单秘境 → 不显示「应用于本机所有秘境」勾选框（老板 2026-10-17）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    // 不发布 Vault（VaultSession.current 为 null）= 单秘境本机
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 邮件通知（_menuAction 有 300ms 错峰延迟）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageNotifyLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageNotifyLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 没有"其它秘境"可同步：勾选框整个不出现（弹窗本身照常）
+    expect(find.text(_zh.settingsScopeAll), findsNothing);
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.widgetWithText(FilledButton, _zh.chatPageEmailSubmit),
+        findsOneWidget);
+  });
+
+  testWidgets('邮件通知：已设邮箱时点停用 → 关弹窗 + 顶部通知一句（老板 2026-10-15）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    api.notifyEmailStatus = NotifyEmailStatus(email: 'me@tic.cc', state: 'verified');
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 邮件通知（_menuAction 有 300ms 错峰延迟）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageNotifyLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageNotifyLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 已设置：邮箱只读回显、只给「停用」不给「保存」
+    expect(find.text('me@tic.cc'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, _zh.chatPageNotifyStop), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, _zh.chatPageEmailSubmit), findsNothing);
+
+    // 只读输入框**不许聚焦**：点它边框也不该变蓝（TextField canRequestFocus:false，
+    // 老板 2026-10-15）——否则像能改其实不能，误导。
+    // 限定在弹窗内找输入框：聊天页底部还有个输入框，全局找会命中两个
+    final emailField = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(TextField));
+    final field = tester.widget<TextField>(emailField);
+    expect(field.canRequestFocus, isFalse);
+    expect(field.focusNode!.canRequestFocus, isFalse);
+    expect(field.focusNode!.hasFocus, isFalse); // 开弹窗时不该自带焦点
+    await tester.tap(emailField);
+    await tester.pumpAndSettle();
+    expect(field.focusNode!.hasFocus, isFalse); // 点了也不该获得焦点
+
+    // 点停用 → DELETE 已发、弹窗关闭、通知一句（不再原地切回输入界面）
+    await tester.tap(find.widgetWithText(TextButton, _zh.chatPageNotifyStop));
+    await tester.pumpAndSettle();
+
+    expect(api.notifyEmailDeleted, isTrue);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text(_zh.chatPageNotifyRemoved), findsOneWidget);
+
+    // 弹窗关闭后还有 400ms 的延迟 dispose（Future.delayed）——不等等它跑完就结束
+    // 测试，会栽在"pending timer"断言上
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---- 「我的身份 / 当前通道」弹窗的范围选择（老板 2026-10-15）----
+
+  testWidgets('我的身份弹窗：范围勾选默认不勾选；勾上提交 → 所有秘境同名且其余字段保留',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    await tester.runAsync(() => _seedSpaceBProfile(db));
+    final api = _FakeApi();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: await generateSpaceKey(),
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+        memberName: '旧名',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await _openMyNameDialog(tester);
+    // 勾选框在，且**默认不勾选**（每次显式 opt-in，老板 2026-10-15）
+    expect(find.text(_zh.settingsScopeAll), findsOneWidget);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+
+    await tester.tap(find.text(_zh.settingsScopeAll)); // 勾上：应用到所有秘境
+    await tester.pumpAndSettle();
+    await _enterDialogName(tester, '新名');
+    await tester.tap(find.widgetWithText(FilledButton, _zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+    await _settleFanout(tester);
+
+    // 服务端：当前空间（ChatPage 自己的 tok）+ space-b 各自会话都改了名
+    expect(api.memberNameUpdates.map((u) => u.token).toList()..sort(),
+        ['tok', 'tok-b']);
+    expect(api.memberNameUpdates.every((u) => u.name == '新名'), isTrue);
+
+    // 本地 profile：当前空间是新名；space-b 只换 memberName，其余原样
+    await tester.runAsync(() async {
+      final lock = AppLockService(db);
+      final mine = await lock.loadProfile(spaceId: 'space-demo');
+      expect(mine['memberName'], '新名');
+      final other = await lock.loadProfile(spaceId: 'space-b');
+      expect(other['memberName'], '新名', reason: '扇出应改写 space-b 的名字');
+      expect(other['entranceName'], 'iPhoneB', reason: '其余字段应原样保留');
+      expect(other['peerName'], 'PeerB');
+      expect(other['myGender'], 'male');
+      expect(other['peerGender'], 'female');
+      expect(other['groupName'], '群B');
+    });
+    // 弹窗关闭后还有 400ms 的延迟 dispose（Future.delayed）——不等它跑完就结束
+    // 测试，会栽在"pending timer"断言上
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('我的身份弹窗：不勾范围 → 只改当前秘境（其它秘境服务端/本地都不动）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    await tester.runAsync(() => _seedSpaceBProfile(db));
+    final api = _FakeApi();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: await generateSpaceKey(),
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+        memberName: '旧名',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await _openMyNameDialog(tester);
+    await _enterDialogName(tester, '新名'); // 不碰勾选框（默认不勾选）
+    await tester.tap(find.widgetWithText(FilledButton, _zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+    await _settleFanout(tester);
+
+    // 只有当前空间（ChatPage 自己的 tok）的会话被调用；space-b 的本地 profile 原样
+    expect(api.memberNameUpdates.map((u) => u.token), ['tok']);
+    await tester.runAsync(() async {
+      final other = await AppLockService(db).loadProfile(spaceId: 'space-b');
+      expect(other['memberName'], '旧名B', reason: '不勾选不应扇出到其它秘境');
+    });
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('当前通道弹窗：勾范围提交 → 所有秘境同名且其余字段保留',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    await tester.runAsync(() => _seedSpaceBProfile(db));
+    final api = _FakeApi();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: await generateSpaceKey(),
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+        entranceName: 'iPhone',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await _openEntranceRenameDialog(tester);
+    expect(find.text(_zh.settingsScopeAll), findsOneWidget);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    await _enterDialogName(tester, '新通道');
+    await tester.tap(find.widgetWithText(FilledButton, _zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+    await _settleFanout(tester);
+
+    // 服务端：当前空间（ChatPage 自己的 tok）+ space-b 各自会话都改了通道名
+    expect(api.entranceNameUpdates.map((u) => u.token).toList()..sort(),
+        ['tok', 'tok-b']);
+    expect(api.entranceNameUpdates.every((u) => u.name == '新通道'), isTrue);
+
+    // 本地 profile：space-b 只换 entranceName，memberName 等原样
+    await tester.runAsync(() async {
+      final other = await AppLockService(db).loadProfile(spaceId: 'space-b');
+      expect(other['entranceName'], '新通道', reason: '扇出应改写 space-b 的通道名');
+      expect(other['memberName'], '旧名B', reason: '其余字段应原样保留');
+      expect(other['peerName'], 'PeerB');
+    });
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('阅后即焚：勾「应用于本机所有秘境」提交 → 本机所有空间都落盘',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 菜单 → 阅后即焚（全局设置入口 → 弹层带范围勾选框）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 当前未设置 → 轴停在「关闭」顶点；点「1 天」标注跳到 1 天
+    expect(find.text(_zh.settingsScopeAll), findsOneWidget);
+    await tester.tap(find.text('1 天'));
+    await tester.pumpAndSettle();
+    // 勾上「应用于本机所有秘境」→ 提交
+    await tester.tap(find.text(_zh.settingsScopeAll));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.burnSubmit));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 两个空间的 per-space 键都写成 1 天
+    await tester.runAsync(() async {
+      expect(await BurnAfterSettings(db, spaceId: 'space-demo').load(), 86400);
+      expect(await BurnAfterSettings(db, spaceId: 'space-b').load(), 86400,
+          reason: '勾了所有秘境：其它空间也应落盘');
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('阅后即焚：不勾范围 → 只写当前空间', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    _publishTwoSpaceVault();
+    addTearDown(() => VaultSession.publish(null));
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageMenuBurnLabel));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // 不碰勾选框（默认不勾选）：点「1 天」标注 → 提交
+    await tester.tap(find.text('1 天'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.burnSubmit));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      expect(await BurnAfterSettings(db, spaceId: 'space-demo').load(), 86400);
+      expect(await BurnAfterSettings(db, spaceId: 'space-b').load(), 0,
+          reason: '不勾选不应扇出到其它空间');
+    });
+    expect(tester.takeException(), isNull);
   });
 }

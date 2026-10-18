@@ -75,6 +75,13 @@ class _VideoFakeApi extends ApiClient {
 }
 
 void main() {
+  // 关掉常驻动画：种下去的消息是 **pending**（seedRepo token=null，不等上传），
+  // 时间行的发送小飞机 _SendingPlane 是无限重复动画——pumpAndSettle 会一直
+  // 等到超时。补发（_flushPending，sync 末尾）通常在 settleRealAsync 的真实
+  // 异步窗口内完成、消息转 sent 后飞机消失，所以以前偶发不炸；full-suite 高
+  // 负载下补发没在窗口内跑完就超时（2026-10-14 testAll 实测）。关掉后飞机
+  // 退化为静态图标，确定性收敛（与菜单测试同款处理）。
+  disableAnimationsInTests();
   setUpAll(() async {
     await sodium(); // 附件加解密需要 libsodium
   });

@@ -287,3 +287,21 @@ EntranceSummary summarizeEntrances(
     memberStates: memberStates,
   );
 }
+
+/// 通道行的**客户端段**（「我的设备通道」卡片第二行 / TUI /entrances 行尾共用）：
+/// - App（`client == 'app'`）且报了版本 → `v2610.1409.00`；
+/// - TUI（`client == 'tui'`）→ `TUI`（二进制拿不到自身版本，只报类型标记）；
+/// - 都没报（存量行 / 旧客户端）→ null（调用方不显示该段）。
+///
+/// 背景（老板 2026-10-14）：卡片上要能看出每台设备跑的是 App 还是 TUI、哪个
+/// 版本。App 每次冷启动上报（client + app_version，升级自动跟上）；TUI 只报
+/// client 类型。两列由 `POST /entrances/client` 写、`GET /entrances` 带出。
+String? entranceClientLabel(Map<String, dynamic> row) {
+  final client = row['client'] as String?;
+  if (client == 'tui') return 'TUI';
+  if (client == 'app') {
+    final version = row['app_version'] as String?;
+    if (version != null && version.isNotEmpty) return 'v$version';
+  }
+  return null;
+}

@@ -144,8 +144,11 @@ void main() {
       });
 
       var hookCalls = <String>[];
-      onDnsPoisonDetected = (host, ip) => hookCalls.add('$host@$ip');
+      onDnsPoisonDetected = (host, ip, poisonedIp) =>
+          hookCalls.add('$host@$ip@$poisonedIp');
       addTearDown(() => onDnsPoisonDetected = null);
+      // 系统解析给出**公网假 IP**（与 DoH 分歧）= 真·劫持场景
+      const fakePublicIp = '36.154.238.42';
 
       // attempt 走钉扎工厂：无 pin 时假域名解析失败 → false
       Future<bool> attempt() async {
@@ -169,14 +172,16 @@ void main() {
         attempt,
         ok: (v) => v,
         dohResolver: (h) async => InternetAddress.loopbackIPv4.address,
+        systemResolver: (h) async => fakePublicIp,
       );
       expect(ok, isTrue);
       expect(pinnedServerIps['poisoned.einz.test'],
           InternetAddress.loopbackIPv4.address);
       await Future<void>.delayed(Duration.zero); // 上报/钩子是 fire-and-forget
+      // 第三段是假 IP（系统解析被注入成的公网地址）
       expect(hookCalls, [
-        'poisoned.einz.test@${InternetAddress.loopbackIPv4.address}'
-      ], reason: 'DoH 与系统解析分歧（= 污染）必须触发警报钩子');
+        'poisoned.einz.test@${InternetAddress.loopbackIPv4.address}@$fakePublicIp'
+      ], reason: 'DoH 与系统解析分歧（= 污染）必须触发警报钩子（带假 IP）');
     });
 
     test('DoH 失败（null）→ 返回原始失败结果，不钉扎', () async {
@@ -210,6 +215,90 @@ void main() {
         );
       }
       expect(resolverCalls, 1);
+    });
+
+    test('系统解析与 DoH 一致 → 不钉扎不报警（老板实测误报①：解析本就对）',
+        () async {
+      // 服务器上跑 TUI 实测：系统解析返回的就是正确 IP（与 DoH 一致），只是
+      // 当时服务没起来——旧实现照报"被劫持"。一致 = 与 DNS 无关，不该动。
+      var attempts = 0;
+      final r = await probeWithDohFallback<bool>(
+        'http://agree.einz.test',
+        () async {
+          attempts++;
+          return false;
+        },
+        ok: (v) => v,
+        dohResolver: (h) async => '36.154.238.42',
+        systemResolver: (h) async => '36.154.238.42',
+      );
+      expect(r, isFalse);
+      expect(attempts, 1, reason: '钉同一个 IP 没有意义，不做重试');
+      expect(pinnedServerIps, isEmpty);
+    });
+
+    test('系统解析指向回环（hosts 刻意 127.0.0.1）→ 不钉扎不报警（误报②）',
+        () async {
+      // 老板实测：服务器上 hosts 把 einz.tic.cc 指向 127.0.0.1 自部署——旧实现
+      // 把这当"假 IP"报警，还会把本地覆盖悄悄改道到公网。回环/内网只可能来自
+      // 本机刻意配置，必须是尊重而非"修复"。
+      var hookCalls = 0;
+      onDnsPoisonDetected = (host, ip, poisonedIp) => hookCalls++;
+      addTearDown(() => onDnsPoisonDetected = null);
+      var attempts = 0;
+      final r = await probeWithDohFallback<bool>(
+        'http://local.einz.test',
+        () async {
+          attempts++;
+          return false;
+        },
+        ok: (v) => v,
+        dohResolver: (h) async => '36.154.238.42',
+        systemResolver: (h) async => '127.0.0.1',
+      );
+      expect(r, isFalse);
+      expect(attempts, 1, reason: '本地覆盖不该被改道，不做重试');
+      expect(pinnedServerIps, isEmpty);
+      expect(hookCalls, 0, reason: '刻意的本地覆盖不是劫持，不报警');
+    });
+
+    test('系统解析指向内网（10.x / 192.168.x）→ 同样不钉扎不报警', () async {
+      for (final lanIp in const ['10.0.0.5', '192.168.1.5', '172.16.0.9']) {
+        var hookCalls = 0;
+        onDnsPoisonDetected = (host, ip, poisonedIp) => hookCalls++;
+        addTearDown(() => onDnsPoisonDetected = null);
+        final r = await probeWithDohFallback<bool>(
+          'http://lan.einz.test',
+          () async => false,
+          ok: (v) => v,
+          dohResolver: (h) async => '36.154.238.42',
+          systemResolver: (h) async => lanIp,
+        );
+        expect(r, isFalse, reason: '$lanIp 是内网分流，尊重本地配置');
+        expect(pinnedServerIps, isEmpty);
+        expect(hookCalls, 0);
+      }
+    });
+
+    test('系统解析无答案而 DoH 有 → 仍算分歧（NXDOMAIN 注入），钉扎+报警',
+        () async {
+      // 注入的另一种形态：把解析直接打成 NXDOMAIN。系统查不到而加密解析有
+      // 答案 = 分歧证据；假 IP 未知（展示层降级）。
+      var hookCalls = <String>[];
+      onDnsPoisonDetected = (host, ip, poisonedIp) =>
+          hookCalls.add('$host@$ip@$poisonedIp');
+      addTearDown(() => onDnsPoisonDetected = null);
+      final r = await probeWithDohFallback<bool>(
+        'http://nxdomain.einz.test',
+        () async => false,
+        ok: (v) => v,
+        dohResolver: (h) async => '36.154.238.42',
+        systemResolver: (h) async => null,
+      );
+      expect(r, isFalse);
+      expect(pinnedServerIps['nxdomain.einz.test'], '36.154.238.42');
+      await Future<void>.delayed(Duration.zero);
+      expect(hookCalls, ['nxdomain.einz.test@36.154.238.42@null']);
     });
 
     test('IP 字面量 / localhost 不触发 DoH', () async {

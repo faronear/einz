@@ -28,6 +28,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get settingsScopeAll => 'Apply to all spaces on this device';
+
+  @override
+  String get settingsScopeAllDone => 'Applied to all spaces on this device';
+
+  @override
   String get skip => 'Skip';
 
   @override
@@ -260,7 +266,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
+      'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -383,7 +389,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogConfirmHint => 'Type it again to confirm';
 
   @override
-  String get setPinDialogSetPin => 'Submit';
+  String get setPinDialogSetPin => 'Apply';
 
   @override
   String get setPinDialogPinTooShort => 'PIN must be at least 6 digits';
@@ -418,7 +424,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to delete the current PIN.';
+      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.';
 
   @override
   String get chatPageSetLockHintNoPin =>
@@ -444,14 +450,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockCleared =>
-      'PIN deleted. You can enter the space directly at next launch.';
+      'PIN cleared. You can enter the space directly at next launch.';
 
   @override
-  String get chatPageClearLockTitle => 'Delete PIN?';
+  String get chatPageClearLockTitle => 'Clear PIN?';
 
   @override
   String get chatPageClearLockMessage =>
-      'Delete the PIN? After deletion, next app launch will go straight into chat.';
+      'Clear the PIN? After clearing, next app launch will go straight into chat.';
+
+  @override
+  String get chatPageLockClearConfirm => 'Clear';
 
   @override
   String get chatPageInviteDialogTitleInvite => 'Invite';
@@ -508,10 +517,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuChangePassphrase => 'Change shared passphrase';
 
   @override
-  String get chatPageMenuAvatar => 'My avatar';
+  String get chatPageMenuMyProfile => 'My profile';
 
   @override
-  String get chatPageAvatarUploaded => '✅ Avatar updated';
+  String get chatPageAvatarUploaded => '✅ My avatar updated';
 
   @override
   String get chatPageAvatarTooLarge => 'Image too large (max 2MB)';
@@ -528,13 +537,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuExit => 'Quit app';
 
   @override
-  String get chatPageMenuMore => 'Menu';
+  String get chatPageMenuMore => 'Main menu';
 
   @override
   String get chatPageMsgMoreActions => 'More actions';
 
   @override
-  String get chatPageRenameNameTitle => 'My identity';
+  String get chatPageRenameNameTitle => 'My name';
 
   @override
   String get chatPageRenameNameLabel => 'Name';
@@ -678,6 +687,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => 'Attachment storage';
 
   @override
+  String get chatPageMenuMoreSettings => 'More settings';
+
+  @override
+  String get chatPageMoreSettingsTitle => 'More settings';
+
+  @override
+  String get chatPageMoreSettingsStorage => 'Attachment storage';
+
+  @override
+  String get chatPageMoreSettingsTombstone => 'Tombstone messages';
+
+  @override
+  String get chatPageAttachmentStorageNote =>
+      'Where are attachments — images, videos, audio, files — stored?';
+
+  @override
   String get chatPageAttachmentStorageSecured => 'Remote only';
 
   @override
@@ -692,7 +717,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keeps a plaintext copy after the first download, so you can open it directly on this device. More convenient.';
 
   @override
-  String get chatPageAttachmentStorageSubmit => 'Submit';
+  String get chatPageAttachmentStorageSubmit => 'Apply';
 
   @override
   String get chatPageAttachmentStorageWarnClear =>
@@ -717,9 +742,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMenuBurnLabel => 'Burn-after-read';
-
-  @override
-  String get chatPageMenuMyNameLabel => 'My identity';
 
   @override
   String get chatPageMenuEntranceList => 'My entrances';
@@ -748,9 +770,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String wizardJoinReinviteHintNoName(String target) {
     return 'Invited to add a new entrance of “$target”';
   }
-
-  @override
-  String get chatPageMembersHint => '';
 
   @override
   String chatPageMembersTitle(String mode) {
@@ -833,10 +852,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'If you have new messages and haven\'t been online for a while, a notification will be sent to your email address.';
 
   @override
-  String get chatPageNotifyAllSpaces =>
-      'Apply this setting to all spaces on this device.';
-
-  @override
   String get chatPageNotifyEmailLabel => 'Email';
 
   @override
@@ -885,11 +900,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageBurnNote =>
-      'New messages are deleted on a countdown once read';
+      'Delete new messages automatically once read on a countdown';
 
   @override
-  String get chatPageBurnOff =>
-      'Burn-after-read is off (this message will be kept)';
+  String get chatPageTombstoneHeading => 'Tombstone messages';
+
+  @override
+  String get chatPageTombstoneNote =>
+      'How deleted/burned/recalled messages appear?';
+
+  @override
+  String get chatPageTombstoneKeep => 'Keep message status';
+
+  @override
+  String get chatPageTombstoneKeepDesc =>
+      'Show a placeholder: content hidden, time and record kept, message flow unbroken';
+
+  @override
+  String get chatPageTombstoneHide => 'Hide completely';
+
+  @override
+  String get chatPageTombstoneHideDesc =>
+      'Tombstones disappear from the message flow entirely';
+
+  @override
+  String get chatPageTombstoneSubmit => 'Apply';
+
+  @override
+  String get chatPageBurnOff => 'Burn-after-read is disabled on this message';
 
   @override
   String get chatPageBurnFailed => 'Failed to set burn-after-read';
@@ -922,7 +960,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRecallFailed => 'Recall failed, try again later';
 
   @override
-  String get chatPageDeletedMessage => '(This message is no longer available)';
+  String get chatPageQuotedTombMessage =>
+      '(This message is no longer available)';
+
+  @override
+  String get chatPageQuoteGoneNotice =>
+      'The quoted message is no longer available';
 
   @override
   String get chatPageActionQuote => 'Quote';
@@ -955,6 +998,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageDeleteConfirmOk => 'Delete';
 
   @override
+  String get chatPagePasteSendImageTitle => 'Send this image?';
+
+  @override
+  String chatPagePasteSendVideoTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count videos?',
+      one: 'Send this video?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendAudioTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count audio files?',
+      one: 'Send this audio?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPagePasteSendFilesTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send these $count files?',
+      one: 'Send this file?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatPagePasteEmpty => 'Clipboard is empty';
+
+  @override
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }
@@ -975,17 +1057,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
-  String chatPageOfflineUnsent(int count) {
-    return 'Offline · $count unsent';
+  String chatPageMsgsUnsent(int count) {
+    return 'Waiting to sync… $count unsent, will retry when back online';
   }
 
   @override
   String get chatPageEntranceUnrecognized =>
-      'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
+      'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.';
 
   @override
-  String get chatPageOfflineLocalOnly =>
-      'Offline · local messages only, cannot send or receive';
+  String get chatPageMsgsSyncing =>
+      'Waiting to sync… Send/receive temporarily unavailable, local messages only';
 
   @override
   String get chatPageMsgResending => 'Resending…';
@@ -1029,6 +1111,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEmojiKeyboard => 'Keyboard';
+
+  @override
+  String get chatPageAttachPaste => 'Paste';
 
   @override
   String get chatPageAttachPhoto => 'Take photo';
@@ -1105,6 +1190,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageVideoLoadFailed => 'Video failed to load — tap to retry';
 
   @override
+  String get chatPageVideoUnsupportedPlatform =>
+      'This device can\'t play video — tap to save it';
+
+  @override
   String chatPageFileOpenFailed(String error) {
     return 'Could not open file: $error';
   }
@@ -1114,22 +1203,38 @@ class AppLocalizationsEn extends AppLocalizations {
       'Entrance revoked — local data cleared, please set up again';
 
   @override
-  String get burnOptionOff => 'Off (Do not burn anymore)';
+  String get burnOptionOff => 'Do not auto-burn';
 
   @override
-  String get burnOption1Minute => '1 minute';
+  String get burnSubmit => 'Apply';
 
   @override
-  String get burnOption5Minutes => '5 minutes';
+  String burnPreviewDelay(String duration) {
+    return '$duration';
+  }
 
   @override
-  String get burnOption1Hour => '1 hour';
+  String burnUnitDays(int count) {
+    return '${count}d';
+  }
 
   @override
-  String get burnOption1Day => '1 day';
+  String burnUnitHours(int count) {
+    return '${count}h';
+  }
 
   @override
-  String get burnOption7Days => '7 days';
+  String burnUnitMinutes(int count) {
+    return '${count}m';
+  }
+
+  @override
+  String burnUnitSeconds(int count) {
+    return '${count}s';
+  }
+
+  @override
+  String get burnAxisOffLabel => 'Off';
 
   @override
   String get lockPageTitle => 'My Einz';
@@ -1167,10 +1272,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
+      'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';
+
+  @override
+  String get aboutDownloadLabel => 'Download';
 
   @override
   String get aboutServerLabel => 'Server';
@@ -1189,6 +1297,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutStatusUnreachable => 'Unreachable';
+
+  @override
+  String get aboutDnsPoisonLabel => 'DNS poisoning';
+
+  @override
+  String aboutDnsPoisonValue(String host, String ip) {
+    return '$host hijacked to $ip';
+  }
+
+  @override
+  String get aboutDnsPoisonUnknownIp => 'unknown';
+
+  @override
+  String get aboutDnsPoisonNote =>
+      'Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown';
 
   @override
   String get advancedMenuTitle => 'Advanced security';

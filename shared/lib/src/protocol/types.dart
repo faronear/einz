@@ -44,6 +44,11 @@ class Api {
   // 补登安装级标识（多空间）：存量安装进聊天页时幂等上报一次，服务端据此把
   // 同一安装在不同空间的 entrance_id 关联起来（PROTOCOL.md §7.3）。
   static const installUid = '/entrances/install-uid';
+  // 客户端信息上报（每次冷启动一次，幂等）：client（'app'/'tui'）+ app_version
+  // （yymm.ddhh.mm，仅 App 报——TUI 二进制拿不到自身版本，只报类型标记）。
+  // /entrances 响应带出，「我的设备通道」卡片/TUI 通道行据此显示各设备跑的
+  // 什么客户端、什么版本（PROTOCOL.md §7.1）。
+  static const clientInfo = '/entrances/client';
   // 未读条数（多空间列表角标）：服务端派生——消息 + 我上报的读取水位（receipts）。
   static const messagesUnread = '/messages/unread';
   // 邮件通知（PROTOCOL.md §7.5）：没进应用商店 → 没有后台推送，给离线的对方发一封

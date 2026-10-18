@@ -42,11 +42,18 @@ Future<void> tapDeferred(WidgetTester tester, Finder finder) async {
 /// 一次把新的 frame/future 接到下一环（单次长 `runAsync` 不够——后续步骤要等 pump）。
 ///
 /// 背景：附件明文的 `FutureBuilder` 在字节就绪前显示 `CircularProgressIndicator`，
-/// 那是无限动画，只靠 `pumpAndSettle` 会直接超时（2026-09-19 修 5 个既有红测试）。
+/// 那是无限动画（且**不理会** disableAnimations），只靠 `pumpAndSettle` 会直接超时
+/// （2026-09-19 修 5 个既有红测试）。
+///
+/// 轮数上限 40（≈4s 真实时间）：解密→落盘→取帧→解码每一步都要 pump 接送。原为 12
+/// （≈1.2s）——单独跑够用，但 full-suite（46 个文件并发 isolate，CPU 争抢）下链路
+/// 偶尔超过 1.2s，循环耗尽时 spinner 还在，随后的 `pumpAndSettle` 挂在无限动画上
+/// 直接超时（2026-10-14 testAll 实测复现，chat_quote_video_test）。没有附件的测试
+/// 第一轮就退出，放宽上限不影响它们。
 Future<void> settleRealAsync(WidgetTester tester) async {
   // 每一轮只能推进一步（exists → 解密 → 落盘 → 取帧 → 解码），所以循环到
   // 「不再有转圈的附件」为止（没有附件时第一轮就退出）
-  for (var round = 0; round < 12; round++) {
+  for (var round = 0; round < 40; round++) {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
     if (tester.widgetList(find.byType(CircularProgressIndicator)).isEmpty) break;
