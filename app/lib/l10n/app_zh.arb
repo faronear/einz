@@ -205,7 +205,7 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockClearHint": "设置后，每次进入秘境都要解锁。也可设为空，即可删除当前锁屏码。",
+  "chatPageSetLockClearHint": "设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。",
   "chatPageSetLockHintNoPin": "设置后，每次进入秘境都要解锁，更安全。",
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
@@ -552,7 +552,7 @@
       }
     }
   },
-  "chatPageEntranceUnrecognized": "这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除",
+  "chatPageEntranceUnrecognized": "这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。",
   "chatPageMsgsSyncing": "等待同步中… 暂时无法收发，仅可查看本地消息",
   "chatPageMsgResending": "重发中…",
   "chatPageMsgSpeedingUp": "加速中…",

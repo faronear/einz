@@ -424,7 +424,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to delete the current PIN.';
+      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.';
 
   @override
   String get chatPageSetLockHintNoPin =>
@@ -1063,11 +1063,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceUnrecognized =>
-      'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
+      'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.';
 
   @override
   String get chatPageMsgsSyncing =>
-      'Waiting to sync… send/receive temporarily unavailable, local messages only';
+      'Waiting to sync… Send/receive temporarily unavailable, local messages only';
 
   @override
   String get chatPageMsgResending => 'Resending…';

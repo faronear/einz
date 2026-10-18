@@ -391,7 +391,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可删除当前锁屏码。';
+  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。';
 
   @override
   String get chatPageSetLockHintNoPin => '设置后，每次进入秘境都要解锁，更安全。';
@@ -996,7 +996,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceUnrecognized =>
-      '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
+      '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。';
 
   @override
   String get chatPageMsgsSyncing => '等待同步中… 暂时无法收发，仅可查看本地消息';
