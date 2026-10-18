@@ -2968,11 +2968,14 @@ Future<void> _runInputLoop() async {
   var esc = '';
   // 裸 Esc 检测（文件浏览器要用 Esc 取消）：终端对"只按 Esc"只发一个 0x1B，
   // 与转义序列首字节无法区分——只能等一小会儿，没有后续字节才算单独按下。
-  // 50ms 内来了字节 → 定时器作废（那是序列的一部分），不影响方向键等。
+  // 窗口内来了字节 → 定时器作废（那是序列的一部分），不影响方向键等。
+  // 150ms（老板 2026-10-18 复查放宽，原 50ms）：SSH/高负载下转义序列可能跨
+  // chunk 到达、字节间隔超过 50ms，窗口太窄会把 \x1B[A 拆散——Esc 误取消
+  // 浏览器、'[A' 落进输入行。150ms 仍远低于人手两次按键间隔，裸 Esc 不觉迟滞。
   Timer? escTimer;
   void armEscTimer() {
     escTimer?.cancel();
-    escTimer = Timer(const Duration(milliseconds: 50), () {
+    escTimer = Timer(const Duration(milliseconds: 150), () {
       escTimer = null;
       if (esc != '\x1B') return; // 已进入/完成序列：不是裸 Esc
       esc = '';
@@ -3016,7 +3019,7 @@ Future<void> _runInputLoop() async {
       if (esc.isNotEmpty || code == 27) {
         if (esc.isEmpty) {
           esc = '\x1B';
-          armEscTimer(); // 50ms 内没有后续字节 → 按裸 Esc 处理
+          armEscTimer(); // 窗口内没有后续字节 → 按裸 Esc 处理
           continue;
         }
         final seq = esc + ch;
