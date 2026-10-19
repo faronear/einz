@@ -293,8 +293,18 @@ class MessageRepository {
     await _notifyPersisted(onPersisted, messageId);
 
     // 演示秘境：本地落库即"对方已读"，不进发送队列（无服务端对端）。
+    // 补一个**合成 serverSequence**（演示空间内最大 seq+1，与 DemoSpace 种入的
+    // 1..N 续接）：撤回入口的可见条件含 `serverSequence != null`（_messageRecallable），
+    // 不补的话审核员自己发的消息长按没有撤回（2026-10-19 老板实测）。
+    // status 用 _markSent 的 'sent'（单勾、未送达）——与"撤回=还没人拉到"语义一致。
     if (isDemo) {
-      await _setStatus(messageId, 'read');
+      final row = await (db.selectOnly(db.localMessages)
+            ..addColumns([db.localMessages.serverSequence.max()])
+            ..where(db.localMessages.spaceId.equals(spaceId)))
+          .getSingle();
+      final maxSeq = row.read(db.localMessages.serverSequence.max());
+      await _markSent(messageId, (maxSeq ?? 0) + 1,
+          env.createdAt ?? DateTime.now().millisecondsSinceEpoch);
       return messageId;
     }
 
@@ -383,8 +393,15 @@ class MessageRepository {
 
     // 演示秘境：本地落库即"对方已读"，blob 也不上传（无服务端对端）。
     // local_cipher 副本已落库（步骤 2）→ 图片/语音气泡照常显示。
+    // 合成 serverSequence 同 send()——撤回入口需要它（2026-10-19）。
     if (isDemo) {
-      await _setStatus(messageId, 'read');
+      final row = await (db.selectOnly(db.localMessages)
+            ..addColumns([db.localMessages.serverSequence.max()])
+            ..where(db.localMessages.spaceId.equals(spaceId)))
+          .getSingle();
+      final maxSeq = row.read(db.localMessages.serverSequence.max());
+      await _markSent(messageId, (maxSeq ?? 0) + 1,
+          env.createdAt ?? DateTime.now().millisecondsSinceEpoch);
       await (db.update(db.localAttachments)
             ..where((a) => a.attachmentId.equals(attachmentId)))
           .write(const LocalAttachmentsCompanion(status: Value('downloaded')));
@@ -467,6 +484,11 @@ class MessageRepository {
   /// （UI 提示）；403 非本人；404 消息不在服务端（可能已被撤）——404 也按
   /// 成功处理（本地照常墓碑，结果一致：这条消息没了）。
   Future<void> recallMessage(String messageId) async {
+    // 演示秘境：没有服务端对端——本地直接打墓碑（语义与 404 一致：这条消息没了）。
+    if (isDemo) {
+      await tombstoneMessage(messageId, kind: 'recall');
+      return;
+    }
     try {
       await _withAutoAuth((tok) => api.recallMessage(messageId, tok));
     } on ApiException catch (e) {
