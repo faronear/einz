@@ -263,7 +263,10 @@
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
   "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
-  "chatPageSetLockNoPinNotice": "No PIN set. Anyone who has access to this device can visit your space.",
+  "chatPageSetLockPinRequired": "Enter a new PIN to enable the lock",
+  "@chatPageSetLockPinRequired": {
+    "description": "Inline error when submit is tapped with both PIN fields empty and no PIN set"
+  },
   "chatPageSetLockDone": "PIN set. Einz will lock itself everytime after inactivity of {duration}.",
   "@chatPageSetLockDone": {
     "description": "Top notice after PIN is set (duration = auto-lock delay, e.g. \"5 minutes\")",

@@ -442,7 +442,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockSameAsOld => '新锁屏码与当前锁屏码相同，未作修改';
 
   @override
-  String get chatPageSetLockNoPinNotice => '锁屏码为空，其他人拿到这台设备就能进入秘境。';
+  String get chatPageSetLockPinRequired => '请输入新 PIN 以启用锁屏码';
 
   @override
   String chatPageSetLockDone(String duration) {

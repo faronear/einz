@@ -438,6 +438,47 @@ void main() {
     expect(await AppLockService(db).isSetup, true);
   });
 
+  testWidgets('未设 PIN 时两空提交「启用」→ 红字要求输入，不放行不通知', (WidgetTester tester) async {
+    // 2026-10-19：此前两空提交=无改动放行+顶部通知 chatPageSetLockNoPinNotice；
+    // 老板改为必须报错——不想设就点「取消」。旧通知键随行为删除。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget);
+
+    // 什么都不填直接点「启用」
+    await tester.tap(find.text('启用'));
+    await tester.pumpAndSettle();
+    // 弹窗不关，红字要求输入新 PIN
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget,
+        reason: '两空提交应报错留在弹窗内');
+    expect(find.text(_zh.chatPageSetLockPinRequired), findsOneWidget);
+    // 锁未落盘
+    expect(await AppLockService(db).isSetup, false);
+  });
+
   testWidgets('有 PIN 时改码：不填/填错旧码都报错不动锁；相同新码也不设置', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);

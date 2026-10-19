@@ -884,11 +884,11 @@ abstract class AppLocalizations {
   /// **'New PIN is the same as the current one, nothing is changed.'**
   String get chatPageSetLockSameAsOld;
 
-  /// No description provided for @chatPageSetLockNoPinNotice.
+  /// Inline error when submit is tapped with both PIN fields empty and no PIN set
   ///
   /// In en, this message translates to:
-  /// **'No PIN set. Anyone who has access to this device can visit your space.'**
-  String get chatPageSetLockNoPinNotice;
+  /// **'Enter a new PIN to enable the lock'**
+  String get chatPageSetLockPinRequired;
 
   /// Top notice after PIN is set (duration = auto-lock delay, e.g. "5 minutes")
   ///

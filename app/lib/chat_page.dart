@@ -10221,11 +10221,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     await saveSecondsIfChanged();
     if (!mounted) return;
     if (!_hasPin) {
-      // 本来就没设锁屏码：没有可清的东西——只提示一句（老板 2026-09-14）；
-      // 先关弹窗再顶部提示（老板 2026-09-23）：通知浮在弹窗上不合理。
-      // 未设 PIN 时菜单右侧不显示时长，改时长也不需要刷新菜单
-      Navigator.of(context).pop(); // 无改动：不回 true（菜单不做无谓刷新）
-      showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice, extraTop: kNoticeExtraTopBelowStatusBar);
+      // 未设锁屏码时两框全空就点「启用」＝什么都没设（老板 2026-10-19）：
+      // 不再当"无改动"放行+顶部通知，而是留在弹窗内红字要求输入——不想设
+      // 的正确出路是「取消」按钮
+      setState(() => _error = l10n.chatPageSetLockPinRequired);
       return;
     }
     // PIN 没变但时长动过 → 回 true：调用方要重载时长，菜单右侧的「已设置 · 时长」
