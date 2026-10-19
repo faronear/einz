@@ -15239,3 +15239,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T13:18:23Z / ��**：老板报最近几天 boot2run 总停在「等待 adb 设备上线」。排查链：adb devices 显示 emulator-5554 offline（qemu 进程活着但系统起不来）→ 模拟器日志 `Failed to load snapshot 'default_boot'`（goldfish_pipe error while loading state, Error -5）→ **根因 = AVD quick-boot 快照损坏**，普通启动每次都卡在加载坏快照。排查弯路：AVD 目录不在 `~/.android/avd/einz_emu.avd`——`einz_emu.ini` 的 path 指向 `~/.android/avd/Pixel_4_XL.avd`（AVD 改过名、目录沿用旧名），第一次 rm 删错了空目录。修法：kill 残留 qemu/netsimd → 删 `Pixel_4_XL.avd/snapshots/default_boot`（冷启动 `-no-snapshot` 仅作诊断）→ 普通启动实测 40s 开机 ✅。今后再遇到同样症状（进程在但 adb 一直 offline），直接删该快照即可。未改 package.json 脚本。
 
 **（2026-10-19T13:20:53Z / ��**：老板定夺：`app-apk-boot2run` 每次启动模拟器前先删 quick-boot 快照。改 `package.json` 该脚本：launch 前从 `~/.android/avd/einz_emu.ini` 的 path 动态解析 AVD 目录（不写死 Pixel_4_XL，AVD 再改名不怕），存在 `snapshots/default_boot` 就 rm 并提示「🗑 已清除」。代价 = 每次冷启动（约 40s 开机，无快照恢复的十几秒），换来不会再被坏快照卡死。已在运行则跳过启动、不删快照（避免与活着的 qemu 冲突）。验证：node 解析 package.json OK；AVD_DIR 解析正确。
+
+**（2026-10-19T13:22:38Z / ��**：清快照步骤改由 CLEAN 门控（老板定）：默认 `npm run app-apk-boot2run` 走快照快速恢复；要冷启动才 `CLEAN=true npm run app-apk-boot2run`（删快照 + 冷启动；CLEAN 同时沿用到后续 app-apk-run 的 clean 安装，语义一致）。
