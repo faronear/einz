@@ -2205,38 +2205,34 @@ class _SetupPageState extends State<SetupPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _stepHeader(l10n.wizardTitlePin, l10n.wizardPinHint),
-        TextField(
+        // 锁屏码也用共用组件 PassphraseField（老板 2026-10-19）：与修改口令弹窗
+        // 同款小眼睛——3 秒后自动变回暗码 + tooltip + TAB 跳过眼睛；确认框不给眼睛
+        PassphraseField(
           controller: _pin,
           focusNode: _pinFocus,
           style: const TextStyle(fontSize: 20),
-          obscureText: true,
+          autofocus: true,
+          revealTip: l10n.chatPagePassphraseRevealTip,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          autofocus: true,
           // 开始填写即清除 PIN 红字（不依赖再点下一步）
           onChanged: (_) {
             if (_pinError != null) setState(() => _pinError = null);
           },
-          decoration: InputDecoration(
-            hintText: l10n.setPinDialogPinHint,
-            border: const OutlineInputBorder(),
-          ),
+          hintText: l10n.setPinDialogPinHint,
         ),
         const SizedBox(height: 12),
-        TextField(
+        PassphraseField(
           controller: _confirm,
           style: const TextStyle(fontSize: 20),
-          obscureText: true,
+          showReveal: false, // 确认框不给眼睛（组件惯例：复核框容易顺手点开）
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           // 开始填写即清除 PIN 红字（不依赖再点下一步）
           onChanged: (_) {
             if (_pinError != null) setState(() => _pinError = null);
           },
-          decoration: InputDecoration(
-            hintText: l10n.setPinDialogConfirmHint,
-            border: const OutlineInputBorder(),
-          ),
+          hintText: l10n.setPinDialogConfirmHint,
         ),
         if (_pinError != null) _localErrorHint(_pinError!),
       ],

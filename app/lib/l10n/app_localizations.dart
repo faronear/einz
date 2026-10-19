@@ -794,11 +794,11 @@ abstract class AppLocalizations {
   /// **'Set PIN'**
   String get chatPageSetLockTitle;
 
-  /// No description provided for @chatPageSetLockHintNoPin.
+  /// Hint shown in the set-PIN dialog when no PIN is set (duration = auto-lock delay, e.g. "5 minutes")
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you open the app afer inactivity of a specified period.'**
-  String get chatPageSetLockHintNoPin;
+  /// **'Once set, Einz will lock itself everytime after inactivity of {duration}, you must unlock to enter the space again.'**
+  String chatPageSetLockHintNoPin(String duration);
 
   /// No description provided for @chatPageSetLockRowVerify.
   ///
@@ -887,19 +887,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockNoPinNotice.
   ///
   /// In en, this message translates to:
-  /// **'No PIN set. Next launch goes straight into the space.'**
+  /// **'No PIN set. Anyone who has access to this device can visit your space.'**
   String get chatPageSetLockNoPinNotice;
 
-  /// No description provided for @chatPageSetLockDone.
+  /// Top notice after PIN is set (duration = auto-lock delay, e.g. "5 minutes")
   ///
   /// In en, this message translates to:
-  /// **'PIN set. You must enter PIN to unlock the space at next launch.'**
-  String get chatPageSetLockDone;
+  /// **'PIN set. Einz will lock itself everytime after inactivity of {duration}.'**
+  String chatPageSetLockDone(String duration);
 
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
-  /// **'PIN cleared. You can enter the space directly at next launch.'**
+  /// **'PIN cleared. Anyone who has access to this device can visit your space.'**
   String get chatPageSetLockCleared;
 
   /// No description provided for @chatPageLockClearConfirm.

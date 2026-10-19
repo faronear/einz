@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// 口令输入框：默认暗码，右侧眼睛点一下看明文、**3 秒后自动回到暗码**。
 ///
@@ -20,6 +21,8 @@ class PassphraseField extends StatefulWidget {
     this.onChanged,
     this.autofocus = false,
     this.focusNode,
+    this.keyboardType,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
@@ -40,6 +43,11 @@ class PassphraseField extends StatefulWidget {
 
   final TextStyle? style;
   final ValueChanged<String>? onChanged;
+
+  /// 键盘类型与输入过滤（锁屏码等纯数字场景用；老板 2026-10-19：锁屏码
+  /// 输入框统一复用本组件的小眼睛行为）。
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<PassphraseField> createState() => _PassphraseFieldState();
@@ -86,6 +94,8 @@ class _PassphraseFieldState extends State<PassphraseField> {
       onChanged: widget.onChanged,
       autofocus: widget.autofocus,
       focusNode: widget.focusNode,
+      keyboardType: widget.keyboardType,
+      inputFormatters: widget.inputFormatters,
       decoration: InputDecoration(
         labelText: widget.labelText,
         hintText: widget.hintText,

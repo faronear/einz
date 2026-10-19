@@ -205,14 +205,22 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后重新打开秘境都要解锁，更安全。",
+  "chatPageSetLockHintNoPin": "设置后，每次离开 {duration} 后自动锁屏，必须解锁才能再进入秘境。",
+  "@chatPageSetLockHintNoPin": {
+    "description": "未设锁屏码时弹窗顶部的提示（duration=自动锁屏时长，取自弹窗内时长轴当前值，如「5 分钟」）",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageSetLockRowVerify": "验证",
   "chatPageSetLockRowSet": "设置",
   "chatPageSetLockRowConfirm": "确认",
   "chatPageSetLockNewPinLabel": "新 PIN 或者留空则不变",
   "chatPageSetLockNewPinLabelNoPin": "新 PIN（至少 6 位数字）",
   "chatPageSetLockSubmitChange": "更换",
-  "chatPageSetLockDurationLabel": "无操作多久后自动锁屏",
+  "chatPageSetLockDurationLabel": "自动锁屏每当离开",
   "chatPageSetLockTabChange": "更换锁屏码",
   "chatPageSetLockClearButton": "清除锁屏码",
   "lockDurationSecs": "{n} 秒",
@@ -234,9 +242,17 @@
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
   "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",
-  "chatPageSetLockNoPinNotice": "锁屏码仍然为空，下次启动应用可直接进入秘境。",
-  "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
-  "chatPageSetLockCleared": "已清除锁屏码，下次启动应用可直接进入秘境。",
+  "chatPageSetLockNoPinNotice": "锁屏码为空，其他人拿到这台设备就能进入秘境。",
+  "chatPageSetLockDone": "锁屏码已设置，离开 {duration} 后自动锁屏。",
+  "@chatPageSetLockDone": {
+    "description": "设置/更换锁屏码成功后的顶部提示（duration=自动锁屏时长，如「5 分钟」）",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageSetLockCleared": "已清除锁屏码，其他人拿到这台设备就能进入秘境。",
   "chatPageLockClearConfirm": "清除",
   "chatPageInviteDialogTitleInvite": "邀请",
   "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",

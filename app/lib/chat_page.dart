@@ -10085,6 +10085,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   @override
   void initState() {
     super.initState();
+    // 确认输入框的显隐跟随「新 PIN」行是否有内容（老板 2026-10-19）：TextField
+    // 自己改文本不会重建弹窗，这里用 controller 监听补一次 setState
+    _pinCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
     AppLockService(widget.db).loadLockSeconds().then((value) {
       if (!mounted) return;
       setState(() {
@@ -10200,7 +10205,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         await saveSecondsIfChanged();
         if (!mounted) return;
         Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
-        showTopNoticeOn(overlay, l10n.chatPageSetLockDone, extraTop: kNoticeExtraTopBelowStatusBar);
+        // 提示带上本次生效的自动锁屏时长（老板 2026-10-19：clockPageSetLockDone
+        // 加 {duration} 占位）；未动过时长时就是弹窗读回的当前档位
+        showTopNoticeOn(overlay,
+            l10n.chatPageSetLockDone(_formatLockSeconds(_axisSeconds, l10n)),
+            extraTop: kNoticeExtraTopBelowStatusBar);
       } catch (e) {
         if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
         setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
@@ -10335,6 +10344,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   Widget _setLockGroup({
     String? title,
     Widget? trailing,
+    Widget? trailingInline,
     required List<Widget> children,
   }) {
     final colors = Theme.of(context).colorScheme;
@@ -10362,6 +10372,12 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                     color: colors.onSurface,
                   ),
                 ),
+                // trailingInline：紧跟标签（12px 间距，老板 2026-10-19 从 8 加大，
+                // 与描述文字拉开层次），不推到行尾
+                if (trailingInline != null) ...[
+                  const SizedBox(width: 12),
+                  trailingInline,
+                ],
                 if (trailing != null) ...[const Spacer(), trailing],
               ],
             ),
@@ -10376,13 +10392,17 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   /// 分组卡内的「标签 + 输入框」同行行（老板 2026-10-18）：标签占固定宽度列
   /// （中英标签宽度不一，固定列才能让各行的输入框左右对齐），输入框 Expanded
   /// 占满剩余宽度。obscure + 纯数字是锁屏码输入框的共性，抽在这里少写三遍。
+  /// [revealable]：true 时输入框右侧带小眼睛（老板 2026-10-19：老 PIN 与
+  /// 第一个新 PIN），点按切换明文/暗码。
   Widget _setLockPinRow({
     required String label,
     required TextEditingController controller,
     required String fieldLabel,
     bool autofocus = false,
+    bool revealable = false,
   }) {
     final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -10399,16 +10419,17 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: TextField(
+          // 小眼睛统一走共用组件 PassphraseField（老板 2026-10-19：与修改口令
+          // 弹窗同款行为——3 秒后自动变回暗码 + tooltip + TAB 跳过眼睛；确认框
+          // 按组件惯例不给眼睛）。纯数字键盘 + digitsOnly 由调用参数传入。
+          child: PassphraseField(
             controller: controller,
-            obscureText: true,
+            labelText: fieldLabel,
+            autofocus: autofocus,
+            showReveal: revealable,
+            revealTip: l10n.chatPagePassphraseRevealTip,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            autofocus: autofocus,
-            decoration: InputDecoration(
-              labelText: fieldLabel,
-              border: const OutlineInputBorder(),
-            ),
           ),
         ),
       ],
@@ -10554,6 +10575,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   controller: _oldCtrl,
                   fieldLabel: l10n.chatPageSetLockOldLabel,
                   autofocus: true, // 本页唯一输入框
+                  revealable: true, // 小眼睛（老板 2026-10-19）
                 ),
               ],
             ),
@@ -10561,8 +10583,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             // 未设锁屏码：一句"为什么要设"（老板 2026-09-14）。已设锁屏码时页面
             // 自解释（分组卡片标签 + 主按钮），不再放备注（老板 2026-10-18）
             if (!_hasPin) ...[
+              // 时长取弹窗内时长轴当前档位（老板 2026-10-19 文案加 {duration}）：
+              // 未设 PIN 时轴初始就是持久化的档位（initState 读回），拖动即跟随
               Text(
-                l10n.chatPageSetLockHintNoPin,
+                l10n.chatPageSetLockHintNoPin(
+                    _formatLockSeconds(_axisSeconds, l10n)),
                 style: TextStyle(
                   fontSize: 12,
                   color: colors.outline,
@@ -10580,12 +10605,15 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                     controller: _oldCtrl,
                     fieldLabel: l10n.chatPageSetLockOldLabel,
                     autofocus: true, // 已设锁屏码时这是第一个框
+                    revealable: true, // 小眼睛（老板 2026-10-19）
                   ),
                 ],
               ),
               const SizedBox(height: 12),
             ],
-            // 第二组：新 PIN（设置 / 确认 两行同卡——新码的两行归一组）
+            // 第二组：新 PIN（设置 / 确认 两行同卡——新码的两行归一组）。
+            // 确认行仅在「设置」行有内容时出现（老板 2026-10-19：空着时不显示，
+            // 减少首设场景的视觉负担；开始输入即出现）
             _setLockGroup(
               children: [
                 _setLockPinRow(
@@ -10597,17 +10625,20 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                       ? l10n.chatPageSetLockNewPinLabel
                       : l10n.chatPageSetLockNewPinLabelNoPin,
                   autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
+                  revealable: true, // 小眼睛（老板 2026-10-19）
                 ),
-                const SizedBox(height: 12),
-                _setLockPinRow(
-                  label: l10n.chatPageSetLockRowConfirm,
-                  controller: _confirmCtrl,
-                  // 确认行与设置行同文案，靠左侧 设置/确认 标签区分
-                  // （老板 2026-10-18 原话："第一行标签设置、第二行标签确认"）
-                  fieldLabel: _hasPin
-                      ? l10n.chatPageSetLockNewPinLabel
-                      : l10n.chatPageSetLockNewPinLabelNoPin,
-                ),
+                if (_pinCtrl.text.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _setLockPinRow(
+                    label: l10n.chatPageSetLockRowConfirm,
+                    controller: _confirmCtrl,
+                    // 确认行与设置行同文案，靠左侧 设置/确认 标签区分
+                    // （老板 2026-10-18 原话："第一行标签设置、第二行标签确认"）
+                    fieldLabel: _hasPin
+                        ? l10n.chatPageSetLockNewPinLabel
+                        : l10n.chatPageSetLockNewPinLabelNoPin,
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -10615,12 +10646,15 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             // 即焚轴，档位吸附 + 轴下可点标注）。前台闲置锁与后台回来锁共用同一值；
             // 改它不需要验当前锁屏码，与前两组互不干扰。
             _setLockGroup(
+              // 当前档位紧跟在标签之后（老板 2026-10-19）：不要 Spacer 推到最右，
+              // 拖轴时数值就在标签旁边变化，视线不用横跨整张卡
               title: l10n.chatPageSetLockDurationLabel,
-              // 当前档位：标题行右侧大字醒目显示（拖轴时的即时反馈）
-              trailing: Text(
+              trailingInline: Text(
                 _formatLockSeconds(_axisSeconds, l10n),
                 style: TextStyle(
-                  fontSize: 15,
+                  // 字号明显大于左侧描述（13）+ 更大间距（老板 2026-10-19）：
+                  // 与描述文字一眼区分开
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: colors.primary,
                 ),

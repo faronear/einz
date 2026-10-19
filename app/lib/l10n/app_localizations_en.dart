@@ -423,8 +423,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockTitle => 'Set PIN';
 
   @override
-  String get chatPageSetLockHintNoPin =>
-      'Once set, you\'ll unlock every time you open the app afer inactivity of a specified period.';
+  String chatPageSetLockHintNoPin(String duration) {
+    return 'Once set, Einz will lock itself everytime after inactivity of $duration, you must unlock to enter the space again.';
+  }
 
   @override
   String get chatPageSetLockRowVerify => 'Verify';
@@ -475,15 +476,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockNoPinNotice =>
-      'No PIN set. Next launch goes straight into the space.';
+      'No PIN set. Anyone who has access to this device can visit your space.';
 
   @override
-  String get chatPageSetLockDone =>
-      'PIN set. You must enter PIN to unlock the space at next launch.';
+  String chatPageSetLockDone(String duration) {
+    return 'PIN set. Einz will lock itself everytime after inactivity of $duration.';
+  }
 
   @override
   String get chatPageSetLockCleared =>
-      'PIN cleared. You can enter the space directly at next launch.';
+      'PIN cleared. Anyone who has access to this device can visit your space.';
 
   @override
   String get chatPageLockClearConfirm => 'Clear';

@@ -391,7 +391,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockHintNoPin => '设置后，每次离开一定时间后重新打开秘境都要解锁，更安全。';
+  String chatPageSetLockHintNoPin(String duration) {
+    return '设置后，每次离开 $duration 后自动锁屏，必须解锁才能再进入秘境。';
+  }
 
   @override
   String get chatPageSetLockRowVerify => '验证';
@@ -412,7 +414,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockSubmitChange => '更换';
 
   @override
-  String get chatPageSetLockDurationLabel => '无操作多久后自动锁屏';
+  String get chatPageSetLockDurationLabel => '自动锁屏每当离开';
 
   @override
   String get chatPageSetLockTabChange => '更换锁屏码';
@@ -440,13 +442,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockSameAsOld => '新锁屏码与当前锁屏码相同，未作修改';
 
   @override
-  String get chatPageSetLockNoPinNotice => '锁屏码仍然为空，下次启动应用可直接进入秘境。';
+  String get chatPageSetLockNoPinNotice => '锁屏码为空，其他人拿到这台设备就能进入秘境。';
 
   @override
-  String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
+  String chatPageSetLockDone(String duration) {
+    return '锁屏码已设置，离开 $duration 后自动锁屏。';
+  }
 
   @override
-  String get chatPageSetLockCleared => '已清除锁屏码，下次启动应用可直接进入秘境。';
+  String get chatPageSetLockCleared => '已清除锁屏码，其他人拿到这台设备就能进入秘境。';
 
   @override
   String get chatPageLockClearConfirm => '清除';

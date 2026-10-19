@@ -226,7 +226,15 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you open the app afer inactivity of a specified period.",
+  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after inactivity of {duration}, you must unlock to enter the space again.",
+  "@chatPageSetLockHintNoPin": {
+    "description": "Hint shown in the set-PIN dialog when no PIN is set (duration = auto-lock delay, e.g. \"5 minutes\")",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageSetLockRowVerify": "Verify",
   "chatPageSetLockRowSet": "Set",
   "chatPageSetLockRowConfirm": "Confirm",
@@ -255,9 +263,17 @@
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
   "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
-  "chatPageSetLockNoPinNotice": "No PIN set. Next launch goes straight into the space.",
-  "chatPageSetLockDone": "PIN set. You must enter PIN to unlock the space at next launch.",
-  "chatPageSetLockCleared": "PIN cleared. You can enter the space directly at next launch.",
+  "chatPageSetLockNoPinNotice": "No PIN set. Anyone who has access to this device can visit your space.",
+  "chatPageSetLockDone": "PIN set. Einz will lock itself everytime after inactivity of {duration}.",
+  "@chatPageSetLockDone": {
+    "description": "Top notice after PIN is set (duration = auto-lock delay, e.g. \"5 minutes\")",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageSetLockCleared": "PIN cleared. Anyone who has access to this device can visit your space.",
   "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
   "chatPageInviteDialogTitleAttachSelf": "Add my new entrance",
