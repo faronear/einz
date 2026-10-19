@@ -834,7 +834,7 @@
   "promptLockCodeHint": "Verify this device's lock screen code first",
   "leaveSpaceConfirm": "Destroy",
   "exitGroupTitle": "Leave group?",
-  "exitGroupMessage": "Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. This cannot be undone!",
+  "exitGroupMessage": "Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!",
   "exitGroupConfirm": "Leave",
   "exitGroupNameHint": "Type the group name “{name}”",
   "@exitGroupNameHint": {

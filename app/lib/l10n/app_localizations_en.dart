@@ -1371,7 +1371,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitGroupMessage =>
-      'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. This cannot be undone!';
+      'Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!';
 
   @override
   String get exitGroupConfirm => 'Leave';
