@@ -178,9 +178,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardJoinPassphraseTitle => 'Verify passphrase';
 
   @override
-  String get wizardTitlePin => 'Set PIN';
-
-  @override
   String get wizardTitleEnvelope => 'Verify key envelope';
 
   @override
@@ -238,10 +235,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardSwitchToPassphrase => 'Use a shared passphrase instead';
-
-  @override
-  String get wizardPinHint =>
-      'Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.';
 
   @override
   String get welcomeDialogTitleCreate => 'All set!';
@@ -380,13 +373,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinLabel => 'New PIN (at least 6 digits)';
 
   @override
-  String get setPinDialogPinHint => 'At least 6 digits';
-
-  @override
   String get setPinDialogConfirmLabel => 'Confirm new PIN';
-
-  @override
-  String get setPinDialogConfirmHint => 'Type it again to confirm';
 
   @override
   String get setPinDialogSetPin => 'Apply';
@@ -1400,9 +1387,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveSpaceConfirm => 'Destroy';
-
-  @override
-  String get setupPinReuseNotice => 'This space will share the current PIN.';
 
   @override
   String errorBackend(String message) {

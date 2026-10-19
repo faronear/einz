@@ -215,7 +215,6 @@ void main() {
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(find.text(_zh.wizardPassphraseMismatch), findsNothing, reason: '一致后旧红字不应残留');
-    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: 'PIN 步骤已移除，不该再出现');
   });
 
   testWidgets('create 口令页：首框有长度提示；不足 8 位 → 红字拦截（不卡字符种类）', (WidgetTester tester) async {
@@ -238,6 +237,5 @@ void main() {
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(find.text(_zh.wizardPassphraseTooShort), findsNothing, reason: '够 8 位不该再报长度');
-    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: 'PIN 步骤已移除，不该再出现');
   });
 }

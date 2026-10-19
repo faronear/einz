@@ -45,11 +45,12 @@
   （复用 `entrance.revoked` / `ENTRANCE_REVOKED` 口径）；墓碑行保名字 + slot 让位；
   `member.left` 广播 + 顶部通知（不落聊天流）；不做踢人。细节见 `aimemo/groupExitDesign.md`
 - `[ ]` **撤销的 App 入口**（通道列表「撤销这条通道」：口令 + 二次确认；`ApiClient.revokeEntrance` 已就绪）
-- `[ ]` **向导 PIN 步骤残留代码清理**（2026-10-19 记）：向导锁屏码页已整页移除
-  （口令/信封页「下一步」直接完成），但 `_buildStepPin` / `_buildStepPinReuse` /
-  `_isPinStep` / `_pinStepSkippable` / `_pinFocus` / `_pinInputsChanged` 等仍在
-  `app/lib/setup_page.dart`（标了 `ignore: unused_element` 保留备找回，步骤号
-  create/join=4、offline=2）。老板体验一段时间没问题后，**提醒他要不要彻底删掉**这些代码
+- `[x]` **向导 PIN 步骤残留代码清理**（2026-10-19）：老板拍板彻底删除（"删掉只有好处，
+  简化了许多"）——`_buildStepPin` / `_buildStepPinReuse` / `_isPinStep` /
+  `_pinStepSkippable` / `_setupLockAndEnter` / `_pin`·`_confirm`·`_pinFocus`·
+  `_pinSkipped`·`_pinError` 及 ARB 死键（wizardTitlePin/wizardPinHint/
+  setupPinReuseNotice/setupPageSkipPin*/setPinDialogPinHint/ConfirmHint）全删；
+  chat_page 弹窗的锁屏码功能不受影响
 - `[ ]` **macOS 分发签名 + 公证**（2026-09-18 记）：Developer ID Application 证书 →
   `codesign --options runtime --timestamp` → `notarytool submit` + `stapler staple` →
   搬进 GitHub Actions（secrets：证书 p12/密码/App 专用密码/AppleID）

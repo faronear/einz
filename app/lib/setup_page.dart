@@ -130,13 +130,6 @@ class _SetupPageState extends State<SetupPage> {
   // 接入口令强度（仅 create 设置时校验；join 是验证已有口令不限制，避免历史短口令
   // 被新规则挡在门外）。策略唯一来源：shared 的 passphrase_policy.dart。
 
-  final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
-  final _confirm = TextEditingController();
-  // 两个 PIN 输入框的合并监听：底部按钮据此把标签切成「跳过」（不必整页重建）
-  // ignore: unused_field —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
-  late final Listenable _pinInputsChanged = Listenable.merge([_pin, _confirm]);
-  String? _pinError; // PIN 步骤红色提示（输入框下方）
-  bool _pinSkipped = false; // 用户选择"不设置锁屏码"（底部按钮=跳过时）：跳过 setPin，仍完成前置并进下一步
   final _joinTokenCtrl = TextEditingController(); // 加入通道时填的一次性通道码（或整条邀请链接）
   // 键盘遮挡处理：
   // 方案 1（聚焦即滚出性别卡）：名字/伴侣名输入框聚焦时把性别卡滚入可见区；
@@ -149,7 +142,6 @@ class _SetupPageState extends State<SetupPage> {
   final _passphraseFocus = FocusNode(); // create 第 2 步 / join 第 3 步（共享口令）
   final _inviteFocus = FocusNode(); // join 第 1 步（通道码）
   final _envelopeFocus = FocusNode(); // offline 第 1 步（密保信封）
-  final _pinFocus = FocusNode(); // create 第 3 步 / join 第 4 步 / offline 第 2 步（锁屏码）
   final _myGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
   // 空间显示名（进入聊天页的对方名字）
@@ -208,14 +200,11 @@ class _SetupPageState extends State<SetupPage> {
     _passphraseFocus.dispose();
     _inviteFocus.dispose();
     _envelopeFocus.dispose();
-    _pinFocus.dispose();
     _creatorName.dispose();
     _spaceId.dispose();
     _envelopeKey.dispose();
     _escrowPassphrase.dispose();
     _escrowPassphraseConfirm.dispose();
-    _pin.dispose();
-    _confirm.dispose();
     _joinTokenCtrl.dispose();
     _probeRetryTimer?.cancel();
     super.dispose();
@@ -611,10 +600,8 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 步骤总数（角色由探测自动判定：create=首条通道 / join=后续通道 / offline=密保信封）。
   ///
-  /// **PIN 步骤已从向导移除**（老板 2026-10-19：没必要——锁屏码随时能在秘境里
-  /// 设置；跳过设锁成为唯一路径，`_pinSkipped` 恒为 true）。原 PIN 步骤整页
-  /// 代码（[_buildStepPin] / [_buildStepPinReuse] / [_setupLockAndEnter]）保留
-  /// 未删，将来要找回时步骤号按此逆推：PIN 原在 create/join=4、offline=2。
+  /// **PIN 步骤已从向导彻底删除**（老板 2026-10-19：删掉只有好处——必设时代的
+  /// 遗留位置，可选时代没有拆掉；锁屏码随时能在秘境菜单里补设）。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
@@ -632,24 +619,6 @@ class _SetupPageState extends State<SetupPage> {
         return 1;
     }
   }
-
-  // 当前是否为 PIN 步骤（create=4 / join=4 / offline=2）。
-  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
-  bool get _isPinStep =>
-      (_role == _WizardRole.create && _step == 4) ||
-      (_role == _WizardRole.join && _step == 4) ||
-      (_role == _WizardRole.offline && _step == 2);
-
-  // PIN 步骤上「两个输入框都空」：此时底部按钮=跳过设锁（标签「跳过」），
-  // 按钮标签本身就是提示，不再弹二次确认弹窗（老板要求 2026-09-13）。
-  // 本机已有锁屏码时**不可跳过**（老板 2026-09-25）：PIN 是 Vault 级共用的，
-  // 此时按钮应为「下一步」而不是「跳过」（没有"跳过"可言之——锁已经在）。
-  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
-  bool get _pinStepSkippable =>
-      _isPinStep &&
-      !_lockAlreadySet &&
-      _pin.text.isEmpty &&
-      _confirm.text.isEmpty;
 
   /// 本机已设锁屏码（多空间再加一个空间）：PIN 是 Vault 级的，不该每加一个空间
   /// 重设一次——页面只提示"沿用当前锁屏码"，且不再 setPin/savePlain（那会用
@@ -753,12 +722,11 @@ class _SetupPageState extends State<SetupPage> {
     FocusScope.of(context).unfocus();
     // 每轮「下一步」：先把所有红字清空，再统一检查当前页所有输入元素——名字/性别
     // 等各自独立提示（不因第一个未过就跳过其余）；本地可检测的错误 → _localError/
-    // _genderError/_pinError（红字在输入框/选项卡下方）；后台/网络错误 → _status
+    // _genderError（红字在输入框/选项卡下方）；后台/网络错误 → _status
     // （红字在按钮下方）。旧错误一律不残留（老板要求 2026-09-09）。
     setState(() {
       _localError = null;
       _genderError = null;
-      _pinError = null;
       _status = null;
     });
     // ---- 本地校验：收集当前页所有失败，任一失败即停留本页 ----
@@ -869,11 +837,11 @@ class _SetupPageState extends State<SetupPage> {
       });
       return;
     }
-    // ---- PIN 步骤已移除（老板 2026-10-19）----
+    // ---- PIN 步骤已删除（老板 2026-10-19：彻底移除，简化向导）----
     // 原先各流程的 PIN 步（create/join=4、offline=2）承担"设锁 or 跳过/沿用"
     // 的提交动作；现在口令/信封页成为最后一个输入页，「下一步」在这里直接：
-    //   · 已设锁（existingPin）→ 沿用现有锁跑 _run*（原 _lockAlreadySet 分支）
-    //   · 未设锁 → 跳过设锁（_pinSkipped=true，等价原"两空提交"）跑 _run*
+    //   · 已设锁（existingPin）→ 沿用现有锁，直接完成
+    //   · 未设锁 → 跳过设锁，明文落盘（savePlain）
     // 锁屏码随时能在秘境菜单里补设（chatPagePinLabel）。
     // create 必须自举登记完成（_enroll != null）才触发——_runPinSetup 依赖
     // _enroll 的 entranceId；未完成时本次「下一步」先跑自举（见下方分支），
@@ -882,9 +850,7 @@ class _SetupPageState extends State<SetupPage> {
         (_role == _WizardRole.join && _step == 3) ||
         (_role == _WizardRole.offline && _step == 1);
     if (isLastInputStep) {
-      _pinSkipped = !_lockAlreadySet; // 已设锁=false（沿用）；未设锁=true（跳过）
-      setState(() => _pinError = null);
-      // 执行对应 _run*（内部完成前置：登记/认证/Space Key；_pinSkipped 则明文落盘）
+      // 执行对应 _run*（内部完成前置：登记/认证/Space Key；未设锁则明文落盘）
       if (_role == _WizardRole.create) {
         await _runPinSetup();
       } else if (_role == _WizardRole.join) {
@@ -895,11 +861,15 @@ class _SetupPageState extends State<SetupPage> {
       return; // _run* 内部推进 _step
     }
     // create 口令页（步骤 3）→ 自动自举登记（登记时上传本人名字/性别 + 空间类型；
-    // 通道名已自动设置不再询问），成功才进口令之后的 PIN 步骤
+    // 通道名已自动设置不再询问）。PIN 步骤已删除（老板 2026-10-19）：自举成功后
+    // 口令页就是最后一个输入页，直接走完成路径——不能再落到尾部 _step++（done 页
+    // 是空壳，欢迎弹窗只由 _completeWizard 弹，落空即"只有背景没有弹窗"的真机 bug）
     if (_role == _WizardRole.create && _step == 3 && _enroll == null) {
       await _runBootstrap();
       if (!mounted) return;
       if (_enroll == null) return; // 自举失败：留在本步展示错误/改用加入
+      await _runPinSetup();
+      return;
     }
     setState(() {
       if (_step < _stepCount) _step++; // done 页 = _stepCount（如 create/join 第 6 步）
@@ -1296,58 +1266,6 @@ class _SetupPageState extends State<SetupPage> {
     name = sanitizeEntranceName(name);
     _autoEntranceNameCache = name;
     return name;
-  }
-
-  /// 设置启动锁：内嵌表单直接执行（不再弹窗、无恢复码）——
-  /// 校验 PIN 两次一致 → AppLockService.setPin 加密 Space Key 包 → 返回是否完成。
-  /// （口令托管上传已与 PIN 解耦：由各 _run* 在设锁/跳过之前统一上传，见 _runPinSetup）
-  Future<bool> _setupLockAndEnter({
-    required String spaceId,
-    required String entranceId,
-    required String spaceKeyB64,
-    required int keyVersion,
-    required String token,
-    String? publicKeyB64, // 通道公钥（b64）：随锁包持久化，重启后 reauth + 弹窗展示
-    String? privateKeyB64, // 通道私钥（b64）：随锁包持久化（与 Space Key 同库同策略）
-  }) async {
-    final l10n = AppLocalizations.of(context)!;
-    if (_lockAlreadySet) return true; // 沿用现有锁屏码：不重设（addSpace 由调用方做）
-    final pin = _pin.text;
-    // 新 PIN 非空先行校验（老板 2026-10-19，与锁屏码弹窗同口径）：空串过不了
-    // 下面的 digitsOnly 正则，会报"PIN 只能是数字"这种不着边的红字
-    if (pin.isEmpty) {
-      setState(() => _status = l10n.chatPageSetLockPinRequired);
-      return false;
-    }
-    if (!AppLockService.isPinDigitsOnly(pin)) {
-      setState(() => _status = l10n.setPinDialogPinDigitsOnly);
-      return false;
-    }
-    if (pin.length < AppLockService.pinMinLength) {
-      setState(() => _status = l10n.setPinDialogPinTooShort);
-      return false;
-    }
-    if (pin != _confirm.text) {
-      setState(() => _status = l10n.setPinDialogPinMismatch);
-      return false;
-    }
-    try {
-      final payload = AppLockPayload(
-        spaceId: spaceId,
-        entranceId: entranceId,
-        spaceKeyB64: spaceKeyB64,
-        keyVersion: keyVersion,
-        token: token,
-        publicKeyB64: publicKeyB64,
-        privateKeyB64: privateKeyB64,
-      );
-      await AppLockService(widget.db ?? LocalDatabase.shared).setPin(pin, payload: payload);
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      setState(() => _status = l10n.setPinDialogSetupFailed('$e'));
-      return false;
-    }
   }
 
   /// 完成动作：进入聊天页（create/join/offline 填充数据后统一调用；
@@ -2167,68 +2085,6 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  // 步骤 4：设置启动锁（内嵌表单：PIN 两次确认，提交走底部"下一步"校验/跳过）。
-  // 多空间再加一个空间：PIN 步骤改为"沿用当前锁屏码"提示（不重设）。
-  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
-  Widget _buildStepPinReuse() {
-    final l10n = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
-      child: Column(
-        // 图标与文案都居中（老板 2026-09-24 起：文案不再靠左）
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Icon(Icons.lock_outline, size: 40),
-          const SizedBox(height: 16),
-          Text(l10n.setupPinReuseNotice, textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, height: 1.5)),
-        ],
-      ),
-    );
-  }
-
-  // 步骤 4：设置启动锁（内嵌表单：PIN 两次确认）。
-  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
-  Widget _buildStepPin() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _stepHeader(l10n.wizardTitlePin, l10n.wizardPinHint),
-        // 锁屏码也用共用组件 PassphraseField（老板 2026-10-19）：与修改口令弹窗
-        // 同款小眼睛——3 秒后自动变回暗码 + tooltip + TAB 跳过眼睛；确认框不给眼睛
-        PassphraseField(
-          controller: _pin,
-          focusNode: _pinFocus,
-          style: const TextStyle(fontSize: 20),
-          autofocus: true,
-          revealTip: l10n.chatPagePassphraseRevealTip,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          // 开始填写即清除 PIN 红字（不依赖再点下一步）
-          onChanged: (_) {
-            if (_pinError != null) setState(() => _pinError = null);
-          },
-          hintText: l10n.setPinDialogPinHint,
-        ),
-        const SizedBox(height: 12),
-        PassphraseField(
-          controller: _confirm,
-          style: const TextStyle(fontSize: 20),
-          showReveal: false, // 确认框不给眼睛（组件惯例：复核框容易顺手点开）
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          // 开始填写即清除 PIN 红字（不依赖再点下一步）
-          onChanged: (_) {
-            if (_pinError != null) setState(() => _pinError = null);
-          },
-          hintText: l10n.setPinDialogConfirmHint,
-        ),
-        if (_pinError != null) _localErrorHint(_pinError!),
-      ],
-    );
-  }
-
   /// create：生成 Space Key（首次）+ 认证 + 设置 PIN（含口令托管上传）。
   Future<void> _runPinSetup() async {
     final kp = _keyPair;
@@ -2250,23 +2106,14 @@ class _SetupPageState extends State<SetupPage> {
         token = session.sessionToken;
         _sessionToken = token;
       }
-      // 3) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
-      // （共享口令不随 AppLockPayload 持久化——服务器为唯一真相源）
-      if (_pinSkipped && !_lockAlreadySet) {
-        if (!mounted) return;
-        await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-          spaceId: _spaceId.text.trim(),
-          entranceId: _enroll!.entranceId,
-          spaceKeyB64: base64Encode(_spaceKey!),
-          keyVersion: 1,
-          token: token,
-          publicKeyB64: kp.publicKeyB64,
-          privateKeyB64: kp.privateKeyB64,
-        ));
+      // 3) 落盘：已设锁沿用（不写包，addSpace 由调用方做）；未设锁明文持久化
+      // （下次启动直接进聊天；共享口令不随 AppLockPayload 持久化——服务器为唯一真相源）
+      if (_lockAlreadySet) {
         _completeWizard();
         return;
       }
-      final ok = await _setupLockAndEnter(
+      if (!mounted) return;
+      await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         spaceId: _spaceId.text.trim(),
         entranceId: _enroll!.entranceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -2274,11 +2121,8 @@ class _SetupPageState extends State<SetupPage> {
         token: token,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
-      );
-      if (!mounted) return;
-      if (ok) {
-        _completeWizard();
-      }
+      ));
+      _completeWizard();
     } catch (e) {
       if (!mounted) return;
       setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
@@ -2466,22 +2310,14 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _runJoinAccess() async {
     final kp = _keyPair;
     if (kp == null) return;
-    // 口令已在口令页（步骤 3）验证通过（_verifyJoinPassphrase），这里仅设锁/完成
-    if (_pinSkipped && !_lockAlreadySet) {
-      if (!mounted) return;
-      await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-        spaceId: _spaceId.text,
-        entranceId: _enroll!.entranceId,
-        spaceKeyB64: base64Encode(_spaceKey!),
-        keyVersion: _joinKeyVersion,
-        token: _sessionToken!,
-        publicKeyB64: kp.publicKeyB64,
-        privateKeyB64: kp.privateKeyB64,
-      ));
+    // 口令已在口令页（步骤 3）验证通过（_verifyJoinPassphrase），这里仅落盘/完成：
+    // 已设锁沿用（不写包）；未设锁明文落盘（savePlain）
+    if (_lockAlreadySet) {
       _completeWizard();
       return;
     }
-    final ok = await _setupLockAndEnter(
+    if (!mounted) return;
+    await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
       spaceId: _spaceId.text,
       entranceId: _enroll!.entranceId,
       spaceKeyB64: base64Encode(_spaceKey!),
@@ -2489,11 +2325,8 @@ class _SetupPageState extends State<SetupPage> {
       token: _sessionToken!,
       publicKeyB64: kp.publicKeyB64,
       privateKeyB64: kp.privateKeyB64,
-    );
-    if (!mounted) return;
-    if (ok) {
-      _completeWizard();
-    }
+    ));
+    _completeWizard();
   }
 
   // ---- 场景 C（offline）：密保信封导入 ----
@@ -2580,22 +2413,12 @@ class _SetupPageState extends State<SetupPage> {
       _sessionToken = session.sessionToken;
     }
     if (!mounted) return;
-    // 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
-    if (_pinSkipped && !_lockAlreadySet) {
-      if (!mounted) return;
-      await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-        spaceId: enroll.spaceId,
-        entranceId: enroll.entranceId,
-        spaceKeyB64: base64Encode(_spaceKey!),
-        keyVersion: 1,
-        token: _sessionToken!,
-        publicKeyB64: kp.publicKeyB64,
-        privateKeyB64: kp.privateKeyB64,
-      ));
+    // 落盘：已设锁沿用（不写包，addSpace 由调用方做）；未设锁明文持久化（下次启动直接进聊天）
+    if (_lockAlreadySet) {
       _completeWizard();
       return;
     }
-    final ok = await _setupLockAndEnter(
+    await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
       spaceId: enroll.spaceId,
       entranceId: enroll.entranceId,
       spaceKeyB64: base64Encode(_spaceKey!),
@@ -2603,11 +2426,8 @@ class _SetupPageState extends State<SetupPage> {
       token: _sessionToken!,
       publicKeyB64: kp.publicKeyB64,
       privateKeyB64: kp.privateKeyB64,
-    );
-    if (!mounted) return;
-    if (ok) {
-      _completeWizard();
-    }
+    ));
+    _completeWizard();
   }
 }
 

@@ -170,9 +170,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseTitle => '验证共享口令';
 
   @override
-  String get wizardTitlePin => '设置锁屏码';
-
-  @override
   String get wizardTitleEnvelope => '解析密保信封';
 
   @override
@@ -217,10 +214,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardSwitchToPassphrase => '改用共享口令';
-
-  @override
-  String get wizardPinHint =>
-      '在本机上保护你的秘境，任何人启动app时将需要验证锁屏码。当前也可先跳过，进入秘境后能够随时设置。';
 
   @override
   String get welcomeDialogTitleCreate => '一切就绪！';
@@ -348,13 +341,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogPinLabel => '新 PIN（至少 6 位数字）';
 
   @override
-  String get setPinDialogPinHint => '至少 6 位数字';
-
-  @override
   String get setPinDialogConfirmLabel => '确认新 PIN';
-
-  @override
-  String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
   String get setPinDialogSetPin => '启用';
@@ -1330,9 +1317,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceConfirm => '销毁';
-
-  @override
-  String get setupPinReuseNotice => '本秘境将共用当前的锁屏码。';
 
   @override
   String errorBackend(String message) {

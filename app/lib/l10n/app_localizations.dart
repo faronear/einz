@@ -398,12 +398,6 @@ abstract class AppLocalizations {
   /// **'Verify passphrase'**
   String get wizardJoinPassphraseTitle;
 
-  /// No description provided for @wizardTitlePin.
-  ///
-  /// In en, this message translates to:
-  /// **'Set PIN'**
-  String get wizardTitlePin;
-
   /// No description provided for @wizardTitleEnvelope.
   ///
   /// In en, this message translates to:
@@ -481,12 +475,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use a shared passphrase instead'**
   String get wizardSwitchToPassphrase;
-
-  /// No description provided for @wizardPinHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.'**
-  String get wizardPinHint;
 
   /// No description provided for @welcomeDialogTitleCreate.
   ///
@@ -716,23 +704,11 @@ abstract class AppLocalizations {
   /// **'New PIN (at least 6 digits)'**
   String get setPinDialogPinLabel;
 
-  /// No description provided for @setPinDialogPinHint.
-  ///
-  /// In en, this message translates to:
-  /// **'At least 6 digits'**
-  String get setPinDialogPinHint;
-
   /// No description provided for @setPinDialogConfirmLabel.
   ///
   /// In en, this message translates to:
   /// **'Confirm new PIN'**
   String get setPinDialogConfirmLabel;
-
-  /// No description provided for @setPinDialogConfirmHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Type it again to confirm'**
-  String get setPinDialogConfirmHint;
 
   /// No description provided for @setPinDialogSetPin.
   ///
@@ -2401,12 +2377,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Destroy'**
   String get leaveSpaceConfirm;
-
-  /// No description provided for @setupPinReuseNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'This space will share the current PIN.'**
-  String get setupPinReuseNotice;
 
   /// Prefix for errors reported by the server; errors decided on this device carry no prefix
   ///

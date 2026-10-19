@@ -147,8 +147,6 @@ void main() {
         reason: '错误口令必须被拦截并提示');
     expect(find.text(_zh.wizardJoinPassphraseHint('duo')),
         findsOneWidget, reason: '应停留在口令页');
-    // PIN 步骤已移除（老板 2026-10-19）：用 PIN 页标题断言"未放行"
-    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('正确口令：通过验证放行进完成路径（欢迎弹窗）', (WidgetTester tester) async {
@@ -160,7 +158,6 @@ void main() {
     // join → 跳过设锁落盘 → 完成页 + 欢迎弹窗
     expect(find.text(_zh.welcomeDialogMessage), findsOneWidget,
         reason: '正确口令应直接走完进完成页（欢迎弹窗）');
-    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: 'PIN 步骤已移除，不该再出现');
     expect(find.text(_zh.wizardJoinPassphraseWrong), findsNothing,
         reason: '正确口令不应报错');
   });
@@ -196,8 +193,6 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    // PIN 步骤已移除（老板 2026-10-19）：断言不再进 PIN 页
-    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: 'PIN 步骤已移除，不该再出现');
     expect(joinCalls, 1, reason: 'token 只应被消费一次');
   });
 
@@ -216,8 +211,6 @@ void main() {
 
     expect(find.textContaining('后台：${_zh.setupTokenSpaceAlreadyAdded}'), findsOneWidget,
         reason: '服务端说的错误必须带「后台：」前缀');
-    // PIN 步骤已移除（老板 2026-10-19）：断言不再进 PIN 页
-    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: '被拒后不得放行');
   });
 
   // 原「PIN 页退回口令页再前进：不重复消费 token」用例已删（老板 2026-10-19 移除
