@@ -797,19 +797,19 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // 绑定空间后激活会话（同步通道名 → 增量同步 → 设锁屏码 → 启动 WS）——
+  // 绑定空间后激活会话（同步通道名 → 增量同步 → 启动 WS；入网路径先致欢迎辞）——
   // Multiverse：/space create、/space join 命令绑定成功后与启动引导共用
   await _activateAfterBind(session, store, storePath, server);
 }
 
 /// 绑定空间后激活会话。顺序随是否入网而不同：
 /// - 正常启动：增量同步 → 启动 WS（立刻可收发）
-/// - 新入网（[_onboarded]）：设锁屏码 → 致欢迎辞并**等用户回车**显性进入聊天态
-///   → 才增量同步 + 启动 WS
+/// - 新入网（[_onboarded]）：致欢迎辞 → 自动读秒倒计时 → 清 system 消息进聊天态
+///   → 才增量同步 + 启动 WS（锁屏码询问 2026-10-19 已移除，随时可 /pin 补设）
 ///
 /// **入网向导期间不 sync、不启 WS**（老板 2026-09-14）：否则对方消息会直接流进
-/// 消息流、插在向导的 system 消息之间。入网期间错过的消息由回车后的那次增量同步
-/// 一次性补齐。
+/// 消息流、插在向导的 system 消息之间。入网期间错过的消息由进聊天态后的那次增量
+/// 同步一次性补齐。
 Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String storePath, String server) async {
   // 已登记通道启动时把本地通道名称同步到后台（TUI 里改名后服务端 dev1 的
   // entranceName 同步更新；首条通道 enroll 已带上 entranceName，此处幂等覆盖）

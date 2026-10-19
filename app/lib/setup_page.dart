@@ -839,24 +839,23 @@ class _SetupPageState extends State<SetupPage> {
     }
     // ---- PIN 步骤已删除（老板 2026-10-19：彻底移除，简化向导）----
     // 原先各流程的 PIN 步（create/join=4、offline=2）承担"设锁 or 跳过/沿用"
-    // 的提交动作；现在口令/信封页成为最后一个输入页，「下一步」在这里直接：
+    // 的提交动作；现在口令页成为最后一个输入页，「下一步」在这里直接：
     //   · 已设锁（existingPin）→ 沿用现有锁，直接完成
     //   · 未设锁 → 跳过设锁，明文落盘（savePlain）
     // 锁屏码随时能在秘境菜单里补设（chatPagePinLabel）。
     // create 必须自举登记完成（_enroll != null）才触发——_runPinSetup 依赖
-    // _enroll 的 entranceId；未完成时本次「下一步」先跑自举（见下方分支），
-    // 再点一次才完成向导
+    // _enroll 的 entranceId。_enroll == null 时本次「下一步」先跑自举，成功后
+    // **同一次点击内**继续 _runPinSetup 完成向导（见下方分支，不需要再点一次）。
+    // offline 不在此列：信封页「下一步」在更上面就分支回 join 口令页
+    // （2026-09-09 老板定），offline 角色到不了这里——见 _runEnvelopeImport 注释。
     final isLastInputStep = (_role == _WizardRole.create && _step == 3 && _enroll != null) ||
-        (_role == _WizardRole.join && _step == 3) ||
-        (_role == _WizardRole.offline && _step == 1);
+        (_role == _WizardRole.join && _step == 3);
     if (isLastInputStep) {
       // 执行对应 _run*（内部完成前置：登记/认证/Space Key；未设锁则明文落盘）
       if (_role == _WizardRole.create) {
         await _runPinSetup();
-      } else if (_role == _WizardRole.join) {
-        await _runJoinAccess();
       } else {
-        await _runEnvelopeImport();
+        await _runJoinAccess();
       }
       return; // _run* 内部推进 _step
     }
@@ -2402,7 +2401,16 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// offline：信封导入路径——认证/设锁/完成（Space Key 已存 _spaceKey）。
+  /// offline：信封导入路径——认证/落盘/完成（Space Key 已存 _spaceKey）。
+  ///
+  /// **当前不可达（自 2026-09-09 起）**：信封页（offline 步骤 1）的「下一步」在
+  /// _nextStep 里就分支回 join 口令页（老板 2026-09-09 定：信封⇄口令互切由页内
+  /// 「改用共享口令」承担），offline 角色永远到不了完成点——粘贴的信封文字也不
+  /// 被消费（_verifyEnvelope 同年删除）。整个信封页实际是口令页的旁路 detour。
+  /// 本函数保留备将来两种走向：① 产品决定复活信封导入（补 _verifyEnvelope +
+  /// 放行完成）；② 决定删掉信封页整条线（连同 _buildStepEnvelope/_openEnvelopeImport/
+  /// _switchToPassphrase/_role==offline 分支）。**属待产品决策项**，故不删。
+  // ignore: unused_element
   Future<void> _runEnvelopeImport() async {
     final kp = _keyPair;
     if (kp == null) return;
