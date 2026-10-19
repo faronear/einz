@@ -9,7 +9,7 @@
 - **部署形态：** Multiverse 多租户（`spaces` 表 + 动态登记；**一条通道可进多个秘境**，
   见 `docs/GLOSSARY.md` 的术语分层）
 - **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.0）
-- **最后更新：** 2026-10-09
+- **最后更新：** 2026-10-19
 
 ---
 
@@ -40,6 +40,10 @@
   中英双版邮件正文（`lang` 由客户端上报）、ARB 键 15 个、`_FakeApi` 补 stub。
   `[x]` 大陆服务器 → Oracle SMTP 出站：老板实测**通过**（不必换服务商）。
   `[ ]` **真机自测**：填邮箱 → 收确认信 → 点链接 → 离线收一封摘要信（按老板惯例他自测）
+- `[ ]` **群组成员退出（自愿退群）**（2026-10-19 定稿）：仅 group 空间开放（**duo 不退出**，
+  想离开只能销毁本通道）；身份级离场=本身份全部通道一并退役 + 其他设备上线自毁
+  （复用 `entrance.revoked` / `ENTRANCE_REVOKED` 口径）；墓碑行保名字 + slot 让位；
+  `member.left` 广播 + 顶部通知（不落聊天流）；不做踢人。细节见 `aimemo/groupExitDesign.md`
 - `[ ]` **撤销的 App 入口**（通道列表「撤销这条通道」：口令 + 二次确认；`ApiClient.revokeEntrance` 已就绪）
 - `[ ]` **向导 PIN 步骤残留代码清理**（2026-10-19 记）：向导锁屏码页已整页移除
   （口令/信封页「下一步」直接完成），但 `_buildStepPin` / `_buildStepPinReuse` /
