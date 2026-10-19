@@ -30,7 +30,7 @@ All of your content lives in the app's database on your device, and a PIN is req
 
 - No ads, no user profiling, no data selling;
 - No collection or analysis of your chat content (we can't, and we wouldn't);
-- No app store listings, no third-party analytics SDKs.
+- No third-party analytics SDKs.
 
 ## Data deletion
 
