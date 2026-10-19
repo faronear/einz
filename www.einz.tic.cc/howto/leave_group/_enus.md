@@ -14,9 +14,8 @@ Open the members sheet (tap the group name capsule in the top bar) and use the r
 
 ## What happens when you leave
 
-- **This group is erased from this device**: messages, attachments, credentials — all of it;
+- **This group disappears from all your devices**: this device erases everything right away (messages, attachments, credentials); your other devices (the same identity's phone, tablet, etc.) leave and erase their local data automatically the next time they come online, just like being revoked;
 - **History stays on the other members' devices** — they can still read everything from before;
-- **Your other devices** (the same identity's phone + tablet, etc.) **erase their local data automatically**, just like being revoked;
 - The member count drops by one, and the freed slot can be filled by whoever the remaining members invite.
 
 ## FAQ
