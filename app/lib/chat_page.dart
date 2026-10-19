@@ -10085,11 +10085,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   @override
   void initState() {
     super.initState();
-    // 确认输入框的显隐跟随「新 PIN」行是否有内容（老板 2026-10-19）：TextField
-    // 自己改文本不会重建弹窗，这里用 controller 监听补一次 setState
-    _pinCtrl.addListener(() {
-      if (mounted) setState(() {});
-    });
     AppLockService(widget.db).loadLockSeconds().then((value) {
       if (!mounted) return;
       setState(() {
@@ -10611,8 +10606,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               const SizedBox(height: 12),
             ],
             // 第二组：新 PIN（设置 / 确认 两行同卡——新码的两行归一组）。
-            // 确认行仅在「设置」行有内容时出现（老板 2026-10-19：空着时不显示，
-            // 减少首设场景的视觉负担；开始输入即出现）
+            // 确认行常驻（老板 2026-10-19：试过"空时不显示、输入即出现"，
+            // 体验不好——输入框凭空长出来打断填写节奏，撤回）
             _setLockGroup(
               children: [
                 _setLockPinRow(
@@ -10626,18 +10621,16 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
                   revealable: true, // 小眼睛（老板 2026-10-19）
                 ),
-                if (_pinCtrl.text.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _setLockPinRow(
-                    label: l10n.chatPageSetLockRowConfirm,
-                    controller: _confirmCtrl,
-                    // 确认行与设置行同文案，靠左侧 设置/确认 标签区分
-                    // （老板 2026-10-18 原话："第一行标签设置、第二行标签确认"）
-                    fieldLabel: _hasPin
-                        ? l10n.chatPageSetLockNewPinLabel
-                        : l10n.chatPageSetLockNewPinLabelNoPin,
-                  ),
-                ],
+                const SizedBox(height: 12),
+                _setLockPinRow(
+                  label: l10n.chatPageSetLockRowConfirm,
+                  controller: _confirmCtrl,
+                  // 确认行与设置行同文案，靠左侧 设置/确认 标签区分
+                  // （老板 2026-10-18 原话："第一行标签设置、第二行标签确认"）
+                  fieldLabel: _hasPin
+                      ? l10n.chatPageSetLockNewPinLabel
+                      : l10n.chatPageSetLockNewPinLabelNoPin,
+                ),
               ],
             ),
             const SizedBox(height: 12),
