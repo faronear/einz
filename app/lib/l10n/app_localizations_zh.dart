@@ -37,11 +37,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get close => '关闭';
 
   @override
-  String setupPageEnvelopeKeyHint(String mode) {
-    return '密保信封是私下交接的一段加密文字。请询问你的同伴获取。';
-  }
-
-  @override
   String get setupPageNeedPassphrase => '请设置共享口令';
 
   @override
@@ -122,9 +117,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardAppBarJoin => '加入秘境';
 
   @override
-  String get wizardAppBarOffline => '导入密保信封';
-
-  @override
   String get wizardNext => '下一步';
 
   @override
@@ -167,9 +159,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseTitle => '验证共享口令';
 
   @override
-  String get wizardTitleEnvelope => '解析密保信封';
-
-  @override
   String get wizardEnrollExists =>
       '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性通道码加入。';
 
@@ -205,12 +194,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误！请询问你的秘境同伴获取正确的口令。';
-
-  @override
-  String get wizardSwitchToEnvelope => '改用线下密保信封';
-
-  @override
-  String get wizardSwitchToPassphrase => '改用共享口令';
 
   @override
   String get welcomeDialogTitleCreate => '一切就绪！';
@@ -313,9 +296,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupInitClearedRestart => '本机数据已清除。请完全退出并重新打开 App。';
-
-  @override
-  String get setupPagePasteEnvelope => '⚠️ 请粘贴密保信封（base64）';
 
   @override
   String get setupPageScanInvite => '扫码填入通道码';

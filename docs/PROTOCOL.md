@@ -493,8 +493,9 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
   服务器上**所有空间**的通道全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
   只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方通道全丢 =
   双方放弃该空间，重新建一个即可（v1 只有一个空间才不得不支持恢复）。
-  新通道接入仍走：**一次性 join token（邀请链接）/ 共享口令 / 密保信封**
-  （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除）。
+  新通道接入仍走：**一次性 join token（邀请链接）/ 共享口令**
+  （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除；
+  密保信封导入线 2026-10-19 整条删除，见 aimemo/worklog）。
 
 ## 8. WebSocket（实时通道）
 

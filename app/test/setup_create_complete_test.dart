@@ -4,7 +4,7 @@
 // create 口令页首次「下一步」只跑自举（_enroll == null → _runBootstrap），旧
 // 实现成功后落到 _nextStep 尾部的 _step++——空壳 done 页。欢迎弹窗只由
 // _completeWizard 触发，自举路径没经过它，表现为「只有背景没有欢迎弹窗」。
-// join/offline 无自举环节所以当时正常；本测试站岗 create 这条路径
+// join 无自举环节所以当时正常；本测试站岗 create 这条路径
 // （join 流的同款断言见 setup_join_passphrase_test.dart）。
 
 import 'package:drift/native.dart';
@@ -49,7 +49,7 @@ void main() {
         probeServer: (_) async => const ServerHealth(
             ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
         // create 口令页「下一步」触发自举登记（_runBootstrap → createSpace），
-        // fake 返回成功结果（与 wizard_envelope_entry_test 同款）
+        // fake 返回成功结果（与 wizard_create_flow_test 同款）
         createOverride: () async => const SpaceCreateResult(
           spaceId: 'space-test',
           spaceAddress: '0x00',

@@ -152,12 +152,6 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get close;
 
-  /// No description provided for @setupPageEnvelopeKeyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.'**
-  String setupPageEnvelopeKeyHint(String mode);
-
   /// No description provided for @setupPageNeedPassphrase.
   ///
   /// In en, this message translates to:
@@ -302,12 +296,6 @@ abstract class AppLocalizations {
   /// **'Join a space'**
   String get wizardAppBarJoin;
 
-  /// No description provided for @wizardAppBarOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Import key envelope'**
-  String get wizardAppBarOffline;
-
   /// No description provided for @wizardNext.
   ///
   /// In en, this message translates to:
@@ -392,12 +380,6 @@ abstract class AppLocalizations {
   /// **'Verify passphrase'**
   String get wizardJoinPassphraseTitle;
 
-  /// No description provided for @wizardTitleEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify key envelope'**
-  String get wizardTitleEnvelope;
-
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
@@ -457,18 +439,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wrong passphrase.'**
   String get wizardJoinPassphraseWrong;
-
-  /// No description provided for @wizardSwitchToEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'Use key envelope instead (offline)'**
-  String get wizardSwitchToEnvelope;
-
-  /// No description provided for @wizardSwitchToPassphrase.
-  ///
-  /// In en, this message translates to:
-  /// **'Use a shared passphrase instead'**
-  String get wizardSwitchToPassphrase;
 
   /// No description provided for @welcomeDialogTitleCreate.
   ///
@@ -655,12 +625,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Local data cleared. Fully quit and reopen the app.'**
   String get startupInitClearedRestart;
-
-  /// No description provided for @setupPagePasteEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Paste the key envelope (base64)'**
-  String get setupPagePasteEnvelope;
 
   /// No description provided for @setupPageScanInvite.
   ///

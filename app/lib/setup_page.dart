@@ -24,10 +24,11 @@ import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/passphrase_field.dart';
 import 'widgets/cute_house_icon.dart';
-import 'widgets/clickable.dart';
 
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
-enum _WizardRole { create, join, offline }
+/// （密保信封导入线 2026-10-19 整条删除——信封页自 2026-09-09 起只剩回头路，
+///  粘贴内容不被消费，见 worklog；Space Key 接入现仅邀请链接 + 共享口令两路径。）
+enum _WizardRole { create, join }
 
 /// 设置页：一次性配置（生成通道凭证 → 建立/加入空间 → 获得 Space Key → 设置启动锁）。
 ///
@@ -35,8 +36,7 @@ enum _WizardRole { create, join, offline }
 /// - create（第一个使用者）：`POST /spaces` 一步完成通道登记 + 签发空间会话 →
 ///   设接入口令托管 Space Key → 进聊天页（邀请由聊天页顶栏调 `/spaces/{id}/join-tokens`
 ///   生成链接/二维码；口令由加入方另行输入）；
-/// - join：邀请链接/token → preflight → 口令取钥 → `POST /spaces/join` 登记通道 + 发会话；
-/// - offline：密保信封导入（用对方公钥密封的 Space Key，口令页的平行替代）。
+/// - join：邀请链接/token → preflight → 口令取钥 → `POST /spaces/join` 登记通道 + 发会话。
 /// 会话由 create/join 直接签发（绑定该 Space），无需再单独登记。
 class SetupPage extends StatefulWidget {
   const SetupPage({
@@ -122,7 +122,6 @@ class _SetupPageState extends State<SetupPage> {
   /// 资料，供「切换我的秘境」卡片配色——不必等聊天页拉一次 /space。
   String? _joinSpaceMode;
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
-  final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
   // create 首条通道：口令二次确认（避免设错口令后无法再入）。join 是验证已有
   // 口令，无需确认，故仅 create 用。
@@ -141,7 +140,6 @@ class _SetupPageState extends State<SetupPage> {
   // 其余步骤的「首框」节点：切步骤后由 [_focusFirstFieldOfStep] 显式 requestFocus
   final _passphraseFocus = FocusNode(); // create 第 2 步 / join 第 3 步（共享口令）
   final _inviteFocus = FocusNode(); // join 第 1 步（通道码）
-  final _envelopeFocus = FocusNode(); // offline 第 1 步（密保信封）
   final _myGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
   // 空间显示名（进入聊天页的对方名字）
@@ -183,10 +181,6 @@ class _SetupPageState extends State<SetupPage> {
   String? _localError; // 本地校验错误提示（红字，显示在输入框下方）
   bool _busy = false;
 
-  /// 进入密保信封页（offline）前的角色：切回口令页时恢复来源
-  /// （create 回步骤 2 / join 回步骤 3），实现口令⇄信封自由互切。
-  _WizardRole _preEnvelopeRole = _WizardRole.join;
-
   /// 通道登记结果（服务端分配的真实 entranceId/memberId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 entranceId。
   EntranceBinding? _enroll;
@@ -199,10 +193,8 @@ class _SetupPageState extends State<SetupPage> {
     _nameFocus.dispose();
     _passphraseFocus.dispose();
     _inviteFocus.dispose();
-    _envelopeFocus.dispose();
     _creatorName.dispose();
     _spaceId.dispose();
-    _envelopeKey.dispose();
     _escrowPassphrase.dispose();
     _escrowPassphraseConfirm.dispose();
     _joinTokenCtrl.dispose();
@@ -338,7 +330,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 本步骤「第一个输入框」的焦点节点（没有输入框的步骤返回 null）。
   /// PIN 步骤已移除（老板 2026-10-19）：create/join 的步骤 4 原是 PIN，现在
-  /// 直接落到 done；offline 的步骤 2 同理。
+  /// 口令页就是最后一个输入页。
   FocusNode? _firstFieldNodeOfStep() {
     if (_role == null) return null;
     return switch (_role!) {
@@ -350,12 +342,8 @@ class _SetupPageState extends State<SetupPage> {
         },
       _WizardRole.join => switch (_step) {
           1 => _inviteFocus, // 通道码
-          // 2 = 选择身份（只有卡片，没有输入框）
+          // 2 = 名字/性别页（名字框自带 autofocus，无需显式交焦点）
           3 => _passphraseFocus,
-          _ => null,
-        },
-      _WizardRole.offline => switch (_step) {
-          1 => _envelopeFocus, // 密信信封
           _ => null,
         },
     };
@@ -406,8 +394,7 @@ class _SetupPageState extends State<SetupPage> {
           ],
         ),
         actions: [
-          // 右上角菜单：语言切换 + 退出（全丢恢复按老板决策已移除，仅 TUI 保留；
-          // 密保信封导入在 join 口令页次级入口）
+          // 右上角菜单：语言切换 + 退出（全丢恢复按老板决策已移除，仅 TUI 保留）
           PopupMenuButton<String>(
             // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
             // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
@@ -562,8 +549,7 @@ class _SetupPageState extends State<SetupPage> {
                   Row(
                     children: [
                       // 第 1 页（选择页）无上一步；步骤 1（create=关于我 / join=通道码）
-                      // 起可回退——步骤 1 回到第 1 页选择页（老板 2026-09-11）；
-                      // 信封页（offline 步骤 1）回退到 join 口令页（_backStep 内处理）
+                      // 起可回退——步骤 1 回到第 1 页选择页（老板 2026-09-11）
                       TextButton(
                         onPressed: _step >= 1 ? _backStep : null,
                         // 渐变上白字（不可用时白色半透明）
@@ -598,7 +584,7 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---------- 向导框架 ----------
 
-  /// 步骤总数（角色由探测自动判定：create=首条通道 / join=后续通道 / offline=密保信封）。
+  /// 步骤总数（角色由探测自动判定：create=首条通道 / join=后续通道）。
   ///
   /// **PIN 步骤已从向导彻底删除**（老板 2026-10-19：删掉只有好处——必设时代的
   /// 遗留位置，可选时代没有拆掉；锁屏码随时能在秘境菜单里补设）。
@@ -613,8 +599,6 @@ class _SetupPageState extends State<SetupPage> {
         // 跳过 2）。stepCount 恒为 4：若按"少一页"记 3，口令步（3）会撞上 done 判定
         // （_step == _stepCount）被当成完成页——底部按钮消失、chrome 变 done 样式。
         return 4;
-      case _WizardRole.offline:
-        return 2; // envelope/done
       case null:
         return 1;
     }
@@ -633,21 +617,16 @@ class _SetupPageState extends State<SetupPage> {
         return l10n.wizardAppBarCreate;
       case _WizardRole.join:
         return l10n.wizardAppBarJoin;
-      case _WizardRole.offline:
-        return l10n.wizardAppBarOffline;
     }
   }
 
   /// 进度圆点指示器：共 4 点 = 第 1 页空间入口页（角色选择）+ 3 个向导内容步骤
   /// （create/join 内容步数相同；老板 2026-09-11：入口页也计为一个点，且第 2 页
   /// 可"上一步"返回选择页）。角色未选（入口页）时同样显示，仅首点亮。
-  /// 信封模式（offline）是 join 流程内口令页的平行替代：进度条按 join 展示，
-  /// 信封与口令处于同一位置（join 步骤 3），不缩成更少点（老板要求 2026-09-09）。
   /// PIN 步骤已移除（老板 2026-10-19）：原 5 点改 4 点。
   Widget _buildProgressDots() {
-    // offline 的角色/步映射：1→3（口令位=信封位）、2→4（完成）
-    final progressStep = _role == _WizardRole.offline ? _step + 2 : _step;
     // 圆点 i 对应页面 _step == i（i=0 为入口页）：已到达（含当前）纯白，未到半透明
+    final progressStep = _step;
     const total = 4;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -783,10 +762,6 @@ class _SetupPageState extends State<SetupPage> {
         invalid = true;
       }
     }
-    if (_role == _WizardRole.offline && _step == 1 && _envelopeKey.text.trim().isEmpty) {
-      localError = l10n.setupPagePasteEnvelope;
-      invalid = true;
-    }
     if (invalid) {
       setState(() {
         _localError = localError;
@@ -826,28 +801,15 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (!verified) return;
     }
-    // offline 信封页（步骤 1）「下一步」= 回到 join 口令页（步骤 3，信封入口
-    // 所在位置）：信封⇄口令互切仍由页内「改用线上共享口令」承担（老板要求 2026-09-09）
-    if (_role == _WizardRole.offline && _step == 1) {
-      setState(() {
-        _role = _preEnvelopeRole;
-        _step = 3; // join 口令页
-        _status = null;
-        _localError = null;
-      });
-      return;
-    }
     // ---- PIN 步骤已删除（老板 2026-10-19：彻底移除，简化向导）----
-    // 原先各流程的 PIN 步（create/join=4、offline=2）承担"设锁 or 跳过/沿用"
-    // 的提交动作；现在口令页成为最后一个输入页，「下一步」在这里直接：
+    // 原先各流程的 PIN 步（create/join=4）承担"设锁 or 跳过/沿用"的提交动作；
+    // 现在口令页成为最后一个输入页，「下一步」在这里直接：
     //   · 已设锁（existingPin）→ 沿用现有锁，直接完成
     //   · 未设锁 → 跳过设锁，明文落盘（savePlain）
     // 锁屏码随时能在秘境菜单里补设（chatPagePinLabel）。
     // create 必须自举登记完成（_enroll != null）才触发——_runPinSetup 依赖
     // _enroll 的 entranceId。_enroll == null 时本次「下一步」先跑自举，成功后
     // **同一次点击内**继续 _runPinSetup 完成向导（见下方分支，不需要再点一次）。
-    // offline 不在此列：信封页「下一步」在更上面就分支回 join 口令页
-    // （2026-09-09 老板定），offline 角色到不了这里——见 _runEnvelopeImport 注释。
     final isLastInputStep = (_role == _WizardRole.create && _step == 3 && _enroll != null) ||
         (_role == _WizardRole.join && _step == 3);
     if (isLastInputStep) {
@@ -877,16 +839,6 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
-      // 信封页（offline 步骤 1）「上一步」：回到 join 口令页（步骤 3，信封入口
-      // 所在位置）——信封是口令的平行替代（同处口令位），与「下一步」回退
-      // 语义一致（老板要求 2026-09-09：信封页的上一步也要能点）
-      if (_role == _WizardRole.offline && _step == 1) {
-        _role = _preEnvelopeRole; // 进入信封页前必为 join
-        _step = 3; // join 口令页
-        _localError = null;
-        _status = null;
-        return;
-      }
       // 各角色步骤 1（create=关于我 / join=通道码）：回到第 1 页空间入口页
       // （清空角色重新选择创建/加入；join 的 token 相关状态一并重置，避免
       // 换角色/重进后残留旧 token 直接跳过校验）
@@ -911,7 +863,7 @@ class _SetupPageState extends State<SetupPage> {
         _status = null;
         return;
       }
-      // 步骤 2 及以上：逐级回退（create=名字 / join=名字（invite）/ offline=密保信封）
+      // 步骤 2 及以上：逐级回退（create=名字 / join=名字（invite））
       if (_step > 1) _step--;
       _localError = null;
       _status = null;
@@ -971,7 +923,7 @@ class _SetupPageState extends State<SetupPage> {
   Widget _buildStep() {
     if (_role == null || _step == 0) {
       // Multiverse：探测成功后（角色未选）显示空间入口页；探测中/失败显示启动屏
-      return (_probeDone && !_probeFailed) ? _buildStepEntry() : _buildDetectAndEnvelope();
+      return (_probeDone && !_probeFailed) ? _buildStepEntry() : _buildProbing();
     }
     switch (_role!) {
       case _WizardRole.create:
@@ -999,14 +951,6 @@ class _SetupPageState extends State<SetupPage> {
           case 3:
             // PIN 步骤已移除（老板 2026-10-19）：口令页是最后一个输入页
             return _buildStepPassphrase();
-          default:
-            return _buildStepDone();
-        }
-      case _WizardRole.offline:
-        switch (_step) {
-          case 1:
-            // PIN 步骤已移除（老板 2026-10-19）：信封页是唯一输入页
-            return _buildStepEnvelope();
           default:
             return _buildStepDone();
         }
@@ -1132,10 +1076,10 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 第 0 步（角色未判定时）：显示探测状态（密保信封导入在口令页有次级入口）。
+  /// 第 0 步（角色未判定时）：显示探测状态。
   /// 角色由服务器探测自动判定（member 名称表空=首条通道 create，非空=后续通道 join），
   /// 不再让用户手动选择。
-  Widget _buildDetectAndEnvelope() {
+  Widget _buildProbing() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1267,7 +1211,7 @@ class _SetupPageState extends State<SetupPage> {
     return name;
   }
 
-  /// 完成动作：进入聊天页（create/join/offline 填充数据后统一调用；
+  /// 完成动作：进入聊天页（create/join 填充数据后统一调用；
   /// entranceId/spaceId 一律用登记后服务端返回的真实值）。
   Future<void> _finish() async {
     final kp = _keyPair;
@@ -1834,7 +1778,7 @@ class _SetupPageState extends State<SetupPage> {
         memberId: created.creatorMemberId,
         spaceId: created.spaceId,
       );
-      // 此前 create 流程漏填 _spaceId.text（仅 join/offline 填写）→ ChatPage 拿空
+      // 此前 create 流程漏填 _spaceId.text（仅 join 填写）→ ChatPage 拿空
       // spaceId → 聊天页生成通道码 POST /spaces//join-tokens 报 SPACE_NOT_FOUND
       // （2026-09-11 老板真机报告）；与 join 对齐补填服务端返回的 spaceId
       _spaceId.text = created.spaceId;
@@ -2014,35 +1958,20 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
-        // 文字链接；仅后续通道 join 适用——首条通道无对端可导出密封信封）
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 两套标题：首条通道「设置共享口令」/ 后续通道「验证共享口令」（老板要求）
-            Expanded(
-              child: _stepHeader(
-                _role == _WizardRole.join
-                    ? l10n.wizardJoinPassphraseTitle
-                    : l10n.wizardTitlePassphrase,
-                // attach 流（设备接入 / 别人帮我找回）没有名字页，所以"这条链接是
-                // 谁的、要做什么"落在**这一页的备注位**（2026-10-04 老板改版式：
-                // 原先是带图标的一行浮在大标题上方）。invite 流那份在名字页。
-                (_role == _WizardRole.join && _joinPurpose == 'attach'
-                        ? _joinNoteText(l10n)
-                        : null) ??
-                    (_role == _WizardRole.join
-                        ? l10n.wizardJoinPassphraseHint(_copyMode)
-                        : l10n.wizardPassphraseHint(_copyMode)),
-              ),
-            ),
-            if (_role == _WizardRole.join)
-              _DogEarSwitch(
-                icon: Icons.mail_outline,
-                tooltip: l10n.wizardSwitchToEnvelope,
-                onTap: _openEnvelopeImport,
-              ),
-          ],
+        // 两套标题：首条通道「设置共享口令」/ 后续通道「验证共享口令」（老板要求）
+        _stepHeader(
+          _role == _WizardRole.join
+              ? l10n.wizardJoinPassphraseTitle
+              : l10n.wizardTitlePassphrase,
+          // attach 流（设备接入 / 别人帮我找回）没有名字页，所以"这条链接是
+          // 谁的、要做什么"落在**这一页的备注位**（2026-10-04 老板改版式：
+          // 原先是带图标的一行浮在大标题上方）。invite 流那份在名字页。
+          (_role == _WizardRole.join && _joinPurpose == 'attach'
+                  ? _joinNoteText(l10n)
+                  : null) ??
+              (_role == _WizardRole.join
+                  ? l10n.wizardJoinPassphraseHint(_copyMode)
+                  : l10n.wizardPassphraseHint(_copyMode)),
         ),
         // 口令框带"查看明文"眼睛（点一下看 3 秒自动回暗码，老板 2026-09-15）；
         // 下面的**确认框刻意不给眼睛**——确认是用来复核的，能顺手点开就失去意义。
@@ -2130,7 +2059,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 完成页（create/join/offline 共用）：底部"完成"按钮 → _finish 进聊天页。
+  /// 完成页（create/join 共用）：底部"完成"按钮 → _finish 进聊天页。
   /// 向导完成：推进到完成步骤并弹出欢迎对话框（唯一「开始聊天」按钮 → 消息流页）。
   void _completeWizard() {
     setState(() {
@@ -2328,115 +2257,12 @@ class _SetupPageState extends State<SetupPage> {
     _completeWizard();
   }
 
-  // ---- 场景 C（offline）：密保信封导入 ----
+  // ---- 文案辅助 ----
 
   /// 文案里"同伴"的单复数要用**秘境类型**：duo=单数、group=复数
   /// （英文 ICU select 的 `mode` 形参）。拿不到就退 'duo'（极早期渲染）。
   String get _copyMode =>
       (_role == _WizardRole.create ? _spaceKind : _joinSpaceMode) ?? 'duo';
-
-  /// 步骤 1（offline）：粘贴密保信封（对方用本通道公钥密封的 Space Key）。
-  /// 同时需填写一次性通道码（非首条通道必须凭码登记后才能认证）。
-  Widget _buildStepEnvelope() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
-        // 文字链接；切回口令页保留已输入的口令与通道码，任一完成都进入 PIN 步骤）
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _stepHeader(
-                  l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint(_copyMode)),
-            ),
-            _DogEarSwitch(
-              icon: Icons.password,
-              tooltip: l10n.wizardSwitchToPassphrase,
-              onTap: _switchToPassphrase,
-            ),
-          ],
-        ),
-        TextField(
-          controller: _envelopeKey,
-          focusNode: _envelopeFocus,
-          style: const TextStyle(fontSize: 18),
-          maxLines: 3,
-          autofocus: true,
-          // 开始填写即清除「信封为空」红字（不依赖再点下一步）
-          onChanged: (_) {
-            if (_localError != null) setState(() => _localError = null);
-          },
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
-        ),
-        if (_localError != null) _localErrorHint(_localError!),
-      ],
-    );
-  }
-
-  /// 从口令页切到密保信封页（offline 步骤 1）：记录来源角色/步骤，便于
-  /// 信封页「改用线上共享口令」切回原地（create 步骤 2 / join 步骤 3）。
-  /// 不用 _selectRole（它重置步骤到目标角色步骤 1 且不记来源）。
-  void _openEnvelopeImport() {
-    setState(() {
-      _preEnvelopeRole = _role ?? _WizardRole.join; // 口令页可见时角色必已判定
-      _role = _WizardRole.offline;
-      _step = 1;
-      _localError = null;
-    });
-  }
-
-  /// 从密保信封页切回「口令」页（回到进入信封页前的角色：create 步骤 2 / join 步骤 3）。
-  /// 不能用 _selectRole（它会重置 _step=1 回身份页）；直接切角色+步骤，
-  /// 已输入的通道码/口令保留，任一方案完成都进入 PIN 步骤。
-  void _switchToPassphrase() {
-    setState(() {
-      _role = _preEnvelopeRole;
-      _step = _preEnvelopeRole == _WizardRole.create ? 2 : 3;
-      _status = null;
-      _localError = null;
-    });
-  }
-
-  /// offline：信封导入路径——认证/落盘/完成（Space Key 已存 _spaceKey）。
-  ///
-  /// **当前不可达（自 2026-09-09 起）**：信封页（offline 步骤 1）的「下一步」在
-  /// _nextStep 里就分支回 join 口令页（老板 2026-09-09 定：信封⇄口令互切由页内
-  /// 「改用共享口令」承担），offline 角色永远到不了完成点——粘贴的信封文字也不
-  /// 被消费（_verifyEnvelope 同年删除）。整个信封页实际是口令页的旁路 detour。
-  /// 本函数保留备将来两种走向：① 产品决定复活信封导入（补 _verifyEnvelope +
-  /// 放行完成）；② 决定删掉信封页整条线（连同 _buildStepEnvelope/_openEnvelopeImport/
-  /// _switchToPassphrase/_role==offline 分支）。**属待产品决策项**，故不删。
-  // ignore: unused_element
-  Future<void> _runEnvelopeImport() async {
-    final kp = _keyPair;
-    if (kp == null) return;
-    final enroll = _enroll!;
-    // 认证（用登记后的真实 entranceId；信封页验证时未认证则这里补上）
-    if (_sessionToken == null) {
-      final session = await _authenticate(kp, enroll.entranceId, spaceId: enroll.spaceId);
-      _sessionToken = session.sessionToken;
-    }
-    if (!mounted) return;
-    // 落盘：已设锁沿用（不写包，addSpace 由调用方做）；未设锁明文持久化（下次启动直接进聊天）
-    if (_lockAlreadySet) {
-      _completeWizard();
-      return;
-    }
-    await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-      spaceId: enroll.spaceId,
-      entranceId: enroll.entranceId,
-      spaceKeyB64: base64Encode(_spaceKey!),
-      keyVersion: 1,
-      token: _sessionToken!,
-      publicKeyB64: kp.publicKeyB64,
-      privateKeyB64: kp.privateKeyB64,
-    ));
-    _completeWizard();
-  }
 }
 
 /// 邀请链接扫码页：全屏相机预览，识别到二维码即返回其内容（自动填入与自动
@@ -2496,77 +2322,6 @@ class _InviteScannerPageState extends State<_InviteScannerPage> {
       ),
     );
   }
-}
-
-/// 表单右上角「折角切换块」（老板要求 2026-09-10）：右上角斜切（狗耳朵折角），
-/// 折角背后露出品牌粉——类似登录页手机/邮件登录互换、二维码/输入框登录互换的
-/// 切换样式，比纯图标更生动。
-class _DogEarSwitch extends StatelessWidget {
-  const _DogEarSwitch({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  static const double _cut = 14; // 折角斜切边长（等腰直角三角形）
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Clickable(
-        onTap: onTap,
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Stack(
-            children: [
-              // 折角背面：斜切三角形区域露出品牌粉（折角翻起效果）
-              const Positioned.fill(child: ColoredBox(color: Color(0xFFD6529C))),
-              // 主体矩形：右上角斜切，白底细描边 + 切换图标居中
-              Positioned.fill(
-                child: ClipPath(
-                  clipper: const _DogEarClipper(_cut),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFE9D5E0)),
-                    ),
-                    child: Icon(icon, size: 22, color: const Color(0xFF33415A)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 右上角斜切（狗耳朵/折角）路径：右上角切掉边长 [cut] 的等腰直角三角形。
-class _DogEarClipper extends CustomClipper<Path> {
-  const _DogEarClipper(this.cut);
-
-  final double cut;
-
-  @override
-  Path getClip(Size size) {
-    return Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width - cut, 0)
-      ..lineTo(size.width, cut)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(_DogEarClipper oldClipper) => oldClipper.cut != cut;
 }
 
 /// 空间入口页的选择卡片：大图标 + 名称，点按选择「创建秘境 / 加入秘境」。

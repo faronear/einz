@@ -10,7 +10,8 @@
 // 失配要么排查日志、要么读 PNG 对比（读图 token 消耗极高），收益不抵成本。
 // 等 UI 冻结（发版前/集中打磨样式）再开开关一次性重生成。
 // 向导步骤编号规则（老板确认，2026-09-05 对齐 TUI 重构后）：
-// 1=检测页；1.1/1.2/1.3=create/join/offline 三条自动判定流程；
+// 1=检测页；1.1/1.2=create/join 两条自动判定流程（offline 密保信封线
+// 2026-10-19 整条删除，原 1.3 系列一并退役）；
 // 分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_name=create 身份名字）。
 //
 // 说明：golden 测试默认 Ahem 字体（中文显示为方块），此处加载系统中文字体
@@ -361,23 +362,7 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
   });
 
-  // ---- offline（密保信封导入：口令页次级入口，不再走 AppBar 菜单）----
-
-  testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
-    _usePhoneSize(tester);
-    // 信封入口仅 join（第二/三条通道）口令页显示：探测到 memberA → 身份（自动进通道码页）→ 口令页
-    await pumpSetup(tester, probeNames: {'memberA': 'Lukas'});
-    await tester.tap(find.text('Lukas')); // 选身份（自动进通道码页）
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 通道码（校验非空）
-    await tester.tap(find.text('下一步')); // 通道码 → 口令页
-    await tester.pumpAndSettle();
-    // 口令页底部「改用线下密保信封」→ offline 首步即密保信封粘贴页
-    await tester.tap(find.text('改用线下密保信封'));
-    await tester.pumpAndSettle();
-    await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));
-  });
+  // ---- offline（密保信封导入）---- 整条线 2026-10-19 删除，对应 golden 用例一并移除
 
   testWidgets('向导 ⋯ 菜单：退出本应用确认弹窗（不触发 exit）', (WidgetTester tester) async {
     await pumpSetup(tester, keyPair: _goldenKeyPair); // 空名称表 → create 向导

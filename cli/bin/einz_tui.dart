@@ -454,8 +454,9 @@ Future<(bool, String, List<String>)> _probeDirect(String server) async {
 }
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
-/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
-/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧用密保信封导入）。
+/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)。
+/// （曾有的"sealed 信封导入"选项早已不在 TUI 引导里——App 侧信封线也于
+///  2026-10-19 整条删除，Space Key 接入统一走邀请 token + 共享口令。）
 ///
 /// 地址**永不落盘**（与 App 端同构）：`--server` 与引导手输都只本次生效，出厂默认值
 /// 每次启动重读。默认地址连不上时每次启动都会再问一次——那是"该去改 localConfig.json
@@ -1475,7 +1476,7 @@ Future<void> main(List<String> args) async {
   // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成通道凭证；
   // 无 Space Key → 口令接入（escrow）；未激活 → auth。全部就绪后才进入 TUI。
   final onboard = await _onboard(storePath, server);
-  if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
+  if (exitCode != 0) return; // 非交互终端等启动期致命错误：提示后退出
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/myeinz.json）

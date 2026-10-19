@@ -1,6 +1,6 @@
-// 密保信封入口可见性回归测试：信封（及通道码）是"后续通道加入"机制——
-// 仅 join（第二/三条通道）口令页显示「改用线下密保信封」入口；
-// 首条通道（create）没有对端通道可用信封，口令页不显示该入口。
+// create 向导流程回归测试：首条通道的名字/性别/口令各步校验与放行。
+// （原「密保信封入口可见性」用例随信封线 2026-10-19 整条删除而移除；
+//  join 流的口令页覆盖见 setup_join_passphrase_test.dart。）
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -12,13 +12,8 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz/data/server_config.dart';
 
-/// 打开向导并走到口令页。join=true 走 Multiverse join 路径（入口页 → token
-/// preflight → 名字 → 口令）；false=create（首条通道，名字页——createSpace 无
-/// fake 注入，名字页下一步即红字拦截，断言只查"无信封入口"仍成立）。
-Future<void> pumpToPassphrase(
-  WidgetTester tester, {
-  bool join = false,
-}) async {
+/// 打开向导并走到口令页（create 首条通道：入口页 → 名字/性别 → 类型 → 口令）。
+Future<void> pumpToPassphrase(WidgetTester tester) async {
   final db = LocalDatabase.forTesting(NativeDatabase.memory());
   addTearDown(db.close);
   await tester.pumpWidget(MaterialApp(
@@ -29,20 +24,6 @@ Future<void> pumpToPassphrase(
       db: db,
       probeServer: (_) async => const ServerHealth(
           ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
-      // Multiverse join：token 校验（preflight）用 fake——默认走真实 ApiClient。
-      // 群聊一期（2026-10-03）：purpose='invite' → 走"新成员自填名"向导
-      preflightOverride: join
-          ? (token) async => const SpaceJoinPreflight(
-              spaceId: 'space-test',
-              status: 'waiting',
-              memberCount: 1,
-              purpose: 'invite',
-              slots: [
-                SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
-                SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
-              ],
-            )
-          : null,
       // create 名字页下一步触发 Multiverse 创建（_runBootstrap → POST /spaces），
       // 需 createOverride fake 返回成功结果才能放行到口令页
       createOverride: () async => const SpaceCreateResult(
@@ -59,53 +40,24 @@ Future<void> pumpToPassphrase(
   ));
   await tester.pumpAndSettle();
 
-  if (join) {
-    // join：入口页 → 加入 → token 页（preflight 通过）→ 名字页（invite 自填名，
-    // 群聊一期：身份选择页已删）→ 口令页
-    await tester.tap(find.text(_zh.setupEntryJoin));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'TOKEN-1');
-    await tester.tap(find.text(_zh.wizardNext)); // preflight 通过 → 直接进名字页
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '小芳'); // invite 新成员自填名字
-    await tester.testTextInput.receiveAction(TextInputAction.done); // 收键盘露出性别卡
-    await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.female)); // 选性别女
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(_zh.wizardNext));
-    await tester.pumpAndSettle(); // → 口令页
-  } else {
-    // create：入口页 → 新建 → 名字页（填名字+性别）→ 口令页（群聊一期：伴侣页已删）
-    await tester.tap(find.text(_zh.setupEntryCreate));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Lukas');
-    await tester.tap(find.byIcon(Icons.male)); // 选性别男
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(_zh.wizardNext));
-    await tester.pumpAndSettle(); // → 类型页（2026-10-04 起 create 多了这一步）
-    await tester.tap(find.text(_zh.wizardSpaceKindDuo)); // 选「双人秘境」
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(_zh.wizardNext));
-    await tester.pumpAndSettle(); // → 口令页（自动自举 createOverride 放行）
-  }
+  // create：入口页 → 新建 → 名字页（填名字+性别）→ 口令页（群聊一期：伴侣页已删）
+  await tester.tap(find.text(_zh.setupEntryCreate));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField), 'Lukas');
+  await tester.tap(find.byIcon(Icons.male)); // 选性别男
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(_zh.wizardNext));
+  await tester.pumpAndSettle(); // → 类型页（2026-10-04 起 create 多了这一步）
+  await tester.tap(find.text(_zh.wizardSpaceKindDuo)); // 选「双人秘境」
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(_zh.wizardNext));
+  await tester.pumpAndSettle(); // → 口令页（自动自举 createOverride 放行）
 }
 
 /// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
 final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 
 void main() {
-  testWidgets('首条通道 create 口令页：不显示信封导入入口', (WidgetTester tester) async {
-    await pumpToPassphrase(tester);
-    expect(find.byIcon(Icons.mail_outline), findsNothing,
-        reason: '首条通道没有对端通道导出的信封，不应提供信封导入入口');
-  });
-
-  testWidgets('后续通道 join 口令页：显示信封导入入口', (WidgetTester tester) async {
-    await pumpToPassphrase(tester, join: true);
-    expect(find.byIcon(Icons.mail_outline), findsOneWidget,
-        reason: 'join 用户可用对端导出的信封替代口令获取 Space Key（标题行右上角切换图标）');
-  });
-
   testWidgets('create 步骤 1：名字/性别缺一不可——双红字同显、填写即消、选中放行', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -169,12 +121,6 @@ void main() {
     expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget, reason: 'create 口令页');
     expect(find.byType(TextField), findsNWidgets(2),
         reason: '首条通道设置口令需输入两次（口令 + 确认）——老板 2026-09-12');
-  });
-
-  testWidgets('join 口令页：仅一个口令输入框（验证已有口令，无需确认）', (WidgetTester tester) async {
-    await pumpToPassphrase(tester, join: true);
-    expect(find.byType(TextField), findsOneWidget,
-        reason: 'join 是验证已有口令，无需二次确认');
   });
 
   testWidgets('口令输入框的小眼睛排除在 TAB 序列外（桌面版连续输入不被打断）',

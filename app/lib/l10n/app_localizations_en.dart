@@ -37,15 +37,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get close => 'Close';
 
   @override
-  String setupPageEnvelopeKeyHint(String mode) {
-    String _temp0 = intl.Intl.selectLogic(mode, {
-      'duo': 'your companion',
-      'other': 'your companions',
-    });
-    return 'A key envelope is an asymmetrically encrypted text handed over in person. Ask $_temp0 for it.';
-  }
-
-  @override
   String get setupPageNeedPassphrase => 'Enter a shared passphrase';
 
   @override
@@ -127,9 +118,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardAppBarJoin => 'Join a space';
 
   @override
-  String get wizardAppBarOffline => 'Import key envelope';
-
-  @override
   String get wizardNext => 'Next';
 
   @override
@@ -173,9 +161,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseTitle => 'Verify passphrase';
-
-  @override
-  String get wizardTitleEnvelope => 'Verify key envelope';
 
   @override
   String get wizardEnrollExists =>
@@ -226,12 +211,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseWrong => 'Wrong passphrase.';
-
-  @override
-  String get wizardSwitchToEnvelope => 'Use key envelope instead (offline)';
-
-  @override
-  String get wizardSwitchToPassphrase => 'Use a shared passphrase instead';
 
   @override
   String get welcomeDialogTitleCreate => 'All set!';
@@ -342,9 +321,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get startupInitClearedRestart =>
       'Local data cleared. Fully quit and reopen the app.';
-
-  @override
-  String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override
   String get setupPageScanInvite => 'Scan entrance token QR code';

@@ -51,12 +51,14 @@
   `_pinSkipped`·`_pinError` 及 ARB 死键（wizardTitlePin/wizardPinHint/
   setupPinReuseNotice/setupPageSkipPin*/setPinDialogPinHint/ConfirmHint）全删；
   chat_page 弹窗的锁屏码功能不受影响
-- `[ ]` **信封页（密保信封导入）死活待产品决策**（2026-10-19 review 发现）：信封页自
-  2026-09-09 起实际是口令页的旁路 detour——「下一步」分支回口令页（老板 2026-09-09 定）、
-  粘贴的信封文字不被消费（`_verifyEnvelope` 同年删除）、`_runEnvelopeImport` 不可达
-  （已标 `ignore: unused_element` 保留备找回）。待老板定：① 复活信封导入（补验证+放行
-  完成）；② 删掉整条线（`_buildStepEnvelope`/`_openEnvelopeImport`/`_switchToPassphrase`/
-  offline 角色分支）
+- `[x]` **信封页（密保信封导入）整条删除**（2026-10-19 老板拍板"删掉"）：信封页自
+  2026-09-09 起实际是口令页旁路 detour（下一步分支回口令页、粘贴内容不被消费、
+  `_runEnvelopeImport` 不可达），且无生产者。删除范围：`_WizardRole.offline` 枚举及全部分支、
+  `_buildStepEnvelope`/`_openEnvelopeImport`/`_switchToPassphrase`/`_runEnvelopeImport`/
+  `_DogEarSwitch`/`_DogEarClipper`、口令页邮件图标入口、`_envelopeKey`/`_envelopeFocus`/
+  `_preEnvelopeRole`、6 个 l10n 键；测试删 setup_envelope_verify_test、wizard_envelope_entry_test
+  改名 wizard_create_flow_test（去信封用例）、golden 1.3.1 用例删；docs 五处同步。
+  Space Key 接入现仅邀请链接 + 共享口令两路径
 - `[ ]` **macOS 分发签名 + 公证**（2026-09-18 记）：Developer ID Application 证书 →
   `codesign --options runtime --timestamp` → `notarytool submit` + `stapler staple` →
   搬进 GitHub Actions（secrets：证书 p12/密码/App 专用密码/AppleID）

@@ -9,14 +9,6 @@
   "settingsScopeAll": "Apply to all spaces on this device",
   "settingsScopeAllDone": "Applied to all spaces on this device",
   "close": "Close",
-  "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.",
-  "@setupPageEnvelopeKeyHint": {
-    "placeholders": {
-      "mode": {
-        "type": "String"
-      }
-    }
-  },
   "setupPageNeedPassphrase": "Enter a shared passphrase",
   "upgradeFrozenTitle": "Update required",
   "upgradeFrozenBody": "Your app version {current} is no longer supported, you need at least {min}. Please update to continue.",
@@ -72,7 +64,6 @@
   "wizardGenderRequired": "Select a gender",
   "wizardAppBarCreate": "Create a space",
   "wizardAppBarJoin": "Join a space",
-  "wizardAppBarOffline": "Import key envelope",
   "wizardNext": "Next",
   "wizardBack": "Back",
   "wizardDone": "Done",
@@ -87,7 +78,6 @@
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
   "wizardTitlePassphrase": "Set passphrase",
   "wizardJoinPassphraseTitle": "Verify passphrase",
-  "wizardTitleEnvelope": "Verify key envelope",
   "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
@@ -119,8 +109,6 @@
     }
   },
   "wizardJoinPassphraseWrong": "Wrong passphrase.",
-  "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
-  "wizardSwitchToPassphrase": "Use a shared passphrase instead",
   "welcomeDialogTitleCreate": "All set!",
   "welcomeDialogTitleJoin": "All set!",
   "welcomeDialogMessage": "Your space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!",
@@ -189,7 +177,6 @@
   "startupInitClearDataTitle": "Clear local data?",
   "startupInitClearDataMessage": "Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.",
   "startupInitClearedRestart": "Local data cleared. Fully quit and reopen the app.",
-  "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
   "setupPageScanInvite": "Scan entrance token QR code",
   "setupPageScannerHint": "Point the camera at the entrance token QR code",
   "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first entrance first",
