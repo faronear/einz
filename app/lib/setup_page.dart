@@ -1029,9 +1029,9 @@ class _SetupPageState extends State<SetupPage> {
             onPressed: _enterDemo,
             child: Text(
               l10n.setupEntryDemo,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.85),
+                color: Color(0xFF2271F7), // 品牌蓝：入口页卡片是白底，白字会隐形（老板 2026-10-19）
                 decoration: TextDecoration.underline,
               ),
             ),
