@@ -15221,3 +15221,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 ## 20261019 「邀请新同伴」按钮与成员卡片拉开间距
 
 **（2026-10-19T12:47:19Z / 2026-10-19 20:47）**：老板指出「我的秘境」列表弹层（群空间的成员弹层）里，「邀请新同伴」大按钮离上方成员卡太近（只有卡片自身 vertical 4 的下边距 = 4px），比成员卡之间（4+4=8px）还近，看不出它和成员卡不是一组。修法：按钮外包一层 Column，在 Material 前加 `SizedBox(height: 12)`——按钮与最后一张卡实际间距 16px，明显大于卡间 8px（`app/lib/chat_page.dart` 成员弹层 `_canInvite` 分支）。验证：`flutter analyze lib/chat_page.dart` 0 问题；diff 单 hunk 全为本改动，无混入。
+
+**（2026-10-19T12:26:00Z / 2026-10-19 20:26）**：修「群名未设置时退群闸门无法通过」（老板实测：英文弹窗要求 `Type the group name ""`——空群名被插进提示，而闸门实际期待的固定确认词 RESET 从没出现，用户不知道该输什么）。根因：confirmExitGroup 把 groupName 原样传给 exitGroupNameHint/Label，空值时渲染出 `""`；_confirmDestructive 内部虽退化为 resetEntranceConfirmWord，但提示与预期输入不一致。修法：confirmExitGroup 按 hasName 分流三套文案——未命名时 hint 用新键 exitGroupConfirmWordHint（"群组还没有命名。请输入“重置”以确认"/"This group has no name yet. Type “RESET” to confirm"）、label 直接给确认词、mismatch 用新键 exitGroupConfirmWordMismatch（确认词口径红字）；expected 与提示自此一致。测试新增用例「群名未设置」：先输错报确认词口径红字且留在群里，再输对（resetEntranceConfirmWord）走完整退群链回向导。FAQ 中英页补未命名分支说明。验证：analyze 0，group_exit_flow_test 4/4。

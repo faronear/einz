@@ -1371,7 +1371,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitGroupMessage =>
-      'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. History stays on the other members\' devices. To come back later, a remaining member must send you a new invite (you\'ll join as a new identity). This cannot be undone!';
+      'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. This cannot be undone!';
 
   @override
   String get exitGroupConfirm => 'Leave';
@@ -1388,6 +1388,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitGroupNameMismatch => 'Enter the correct group name to confirm';
+
+  @override
+  String exitGroupConfirmWordHint(String word) {
+    return 'This group has no name yet. Type “$word” to confirm';
+  }
+
+  @override
+  String get exitGroupConfirmWordMismatch =>
+      'Enter the correct confirmation word';
 
   @override
   String get exitGroupFailed =>

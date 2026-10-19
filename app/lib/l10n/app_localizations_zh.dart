@@ -1304,7 +1304,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exitGroupMessage =>
-      '退出后，这个群组会从你的所有设备上消失：本机立即删除全部数据，你名下的其他设备也会自动退出并清除本地数据；历史消息仍留在其他成员的设备上。日后回来需要剩余成员重新邀请（将以新身份加入）。此操作无法撤销！';
+      '退出后，这个群组会从你的所有设备上消失：本机立即删除全部数据，你名下的其他设备也会自动退出并清除本地数据。此操作无法撤销！';
 
   @override
   String get exitGroupConfirm => '退出';
@@ -1321,6 +1321,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exitGroupNameMismatch => '请输入正确的群组名称以确认';
+
+  @override
+  String exitGroupConfirmWordHint(String word) {
+    return '群组还没有命名。请输入“$word”以确认';
+  }
+
+  @override
+  String get exitGroupConfirmWordMismatch => '请输入正确的确认词';
 
   @override
   String get exitGroupFailed => '退出失败，仍留在群组中';

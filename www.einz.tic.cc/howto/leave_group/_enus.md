@@ -10,7 +10,7 @@ In a group space (three or more members), anyone can leave on their own. Here is
 
 ## How to leave
 
-Open the members sheet (tap the group name capsule in the top bar) and use the red **Leave group** item at the bottom. You will be asked to type the **group name** to confirm (plus your device PIN if you set one) — the same gate as "Destroy this entrance", so a stray tap can't do it.
+Open the members sheet (tap the group name capsule in the top bar) and use the red **Leave group** item at the bottom. You will be asked to type the **group name** to confirm (plus your device PIN if you set one) — the same gate as "Destroy this entrance", so a stray tap can't do it. If the group has no name yet, type the fixed confirmation word **RESET** instead.
 
 ## What happens when you leave
 

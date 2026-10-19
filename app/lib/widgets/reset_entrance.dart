@@ -186,20 +186,29 @@ Future<bool> confirmExitGroup(
 }) async {
   final database = db ?? LocalDatabase.shared;
   final l10n = AppLocalizations.of(context)!;
+  // 群组名是确认因子（用户自己起的名字）；没起过名 → 弹窗内部退化为固定确认词
+  // （resetEntranceConfirmWord，与未命名通道的销毁流程同一机制）。此时三套文案
+  // 必须换成"确认词"口径——否则提示写"请输入群组名称「重置」"，而「重置」显然不是
+  // 群名，用户不知道该输什么（老板 2026-10-19 实测）。
+  final name = groupName.trim();
+  final hasName = name.isNotEmpty;
+  final confirmWord = l10n.resetEntranceConfirmWord;
   final ok = await _confirmDestructive(
     context,
     db: database,
-    // 群组名是确认因子（用户自己起的名字）；没起过名 → 弹窗内部退化为固定确认词。
-    // 群名仅本机存储（服务端没有空间名字段），所以这里只能用它。
+    // 群名仅本机存储（服务端没有空间名字段），所以这里只能用它
     entranceName: groupName,
     hasPin: hasPin,
     copy: ConfirmDialogCopy(
       title: l10n.exitGroupTitle,
       message: l10n.exitGroupMessage,
       confirmLabel: l10n.exitGroupConfirm,
-      nameHint: l10n.exitGroupNameHint(groupName),
-      nameLabel: l10n.exitGroupNameLabel(groupName),
-      nameMismatch: l10n.exitGroupNameMismatch,
+      nameHint: hasName
+          ? l10n.exitGroupNameHint(name)
+          : l10n.exitGroupConfirmWordHint(confirmWord),
+      nameLabel: hasName ? l10n.exitGroupNameLabel(name) : confirmWord,
+      nameMismatch:
+          hasName ? l10n.exitGroupNameMismatch : l10n.exitGroupConfirmWordMismatch,
     ),
   );
   if (!ok || !context.mounted) return false;

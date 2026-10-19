@@ -805,6 +805,16 @@
     }
   },
   "exitGroupNameMismatch": "请输入正确的群组名称以确认",
+  "exitGroupConfirmWordHint": "群组还没有命名。请输入“{word}”以确认",
+  "@exitGroupConfirmWordHint": {
+    "description": "群名未设置时退群确认闸门的提示（expected 退化为固定确认词，与未命名通道的销毁流程同机制）",
+    "placeholders": {
+      "word": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupConfirmWordMismatch": "请输入正确的确认词",
   "exitGroupFailed": "退出失败，仍留在群组中",
   "exitGroupMenuItem": "退出群组",
   "chatPageMemberLeftNotice": "{name} 退出了群组",

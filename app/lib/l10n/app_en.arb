@@ -853,6 +853,16 @@
     }
   },
   "exitGroupNameMismatch": "Enter the correct group name to confirm",
+  "exitGroupConfirmWordHint": "This group has no name yet. Type “{word}” to confirm",
+  "@exitGroupConfirmWordHint": {
+    "description": "Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed entrance)",
+    "placeholders": {
+      "word": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupConfirmWordMismatch": "Enter the correct confirmation word",
   "exitGroupFailed": "Couldn't leave the group — you're still in it",
   "exitGroupMenuItem": "Leave group",
   "chatPageMemberLeftNotice": "{name} left the group",

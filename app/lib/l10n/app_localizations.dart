@@ -2357,7 +2357,7 @@ abstract class AppLocalizations {
   /// No description provided for @exitGroupMessage.
   ///
   /// In en, this message translates to:
-  /// **'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. History stays on the other members\' devices. To come back later, a remaining member must send you a new invite (you\'ll join as a new identity). This cannot be undone!'**
+  /// **'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. This cannot be undone!'**
   String get exitGroupMessage;
 
   /// No description provided for @exitGroupConfirm.
@@ -2383,6 +2383,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter the correct group name to confirm'**
   String get exitGroupNameMismatch;
+
+  /// Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed entrance)
+  ///
+  /// In en, this message translates to:
+  /// **'This group has no name yet. Type “{word}” to confirm'**
+  String exitGroupConfirmWordHint(String word);
+
+  /// No description provided for @exitGroupConfirmWordMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the correct confirmation word'**
+  String get exitGroupConfirmWordMismatch;
 
   /// No description provided for @exitGroupFailed.
   ///

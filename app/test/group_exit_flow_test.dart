@@ -186,19 +186,24 @@ Future<({LocalDatabase db, _ExitApi api})> _pump(
   return (db: db, api: api);
 }
 
-/// 点状态条胶囊（群名）打开「我的群组」弹层。
-Future<void> _openMembersSheet(WidgetTester tester) async {
-  await tester.tap(find.descendant(of: _statusBar, matching: find.text('测试群')));
+/// 点状态条胶囊（群名）打开「我的群组」弹层。群名未设置时胶囊里只有编辑图标，
+/// 点它同样打开（与 group_status_bar_test 的走位一致）。
+Future<void> _openMembersSheet(WidgetTester tester, {String groupName = '测试群'}) async {
+  if (groupName.isEmpty) {
+    await tester.tap(find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
+  } else {
+    await tester.tap(find.descendant(of: _statusBar, matching: find.text(groupName)));
+  }
   await tester.pumpAndSettle();
   expect(find.text(_zh.chatPageMembersTitle('group')), findsOneWidget,
       reason: '点群名胶囊应打开「我的群组」弹层');
 }
 
-/// 弹层 →「退出群组」→ 确认闸门（输入群组名）→ 点确认。
+/// 弹层 →「退出群组」→ 确认闸门（输入群组名 / 未命名时输确认词）→ 点确认。
 /// 之后按 [expectSuccess] 分流 settle：成功链要清本地（十几次真实异步跳转，
 /// 见 [_settleUntilWizard]）；失败链只弹顶部通知，几轮就够。
 Future<void> _tapExitAndConfirm(WidgetTester tester,
-    {required bool expectSuccess}) async {
+    {required bool expectSuccess, String confirmWord = '测试群'}) async {
   await tester.tap(find.text(_zh.exitGroupMenuItem));
   await tester.pumpAndSettle();
   // 红字项 onTap = 收弹层 + _menuAction（300ms route 交接）
@@ -206,7 +211,7 @@ Future<void> _tapExitAndConfirm(WidgetTester tester,
   await tester.pumpAndSettle();
   expect(find.text(_zh.exitGroupTitle), findsOneWidget,
       reason: '应弹出退出确认闸门（群组名 + 禁误触关闭）');
-  await tester.enterText(_dialogField, '测试群');
+  await tester.enterText(_dialogField, confirmWord);
   await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(FilledButton, _zh.exitGroupConfirm));
   if (expectSuccess) {
@@ -303,5 +308,37 @@ void main() {
         reason: '失败必须留在群里（设计 §6.3：失败不清本地）');
     expect(find.text(_zh.exitGroupFailed), findsOneWidget,
         reason: '顶部通知如实告知退出失败');
+  });
+
+  testWidgets('群名未设置：闸门改要固定确认词（输错有确认词口径红字，输对方能通过）', (tester) async {
+    final ctx = await _pump(tester, groupName: '');
+
+    await _openMembersSheet(tester, groupName: '');
+    await tester.tap(find.text(_zh.exitGroupMenuItem));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    // 提示必须是"确认词"口径，且 expected 与提示一致——否则用户无法通过
+    // （老板 2026-10-19 实测：原来写"请输入群组名称「重置」"，而重置不是群名）
+    expect(
+        find.text(_zh.exitGroupConfirmWordHint(_zh.resetEntranceConfirmWord)),
+        findsOneWidget);
+    // 输错 → 确认词口径的红字（不是"请输入正确的群组名称"）
+    await tester.enterText(_dialogField, '测试群');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, _zh.exitGroupConfirm));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.exitGroupConfirmWordMismatch), findsOneWidget,
+        reason: '输错时报确认词口径的红字');
+    expect(find.byType(ChatPage), findsOneWidget, reason: '闸门没过 → 留在群里');
+    // 输对（固定确认词）→ 通过，走完整退群链
+    await tester.enterText(_dialogField, _zh.resetEntranceConfirmWord);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, _zh.exitGroupConfirm));
+    await _settleUntilWizard(tester);
+
+    expect(ctx.api.leaveCalls, ['space-demo']);
+    expect(find.byType(ChatPage), findsNothing);
+    expect(find.byType(SetupPage), findsOneWidget);
   });
 }
