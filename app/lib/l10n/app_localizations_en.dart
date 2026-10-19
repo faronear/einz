@@ -905,14 +905,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageTombstoneKeepDesc =>
-      'Show a placeholder: content hidden, time and record kept, message flow unbroken';
+      'Show a time and status bar without content, message flow unbroken';
 
   @override
   String get chatPageTombstoneHide => 'Hide completely';
 
   @override
   String get chatPageTombstoneHideDesc =>
-      'Tombstones disappear from the message flow entirely';
+      'Disappear from the message flow entirely';
 
   @override
   String get chatPageTombstoneSubmit => 'Apply';

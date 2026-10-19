@@ -1601,7 +1601,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneKeepDesc.
   ///
   /// In en, this message translates to:
-  /// **'Show a placeholder: content hidden, time and record kept, message flow unbroken'**
+  /// **'Show a time and status bar without content, message flow unbroken'**
   String get chatPageTombstoneKeepDesc;
 
   /// No description provided for @chatPageTombstoneHide.
@@ -1613,7 +1613,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHideDesc.
   ///
   /// In en, this message translates to:
-  /// **'Tombstones disappear from the message flow entirely'**
+  /// **'Disappear from the message flow entirely'**
   String get chatPageTombstoneHideDesc;
 
   /// No description provided for @chatPageTombstoneSubmit.

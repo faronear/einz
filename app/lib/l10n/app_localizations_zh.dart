@@ -641,7 +641,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMoreSettingsStorage => '附件存储';
 
   @override
-  String get chatPageMoreSettingsTombstone => '墓碑消息';
+  String get chatPageMoreSettingsTombstone => '消息留痕';
 
   @override
   String get chatPageAttachmentStorageNote => '图片、视频、音频、文件等附件存放在哪里？';
@@ -844,13 +844,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTombstoneHeading => '消息留痕';
 
   @override
-  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否留痕？';
+  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否显示？';
 
   @override
   String get chatPageTombstoneKeep => '占位留痕';
 
   @override
-  String get chatPageTombstoneKeepDesc => '显示为消息墓碑：正文隐藏，时间记录仍在，不打破消息流水';
+  String get chatPageTombstoneKeepDesc => '显示为时间和状态条，正文隐藏，不打破消息流水';
 
   @override
   String get chatPageTombstoneHide => '彻底消失';
