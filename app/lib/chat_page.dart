@@ -10163,6 +10163,13 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     }
 
     if (changePin) {
+      // 新 PIN 非空必须先行校验（老板 2026-10-19）：只填了确认框、新 PIN 空着
+      // 时，落进下面的 digitsOnly/length 校验会报"只能是数字/太短"这种不着边的
+      // 红字——真正的错误是"新 PIN 没填"。统一报 chatPageSetLockPinRequired。
+      if (pin.isEmpty) {
+        setState(() => _error = l10n.chatPageSetLockPinRequired);
+        return;
+      }
       // 已设锁屏码：修改必须先验证当前锁屏码（老板 2026-09-14 定）——
       // 否则"清空 → 重设"两步即可绕过验证；手机被他人短暂拿到就能装一个自己的 PIN。
       // 验证走 AppLockService.unlockVault（与锁屏同一套防爆破：连错 5 次锁 30 秒）。

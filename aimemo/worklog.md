@@ -15171,3 +15171,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T02:35:00Z / 2026-10-19 10:35）**：未设 PIN 时两空提交「启用」改报错（老板 2026-10-19）。原行为：未设锁屏码时两框全空点「启用」=无改动放行+顶部通知 chatPageSetLockNoPinNotice（2026-09-14 遗留语义）。老板定：必须红字要求输入新 PIN，不想设的正确出路是「取消」按钮。实现：_submit 的 !_hasPin 空提交分支改 setState 红字（新键 chatPageSetLockPinRequired，zh「请输入新 PIN 以启用锁屏码」）；旧键 chatPageSetLockNoPinNotice 无调用点，arb 删除 + gen-l10n 重新生成。新增用例「未设 PIN 时两空提交」通过（弹窗不关、红字可见、锁未落盘）。analyze 0。提交 6ba2ad33。
 
 **（2026-10-19T02:50:00Z / 2026-10-19 10:50）**：确认 PIN 输入框恢复常驻（老板 2026-10-19 实测撤回）。上午做的「新 PIN 空时隐藏确认行、输入即出现」体验不好——输入框凭空长出来打断填写节奏。撤回：确认行恢复常驻，连同 initState 里为动态显隐加的 _pinCtrl 监听一并删除。analyze 0。提交 5bb0c8ff。
+
+**（2026-10-19T03:10:00Z / 2026-10-19 11:10）**：修复「只填确认框提交报'PIN 只能是数字'」的错位红字（老板 2026-10-19）。根因：pin 空串过不了 isPinDigitsOnly 正则，digitsOnly 校验先于"新 PIN 是否填了"校验执行。修复：_submit 的 changePin 分支最前面加 pin.isEmpty 先行校验，统一报 chatPageSetLockPinRequired（请输入新 PIN 以启用锁屏码）；只填新 PIN 漏确认框仍报「两次输入的 PIN 不一致」（原行为正确）。新增用例覆盖两个方向，通过；analyze 0。

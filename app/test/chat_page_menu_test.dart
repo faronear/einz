@@ -479,6 +479,55 @@ void main() {
     expect(await AppLockService(db).isSetup, false);
   });
 
+  testWidgets('未设 PIN：只填确认框/只填新 PIN，红字都指向真正的错误', (WidgetTester tester) async {
+    // 2026-10-19：只填确认框时旧逻辑落进 digitsOnly 校验，报"PIN 只能是数字"
+    // 这种不着边的红字——新 PIN 非空校验必须先行。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
+
+    final fields =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+
+    // ① 只填确认框 → 红字"请输入新 PIN"，不是"只能是数字"
+    await tester.enterText(fields.at(1), '123456');
+    await tester.tap(find.text('启用'));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageSetLockPinRequired), findsOneWidget);
+    expect(find.text(_zh.setPinDialogPinDigitsOnly), findsNothing);
+    expect(await AppLockService(db).isSetup, false);
+
+    // ② 只填新 PIN → 红字"两次输入的 PIN 不一致"
+    await tester.enterText(fields.at(0), '123456');
+    await tester.enterText(fields.at(1), '');
+    await tester.tap(find.text('启用'));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.setPinDialogPinMismatch), findsOneWidget);
+    expect(await AppLockService(db).isSetup, false);
+  });
+
   testWidgets('有 PIN 时改码：不填/填错旧码都报错不动锁；相同新码也不设置', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
