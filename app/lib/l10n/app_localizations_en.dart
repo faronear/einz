@@ -34,9 +34,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsScopeAllDone => 'Applied to all spaces on this device';
 
   @override
-  String get skip => 'Skip';
-
-  @override
   String get close => 'Close';
 
   @override
@@ -462,6 +459,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockPinRequired => 'Enter a new PIN';
+
+  @override
+  String get chatPageSetLockNothingChanged => 'You haven\'t changed anything';
 
   @override
   String chatPageSetLockDone(String duration) {

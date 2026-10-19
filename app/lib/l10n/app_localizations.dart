@@ -146,12 +146,6 @@ abstract class AppLocalizations {
   /// **'Applied to all spaces on this device'**
   String get settingsScopeAllDone;
 
-  /// No description provided for @skip.
-  ///
-  /// In en, this message translates to:
-  /// **'Skip'**
-  String get skip;
-
   /// No description provided for @close.
   ///
   /// In en, this message translates to:
@@ -865,6 +859,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a new PIN'**
   String get chatPageSetLockPinRequired;
+
+  /// Inline error when the change-PIN dialog is submitted with neither the PIN nor the auto-lock delay modified
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t changed anything'**
+  String get chatPageSetLockNothingChanged;
 
   /// Top notice after PIN is set (duration = auto-lock delay, e.g. "5 minutes")
   ///

@@ -34,9 +34,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScopeAllDone => '已应用到本机所有秘境';
 
   @override
-  String get skip => '跳过';
-
-  @override
   String get close => '关闭';
 
   @override
@@ -390,7 +387,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockRowConfirm => '确认';
 
   @override
-  String get chatPageSetLockNewPinLabel => '新 PIN 或者留空则不变';
+  String get chatPageSetLockNewPinLabel => '新 PIN 或者留空不填';
 
   @override
   String get chatPageSetLockNewPinLabelNoPin => '新 PIN（至少 6 位数字）';
@@ -428,6 +425,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageSetLockPinRequired => '请输入新 PIN';
+
+  @override
+  String get chatPageSetLockNothingChanged => '你没有做任何修改';
 
   @override
   String chatPageSetLockDone(String duration) {

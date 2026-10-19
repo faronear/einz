@@ -10224,26 +10224,32 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       return;
     }
 
-    // 不改 PIN：只提交时长（没动就不写盘）
-    await saveSecondsIfChanged();
-    if (!mounted) return;
+    // 不改 PIN：只提交时长。已设锁屏码时**改时长同样要验老 PIN**（老板 2026-10-19）：
+    // 时长也是锁配置的一部分，手机被他人短暂拿到不该能把自动锁改到永不/极短；
+    // 什么都没动就点「更改」→ 红字明示（不再静默返回）。
     if (!_hasPin) {
       // 未设锁屏码时两框全空就点「启用」＝什么都没设（老板 2026-10-19）：
-      // 不再当"无改动"放行+顶部通知，而是留在弹窗内红字要求输入——不想设
-      // 的正确出路是「取消」按钮
+      // 留在弹窗内红字要求输入——不想设的正确出路是「取消」按钮
       setState(() => _error = l10n.chatPageSetLockPinRequired);
       return;
     }
-    // PIN 没变但时长动过 → 回 true：调用方要重载时长，菜单右侧的「已设置 · 时长」
-    // 显示随弹窗关闭即时刷新（老板 2026-10-18）；啥都没动才不回 true。
-    // 只改时长也要弹通知条（老板 2026-10-19）：与改锁屏码本身同款
-    // （chatPageSetLockDone + 本次生效档位）——不然提交后没有任何反馈
-    if (secondsChanged) {
-      showTopNoticeOn(overlay,
-          l10n.chatPageSetLockDone(_formatLockSeconds(_axisSeconds, l10n)),
-          extraTop: kNoticeExtraTopBelowStatusBar);
+    if (!secondsChanged) {
+      // 已设锁屏码、PIN 和时长都没动：红字明示"没有做任何修改"（老板 2026-10-19）
+      setState(() => _error = l10n.chatPageSetLockNothingChanged);
+      return;
     }
-    Navigator.of(context).pop(secondsChanged ? true : null);
+    // 时长动过：先验老 PIN（与改码同一套防爆破），通过才写盘
+    final existingVault = await _verifyOldPin();
+    if (!mounted) return;
+    if (existingVault == null) return; // 校验失败已在表单内置 _error
+    await AppLockService(widget.db).saveLockSeconds(_axisSeconds);
+    if (!mounted) return;
+    // 回 true：调用方要重载时长，菜单右侧的「已设置 · 时长」显示随弹窗关闭即时
+    // 刷新（老板 2026-10-18）。通知条与改锁屏码本身同款（老板 2026-10-19）
+    showTopNoticeOn(overlay,
+        l10n.chatPageSetLockDone(_formatLockSeconds(_axisSeconds, l10n)),
+        extraTop: kNoticeExtraTopBelowStatusBar);
+    Navigator.of(context).pop(true);
   }
 
   /// 「清除锁屏码」标签页的执行（老板 2026-10-18）：验旧码 → 直接清除。

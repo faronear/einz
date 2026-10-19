@@ -8,7 +8,6 @@
   "settings": "Settings",
   "settingsScopeAll": "Apply to all spaces on this device",
   "settingsScopeAllDone": "Applied to all spaces on this device",
-  "skip": "Skip",
   "close": "Close",
   "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.",
   "@setupPageEnvelopeKeyHint": {
@@ -222,7 +221,7 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after inactivity, you must unlock to enter the space again.",
+  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after inactivity for a while, you must unlock to enter the space again.",
   "chatPageSetLockRowVerify": "Verify",
   "chatPageSetLockRowSet": "Set",
   "chatPageSetLockRowConfirm": "Confirm",
@@ -254,6 +253,10 @@
   "chatPageSetLockPinRequired": "Enter a new PIN",
   "@chatPageSetLockPinRequired": {
     "description": "Inline error when submit is tapped with both PIN fields empty and no PIN set"
+  },
+  "chatPageSetLockNothingChanged": "You haven't changed anything",
+  "@chatPageSetLockNothingChanged": {
+    "description": "Inline error when the change-PIN dialog is submitted with neither the PIN nor the auto-lock delay modified"
   },
   "chatPageSetLockDone": "PIN set. Einz will lock itself everytime after inactivity of {duration}.",
   "@chatPageSetLockDone": {

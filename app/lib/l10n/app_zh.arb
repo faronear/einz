@@ -8,7 +8,6 @@
   "settings": "设置",
   "settingsScopeAll": "应用于本机所有秘境",
   "settingsScopeAllDone": "已应用到本机所有秘境",
-  "skip": "跳过",
   "close": "关闭",
   "setupPageEnvelopeKeyHint": "密保信封是私下交接的一段加密文字。请询问你的同伴获取。",
   "setupPageNeedPassphrase": "请设置共享口令",
@@ -201,11 +200,11 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockHintNoPin": "设置后，每次离开自动锁屏，必须解锁才能再进入秘境。",
+  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后就自动锁屏，必须解锁才能再进入秘境。",
   "chatPageSetLockRowVerify": "验证",
   "chatPageSetLockRowSet": "设置",
   "chatPageSetLockRowConfirm": "确认",
-  "chatPageSetLockNewPinLabel": "新 PIN 或者留空则不变",
+  "chatPageSetLockNewPinLabel": "新 PIN 或者留空不填",
   "chatPageSetLockNewPinLabelNoPin": "新 PIN（至少 6 位数字）",
   "chatPageSetLockSubmitChange": "更改",
   "chatPageSetLockDurationLabel": "自动锁屏每当离开",
@@ -234,7 +233,11 @@
   "@chatPageSetLockPinRequired": {
     "description": "未设锁屏码时两框全空点「启用」的红字提示"
   },
-  "chatPageSetLockDone": "锁屏码已设置，离开 {duration} 后自动锁屏。",
+  "chatPageSetLockNothingChanged": "你没有做任何修改",
+  "@chatPageSetLockNothingChanged": {
+    "description": "已设锁屏码的更改弹窗里，PIN 和自动锁屏时长都没动就点「更改」的红字提示"
+  },
+  "chatPageSetLockDone": "锁屏码已设置，每次离开 {duration} 后自动锁屏。",
   "@chatPageSetLockDone": {
     "description": "初设/更改锁屏码成功后的顶部提示（duration=自动锁屏时长，如「5 分钟」）",
     "placeholders": {
