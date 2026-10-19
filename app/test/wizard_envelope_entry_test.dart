@@ -197,7 +197,7 @@ void main() {
     expect(find.byIcon(Icons.visibility), findsOneWidget, reason: '点击后应显示明文');
   });
 
-  testWidgets('create 口令页：两次不一致 → 红字拦截；一致 → 放行进 PIN 页', (WidgetTester tester) async {
+  testWidgets('create 口令页：两次不一致 → 红字拦截；一致 → 放行离开口令页', (WidgetTester tester) async {
     await pumpToPassphrase(tester);
     expect(find.byType(TextField), findsNWidgets(2));
 
@@ -209,12 +209,13 @@ void main() {
     expect(find.text(_zh.wizardPassphraseMismatch), findsOneWidget, reason: '不一致应红字提醒');
     expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget, reason: '不一致应停留口令页');
 
-    // 改为一致：放行进入 PIN 步骤
+    // 改为一致：放行离开口令页（PIN 步骤已移除，老板 2026-10-19——放行后直接
+    // 走完成路径；本用例无 auth fake，后台失败回落本页属正常，只断言不再进 PIN 页）
     await tester.enterText(find.byType(TextField).at(1), 'secret-pass-1');
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(find.text(_zh.wizardPassphraseMismatch), findsNothing, reason: '一致后旧红字不应残留');
-    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget, reason: '一致应放行进 PIN 步骤');
+    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: 'PIN 步骤已移除，不该再出现');
   });
 
   testWidgets('create 口令页：首框有长度提示；不足 8 位 → 红字拦截（不卡字符种类）', (WidgetTester tester) async {
@@ -230,12 +231,13 @@ void main() {
     expect(find.text(_zh.wizardPassphraseTooShort), findsOneWidget, reason: '不足 8 位应红字提醒');
     expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget, reason: '不足 8 位应停留口令页');
 
-    // 8 位纯数字：放行（老板 2026-09-15：只卡最短长度，字符种类由用户自定）
+    // 8 位纯数字：放行（老板 2026-09-15：只卡最短长度，字符种类由用户自定）。
+    // PIN 步骤已移除（老板 2026-10-19）：断言不再进 PIN 页
     await tester.enterText(find.byType(TextField).at(0), '12345678');
     await tester.enterText(find.byType(TextField).at(1), '12345678');
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(find.text(_zh.wizardPassphraseTooShort), findsNothing, reason: '够 8 位不该再报长度');
-    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget, reason: '满足策略应放行进 PIN 步骤');
+    expect(find.text(_zh.wizardTitlePin), findsNothing, reason: 'PIN 步骤已移除，不该再出现');
   });
 }

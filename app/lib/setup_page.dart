@@ -133,6 +133,7 @@ class _SetupPageState extends State<SetupPage> {
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
   // 两个 PIN 输入框的合并监听：底部按钮据此把标签切成「跳过」（不必整页重建）
+  // ignore: unused_field —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
   late final Listenable _pinInputsChanged = Listenable.merge([_pin, _confirm]);
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户选择"不设置锁屏码"（底部按钮=跳过时）：跳过 setPin，仍完成前置并进下一步
@@ -347,6 +348,8 @@ class _SetupPageState extends State<SetupPage> {
   // 认证/托管/二维码逻辑按步骤迁移重建。
 
   /// 本步骤「第一个输入框」的焦点节点（没有输入框的步骤返回 null）。
+  /// PIN 步骤已移除（老板 2026-10-19）：create/join 的步骤 4 原是 PIN，现在
+  /// 直接落到 done；offline 的步骤 2 同理。
   FocusNode? _firstFieldNodeOfStep() {
     if (_role == null) return null;
     return switch (_role!) {
@@ -354,19 +357,16 @@ class _SetupPageState extends State<SetupPage> {
           1 => _nameFocus, // 我的名字
           // 2 = 秘境类型（只有两张卡片，没有输入框）
           3 => _passphraseFocus, // 共享口令
-          4 => _pinFocus, // 锁屏码（已设锁屏码时该步无输入框，requestFocus 自然空转）
           _ => null,
         },
       _WizardRole.join => switch (_step) {
           1 => _inviteFocus, // 通道码
           // 2 = 选择身份（只有卡片，没有输入框）
           3 => _passphraseFocus,
-          4 => _pinFocus,
           _ => null,
         },
       _WizardRole.offline => switch (_step) {
           1 => _envelopeFocus, // 密信信封
-          2 => _pinFocus,
           _ => null,
         },
     };
@@ -586,17 +586,13 @@ class _SetupPageState extends State<SetupPage> {
                       ),
                       const Spacer(),
                       // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
-                      // 完成页（_step == _stepCount）显示"完成"；
-                      // PIN 步骤且两个输入框都空 → 显示"跳过"（标签即提示，老板要求
-                      // 2026-09-13）——只重建按钮，不重建整页。
+                      // 完成页（_step == _stepCount）显示"完成"。
+                      // 原 PIN 步骤的「跳过」按钮已随 PIN 步移除（老板 2026-10-19）——
+                      // 跳过设锁成为唯一路径，不需要单独的按钮提示。
                       if (_step < _stepCount)
-                        ListenableBuilder(
-                          listenable: _pinInputsChanged,
-                          builder: (_, _) => FilledButton(
-                            onPressed: _nextStep,
-                            child: Text(
-                                _pinStepSkippable ? l10n.skip : l10n.wizardNext),
-                          ),
+                        FilledButton(
+                          onPressed: _nextStep,
+                          child: Text(l10n.wizardNext),
                         )
                       else
                         FilledButton(
@@ -614,38 +610,41 @@ class _SetupPageState extends State<SetupPage> {
   // ---------- 向导框架 ----------
 
   /// 步骤总数（角色由探测自动判定：create=首条通道 / join=后续通道 / offline=密保信封）。
+  ///
+  /// **PIN 步骤已从向导移除**（老板 2026-10-19：没必要——锁屏码随时能在秘境里
+  /// 设置；跳过设锁成为唯一路径，`_pinSkipped` 恒为 true）。原 PIN 步骤整页
+  /// 代码（[_buildStepPin] / [_buildStepPinReuse] / [_setupLockAndEnter]）保留
+  /// 未删，将来要找回时步骤号按此逆推：PIN 原在 create/join=4、offline=2。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        // 2026-10-04：类型页插在第 2 步（关于我 → **类型** → 口令 → PIN → 完成）。
-        // 共 4 个输入页 + 完成页 = 5，正好对上 _buildProgressDots 的 5 个圆点。
-        // （此前是 3 个输入页却写 5：第 4 个圆点永远点不亮——顺手修掉。）
-        return 5;
+        // 名字(1) → 类型(2) → 口令(3) → 完成(4)。共 3 个输入页 + 完成页 = 4。
+        return 4;
       case _WizardRole.join:
-        // 群聊一期（2026-10-03）：身份选择页删除。invite = token/名字/口令/PIN/done；
-        // attach = token/口令/PIN/done——**页码沿用 invite 的编号**（token=1、
-        // 口令=3、PIN=4、done=5，attach 由 token 页直接跳到口令页、跳过 2）。
-        // stepCount 恒为 5：若按"少一页"记 4，PIN 步（4）会撞上 done 判定
-        // （_step == _stepCount）被当成完成页——底部按钮消失、chrome 变 done 样式
-        //（实测 bug：PIN 输入框透明 + 无上一步/下一步/跳过）。
-        return 5;
+        // invite = token/名字/口令/done；attach = token/口令/done——**页码沿用
+        // invite 的编号**（token=1、口令=3、done=4，attach 由 token 页直接跳到口令页、
+        // 跳过 2）。stepCount 恒为 4：若按"少一页"记 3，口令步（3）会撞上 done 判定
+        // （_step == _stepCount）被当成完成页——底部按钮消失、chrome 变 done 样式。
+        return 4;
       case _WizardRole.offline:
-        return 3; // envelope/pin/done
+        return 2; // envelope/done
       case null:
         return 1;
     }
   }
 
-  /// 当前是否为 PIN 步骤（create=4 / join=4 / offline=2）。
+  // 当前是否为 PIN 步骤（create=4 / join=4 / offline=2）。
+  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
   bool get _isPinStep =>
       (_role == _WizardRole.create && _step == 4) ||
       (_role == _WizardRole.join && _step == 4) ||
       (_role == _WizardRole.offline && _step == 2);
 
-  /// PIN 步骤上「两个输入框都空」：此时底部按钮=跳过设锁（标签「跳过」），
-  /// 按钮标签本身就是提示，不再弹二次确认弹窗（老板要求 2026-09-13）。
-  /// 本机已有锁屏码时**不可跳过**（老板 2026-09-25）：PIN 是 Vault 级共用的，
-  /// 此时按钮应为「下一步」而不是「跳过」（没有"跳过"可言之——锁已经在）。
+  // PIN 步骤上「两个输入框都空」：此时底部按钮=跳过设锁（标签「跳过」），
+  // 按钮标签本身就是提示，不再弹二次确认弹窗（老板要求 2026-09-13）。
+  // 本机已有锁屏码时**不可跳过**（老板 2026-09-25）：PIN 是 Vault 级共用的，
+  // 此时按钮应为「下一步」而不是「跳过」（没有"跳过"可言之——锁已经在）。
+  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
   bool get _pinStepSkippable =>
       _isPinStep &&
       !_lockAlreadySet &&
@@ -670,16 +669,17 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 进度圆点指示器：共 5 点 = 第 1 页空间入口页（角色选择）+ 4 个向导内容步骤
+  /// 进度圆点指示器：共 4 点 = 第 1 页空间入口页（角色选择）+ 3 个向导内容步骤
   /// （create/join 内容步数相同；老板 2026-09-11：入口页也计为一个点，且第 2 页
   /// 可"上一步"返回选择页）。角色未选（入口页）时同样显示，仅首点亮。
   /// 信封模式（offline）是 join 流程内口令页的平行替代：进度条按 join 展示，
-  /// 信封与口令处于同一位置（join 步骤 3），不缩成 2 点（老板要求 2026-09-09）。
+  /// 信封与口令处于同一位置（join 步骤 3），不缩成更少点（老板要求 2026-09-09）。
+  /// PIN 步骤已移除（老板 2026-10-19）：原 5 点改 4 点。
   Widget _buildProgressDots() {
-    // offline 的角色/步映射：1→3（口令位=信封位）、2→4（PIN）、3→5（完成）
+    // offline 的角色/步映射：1→3（口令位=信封位）、2→4（完成）
     final progressStep = _role == _WizardRole.offline ? _step + 2 : _step;
     // 圆点 i 对应页面 _step == i（i=0 为入口页）：已到达（含当前）纯白，未到半透明
-    const total = 5;
+    const total = 4;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -869,39 +869,22 @@ class _SetupPageState extends State<SetupPage> {
       });
       return;
     }
-    if (_isPinStep && _lockAlreadySet) {
-      // 已设锁：不校验/不重设 PIN，直接跑登记（沿用现有锁屏码）
-      if (_role == _WizardRole.create) {
-        await _runPinSetup();
-      } else if (_role == _WizardRole.join) {
-        await _runJoinAccess();
-      } else {
-        await _runEnvelopeImport();
-      }
-      return;
-    }
-    // PIN 步骤（create=5 / join=4 / offline=2）：底部按钮触发校验。
-    // 两空 → 跳过设锁（按钮此时标签就是"跳过"，不再弹二次确认弹窗——
-    // 老板要求 2026-09-13）；有效 PIN → 设锁后推进；其余 → 输入框下方红色提示。
-    if (_isPinStep && !_lockAlreadySet) {
-      final pin = _pin.text;
-      final confirm = _confirm.text;
-      if (pin.isEmpty && confirm.isEmpty) {
-        _pinSkipped = true;
-      } else if (!AppLockService.isPinDigitsOnly(pin)) {
-        setState(() => _pinError = l10n.setPinDialogPinDigitsOnly);
-        return;
-      } else if (pin.length < AppLockService.pinMinLength) {
-        setState(() => _pinError = l10n.setPinDialogPinTooShort);
-        return;
-      } else if (pin != confirm) {
-        setState(() => _pinError = l10n.setPinDialogPinMismatch);
-        return;
-      } else {
-        _pinSkipped = false;
-      }
+    // ---- PIN 步骤已移除（老板 2026-10-19）----
+    // 原先各流程的 PIN 步（create/join=4、offline=2）承担"设锁 or 跳过/沿用"
+    // 的提交动作；现在口令/信封页成为最后一个输入页，「下一步」在这里直接：
+    //   · 已设锁（existingPin）→ 沿用现有锁跑 _run*（原 _lockAlreadySet 分支）
+    //   · 未设锁 → 跳过设锁（_pinSkipped=true，等价原"两空提交"）跑 _run*
+    // 锁屏码随时能在秘境菜单里补设（chatPagePinLabel）。
+    // create 必须自举登记完成（_enroll != null）才触发——_runPinSetup 依赖
+    // _enroll 的 entranceId；未完成时本次「下一步」先跑自举（见下方分支），
+    // 再点一次才完成向导
+    final isLastInputStep = (_role == _WizardRole.create && _step == 3 && _enroll != null) ||
+        (_role == _WizardRole.join && _step == 3) ||
+        (_role == _WizardRole.offline && _step == 1);
+    if (isLastInputStep) {
+      _pinSkipped = !_lockAlreadySet; // 已设锁=false（沿用）；未设锁=true（跳过）
       setState(() => _pinError = null);
-      // 执行对应 _run*（内部完成前置：登记/认证/Space Key；有效 PIN 则设锁）
+      // 执行对应 _run*（内部完成前置：登记/认证/Space Key；_pinSkipped 则明文落盘）
       if (_role == _WizardRole.create) {
         await _runPinSetup();
       } else if (_role == _WizardRole.join) {
@@ -1030,9 +1013,9 @@ class _SetupPageState extends State<SetupPage> {
             // 2026-10-04：秘境类型（双人/群组）——创建时定死、之后不可改
             return _buildStepSpaceKind();
           case 3:
+            // PIN 步骤已移除（老板 2026-10-19）：口令页是最后一个输入页，
+            // 「下一步」直接完成（跳过设锁或沿用现有锁，见 _nextStep）
             return _buildStepPassphrase();
-          case 4:
-            return _lockAlreadySet ? _buildStepPinReuse() : _buildStepPin();
           default:
             return _buildStepDone();
         }
@@ -1045,18 +1028,16 @@ class _SetupPageState extends State<SetupPage> {
             // 名字/性别（复用 create 的名字页）；attach 不经过此步（少一页）
             return _buildStepName();
           case 3:
+            // PIN 步骤已移除（老板 2026-10-19）：口令页是最后一个输入页
             return _buildStepPassphrase();
-          case 4:
-            return _lockAlreadySet ? _buildStepPinReuse() : _buildStepPin();
           default:
             return _buildStepDone();
         }
       case _WizardRole.offline:
         switch (_step) {
           case 1:
+            // PIN 步骤已移除（老板 2026-10-19）：信封页是唯一输入页
             return _buildStepEnvelope();
-          case 2:
-            return _buildStepPin();
           default:
             return _buildStepDone();
         }
@@ -2186,8 +2167,9 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 步骤 4：设置启动锁（内嵌表单：PIN 两次确认，提交走底部"下一步"校验/跳过）。
-  /// 多空间再加一个空间：PIN 步骤改为"沿用当前锁屏码"提示（不重设）。
+  // 步骤 4：设置启动锁（内嵌表单：PIN 两次确认，提交走底部"下一步"校验/跳过）。
+  // 多空间再加一个空间：PIN 步骤改为"沿用当前锁屏码"提示（不重设）。
+  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
   Widget _buildStepPinReuse() {
     final l10n = AppLocalizations.of(context)!;
     return Padding(
@@ -2205,6 +2187,8 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
+  // 步骤 4：设置启动锁（内嵌表单：PIN 两次确认）。
+  // ignore: unused_element —— PIN 步骤已移除（老板 2026-10-19）：保留备将来找回
   Widget _buildStepPin() {
     final l10n = AppLocalizations.of(context)!;
     return Column(

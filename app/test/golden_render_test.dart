@@ -41,6 +41,9 @@ final EntranceKeyPair _goldenKeyPair = EntranceKeyPair(
   privateKey: Uint8List(32),
 );
 
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 /// 最小 fake ApiClient：sync 返回编排好的消息页（渲染聊天界面用）。
 class _FakeApi extends ApiClient {
   _FakeApi(this.page) : super('http://fake');
@@ -310,8 +313,8 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    // PIN 页两个输入框都空 → 底部按钮标签即"跳过"（不再弹确认框，老板 2026-09-13）
-    await tester.tap(find.text('跳过'));
+    // PIN 步骤已移除（老板 2026-10-19）：口令页「下一步」直接完成（跳过设锁）
+    await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
@@ -332,11 +335,12 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // PIN 页两空 → 底部按钮=跳过 → 完成
+    // PIN 步骤已移除（老板 2026-10-19）：口令页「下一步」直接完成
+    await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('🎉 成功创建我的领地'), findsOneWidget); // 对话框标题（create）
-    expect(find.text('仅限两人，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！'), findsOneWidget);
-    expect(find.text('进入秘境'), findsOneWidget); // 唯一按钮（点外面不关闭）
+    expect(find.text(_zh.welcomeDialogTitleCreate), findsOneWidget); // 对话框标题（create）
+    expect(find.text(_zh.welcomeDialogMessage), findsOneWidget);
+    expect(find.text(_zh.welcomeDialogStart), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
 
   // ---- join（后续通道：探测到 memberA → 身份 → 通道码 → …）----

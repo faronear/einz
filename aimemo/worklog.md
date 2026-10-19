@@ -15177,3 +15177,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T03:30:00Z / 2026-10-19 11:30）**：更换 PIN 弹窗确认输入框恢复随第一行显隐（老板 2026-10-19）。区别于上午被撤回的版本：只作用于**已设 PIN 的更换场景**（新 PIN 有输入才显示确认框），首设场景确认框常驻；此前撤回的根因是"第二个填了又清空第一个，确认行隐藏后与报错对不上"，现 _submit 已先行校验第一行非空（报「请输入新 PIN 以启用锁屏码」），矛盾拆除。_pinCtrl 监听加回。analyze 0。提交 27e02220。
 
 **（2026-10-19T03:50:00Z / 2026-10-19 11:50）**：向导锁屏码页空提交红字修复（老板 2026-10-19）。setup_page 的 _setupLockAndEnter 与弹窗同病：pin 空串先落 digitsOnly 校验报"PIN 只能是数字"。补「新 PIN 非空」先行校验（复用 chatPageSetLockPinRequired 键），与弹窗口径一致。analyze 0，setup_join 相关 9 测试通过。提交见 git log。
+
+**（2026-10-19T04:15:52Z / 2026-10-19 12:15）**：向导移除锁屏码（PIN）步骤 + 修复 join 测试挂起（老板 2026-10-19）。① PIN 页整页退出向导：create/join 5→4 步、offline 3→2 步、进度圆点 5→4；口令/信封页成为最后输入页，「下一步」直接完成（已设锁沿用、未设锁跳过落明文）；`_buildStepPin`/`_buildStepPinReuse`/`_isPinStep` 等标 `ignore: unused_element` 保留备找回，步骤号 create/join=4、offline=2（已记 projectPlan 待办：体验稳定后提醒老板是否彻底删除）。② 测试修复：`setup_join_passphrase_test` 补 `FlutterSecureStorage.setMockInitialValues({})`（savePlain 写 Keychain 无 mock 会挂起，欢迎弹窗不出现）+ `setUp` 清 VaultSession（savePlain publish 的内存会话跨用例残留，触发「本机已有通道」闸门误拦后续用例）。golden 测试红属预期（done 页少 PIN 后布局变化，按政策不重刷）。相关 4 个测试文件全绿，analyze 0。

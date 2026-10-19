@@ -73,7 +73,8 @@ void main() {
 
   testWidgets('向导：第 2 步是类型页（无输入框），第 3 步口令页才应聚焦',
       (WidgetTester tester) async {
-    // 2026-10-04 起 create = 名字(1) → **类型(2)** → 口令(3) → PIN(4)。
+    // 2026-10-04 起 create = 名字(1) → **类型(2)** → 口令(3)；PIN 步骤已移除
+    // （老板 2026-10-19），口令页是最后一个输入页。
     // 类型页是两张卡片、没有输入框——"聚焦首框"对它没有意义，别硬套。
     await _pumpCreate(tester);
     await _fillAndNext(tester, name: 'Lukas', gender: _zh.wizardGenderMale);
