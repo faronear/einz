@@ -57,6 +57,7 @@ class MessageRepository {
     this.settings,
     this.reauth,
     String? memberId,
+    this.isDemo = false,
   }) {
     // 向导完成时已知本端 memberId：立即种入映射，保证首帧就按 member 判定归属
     // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshEntranceMap 落盘）。
@@ -104,6 +105,10 @@ class MessageRepository {
   /// 401（session 过期）时自动重新认证的回调（由上层注入：setup_page 的
   /// challenge-response 流程），返回新 token 供 [_withAutoAuth] 重试。
   final Future<String> Function()? reauth;
+
+  /// 演示秘境模式（2026-10-19，App Store 审核演示通道方案 A）：发送只做本地
+  /// 加密落库并立即标已读（'read'），**不触网**——演示空间没有服务端对端。
+  final bool isDemo;
 
   /// 401（session 过期）自动续期：调 [reauth] 拿新 token → 更新 [token] → 重试一次。
   /// 保证 24h 会话过期后 app 请求无感恢复；其他错误原样抛出。
@@ -287,6 +292,12 @@ class MessageRepository {
     await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
     await _notifyPersisted(onPersisted, messageId);
 
+    // 演示秘境：本地落库即"对方已读"，不进发送队列（无服务端对端）。
+    if (isDemo) {
+      await _setStatus(messageId, 'read');
+      return messageId;
+    }
+
     final t = token;
     if (t != null) {
       _pendingUploads.add(messageId);
@@ -369,6 +380,16 @@ class MessageRepository {
     final bs = await _burnState();
     await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
     await _notifyPersisted(onPersisted, messageId);
+
+    // 演示秘境：本地落库即"对方已读"，blob 也不上传（无服务端对端）。
+    // local_cipher 副本已落库（步骤 2）→ 图片/语音气泡照常显示。
+    if (isDemo) {
+      await _setStatus(messageId, 'read');
+      await (db.update(db.localAttachments)
+            ..where((a) => a.attachmentId.equals(attachmentId)))
+          .write(const LocalAttachmentsCompanion(status: Value('downloaded')));
+      return messageId;
+    }
 
     final t = token;
     if (t != null) {

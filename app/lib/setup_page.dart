@@ -15,6 +15,7 @@ import 'widgets/cancel_button.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
+import 'data/demo_space.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/server_config.dart';
@@ -1020,8 +1021,49 @@ class _SetupPageState extends State<SetupPage> {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        // 演示秘境入口（2026-10-19，App Store 审核演示通道方案 A）：本地生成、
+        // 全离线、不入 Vault——真实新用户也能先逛一圈再决定创建/加入
+        Center(
+          child: TextButton(
+            onPressed: _enterDemo,
+            child: Text(
+              l10n.setupEntryDemo,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.85),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ),
       ],
     );
+  }
+
+  /// 进入演示秘境（DemoSpace）：首次种入演示消息（按设备语言定稿文案），
+  /// 然后推一个全离线的聊天页（isDemo=true——不触网、不入 Vault/空间列表）。
+  Future<void> _enterDemo() async {
+    final l10n = AppLocalizations.of(context)!;
+    await DemoSpace.ensureSeeded(
+      widget.db ?? LocalDatabase.shared,
+      chinese: l10n.localeName.startsWith('zh'),
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatPage(
+        spaceId: DemoSpace.spaceId,
+        entranceId: DemoSpace.myEntranceId,
+        spaceKey: DemoSpace.spaceKey,
+        keyVersion: 1,
+        token: 'demo-token', // 演示页不发任何带鉴权请求；占位满足非空参数
+        memberName: 'Me',
+        entranceName: 'demo',
+        peerName: 'Einz',
+        enableWs: false,
+        isDemo: true,
+      ),
+    ));
   }
 
   /// 启动屏（角色未判定时的检测页）：全屏粉蓝品牌渐变 + 上半部旋转 Logo。

@@ -225,6 +225,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryJoin => '加入秘境';
 
   @override
+  String get setupEntryDemo => '先看看演示（无需创建秘境）';
+
+  @override
   String get setupEntryLegacyServer => '服务器版本过低，请升级后再使用';
 
   @override

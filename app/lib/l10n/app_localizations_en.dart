@@ -244,6 +244,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupEntryJoin => 'Join';
 
   @override
+  String get setupEntryDemo => 'Take a look around first (demo, no sign-up)';
+
+  @override
   String get setupEntryLegacyServer =>
       'Server version too old — please upgrade';
 

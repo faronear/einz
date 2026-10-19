@@ -111,6 +111,7 @@
   "setupEntryHint": "秘境是你的私密聊天和共享空间，可以从头创建，或者受邀加入。",
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",
+  "setupEntryDemo": "先看看演示（无需创建秘境）",
   "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
   "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）。请更新 App 后重试",
   "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试（这不是通道码本身的问题）",

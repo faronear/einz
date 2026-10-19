@@ -184,6 +184,7 @@ class ChatPage extends StatefulWidget {
     this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
     this.publicKeyB64, // 通道公钥（b64，随锁包持久化；弹窗展示用）
     this.privateKeyB64, // 通道私钥（b64，随锁包持久化；补设锁写入新锁包）
+    this.isDemo = false, // 演示秘境（DemoSpace）：全离线，不触网、不起任何轮询
   });
 
   final String spaceId;
@@ -213,6 +214,12 @@ class ChatPage extends StatefulWidget {
 
   /// 通道 X25519 私钥（b64，随锁包持久化）：补设锁/改口令时写入新锁包。
   final String? privateKeyB64;
+
+  /// 演示秘境模式（2026-10-19，App Store 审核演示通道方案 A）：空间由
+  /// DemoSpace 本地生成、不入 Vault。聊天页一切需要服务器的路径（同步轮询、
+  /// WS、在线状态、资料校正、推送注册、其它空间未读）全部不启动；
+  /// 发送只落本地并立即标已读（见 MessageRepository.isDemo）。
+  final bool isDemo;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -899,8 +906,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _peerSlot = null;
     _peerName = widget.peerName ?? '';
     _myMemberId = widget.memberId; // 向导路径已知；重启路径为 null → 稍后反查补齐
-    _refreshPeerOnline();
-    _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
+    // 演示秘境：见 widget.isDemo——一切需要服务器的启动路径全部跳过
+    if (!widget.isDemo) {
+      _refreshPeerOnline();
+      _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
+    }
     WidgetsBinding.instance.addObserver(this);
     // 名字未由向导传入（如 PIN 解锁后重启进聊天）→ 从本地 profile 恢复。
     // 必须按 spaceId 读：多空间下全局键是所有空间共用的一格，会被别的空间覆写
@@ -920,7 +930,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
       // 快照可能过期（对方改名 / v2 早期把对方性别写死空串）→ 以服务端为准校正
       // 名字与性别（老板 2026-09-11：App 重启后一直显示旧的对方名字）
-      _refreshProfileFromServer();
+      if (!widget.isDemo) _refreshProfileFromServer();
     });
     _repo = MessageRepository(
       db: db,
@@ -932,6 +942,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       token: widget.token,
       settings: BurnAfterSettings(db, spaceId: widget.spaceId),
       reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
+      isDemo: widget.isDemo,
       // 本端 memberId（向导登记时确定）：种入归属判定映射，离线启动也能
       // 按 member 维度分左右分栏（服务器离线拉不到 entrance→member 映射）
       memberId: widget.memberId,
@@ -954,7 +965,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 喂给 _armIdleLock；解锁/关弹层 pop 回聊天时由 push Future（_pushLockOverlay）
     // 重排。
     _armIdleLock();
-    _refreshNotifyEmail(); // 菜单项「邮件通知」的当前值（拉不到就保持 null，不显示）
+    if (!widget.isDemo) _refreshNotifyEmail(); // 菜单项「邮件通知」的当前值（拉不到就保持 null，不显示）
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
     // 随后用持久化值校正（_loadUiStyle 异步）
     _uiStyle = uiStyleNotifier.value;
@@ -965,6 +976,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadAttachmentStorage(); // 恢复附件存储模式（secured/stored，默认 secured）
     attachmentStorageNotifier.addListener(_onAttachmentStorageChanged);
     // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
+    if (widget.isDemo) return; // 演示秘境：全离线，同步/推送/实时/未读一律不起
     _restartTicker(_tickerInterval);
     _registerPushToken();
     _registerInstallUid();

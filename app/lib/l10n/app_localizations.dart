@@ -494,6 +494,12 @@ abstract class AppLocalizations {
   /// **'Join'**
   String get setupEntryJoin;
 
+  /// No description provided for @setupEntryDemo.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a look around first (demo, no sign-up)'**
+  String get setupEntryDemo;
+
   /// No description provided for @setupEntryLegacyServer.
   ///
   /// In en, this message translates to:
