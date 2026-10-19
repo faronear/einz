@@ -15175,3 +15175,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T03:10:00Z / 2026-10-19 11:10）**：修复「只填确认框提交报'PIN 只能是数字'」的错位红字（老板 2026-10-19）。根因：pin 空串过不了 isPinDigitsOnly 正则，digitsOnly 校验先于"新 PIN 是否填了"校验执行。修复：_submit 的 changePin 分支最前面加 pin.isEmpty 先行校验，统一报 chatPageSetLockPinRequired（请输入新 PIN 以启用锁屏码）；只填新 PIN 漏确认框仍报「两次输入的 PIN 不一致」（原行为正确）。新增用例覆盖两个方向，通过；analyze 0。
 
 **（2026-10-19T03:30:00Z / 2026-10-19 11:30）**：更换 PIN 弹窗确认输入框恢复随第一行显隐（老板 2026-10-19）。区别于上午被撤回的版本：只作用于**已设 PIN 的更换场景**（新 PIN 有输入才显示确认框），首设场景确认框常驻；此前撤回的根因是"第二个填了又清空第一个，确认行隐藏后与报错对不上"，现 _submit 已先行校验第一行非空（报「请输入新 PIN 以启用锁屏码」），矛盾拆除。_pinCtrl 监听加回。analyze 0。提交 27e02220。
+
+**（2026-10-19T03:50:00Z / 2026-10-19 11:50）**：向导锁屏码页空提交红字修复（老板 2026-10-19）。setup_page 的 _setupLockAndEnter 与弹窗同病：pin 空串先落 digitsOnly 校验报"PIN 只能是数字"。补「新 PIN 非空」先行校验（复用 chatPageSetLockPinRequired 键），与弹窗口径一致。analyze 0，setup_join 相关 9 测试通过。提交见 git log。

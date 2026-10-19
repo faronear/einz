@@ -1332,6 +1332,12 @@ class _SetupPageState extends State<SetupPage> {
     final l10n = AppLocalizations.of(context)!;
     if (_lockAlreadySet) return true; // 沿用现有锁屏码：不重设（addSpace 由调用方做）
     final pin = _pin.text;
+    // 新 PIN 非空先行校验（老板 2026-10-19，与锁屏码弹窗同口径）：空串过不了
+    // 下面的 digitsOnly 正则，会报"PIN 只能是数字"这种不着边的红字
+    if (pin.isEmpty) {
+      setState(() => _status = l10n.chatPageSetLockPinRequired);
+      return false;
+    }
     if (!AppLockService.isPinDigitsOnly(pin)) {
       setState(() => _status = l10n.setPinDialogPinDigitsOnly);
       return false;
