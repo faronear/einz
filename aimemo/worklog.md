@@ -15241,3 +15241,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T13:20:53Z / ��**：老板定夺：`app-apk-boot2run` 每次启动模拟器前先删 quick-boot 快照。改 `package.json` 该脚本：launch 前从 `~/.android/avd/einz_emu.ini` 的 path 动态解析 AVD 目录（不写死 Pixel_4_XL，AVD 再改名不怕），存在 `snapshots/default_boot` 就 rm 并提示「🗑 已清除」。代价 = 每次冷启动（约 40s 开机，无快照恢复的十几秒），换来不会再被坏快照卡死。已在运行则跳过启动、不删快照（避免与活着的 qemu 冲突）。验证：node 解析 package.json OK；AVD_DIR 解析正确。
 
 **（2026-10-19T13:22:38Z / ��**：清快照步骤改由 CLEAN 门控（老板定）：默认 `npm run app-apk-boot2run` 走快照快速恢复；要冷启动才 `CLEAN=true npm run app-apk-boot2run`（删快照 + 冷启动；CLEAN 同时沿用到后续 app-apk-run 的 clean 安装，语义一致）。
+
+## 20261019 修 CI group_status_bar_test 失败（弹层变高引发的两处测试问题）
+
+**（2026-10-19T13:37:03Z / ��**：老板报 github CI 红。排查：二分锁定 `9939dfd8`（自愿退群）——非这几天的样式改动。根因两处：① 成员弹层加入「退出群组」项后变高，`_closeMembersSheet` 点 ModalBarrier **中心**（屏中 400,300）落进弹层内容、关不掉弹层，后续 tap 被残留屏障吞掉（插桩实证：失败时刻 sheet 仍开着）；② 412 后一条断言找占位词「群组名称」，但用例刚设了群名 Crew，弹层群名行本应显示 Crew（插桩 placeholder=0 crew=2），断言与自身 reason 矛盾。修法（均只动测试）：`_closeMembersSheet` 改 `tapAt(Offset(20,20))` 点顶部空白必中屏障（注释记根因）；断言改按 `membersSheetGroupNameRow` key 定位群名行里的 Crew。验证：group_status_bar_test 全 10 项通过。App 代码无 bug，未改。

@@ -149,9 +149,14 @@ Future<void> _openGroupNameDialog(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// 关闭「我的同伴」弹层（点最上层的 ModalBarrier 消散；页面里有两个 barrier）。
+/// 关闭「我的同伴」弹层（点屏幕顶部空白处的 ModalBarrier 消散）。
+///
+/// 不再点 barrier 的**中心**（2026-10-19）：成员弹层加入「退出群组」项后变高，
+/// 屏幕中心 (400,300) 会落进弹层内容里、点不到屏障——弹层关不掉，下一个用例
+/// 的 tap 全被残留屏障吞掉（CI group_status_bar_test 失败的根因）。
+/// 点顶部空白（y=20 恒在弹层上方）必中屏障。
 Future<void> _closeMembersSheet(WidgetTester tester) async {
-  await tester.tap(find.byType(ModalBarrier).last, warnIfMissed: false);
+  await tester.tapAt(const Offset(20, 20));
   await tester.pumpAndSettle();
 }
 
@@ -410,7 +415,13 @@ void main() {
     await tester.tap(find.descendant(of: _statusBar, matching: find.text('Crew')));
     await tester.pumpAndSettle();
     expect(membersSheet, findsOneWidget, reason: '群名也属于大胶囊可点区');
-    expect(find.text(_zh.chatPageGroupNameTitle), findsOneWidget,
+    // 有名字 → 群名行显示群名本身（占位词只在没有名字时出现）；
+    // 用行 key 定位，避开状态条上同文案的 Text（老板 2026-10-19 修 CI）
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('membersSheetGroupNameRow')),
+            matching: find.text('Crew')),
+        findsOneWidget,
         reason: '弹层里的群名行：没名字时显示占位词，有名字显示群名本身');
     await _closeMembersSheet(tester);
 
