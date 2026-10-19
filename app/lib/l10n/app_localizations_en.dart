@@ -408,7 +408,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockHintNoPin =>
-      'Once set, Einz will lock itself everytime after inactivity, you must unlock to enter the space again.';
+      'Once set, Einz will lock itself everytime after inactivity for a while, you must unlock to enter the space again.';
 
   @override
   String get chatPageSetLockRowVerify => 'Verify';
@@ -455,7 +455,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockSameAsOld =>
-      'New PIN is the same as the current one, nothing is changed.';
+      'New PIN must be different than the current one.';
 
   @override
   String get chatPageSetLockPinRequired => 'Enter a new PIN';

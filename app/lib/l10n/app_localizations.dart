@@ -767,7 +767,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockHintNoPin.
   ///
   /// In en, this message translates to:
-  /// **'Once set, Einz will lock itself everytime after inactivity, you must unlock to enter the space again.'**
+  /// **'Once set, Einz will lock itself everytime after inactivity for a while, you must unlock to enter the space again.'**
   String get chatPageSetLockHintNoPin;
 
   /// No description provided for @chatPageSetLockRowVerify.
@@ -851,7 +851,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockSameAsOld.
   ///
   /// In en, this message translates to:
-  /// **'New PIN is the same as the current one, nothing is changed.'**
+  /// **'New PIN must be different than the current one.'**
   String get chatPageSetLockSameAsOld;
 
   /// Inline error when submit is tapped with both PIN fields empty and no PIN set

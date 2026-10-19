@@ -200,7 +200,7 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后就自动锁屏，必须解锁才能再进入秘境。",
+  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后就自动锁屏，必须解锁才能进入秘境。",
   "chatPageSetLockRowVerify": "验证",
   "chatPageSetLockRowSet": "设置",
   "chatPageSetLockRowConfirm": "确认",
@@ -228,7 +228,7 @@
   },
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
-  "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",
+  "chatPageSetLockSameAsOld": "新锁屏码不能与当前锁屏码相同",
   "chatPageSetLockPinRequired": "请输入新 PIN",
   "@chatPageSetLockPinRequired": {
     "description": "未设锁屏码时两框全空点「启用」的红字提示"

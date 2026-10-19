@@ -375,7 +375,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockHintNoPin => '设置后，每次离开自动锁屏，必须解锁才能再进入秘境。';
+  String get chatPageSetLockHintNoPin => '设置后，每次离开一定时间后就自动锁屏，必须解锁才能进入秘境。';
 
   @override
   String get chatPageSetLockRowVerify => '验证';
@@ -421,7 +421,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockOldRequired => '请先输入当前锁屏码';
 
   @override
-  String get chatPageSetLockSameAsOld => '新锁屏码与当前锁屏码相同，未作修改';
+  String get chatPageSetLockSameAsOld => '新锁屏码不能与当前锁屏码相同';
 
   @override
   String get chatPageSetLockPinRequired => '请输入新 PIN';
@@ -431,7 +431,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageSetLockDone(String duration) {
-    return '锁屏码已设置，离开 $duration 后自动锁屏。';
+    return '锁屏码已设置，每次离开 $duration 后自动锁屏。';
   }
 
   @override
