@@ -219,9 +219,9 @@
   "chatPageSetLockRowConfirm": "确认",
   "chatPageSetLockNewPinLabel": "新 PIN 或者留空则不变",
   "chatPageSetLockNewPinLabelNoPin": "新 PIN（至少 6 位数字）",
-  "chatPageSetLockSubmitChange": "更换",
+  "chatPageSetLockSubmitChange": "更改",
   "chatPageSetLockDurationLabel": "自动锁屏每当离开",
-  "chatPageSetLockTabChange": "更换锁屏码",
+  "chatPageSetLockTabChange": "更改锁屏码",
   "chatPageSetLockClearButton": "清除锁屏码",
   "lockDurationSecs": "{n} 秒",
   "@lockDurationSecs": {
@@ -242,13 +242,13 @@
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
   "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",
-  "chatPageSetLockPinRequired": "请输入新 PIN 以启用锁屏码",
+  "chatPageSetLockPinRequired": "请输入新 PIN",
   "@chatPageSetLockPinRequired": {
     "description": "未设锁屏码时两框全空点「启用」的红字提示"
   },
   "chatPageSetLockDone": "锁屏码已设置，离开 {duration} 后自动锁屏。",
   "@chatPageSetLockDone": {
-    "description": "设置/更换锁屏码成功后的顶部提示（duration=自动锁屏时长，如「5 分钟」）",
+    "description": "初设/更改锁屏码成功后的顶部提示（duration=自动锁屏时长，如「5 分钟」）",
     "placeholders": {
       "duration": {
         "type": "String"
@@ -366,7 +366,7 @@
       }
     }
   },
-  "chatPageEscrowRotatedNotice": "同伴已重设共享口令，以后必须使用新口令",
+  "chatPageEscrowRotatedNotice": "同伴已更换共享口令，以后必须使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
   "chatPageMenuMoreSettings": "更多设置",

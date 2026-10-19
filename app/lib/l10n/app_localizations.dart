@@ -887,7 +887,7 @@ abstract class AppLocalizations {
   /// Inline error when submit is tapped with both PIN fields empty and no PIN set
   ///
   /// In en, this message translates to:
-  /// **'Enter a new PIN to enable the lock'**
+  /// **'Enter a new PIN'**
   String get chatPageSetLockPinRequired;
 
   /// Top notice after PIN is set (duration = auto-lock delay, e.g. "5 minutes")

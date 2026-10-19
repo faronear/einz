@@ -475,7 +475,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'New PIN is the same as the current one, nothing is changed.';
 
   @override
-  String get chatPageSetLockPinRequired => 'Enter a new PIN to enable the lock';
+  String get chatPageSetLockPinRequired => 'Enter a new PIN';
 
   @override
   String chatPageSetLockDone(String duration) {

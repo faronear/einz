@@ -411,13 +411,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockNewPinLabelNoPin => '新 PIN（至少 6 位数字）';
 
   @override
-  String get chatPageSetLockSubmitChange => '更换';
+  String get chatPageSetLockSubmitChange => '更改';
 
   @override
   String get chatPageSetLockDurationLabel => '自动锁屏每当离开';
 
   @override
-  String get chatPageSetLockTabChange => '更换锁屏码';
+  String get chatPageSetLockTabChange => '更改锁屏码';
 
   @override
   String get chatPageSetLockClearButton => '清除锁屏码';
@@ -442,7 +442,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockSameAsOld => '新锁屏码与当前锁屏码相同，未作修改';
 
   @override
-  String get chatPageSetLockPinRequired => '请输入新 PIN 以启用锁屏码';
+  String get chatPageSetLockPinRequired => '请输入新 PIN';
 
   @override
   String chatPageSetLockDone(String duration) {
@@ -657,7 +657,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageEscrowRotatedNotice(String mode) {
-    return '同伴已重设共享口令，以后必须使用新口令';
+    return '同伴已更换共享口令，以后必须使用新口令';
   }
 
   @override

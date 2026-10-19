@@ -263,7 +263,7 @@
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
   "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
-  "chatPageSetLockPinRequired": "Enter a new PIN to enable the lock",
+  "chatPageSetLockPinRequired": "Enter a new PIN",
   "@chatPageSetLockPinRequired": {
     "description": "Inline error when submit is tapped with both PIN fields empty and no PIN set"
   },
