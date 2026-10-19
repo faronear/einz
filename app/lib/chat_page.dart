@@ -10060,11 +10060,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   // 可用宽度。minWidth 360 是兜底：本弹窗没有长文案，内容 intrinsic 很窄，
   // 不兜底会缩到 Dialog 默认 minWidth 280，比邻居们还窄（老板 2026-10-18
   // 早前嫌过的"太窄"正是这么来的）。
-  // 桌面版：再放宽一档（屏宽 ≥ 600 时 min/max 都取 560）。
-  // 轴下标注的定位几何依赖这套值（见 [_setLockAxisWidth]），改宽策略要同步。
+  // 桌面版：再放宽一档（屏宽 ≥ 600 时 min/max 都取 480；老板 2026-10-19：560 太宽，
+  // 再缩小一点）。轴下标注的定位几何依赖这套值（见 [_setLockAxisWidth]），改宽策略要同步。
   static const double _kDialogInsetH = 40;
   static const double _kDialogMinWidthPhone = 360;
-  static const double _kDialogWidthDesktop = 560;
+  static const double _kDialogWidthDesktop = 480;
   static const double _kDialogWideBreakpoint = 600;
   // 内容/卡片的水平边距：轴宽几何要从弹窗宽里减掉它们（两处 padding 用同常量，防漂移）
   static const double _kDialogContentPadH = 24;
@@ -10558,7 +10558,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     final clearing = _hasPin && _setLockTab == 1; // 当前在「清除锁屏码」标签页
     // 弹窗宽度（老板 2026-10-18）：手机版与其它弹窗一致（Dialog 默认
     // insetPadding 左右各 40 + minWidth 兜底吃满可用宽度）；桌面端（屏宽
-    // ≥ 600）再放宽一档到 560。几何推导见 [_setLockAxisWidth]。
+    // ≥ 600）再放宽一档到 480（老板 2026-10-19 从 560 缩小）。几何推导见 [_setLockAxisWidth]。
     final screenWidth = MediaQuery.sizeOf(context).width;
     final dialogMinWidth = screenWidth >= _kDialogWideBreakpoint
         ? _kDialogWidthDesktop

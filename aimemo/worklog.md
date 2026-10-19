@@ -15197,3 +15197,5 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T06:54:35Z / 2026-10-19 14:54）**：修复 chat_page_menu_test 两个 CI 失败用例（老板 2026-10-19 报）。①「有 PIN 时改码」：确认行随「新 PIN」行显隐（2026-10-19 新交互）后弹窗初始只有旧/新 2 框，旧断言恒 3 框失配——按新交互改写（填新 PIN 后 pumpAndSettle 断言确认行出现）；另把硬编码旧文案「新锁屏码与当前锁屏码相同，未作修改」改回 l10n 键 chatPageSetLockSameAsOld（实际文案「新锁屏码不能与当前锁屏码相同」）。②「无 PIN 时两空提交」：断言的是 2026-09-14 旧行为（放行+顶部通知），2026-10-19 已改红字要求输入——按新行为改写断言。教训：这两条此前被 worktree baseline 归因为"既有失败"而搁置，实际是近期交互变更后测试没跟上；baseline 归因只证明"非本次引入"，不等于"不用修"，CI 要全绿就得跟进修测试。验证：analyze 0，全量 360 项全绿。提交见 git log。
 
 **（2026-10-19T06:59:12Z / 2026-10-19 14:59）**：锁屏弹窗主按钮先清残留红字（老板 2026-10-19）。_submit 与 _clearPin 入口统一先 setState 清 _error 再做本轮校验——旧错误不再横在页面下方被误当成新提交的结果。同批并入老板文案修改：chatPageSetLockOldRequired 英文 "Enter current PIN first"→"Enter current PIN to verify"、chatPagePinMenuValue「已设置 · {duration}」→「已设 · {duration}」。analyze 0，chat_page_menu_test 46 项全过。
+
+**（2026-10-19T07:05:12Z / 2026-10-19 15:05）**：锁屏码弹窗桌面版宽度 560→480（老板 2026-10-19 嫌太宽）。_kDialogWidthDesktop 改 480，注释同步；轴下标注定位几何走 _setLockAxisWidth 统一推导，无需另改。analyze 0，chat_page_menu_test 46 项全过。
