@@ -451,7 +451,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockOldLabel => 'Current PIN';
 
   @override
-  String get chatPageSetLockOldRequired => 'Enter current PIN first';
+  String get chatPageSetLockOldRequired => 'Enter current PIN to verify';
 
   @override
   String get chatPageSetLockSameAsOld =>

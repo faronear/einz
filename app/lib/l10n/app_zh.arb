@@ -456,7 +456,7 @@
   "chatPageEntranceListRefresh": "刷新",
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
-  "chatPagePinMenuValue": "已设置 · {duration}",
+  "chatPagePinMenuValue": "已设 · {duration}",
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
   "chatPageNotifyHint": "你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。",

@@ -800,7 +800,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPagePinMenuValue(String duration) {
-    return '已设置 · $duration';
+    return '已设 · $duration';
   }
 
   @override

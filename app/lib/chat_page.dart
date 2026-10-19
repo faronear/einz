@@ -10151,6 +10151,9 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     if (_busy) return;
+    // 每次点主按钮：先清掉上一轮残留的红字，再做本轮检测（老板 2026-10-19）——
+    // 否则旧错误横在页面下方，容易误当成新提交的结果
+    setState(() => _error = null);
     final pin = _pinCtrl.text;
     final confirm = _confirmCtrl.text;
     // 两框都空 = 不改 PIN（老板 2026-10-18 方案二：原先"两空=清空"的隐式语义
@@ -10258,6 +10261,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   Future<void> _clearPin() async {
     final l10n = AppLocalizations.of(context)!;
     if (_busy) return;
+    // 与 _submit 同口径：先清残留红字再做本轮检测（老板 2026-10-19）
+    setState(() => _error = null);
     final existingVault = await _verifyOldPin();
     if (!mounted) return;
     if (existingVault == null) return; // 校验失败已在表单内置 _error

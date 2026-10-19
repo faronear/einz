@@ -845,7 +845,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockOldRequired.
   ///
   /// In en, this message translates to:
-  /// **'Enter current PIN first'**
+  /// **'Enter current PIN to verify'**
   String get chatPageSetLockOldRequired;
 
   /// No description provided for @chatPageSetLockSameAsOld.

@@ -248,7 +248,7 @@
     }
   },
   "chatPageSetLockOldLabel": "Current PIN",
-  "chatPageSetLockOldRequired": "Enter current PIN first",
+  "chatPageSetLockOldRequired": "Enter current PIN to verify",
   "chatPageSetLockSameAsOld": "New PIN must be different than the current one.",
   "chatPageSetLockPinRequired": "Enter a new PIN",
   "@chatPageSetLockPinRequired": {
