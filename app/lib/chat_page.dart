@@ -3543,32 +3543,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
                   // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
                   if (_canInvite)
-                    Material(
-                      // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
-                      // 三个大按钮底色统一）；hover/按住加深同口径
-                      color: Colors.black.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(mouseCursor: SystemMouseCursors.click,
-                        onTap: () {
-                          Navigator.of(ctx).pop();
-                          _menuAction(
-                              () => _showInviteDialog(purpose: 'invite'));
-                        },
-                        hoverColor: Colors.black.withValues(alpha: 0.10),
-                        highlightColor: Colors.black.withValues(alpha: 0.14),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.add),
-                              const SizedBox(width: 6),
-                              Text(l10n.chatPageMembersInviteNew),
-                            ],
+                    // 与成员卡片拉开一组间距：卡片间仅 8px（各自 vertical 4），
+                    // 这里给 12（合计 16），示意按钮不属于成员卡那一组（老板 2026-10-19）
+                    Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        Material(
+                          // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
+                          // 三个大按钮底色统一）；hover/按住加深同口径
+                          color: Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(mouseCursor: SystemMouseCursors.click,
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              _menuAction(
+                                  () => _showInviteDialog(purpose: 'invite'));
+                            },
+                            hoverColor: Colors.black.withValues(alpha: 0.10),
+                            highlightColor: Colors.black.withValues(alpha: 0.14),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.add),
+                                  const SizedBox(width: 6),
+                                  Text(l10n.chatPageMembersInviteNew),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     )
                   else if (_isGroup)
                     // 群组满员：末尾那张卡变灰（不可点、无按钮），只说"已满"。
