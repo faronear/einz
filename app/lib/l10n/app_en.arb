@@ -222,15 +222,7 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after inactivity of {duration}, you must unlock to enter the space again.",
-  "@chatPageSetLockHintNoPin": {
-    "description": "Hint shown in the set-PIN dialog when no PIN is set (duration = auto-lock delay, e.g. \"5 minutes\")",
-    "placeholders": {
-      "duration": {
-        "type": "String"
-      }
-    }
-  },
+  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after inactivity, you must unlock to enter the space again.",
   "chatPageSetLockRowVerify": "Verify",
   "chatPageSetLockRowSet": "Set",
   "chatPageSetLockRowConfirm": "Confirm",

@@ -10235,7 +10235,14 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       return;
     }
     // PIN 没变但时长动过 → 回 true：调用方要重载时长，菜单右侧的「已设置 · 时长」
-    // 显示随弹窗关闭即时刷新（老板 2026-10-18）；啥都没动才不回 true
+    // 显示随弹窗关闭即时刷新（老板 2026-10-18）；啥都没动才不回 true。
+    // 只改时长也要弹通知条（老板 2026-10-19）：与改锁屏码本身同款
+    // （chatPageSetLockDone + 本次生效档位）——不然提交后没有任何反馈
+    if (secondsChanged) {
+      showTopNoticeOn(overlay,
+          l10n.chatPageSetLockDone(_formatLockSeconds(_axisSeconds, l10n)),
+          extraTop: kNoticeExtraTopBelowStatusBar);
+    }
     Navigator.of(context).pop(secondsChanged ? true : null);
   }
 
@@ -10589,11 +10596,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             // 未设锁屏码：一句"为什么要设"（老板 2026-09-14）。已设锁屏码时页面
             // 自解释（分组卡片标签 + 主按钮），不再放备注（老板 2026-10-18）
             if (!_hasPin) ...[
-              // 时长取弹窗内时长轴当前档位（老板 2026-10-19 文案加 {duration}）：
-              // 未设 PIN 时轴初始就是持久化的档位（initState 读回），拖动即跟随
               Text(
-                l10n.chatPageSetLockHintNoPin(
-                    _formatLockSeconds(_axisSeconds, l10n)),
+                l10n.chatPageSetLockHintNoPin,
                 style: TextStyle(
                   fontSize: 12,
                   color: colors.outline,

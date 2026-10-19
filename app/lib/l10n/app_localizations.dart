@@ -770,11 +770,11 @@ abstract class AppLocalizations {
   /// **'Set PIN'**
   String get chatPageSetLockTitle;
 
-  /// Hint shown in the set-PIN dialog when no PIN is set (duration = auto-lock delay, e.g. "5 minutes")
+  /// No description provided for @chatPageSetLockHintNoPin.
   ///
   /// In en, this message translates to:
-  /// **'Once set, Einz will lock itself everytime after inactivity of {duration}, you must unlock to enter the space again.'**
-  String chatPageSetLockHintNoPin(String duration);
+  /// **'Once set, Einz will lock itself everytime after inactivity, you must unlock to enter the space again.'**
+  String get chatPageSetLockHintNoPin;
 
   /// No description provided for @chatPageSetLockRowVerify.
   ///
