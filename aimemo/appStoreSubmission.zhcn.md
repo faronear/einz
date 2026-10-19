@@ -103,4 +103,107 @@ CONTACT for review questions: einz@tic.cc
 | Review Notes 模板 | ✅ 本文 §1 |
 | Nutrition Labels 口径 | ✅ 本文 §2（提审时照填） |
 | 正式开发者账号（Team CQ6733CTMV 付费） | ✅ 已有 |
-| App Store Connect 建档（名称/截图/分类/年龄分级问卷） | ⏳ 待做（提审时） |
+| ASC 建档物料（名称/描述/分级/URL 等） | ✅ 本文 §4（照填 App Store Connect） |
+
+---
+
+## 4. App Store Connect 建档物料（2026-10-19 起草）
+
+> 主语言英文（不考虑中国区；App 内已支持中英，zh 描述为可选的二级本地化，先给英文，zh 版照译即可）。
+
+### 4.1 基本信息
+
+| 字段 | 填写 | 说明 |
+| --- | --- | --- |
+| Platform | iOS（+ macOS 可后建） | 先 iOS |
+| App Name | `Einz — Private Space` | 30 字符内；副标题带上定位词利于搜索 |
+| Subtitle | `End-to-end encrypted` | 30 字符内；核心卖点 |
+| Bundle ID | `cc.tic.einz` | 与 profile 一致 |
+| Primary Language | English (U.S.) | |
+| Copyright | `Faronear Co. Ltd.` | 与 Team CQ6733CTMV 实体一致（老板核对全称） |
+| Category（一级） | **Social Networking** | 私密社交是主定位 |
+| Category（二级） | **Lifestyle** | 或 Communication——备选，二者都行，老板拍板 |
+| Support URL | `https://www.einz.tic.cc/` | 首页含 Getting started / 隐私政策 |
+| Marketing URL | `https://www.einz.tic.cc/about/what_is_einz/`（可留空） | |
+| Privacy Policy URL | `https://www.einz.tic.cc/rules/privacy_policy/` | 必填 |
+| 邮箱（审核联系） | `einz@tic.cc` | |
+| Release on approval | **Manual release**（建议） | 首版过审后自己挑时间发布；也可自动 |
+
+### 4.2 描述（Description，≤4000 字符）
+
+```
+Einz is a private space for you and the people who matter — end-to-end
+encrypted, local-first, and account-free.
+
+YOUR SECRET SPACE
+Create a space and invite someone with a single link. Everything inside
+— messages, photos, videos, voice notes, and files — is encrypted on
+your device before it ever leaves it. Not even we can read it.
+
+NO ACCOUNTS. NO TRACE.
+There is no sign-up, no phone number, no email, no profile to find.
+Who you are is a key pair on your device. Your server only ever sees
+ciphertext.
+
+BUILT FOR PRIVACY, BY DESIGN
+· End-to-end encryption (XChaCha20-Poly1305) on every message and file
+· Local-first: your history lives on your device, not in our cloud
+· Burn-after-read messages that vanish on a timer
+· Recall any message — for everyone
+· PIN lock with auto-lock timer, and a demo mode to explore first
+
+GROUPS TOO
+Create a duo space for two, or a group space for the people you choose.
+Membership is by invitation only — there is no discovery, no search,
+no feed, and no public content. Ever.
+
+Einz will never show you ads, never profile you, and never sell data.
+Privacy isn't a feature here. It's the architecture.
+```
+
+### 4.3 Keywords（100 字符，逗号分隔无空格）
+
+```
+private,messenger,encrypted,E2EE,secure,chat,secret,diary,couple,notes,vault
+```
+> 覆盖：私密聊天 / 加密 / 情侣 / 日记 / 保险柜场景词。Name/Subtitle 里的词不计入，别重复。
+
+### 4.4 What's New（首版）
+
+```
+First release on the App Store.
+```
+
+### 4.5 年龄分级问卷（Age Rating）— 照此作答
+
+| 问题 | 答 | 依据 |
+| --- | --- | --- |
+| Cartoon/Fantasy Violence, Realistic Violence（含 blood/gore） | No | 无此内容 |
+| Sexual Content / Nudity | No | 无此内容 |
+| Profanity / Crude Humor | No | 无 |
+| Alcohol/Tobacco/Drugs | No | 无 |
+| Medical information | No | 无 |
+| Gambling（含 simulated） | No | 无 |
+| Contests / Contests with real prizes | No | 无 |
+| Horror/Fear themes | No | 无 |
+| Unrestricted web access | **No** | App 无内嵌浏览器/任意 WebView |
+| **User-Generated Content** | **Yes** | 聊天消息即 UGC（如实答） |
+| → 分级结果 | 预期 **12+**（因 UGC） | 若出 17+ 属正常，照单全收——别为了低分级隐瞒 UGC |
+
+> UGC 答 Yes 后 ASC 会问 "Do you have report/block/moderation?"——Notes/描述里的「无公开内容、邀请制白名单、可删除一切」就是回答口径；如有自由文本框，写：*"No public content or discovery. Spaces are invite-only with a server-enforced member whitelist; users can delete any message, delete their space, or revoke their own device access at any time."*
+
+### 4.6 截图 / 预览
+
+| 项 | 要求 |
+| --- | --- |
+| 尺寸 | 6.9"（1320×2868 或 1290×2796）与 6.5"（1284×2778 / 1242×2688）两组，各至少 1 张（建议 3–6 张）；iPad 另备 13"（2064×2752） |
+| 内容建议 | ①聊天主界面（用演示秘境摆拍——内容是硬编码演示文案，无隐私问题）②阅后即焚/撤回长按菜单 ③空间列表（双人+群组配色卡）④PIN 锁屏/自动锁定 |
+| 预览视频 | 可选；如做，演示秘境里录收发/焚化动画最直观 |
+| 摆拍注意 | 别用真实空间截图（会暴露真实聊天）；演示秘境专为这个场景存在 |
+
+### 4.7 提交前还差的账号动作（老板手动）
+
+1. App Store Connect 建 App 记录（Bundle `cc.tic.einz`）；
+2. `buildIos.sh appstore --upload`（`ASC_API_KEY_ID`/`ASC_API_ISSUER` 已在脚本就绪位）出首个正式包；
+3. 填 §4.1–4.5 + Nutrition Labels（§2 口径）+ Review Notes（§1 模板）；
+4. 提审。
