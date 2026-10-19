@@ -15227,3 +15227,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 ## 20261019 状态条对方胶囊右侧内距 6→12
 
 **（2026-10-19T12:58:39Z / ��**：老板指出状态条左侧对方胶囊（头像+名字）名字/时间文字贴着胶囊右缘、没有内部留白。修法：duo 大胶囊 InkWell 内容 Padding 右侧 6→12（`app/lib/chat_page.dart` _buildPeerStatus，注释同步）；头像仍保持「三面贴壁」约定（左/上/下 0）。验证：`flutter analyze lib/chat_page.dart` 0 问题；diff 单 hunk 全为本改动。
+
+## 20261019 group 大胶囊右侧内距 6→12（与 duo 对称）
+
+**（2026-10-19T13:05:13Z / ��**：老板反馈 group 空间状态条左侧大胶囊两个现象。① 右缘贴文字——group 胶囊内部 Padding 仍是右 6（duo 上轮已改 12），对称改为 12，宽度预算 `capsulePad` 同步 6→12（两处注释标明耦合，防 RenderFlex overflow）；② 老板觉得"胶囊整体右移、头像没贴左圆角"——排查确认左侧两层 padding 均为 0、头像条左缘 x=0，真实原因是几何对比：duo 头像 40px 与 40 高胶囊左圆弧（半径 20）同心所以"三面贴壁"，group 头像 32px 垂直居中、左圆弧大一圈，弧线在头像左上/下方收进去，视觉上像右移——自 32px 头像条起即如此，非本次回归。已向老板说明，是否把 group 头像条升到满高（需同步改 _stripAvatarCount/渐隐整套预算）待老板定夺。验证：flutter analyze 0 问题；2 hunks 全为本改动。

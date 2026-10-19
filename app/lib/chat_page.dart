@@ -2017,10 +2017,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 是 0——头像条左缘贴边，见 `_buildPeerStatus` 的 pad 注释）——不扣的话
     // 内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
     const leadingPad = 10.0;
-    // 再扣掉大胶囊自己的水平 Padding（老板 2026-10-12 起只留**右 6**：头像
-    // 三面贴壁、左 0）——不扣的话 Row 内容会超出胶囊（实测 RenderFlex
-    // overflow；此前左右各 6 = 12，头像贴壁后减半）。
-    const capsulePad = 6.0;
+    // 再扣掉大胶囊自己的水平 Padding（老板 2026-10-12 起只留右：头像三面贴壁、
+    // 左 0；2026-10-19 右 6→12 与 duo 对称）——不扣的话 Row 内容会超出胶囊
+    // （实测 RenderFlex overflow；此前左右各 6 = 12，头像贴壁后减半）。
+    const capsulePad = 12.0;
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad - capsulePad;
 
@@ -2150,9 +2150,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           highlightColor: Colors.black.withValues(alpha: 0.08),
           child: Padding(
             // 只给右侧留白（头像条↔群名侧）：头像沿用「三面贴壁」约定（左/上/
-            // 下贴住胶囊内壁，老板 2026-10-12）——与 duo 大胶囊同款（duo 的
-            // fromLTRB(0,0,6,0)）。
-            padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
+            // 下贴住胶囊内壁，老板 2026-10-12）——与 duo 大胶囊同款。
+            // 右侧 6→12（老板 2026-10-19：与 duo 对称，文字不贴胶囊右缘）。
+            padding: const EdgeInsets.fromLTRB(0, 0, 12, 0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
