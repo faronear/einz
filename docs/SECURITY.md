@@ -44,6 +44,7 @@
 | 定向发码（进别人的身份） | `server/src/app.ts` `/spaces/{id}/join-tokens` 路由 | `attach` token 指向**别的成员** = 帮丢了设备的对方找回身份 → **必须校验共享口令**（`assertSpacePassphrase`，与撤销同一档）。理由：拿到你手机的人若能仅凭 session 就给某个人的身份发一张"进他身份"的链接，等于绕过口令把那个身份交出去。指向**自己**不需要口令（自助加设备，与"自助退役"同口径：只处置自己） |
 | 被撤销通道自毁 | `app/lib/chat_page.dart` `_onEntranceRevoked`；`cli/bin/einz_tui.dart` `_exitRevoked` | **只认明确撤销信号**：`entrance.revoked` 帧或认证 403 `ENTRANCE_REVOKED` → 清锁包 + 消息 + 附件 + 媒体缓存（TUI 清 store 文件 + 附件缓存）→ 回设置页 / 退出。未登记（403 `FORBIDDEN`）与连不上**只警告**，本地数据一律保留（2026-09-16） |
 | 自助退役不发自毁信号 | `server/src/ws.ts` `forgetEntranceConnection`；`server/src/entrances.ts` `retireEntrance` | 本机自助注销（`PROTOCOL.md` §7.2.1）只认 session，**不发 `entrance.revoked` 帧、也不主动关闭 WS**——否则「偷到 session」即可远程触发擦除，绕过上面那条口令闸门。它只清服务端状态 + 给对端广播一次 `peer.offline`（2026-09-21） |
+| 自愿退群（身份级离场） | `server/src/spaces.ts` `leaveSpace`；`server/src/ws.ts` `notifyRevokedForMember` / `broadcastMemberLeft` | **仅 group**（duo 409 `LEAVE_NOT_ALLOWED`）。授权 = 成员会话（session 即所有权，同退役档，**不校验共享口令**；本地闸门 = 群组名 + 本机 PIN）。**为自愿退群场景打开了"session 可触发同身份其他设备擦除"的旁路**（2026-10-19 老板拍板，此前只有口令干得动）：退出者名下的其他在线通道逐个 `entrance.revoked` + 4403 → 自毁。安全增量评估：设备 A 被入侵者持会话 → 可擦除同身份设备 B；但入侵者已完全控制 A（可读全部消息），擦除 B 是拒绝服务而非信息泄露，且用户主动退群本就要这个效果。墓碑行保名让 slot、旧 join token 作废（防身份复活） |
 | 重置闸门（本地） | `app/lib/widgets/reset_entrance.dart`；`cli/bin/einz_tui.dart` `/reset` | 不可逆的通道重置要求：① 手动输入通道名（确认清的是这条）；② 本机锁屏码（已设才验，走 `AppLockService.unlock` 同款防爆破）。**全离线**，刻意不用空间口令——它是共享凭证，且校验需联网，会让"连着一台死服务器"这一主要重置场景自锁（2026-09-21） |
 | App 启动锁（PIN） | `app/lib/data/app_lock.dart` | PIN 派生密钥加密 Space Key 包；防偷看与离线取证 |
 | 密钥安全存储 | `app/lib/data/secure_store.dart` | Keychain/Keystore；iOS/macOS 用 `first_unlock_this_device`（**不随备份/换机迁移**） |
@@ -241,6 +242,7 @@
 | 风险 | 状态 | 备注 |
 | --- | --- | --- |
 | 已被对方/被撤销通道同步的密文 + 旧密钥 | **接受** | 密码学不可逆；轮换也不解决（§3.1） |
+| 退群 ≠ 作废解密能力（2026-10-19） | **接受** | 提前保存 Space Key / 密文者仍可解密退出前的历史（Space Key 模型固有边界，同上一行）。退出设备本地的 Space Key 随 Vault 条目一并删除，服务端只是不再收新消息。产品文案 / FAQ 明示；根治靠二期按成员封装密钥（sender-keys） |
 | 越狱/root 通道上的密钥可被提取 | **接受** | 政策禁止 + §4.2 处置 |
 | 伴侣合法通道被攻破 | **接受** | 无技术手段 |
 | 草稿表（明文）在本地库 | **接受** | 仅本机；`DATABASE.md` §3 |

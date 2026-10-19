@@ -785,6 +785,37 @@
   "promptLockCodeTitle": "输入锁屏码",
   "promptLockCodeHint": "请先验证本机锁屏码",
   "leaveSpaceConfirm": "销毁",
+  "exitGroupTitle": "退出群组？",
+  "exitGroupMessage": "退出后将删除本机保存的这个群组的全部数据；历史消息仍留在其他成员的设备上。日后回来需要剩余成员重新邀请（将以新身份加入）。此操作无法撤销！",
+  "exitGroupConfirm": "退出",
+  "exitGroupNameHint": "请输入群组名称“{name}”",
+  "@exitGroupNameHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameLabel": "{name}",
+  "@exitGroupNameLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameMismatch": "请输入正确的群组名称以确认",
+  "exitGroupFailed": "退出失败，仍留在群组中",
+  "exitGroupMenuItem": "退出群组",
+  "chatPageMemberLeftNotice": "{name} 退出了群组",
+  "@chatPageMemberLeftNotice": {
+    "description": "别人自愿退群时的顶部通知（member.left 广播；与 member.joined 同构）",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "errorBackend": "后台：{message}",
   "@errorBackend": {
     "description": "后台（服务端）错误的前缀：只有服务端响应产出的错误才带它，本机判定的错误不带",

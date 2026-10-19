@@ -149,6 +149,41 @@ export function broadcastMemberJoined(spaceId: string, memberId: string): void {
   }
 }
 
+/** 成员退出（自愿退群，2026-10-19，aimemo/groupExitDesign.md）：与
+ *  [broadcastMemberJoined] 对偶——通知同空间全部**剩余**在线通道刷新成员名单，
+ *  另带 display_name 供客户端顶部通知（"X 退出了群组"；名字查表仍以
+ *  member_id 准）。墓碑行保名，历史消息不受影响。
+ *  调用时机：leaveSpace 事务提交后；退出者自己的连接已先摘除/关闭，
+ *  不会收到这帧。 */
+export function broadcastMemberLeft(spaceId: string, memberId: string, displayName: string | null): void {
+  const payload = { space_id: spaceId, member_id: memberId, display_name: displayName };
+  for (const [, conn] of conns) {
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type: "member.left", payload }));
+    }
+  }
+}
+
+/** 自愿退群：把**同一身份的其他在线通道**逐个按撤销处理（[notifyRevoked]：
+ *  entrance.revoked 帧 + WS 4403 关闭）——这就是老板要的"其他设备上线自动
+ *  销毁本地数据，就像被撤回一样"（groupExitDesign.md 决策 2）。
+ *  [exceptEntranceId] = 发起退群的那条通道：它由调用方自己收尾（本地清理 +
+ *  导航），且不该收到"被撤销"这种误导帧（同 retireEntrance 不发
+ *  entrance.revoked 的理由，见 [forgetEntranceConnection] 注释）。 */
+export function notifyRevokedForMember(
+  spaceId: string,
+  memberId: string,
+  exceptEntranceId: string,
+): void {
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.memberId !== memberId) continue;
+    notifyRevoked(entranceId);
+  }
+}
+
 /** 通话信令帧类型（PROTOCOL.md §8.4；与 shared 的 `kWsTypeCall*` 手工对齐）。 */
 const CALL_TYPES = new Set([
   "call.invite",

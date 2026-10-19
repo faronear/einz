@@ -9,6 +9,13 @@ import { normalizeEntranceName } from "./entranceName.js";
 import { normalizeInstallUid } from "./installUid.js";
 import { assertMemberName, isSameMemberName } from "./memberName.js";
 import { assertSafeSpaceId } from "./safeId.js";
+import type { EntranceSession } from "./guard.js";
+import { purgeEmailIfUnused } from "./notifier.js";
+import {
+  broadcastMemberLeft,
+  forgetEntranceConnection,
+  notifyRevokedForMember,
+} from "./ws.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
 // - space_address 由 space_public_key（创建者公钥）经 Keccak-256 + EIP-55 派生
@@ -348,6 +355,17 @@ export function preflightJoin(
   // 存量老 token（target NULL）退回 issuer_member_id（那时只能指向自己）
   const attachTargetId =
     purpose === "attach" ? (tk.target_member_id ?? tk.issuer_member_id) : null;
+  // attach 目标已是墓碑（自愿退群，2026-10-19）→ 码实质已死：join 也会被同一
+  // 判据挡下（见 joinSpace 的 MEMBER_LEFT），这里 fail-fast，让加入方在第一步
+  // 就看到明确原因，而不是走完整个向导才在最后一步失败。
+  if (attachTargetId != null) {
+    const targetStatus = getDb()
+      .prepare(`SELECT status FROM space_members WHERE space_id = ? AND member_id = ?`)
+      .get(tk.space_id, attachTargetId) as { status: string } | undefined;
+    if (targetStatus != null && targetStatus.status === "left") {
+      throw new ApiError("MEMBER_LEFT", "这条链接要进入的身份已退出空间", 410);
+    }
+  }
   return {
     spaceId: tk.space_id,
     status: sp.status,
@@ -478,6 +496,12 @@ export function preflightJoin(
         .get(tk.space_id, chosenSlot) as { member_id: string | null; status: string } | undefined;
       if (!existing || existing.member_id == null) {
         throw new ApiError("INVALID_REQUEST", "该 slot 无已有成员（进已有身份需绑定已有身份）", 400);
+      }
+      // 墓碑身份不可"复活"（2026-10-19 自愿退群）：status='left' 的行保留
+      // member_id 供历史消息名字解析，但 attach 必须被挡下——退出是身份级离场，
+      // 日后回来 = 剩余成员发新 invite（开新身份），不是旧链接续命。
+      if (existing.status === "left") {
+        throw new ApiError("MEMBER_LEFT", "该身份已退出空间", 410);
       }
       isExistingIdentity = true;
       member = existing;
@@ -691,11 +715,16 @@ export function createJoinToken(
     }
     // 目标必须是**本空间的成员**（否则等于给一个不存在的身份发码；也挡住
     // "拿别的空间的 member_id 来试"这种越权探测）
-    const ok = getDb()
-      .prepare(`SELECT 1 FROM space_members WHERE space_id = ? AND member_id = ?`)
-      .get(spaceId, target);
-    if (!ok) {
+    const targetRow = getDb()
+      .prepare(`SELECT status FROM space_members WHERE space_id = ? AND member_id = ?`)
+      .get(spaceId, target) as { status: string } | undefined;
+    if (!targetRow) {
       throw new ApiError("INVALID_REQUEST", "目标身份不属于本空间", 400);
+    }
+    // 墓碑身份签不出码（2026-10-19 退群配套）：退出者回来 = 剩余成员发新
+    // invite 开**新身份**，不是给旧身份续码
+    if (targetRow.status === "left") {
+      throw new ApiError("MEMBER_LEFT", "目标身份已退出空间", 410);
     }
   } else if (targetMemberId != null) {
     // invite 是"开新身份"，带 target 说明客户端把两种语义搞混了 → 明确报错，
@@ -715,4 +744,117 @@ export function createJoinToken(
   }
   const t = newJoinToken(spaceId, "member", purpose, issuerMemberId, target);
   return { joinToken: t.token, link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token, expiresAt: t.expiresAt };
+}
+
+/** 自愿退群（2026-10-19，aimemo/groupExitDesign.md；老板三项拍板的基础实现）。
+ *
+ * **身份级离场**（不是"退出一台设备"）：一次退群 = 该 member 身份退出空间——
+ *  ① 本身份名下**全部**通道一并注销（retireEntrance 的批量版，无口令：
+ *     session 即所有权，自助语义）；
+ *  ② `space_members` 行转**墓碑**（status='left'、left_at=now；保留 member_id /
+ *     display_name / gender——历史消息名字解析依赖，见 getSpace 全量下发），
+ *     **slot 让位**（移到 max(slot)+1，最小空槽分配逻辑自然回收原 slot）；
+ *  ③ 旧 join token 作废（issuer 或 target 指向退出者的未用码）——否则 24h 内的
+ *     attach 码能把墓碑身份"复活"（joinSpace 只认 member_id 在册），退出者的
+ *     待发邀请也会继续拉人；
+ *  ④ email 解绑（置 NULL + purgeEmailIfUnused，notifier 同模式）；
+ *  ⑤ receipts 行删除（PK (space_id, member_id)，无下游依赖）。
+ * avatars 文件**保留**（历史消息头像按 member_id 取）。
+ *
+ * 事务后（在线设备的处置，老板决策 2"就像被撤回一样"）：
+ *  - 发起设备的连接**静默摘除**（forgetEntranceConnection：不发 entrance.revoked
+ *    ——它自己发起的退出，收尾在客户端；对端照样看到 peer.offline）；
+ *  - 同身份的**其他**在线通道逐个 notifyRevoked（entrance.revoked 帧 + 4403）
+ *    → 那些设备自毁本地数据；离线设备无需推送——下次任何请求吃 403
+ *    ENTRANCE_REVOKED 走同一自毁路径（2026-09-16 既定口径）；
+ *  - 其余在线通道收 member.left 广播（刷新名单 + 顶部通知）。
+ *
+ * duo **不开放退群**（老板决策 1）：服务端 409 兜底——App 隐藏入口，这里防
+ * 老客户端/手搓请求（同 createJoinToken 的 DUO_FULL 兜底思路）。想"离开" duo
+ * 只有既有「销毁本通道」（retireEntrance）——身份仍在册，对方可 re-invite。
+ *
+ * 幂等：member 已是墓碑（并发双退的窄窗）→ 直接 {ok:true}，不再广播。
+ *
+ * @param spaceId **URL 上的** space_id（路由层已过 requireSpaceMember 校验；
+ *   刻意不读 sess.space_id——会话的 space 是客户端自报的，可能与成员实际所属
+ *   空间不一致，详见 guard.ts 对 requireSpaceMember 的说明）。
+ */
+export function leaveSpace(sess: EntranceSession, spaceId: string): { ok: true } {
+  const db = getDb();
+  const now = Date.now();
+  const result = db.transaction(() => {
+    // duo 闸门先于一切：这个空间类型里"退群"不是可执行动作
+    const sp = db
+      .prepare(`SELECT mode FROM spaces WHERE space_id = ?`)
+      .get(spaceId) as { mode: string } | undefined;
+    if (!sp) throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
+    if (sp.mode !== "group") {
+      throw new ApiError(
+        "LEAVE_NOT_ALLOWED",
+        "双人秘境不支持退群——想离开请用「销毁本通道」",
+        409,
+      );
+    }
+    const member = db
+      .prepare(`SELECT status, display_name, email FROM space_members WHERE space_id = ? AND member_id = ?`)
+      .get(spaceId, sess.member_id) as
+      | { status: string; display_name: string | null; email: string | null }
+      | undefined;
+    // 幂等：已是墓碑 → 安静返回 ok（重放/并发双退；此刻会话早已随首次退出删掉，
+    // 能走到这里只剩"两个请求同时通过路由层鉴权"这一种窄窗）
+    if (member == null || member.status !== "active") return { left: false as const };
+    // ① 批量退役本身份全部通道（retireEntrance 的批量版；无口令——自助语义）。
+    //    已撤销的行不动（它们的 push/sessions/challenges 在撤销时已清过）。
+    db.prepare(
+      `UPDATE entrances SET status = 'revoked', last_seen = 0, offline_since = ?
+        WHERE member_id = ? AND status != 'revoked'`
+    ).run(now, sess.member_id);
+    // 该身份名下的推送凭证/会话/待签 challenge 全清（含发起设备这条——退出即生效，
+    // 在途 HTTP 响应不受影响：requireSession 在路由层已经跑完）。
+    db.prepare(
+      `DELETE FROM push_tokens WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE member_id = ?)`
+    ).run(sess.member_id);
+    db.prepare(
+      `DELETE FROM sessions WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE member_id = ?)`
+    ).run(sess.member_id);
+    db.prepare(
+      `DELETE FROM challenges WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE member_id = ?)`
+    ).run(sess.member_id);
+    // ② 墓碑：保名保性别（历史消息解析），让 slot（事务内 max+1，不与 UNIQUE 冲突；
+    //    最小空槽分配逻辑会回收原 slot——退出者腾出的位置给新成员）
+    const nextSlot = (
+      db.prepare(`SELECT COALESCE(MAX(slot), -1) + 1 AS s FROM space_members WHERE space_id = ?`)
+        .get(spaceId) as { s: number }
+    ).s;
+    db.prepare(
+      `UPDATE space_members SET status = 'left', left_at = ?, slot = ?
+        WHERE space_id = ? AND member_id = ?`
+    ).run(now, nextSlot, spaceId, sess.member_id);
+    // ④ email 解绑（notifier.deleteNotifyEmail 同模式：没有别处再用就物理删）
+    if (member.email != null && member.email.length > 0) {
+      db.prepare(`UPDATE space_members SET email = NULL WHERE space_id = ? AND member_id = ?`)
+        .run(spaceId, sess.member_id);
+      purgeEmailIfUnused(member.email);
+    }
+    // ⑤ receipts 行删除（无下游依赖：未读计数只读自己的行，退出者已不存在）
+    db.prepare(`DELETE FROM receipts WHERE space_id = ? AND member_id = ?`)
+      .run(spaceId, sess.member_id);
+    // ③ 旧 join token 作废：issuer 或 target 指向退出者的未用码一并标记已用
+    //    （防 24h 内 attach 复活墓碑身份；退出者的待发邀请也不再拉人）
+    db.prepare(
+      `UPDATE join_tokens SET used_at = ?
+        WHERE space_id = ? AND used_at IS NULL AND (issuer_member_id = ? OR target_member_id = ?)`
+    ).run(now, spaceId, sess.member_id, sess.member_id);
+    return { left: true as const, displayName: member.display_name };
+  })();
+  if (!result.left) return { ok: true };
+  // ── 事务后：在线设备处置（顺序：先摘/关退出者的连接，再广播给剩下的人）──
+  // 发起设备：静默摘除（同 retireEntrance 口径——它自己发起的，不需要"被撤销"帧；
+  // peer.offline 照常广播，对端立刻看到退出者的通道下线）
+  forgetEntranceConnection(sess.entrance_id, now);
+  // 同身份的其他在线通道：逐个撤销自毁（"其他设备上线自动销毁，就像被撤回一样"）
+  notifyRevokedForMember(spaceId, sess.member_id, sess.entrance_id);
+  // 剩余成员：member.left（刷新名单 + 顶部通知；墓碑保名，历史消息不受影响）
+  broadcastMemberLeft(spaceId, sess.member_id, result.displayName);
+  return { ok: true };
 }

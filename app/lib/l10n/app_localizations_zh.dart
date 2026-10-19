@@ -1300,6 +1300,40 @@ class AppLocalizationsZh extends AppLocalizations {
   String get leaveSpaceConfirm => '销毁';
 
   @override
+  String get exitGroupTitle => '退出群组？';
+
+  @override
+  String get exitGroupMessage =>
+      '退出后将删除本机保存的这个群组的全部数据；历史消息仍留在其他成员的设备上。日后回来需要剩余成员重新邀请（将以新身份加入）。此操作无法撤销！';
+
+  @override
+  String get exitGroupConfirm => '退出';
+
+  @override
+  String exitGroupNameHint(String name) {
+    return '请输入群组名称“$name”';
+  }
+
+  @override
+  String exitGroupNameLabel(String name) {
+    return '$name';
+  }
+
+  @override
+  String get exitGroupNameMismatch => '请输入正确的群组名称以确认';
+
+  @override
+  String get exitGroupFailed => '退出失败，仍留在群组中';
+
+  @override
+  String get exitGroupMenuItem => '退出群组';
+
+  @override
+  String chatPageMemberLeftNotice(String name) {
+    return '$name 退出了群组';
+  }
+
+  @override
   String errorBackend(String message) {
     return '后台：$message';
   }

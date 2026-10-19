@@ -498,6 +498,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// member_id → 性别（/space 的 member_genders；成员弹层的卡片底色按它取色，
   /// 未知性别的成员退成中性灰）。
   final Map<String, String> _memberGenders = {};
+  /// member_id → 成员状态（/space 的 member_status，2026-10-19 自愿退群配套）：
+  /// 'active' | 'left'（墓碑）。**名字解析用全量**（墓碑保名，历史消息的
+  /// "谁说的"不丢）；**名单/计数/邀请判定只数 active**（aimemo/groupExitDesign.md
+  /// §4.2 三分口径）。老服务端不下发 → 空表 → 全部按 active（没有墓碑）。
+  final Map<String, String> _memberStatus = {};
   /// 空间模式（'duo' | 'group'，/space 下发）。**不靠"成员数 ≥3"猜**——duo 满员
   /// 签发 invite 后、第三人还没加入时 mode 已经是 group（那时就得停用通话了）。
   String _spaceMode = 'duo';
@@ -515,8 +520,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// invite 的那一刻就已升格，此时第三人还没进来，但通话必须立刻停用）。
   bool get _isGroup => _spaceMode == 'group';
 
-  /// 本空间成员数（身份数，同身份多通道只算一个）。
-  int get _memberCount => _memberSlots.length;
+  /// 本空间成员数（身份数，同身份多通道只算一个）——**只数 active**（自愿退群
+  /// 2026-10-19：墓碑成员不占名额、不再收通知，服务端同口径）。
+  int get _memberCount => _activeMembers.length;
+
+  /// 在册成员（member_id → 槽位，**不含墓碑**）：名单/计数/邀请判定都用它。
+  /// `_memberSlots` 是全量（含墓碑，供 slot 反查与历史归属），名字解析走
+  /// `_memberNames`（同样全量）——两边刻意不分母，见 [_memberStatus] 注释。
+  Iterable<MapEntry<String, int>> get _activeMembers => _memberSlots.entries
+      .where((e) => _memberStatus[e.key] != 'left');
 
   /// 群空间状态条要显示的「**其他人在线数**」（**不含我自己**）：由通道轮询
   /// [\_refreshPeerOnline] 维护——在线按 **member** 去重（同一 member 有任一条通道
@@ -1131,6 +1143,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     unawaited(_refreshProfileFromServer());
   }
 
+  /// 自愿退群（member.left，2026-10-19，aimemo/groupExitDesign.md §6.4）：
+  /// **别人**退出——与 [_onMemberJoined] 同构刷新名单/计数，另发一条顶部通知
+  /// （告知形式=顶部通知+名单刷新，老板决策 3；不在聊天流落系统消息）。
+  ///
+  /// 自己退群收不到这帧（服务端只广播给剩余成员；发起设备的连接被静默摘除），
+  /// 这里仍防一手：万一是自己（老服务端回声）→ 只刷新、不通知。
+  void _onMemberLeft(WsMemberLeftEvent event) {
+    unawaited(_refreshProfileFromServer());
+    if (!mounted) return;
+    if (event.memberId.isNotEmpty && event.memberId == _myMemberId) return;
+    final l10n = AppLocalizations.of(context)!;
+    final name = (event.displayName ?? '').trim();
+    _notice(
+      context,
+      l10n.chatPageMemberLeftNotice(
+          name.isEmpty ? l10n.chatPageMembersUnnamed : name),
+    );
+  }
+
   /// 空间口令被重设（Server 广播 passphrase.rotated）：只发通知不弹窗——
   /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
@@ -1217,13 +1248,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 字段继续走原逻辑（下方"第一个非我成员"对 duo 仍等价于唯一对方）。
       _memberSlots
         ..clear()
-        ..addAll(space.memberSlots); // 含未命名成员（memberNames 会漏）
+        ..addAll(space.memberSlots); // 含未命名成员（memberNames 会漏）；含墓碑（保名）
       _memberNames
         ..clear()
         ..addAll(space.memberNames);
       _memberGenders
         ..clear()
         ..addAll(space.memberGenders);
+      // 成员状态（'active' | 'left'）：老服务端不下发 → 空表（全按 active）
+      _memberStatus
+        ..clear()
+        ..addAll(space.memberStatus);
       _spaceMode = space.mode;
       _maxMembers = space.maxMembers;
       // 身份槽位（0=第一人/创建者，1=第二人）：同性别第二人气泡取青色的判据
@@ -1447,6 +1482,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onReceiptUpdated: _onReceiptUpdated,
       onCall: _onCallSignal,
       onMemberJoined: _onMemberJoined,
+      onMemberLeft: _onMemberLeft,
     );
   }
 
@@ -2159,7 +2195,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return slotOf(a).compareTo(slotOf(b));
     }
 
-    return _memberSlots.entries
+    // 只列**在册**成员（不含墓碑——退出的人不该还在头像条里，2026-10-19）
+    return _activeMembers
         .where((e) => e.key != _myMemberId)
         .toList()
       ..sort(compare);
@@ -3381,7 +3418,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
   /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
   /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
-  /// - **无退出入口**（一期：入群即不退群）。
+  /// - 底部「退出群组」红字项（2026-10-19 自愿退群）：**身份级**离场——本机数据
+  ///   全清、同身份其他设备一并掉线自毁、历史消息留在别人设备上。duo 没有这项
+  ///   （ duo 想离开只有「销毁本通道」，身份仍在册）。
   ///
   /// **duo（我的同伴）**：改走 [_showDuoPeerSheet]——与「我的资料」同款的单张
   /// 只读身份卡（duo 只有对方一个人，成员卡列表反而零碎）。
@@ -3391,8 +3430,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return;
     }
     final l10n = AppLocalizations.of(context)!;
-    // 其他成员（不含我），按加入先后（槽位升序 = 入群顺序）排
-    final others = _memberSlots.entries
+    // 其他**在册**成员（不含我、不含墓碑——退出者不该再列出来，2026-10-19），
+    // 按加入先后（槽位升序 = 入群顺序）排
+    final others = _activeMembers
         .where((e) => e.key != _myMemberId)
         .toList()
       ..sort((a, b) => a.value.compareTo(b.value));
@@ -3540,6 +3580,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _memberCount, _maxMembers),
                       muted: true,
                     ),
+                  // 「退出群组」（2026-10-19，aimemo/groupExitDesign.md §6.1）：
+                  // destructive 红字项。与「邀请新同伴」大按钮同款淡灰底（老板
+                  // 2026-10-17 统一口径），红图标+红字表达破坏性；**整块可点**
+                  // （老板偏好：别让人去点中某个小控件）。
+                  if (_isGroup)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          mouseCursor: SystemMouseCursors.click,
+                          onTap: () {
+                            // 先收弹层；等它收完再走确认闸门（route 交接，
+                            // 见 _waitRouteHandoff）
+                            Navigator.of(ctx).pop();
+                            _menuAction(_exitGroup);
+                          },
+                          hoverColor: Colors.black.withValues(alpha: 0.10),
+                          highlightColor: Colors.black.withValues(alpha: 0.14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.logout,
+                                    color: Theme.of(ctx).colorScheme.error),
+                                const SizedBox(width: 6),
+                                Text(
+                                  l10n.exitGroupMenuItem,
+                                  style: TextStyle(
+                                    color: Theme.of(ctx).colorScheme.error,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -3547,6 +3628,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
       },
     );
+  }
+
+  /// 退出群组（2026-10-19，aimemo/groupExitDesign.md §6.3）：确认闸门 →
+  /// 服务端 leaveSpace → 本地 removeSpace → 导航收尾。
+  ///
+  /// 执行链的顺序不能反：**leaveSpace 成功之后再清本地**（凭证在本地，清完就
+  /// 再也调不动服务端）。失败不清本地（confirmExitGroup 内部已报顶部通知），
+  /// 直接 return 留在群里。
+  ///
+  /// 导航收尾与「销毁本通道」同款：还有其他空间 → 切到下一个；一个都不剩 →
+  /// 回向导（VaultPayload.remove 已把 active 让给剩下的第一个）。
+  Future<void> _exitGroup() async {
+    final hasPin =
+        await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
+    if (!mounted) return;
+    final left = await confirmExitGroup(
+      context,
+      db: widget.db,
+      api: widget.api,
+      spaceId: widget.spaceId,
+      session: _session,
+      groupName: _groupName,
+      hasPin: hasPin,
+    );
+    if (!left || !mounted) return;
+    SpaceSessions.forget(widget.spaceId); // 凭证已随 removeSpace 删掉，会话一并丢掉
+    final vault = VaultSession.current;
+    final database = widget.db ?? LocalDatabase.shared;
+    final next = vault == null
+        ? null
+        : await AppLockService(database).resolveActivePayload(vault);
+    if (!mounted) return;
+    if (next == null) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SetupPage()),
+        (route) => false,
+      );
+      return;
+    }
+    await switchToSpace(context, next.spaceId, db: widget.db);
   }
 
   /// duo 的「我的同伴」弹层（老板 2026-10-18 改版）：与「我的资料」弹层**同款
@@ -4577,7 +4698,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         myEntranceId: widget.entranceId,
         myWsOnline: _ws?.connected.value ?? false,
       );
-      final seenOthers = presences.keys.toSet();
+      // 墓碑成员（已退出）不进"其他人"口径：他们的通道行仍在 /entrances 里
+      // （ revoked 软标记），聚合出的 revokedOnly 存在感不该把人算回来
+      // （2026-10-19；_memberCount 已按 active 过滤，这里保持一致）。
+      final seenOthers = presences.keys
+          .where((k) => _memberStatus[k] != 'left')
+          .toSet();
       final onlineOthers = presences.entries
           .where((e) => e.value.online)
           .map((e) => e.key)

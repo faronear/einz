@@ -531,6 +531,7 @@ Authorization: Bearer <session_token>
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成通道码/改口令时按需检测 updated_at 再要求输入新口令） |
 | S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
 | S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加设备（attach token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
+| S→C | `member.left` | `{ "space_id": "…", "member_id": "…", "display_name": "…" }` | 自愿退群（2026-10-19，`PROTOCOL_MULTIVERSE.md` §4.2；**仅 group**）：某成员**身份级**退出（名下全部通道一并注销、成员行转墓碑）。与 `member.joined` 对偶——客户端刷新名单 + 顶部通知；`display_name` 只供通知文案，权威标识是 `member_id`。退出者自己的连接收不到这帧（已被静默摘除 / 撤销关闭）。老客户端忽略未知帧即可（`PROTOCOL_VERSION` 不为此升） |
 
 ### 8.3 顺序与重连
 

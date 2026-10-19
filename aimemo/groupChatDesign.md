@@ -178,8 +178,12 @@
   group 禁通话；duo 恒 2 人）；创建流程不预置对方，新成员自己填名；
   邀请链接双 purpose（invite/channel，channel 绑定发起人身份）；新成员可见全部历史
   （加入页明示文案）；token 逐人一次性；成员无退出；一次性升级（v3，服务端先行）
-- **二期候选**：成员退出（含状态机/重入/广播，依赖下条）、密钥按成员封装（退群作废）、
-  踢人+密钥轮换、群通话（Mesh ≤4 人）、CLI 深度适配（含创建/加入群空间入口）、
+- **二期候选**：~~成员退出（含状态机/重入/广播，依赖下条）~~ ✅ **2026-10-19 已实现**
+  （自愿退群：仅 group、身份级离场、多设备一并退+自毁、顶部通知；设计与实现见
+  `aimemo/groupExitDesign.md`、`docs/PROTOCOL_MULTIVERSE.md` §4.2）、密钥按成员封装
+  （**退群作废解密能力**——本期退群只删本地密钥，历史对已存密钥者仍可解，见
+  `docs/SECURITY.md` §6）、踢人+密钥轮换、群通话（Mesh ≤4 人）、CLI 深度适配
+  （含创建/加入群空间入口）、
   ~~"启动时强制升级"~~ ✅ **2026-10-04 已实现**（`/health` 加 `min_app_version` +
   `app_download_url`；App 首屏核对，低于下限弹不可关闭的升级窗，见
   `app/lib/widgets/version_gate.dart`、`docs/DEPLOYMENT.md` §2.2、`docs/PROTOCOL_MULTIVERSE.md` §4.1）

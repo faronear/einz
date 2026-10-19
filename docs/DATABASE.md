@@ -82,11 +82,24 @@ CREATE TABLE space_members (
     slot INTEGER NOT NULL,
     display_name TEXT,
     gender       TEXT,                     -- male | female
-    status       TEXT NOT NULL DEFAULT 'active',  -- active | pending
+    status       TEXT NOT NULL DEFAULT 'active',  -- active | pending | left
     joined_at    INTEGER,
+    -- 自愿退群墓碑时刻（status='left' 时写；2026-10-19，aimemo/groupExitDesign.md）
+    left_at      INTEGER,
     PRIMARY KEY (space_id, member_id),
     UNIQUE (space_id, slot)
 );
+
+-- space_members.status 三态（2026-10-19 起）：
+--   active = 在册成员；pending = 存量库的"伴侣预置行"（member_id NULL，见上方注释）；
+--   left   = **自愿退群墓碑**：member_id / display_name / gender **保留**（历史消息的
+--     发送者名字解析依赖——消息不带名字，客户端按 member_id 查这张表；删行会让剩余
+--     成员看历史显示「未命名」），且 **slot 已让位**（leaveSpace 把它移到
+--     max(slot)+1，最小空槽分配自然回收原 slot——退出者腾出的位置给新成员）。
+--     墓碑行不占名额（countActiveMembers / planNotifications / isSpaceMember 均按
+--     status='active' 过滤，零改动自动正确）、不再收通知、通道全部撤销。
+--     重入 = 剩余成员发新 invite（开**新身份**），没有"原身份复活"——旧 attach 码
+--     在 leave 时一并作废，且 join/preflight/签发三处对墓碑身份报 MEMBER_LEFT。
 
 -- 一次性加入凭证（邀请链接里的 token；**只存 SHA-256 hash**，24h 过期、用后作废）
 -- 2026-10-03/04 增列：

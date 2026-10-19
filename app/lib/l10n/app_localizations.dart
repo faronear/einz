@@ -2348,6 +2348,60 @@ abstract class AppLocalizations {
   /// **'Destroy'**
   String get leaveSpaceConfirm;
 
+  /// No description provided for @exitGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave group?'**
+  String get exitGroupTitle;
+
+  /// No description provided for @exitGroupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving deletes all local data for this group on this device. History stays on other members\' devices. To come back later, a remaining member must send you a new invite (you\'ll join as a new identity). This cannot be undone!'**
+  String get exitGroupMessage;
+
+  /// No description provided for @exitGroupConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get exitGroupConfirm;
+
+  /// No description provided for @exitGroupNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the group name “{name}”'**
+  String exitGroupNameHint(String name);
+
+  /// No description provided for @exitGroupNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}'**
+  String exitGroupNameLabel(String name);
+
+  /// No description provided for @exitGroupNameMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the correct group name to confirm'**
+  String get exitGroupNameMismatch;
+
+  /// No description provided for @exitGroupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t leave the group — you\'re still in it'**
+  String get exitGroupFailed;
+
+  /// No description provided for @exitGroupMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave group'**
+  String get exitGroupMenuItem;
+
+  /// Top notice when someone leaves the group voluntarily (member.left broadcast; mirrors member.joined)
+  ///
+  /// In en, this message translates to:
+  /// **'{name} left the group'**
+  String chatPageMemberLeftNotice(String name);
+
   /// Prefix for errors reported by the server; errors decided on this device carry no prefix
   ///
   /// In en, this message translates to:

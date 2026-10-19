@@ -331,6 +331,7 @@ class SpaceResult {
     this.memberNames = const {},
     this.memberGenders = const {},
     this.memberSlots = const {},
+    this.memberStatus = const {},
     this.mode = 'duo',
     this.maxMembers = 0,
   });
@@ -349,7 +350,18 @@ class SpaceResult {
   ///
   /// 群聊一期附带用途：**键集合就是本空间全部成员**（含未设置名字的成员——
   /// memberNames 只收有名字的），客户端列成员名单请以这里为准。
+  ///
+  /// 自愿退群（2026-10-19）起：**含墓碑成员**（status='left'——行不删，
+  /// member_id/display_name 保留供历史消息名字解析）。名单/计数/邀请判定
+  /// 一律再按 [memberStatus] 过滤掉 'left'；名字解析用全量。
   final Map<String, int> memberSlots;
+
+  /// member_id → 成员状态（'active' | 'left'；老服务端无此键时为空表——
+  /// 缺省按 active 处理，即没有墓碑）。
+  ///
+  /// 用途（aimemo/groupExitDesign.md §4.2）：成员弹层名单只列 active、
+  /// 计数/邀请判定只数 active、消息发送者名字解析用全量（墓碑保名）。
+  final Map<String, String> memberStatus;
 
   /// 空间模式（群聊一期 2026-10-03）：'duo' = 二人私密空间（上限 2、通话可用）；
   /// 'group' = 群空间（上限 [maxMembers]、通话禁用）。旧服务端缺省回 'duo'。
@@ -371,6 +383,8 @@ class SpaceResult {
             .map((k, v) => MapEntry(k, v as String)),
         memberSlots: (json['member_slots'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as int)),
+        memberStatus: (json['member_status'] as Map<String, dynamic>? ?? {})
+            .map((k, v) => MapEntry(k, v as String)),
         mode: (json['mode'] as String?) ?? 'duo',
         maxMembers: (json['max_members'] as num?)?.toInt() ?? 0,
       );

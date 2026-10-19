@@ -1367,6 +1367,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaveSpaceConfirm => 'Destroy';
 
   @override
+  String get exitGroupTitle => 'Leave group?';
+
+  @override
+  String get exitGroupMessage =>
+      'Leaving deletes all local data for this group on this device. History stays on other members\' devices. To come back later, a remaining member must send you a new invite (you\'ll join as a new identity). This cannot be undone!';
+
+  @override
+  String get exitGroupConfirm => 'Leave';
+
+  @override
+  String exitGroupNameHint(String name) {
+    return 'Type the group name “$name”';
+  }
+
+  @override
+  String exitGroupNameLabel(String name) {
+    return '$name';
+  }
+
+  @override
+  String get exitGroupNameMismatch => 'Enter the correct group name to confirm';
+
+  @override
+  String get exitGroupFailed =>
+      'Couldn\'t leave the group — you\'re still in it';
+
+  @override
+  String get exitGroupMenuItem => 'Leave group';
+
+  @override
+  String chatPageMemberLeftNotice(String name) {
+    return '$name left the group';
+  }
+
+  @override
   String errorBackend(String message) {
     return 'Server: $message';
   }

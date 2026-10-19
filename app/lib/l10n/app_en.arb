@@ -833,6 +833,37 @@
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Verify this device's lock screen code first",
   "leaveSpaceConfirm": "Destroy",
+  "exitGroupTitle": "Leave group?",
+  "exitGroupMessage": "Leaving deletes all local data for this group on this device. History stays on other members' devices. To come back later, a remaining member must send you a new invite (you'll join as a new identity). This cannot be undone!",
+  "exitGroupConfirm": "Leave",
+  "exitGroupNameHint": "Type the group name “{name}”",
+  "@exitGroupNameHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameLabel": "{name}",
+  "@exitGroupNameLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameMismatch": "Enter the correct group name to confirm",
+  "exitGroupFailed": "Couldn't leave the group — you're still in it",
+  "exitGroupMenuItem": "Leave group",
+  "chatPageMemberLeftNotice": "{name} left the group",
+  "@chatPageMemberLeftNotice": {
+    "description": "Top notice when someone leaves the group voluntarily (member.left broadcast; mirrors member.joined)",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "errorBackend": "Server: {message}",
   "@errorBackend": {
     "description": "Prefix for errors reported by the server; errors decided on this device carry no prefix",

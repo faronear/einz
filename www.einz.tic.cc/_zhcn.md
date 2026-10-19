@@ -10,6 +10,7 @@
 
 - [什么是秘境？](./about/what_is_einz/_zhcn.md)
 - [怎样开始使用](./howto/get_started/_zhcn.md)
+- [退出群组](./howto/leave_group/_zhcn.md)
 
 ### 新鲜事
 

@@ -10,6 +10,7 @@
 
 - [What is Einz?](./about/what_is_einz/_enus.md)
 - [How to get started](./howto/get_started/_enus.md)
+- [Leaving a group](./howto/leave_group/_enus.md)
 
 ### What's new
 
