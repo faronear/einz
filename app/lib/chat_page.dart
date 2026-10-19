@@ -6409,17 +6409,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _messageHasActions(HistoryMessage m) => !m.deleted;
 
   /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
-  /// [_messageHasActions]）：自己消息、服务端已收下、且**纯粹单勾**——还没
-  /// 有任何人收到（k=0；老板 2026-10-12：群空间里只要有人收到，撤回就会
-  /// 失败——内容已被拿走；duo 同理 = 对方已拉取。本地粗筛，权威判定在
-  /// 服务端 409）。
-  bool _messageRecallable(HistoryMessage m) =>
-      m.sender == 'me' &&
-      m.env.serverSequence != null &&
-      m.status != 'failed' &&
-      MessageRepository.deliveredCountOf(
-              m.env.serverSequence, _peerReceipts) ==
-          0;
+  /// [_messageHasActions]）：自己消息 + 以下其一——
+  /// - 已有 serverSequence：服务端已收下、且**纯粹单勾**——还没有任何人收到
+  ///   （k=0；老板 2026-10-12：群空间里只要有人收到，撤回就会失败——内容已被
+  ///   拿走；duo 同理 = 对方已拉取。本地粗筛，权威判定在服务端 409）；
+  /// - **还没有 serverSequence**（2026-10-19 老板：pending/failed——离线没到
+  ///   服务端——也该能撤）：没人可能拉到，撤回 = 取消发送；服务端路径与
+  ///   404/409 权威判定照走，见 [MessageRepository.recallMessage]。
+  bool _messageRecallable(HistoryMessage m) {
+    if (m.sender != 'me' || m.status == 'failed' && m.env.serverSequence != null) {
+      // failed 且已在服务端：4xx 明确拒绝（如通道被撤销），重试也无用，不提供
+      return false;
+    }
+    if (m.env.serverSequence == null) {
+      // 未到服务端（pending 在途 / failed 未收下）：撤回 = 取消发送
+      return m.status == 'pending' || m.status == 'failed';
+    }
+    return MessageRepository.deliveredCountOf(
+            m.env.serverSequence, _peerReceipts) ==
+        0;
+  }
 
   Future<void> _showMessageActions(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;

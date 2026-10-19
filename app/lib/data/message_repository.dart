@@ -495,6 +495,19 @@ class MessageRepository {
       if (e.httpStatus != 404) rethrow;
     }
     await tombstoneMessage(messageId, kind: 'recall');
+    await _ensureNotPendingAfterRecall(messageId);
+  }
+
+  /// 撤回后把消息从补发队列里摘出来：`_flushPending` 刻意**不排除墓碑**
+  /// （本机删除≠对方收不到，未确认的消息仍应补发）——但撤回恰恰要求它**永远
+  /// 不到达**。所以撤回一条 status 还是 pending/failed 的消息（离线没到服务端）
+  /// 后，必须把状态改成终态（'sent'——墓碑行的回执恒显单勾，状态只影响补发
+  /// 取数与重试 UI），否则补发队列会把已撤回的消息原样发出去（2026-10-19）。
+  Future<void> _ensureNotPendingAfterRecall(String messageId) async {
+    await (db.update(db.localMessages)
+          ..where((m) => m.messageId.equals(messageId))
+          ..where((m) => m.status.isIn(['pending', 'failed'])))
+        .write(const LocalMessagesCompanion(status: Value('sent')));
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
