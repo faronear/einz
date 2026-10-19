@@ -10530,6 +10530,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     return Container(
       width: double.infinity,
       // 无标题行（纯输入行卡）时上下padding撑开一点，别显得空
+      // （标题行→内容 12→8 保留，老板 2026-10-20；其余 padding 维持原样）
       padding: EdgeInsets.fromLTRB(_kCardPadH, title == null ? 14 : 12, _kCardPadH, 14),
       decoration: BoxDecoration(
         color: colors.surfaceContainerLowest, // 白卡：与弹窗粉底分层
@@ -10560,7 +10561,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                 if (trailing != null) ...[const Spacer(), trailing],
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
           ],
           ...children,
         ],
@@ -10724,25 +10725,32 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       title: _hasPin
           ? _buildSetLockTabs(context, l10n)
           : Center(child: Text(l10n.chatPageSetLockTitle)),
-      // 标签页模式下标题行就是胶囊轨道：底部留 12 再进第一张分组卡片；
-      // 未设锁屏码仍是「标题→备注 4 / 备注→内容 14」的老节奏（老板 2026-10-15）
-      titlePadding: _hasPin ? const EdgeInsets.fromLTRB(24, 24, 24, 12) : null,
+      // 标签页模式下标题行就是胶囊轨道：底部留 8 再进第一张分组卡片（老板
+      // 2026-10-20 键盘遮挡整改：从 12 收紧）；未设锁屏码仍是老节奏
+      titlePadding: _hasPin ? const EdgeInsets.fromLTRB(24, 24, 24, 8) : null,
       contentPadding: _hasPin
-          ? EdgeInsets.fromLTRB(_kDialogContentPadH, 0, _kDialogContentPadH, 24)
+          ? EdgeInsets.fromLTRB(_kDialogContentPadH, 0, _kDialogContentPadH, 16)
           : const EdgeInsets.fromLTRB(24, 4, 24, 24),
       // 手机版 insetPadding 与 Dialog 默认一致（左右各 40）；minWidth 兜底理由
       // 见 [_setLockAxisWidth]，maxWidth 防桌面端被内容 intrinsic 无限拉宽。
       insetPadding: const EdgeInsets.symmetric(horizontal: _kDialogInsetH, vertical: 24),
       constraints: BoxConstraints(minWidth: dialogMinWidth, maxWidth: _kDialogWidthDesktop),
       // 三组卡片比旧的"提示+三框+轴"高：小屏（或键盘弹起挤压高度）时允许滚动，
-      // 不出 RenderFlex overflow（默认 scrollable: false 会直接溢出）
-      scrollable: true,
+      // 不出 RenderFlex overflow——滚动收在 content 内层 Flexible 的
+      // SingleChildScrollView 里（外层 Column 不滚），错误红字才能**固定**
+      // 在按钮区上方不随内容滚走（老板 2026-10-20）。
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (clearing) ...[
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (clearing) ...[
             // 「清除锁屏码」标签页（老板 2026-10-18）：红色「清除」主按钮本身就是
             // 警示，页面不再叠备注/警告文案，只留旧码验证框——与更换页第一组同款
             // 的「验证」行卡片，保持结构一致。验旧码仍然必须（2026-09-14 定：否则
@@ -10785,7 +10793,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
             ],
             // 第二组：新 PIN（设置 / 确认 两行同卡——新码的两行归一组）。
             // 确认行仅在**已设 PIN 的更换场景**下随第一行显隐（老板 2026-10-19）：
@@ -10819,7 +10827,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                 ],
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             // 第三组：自动锁屏时长（对数轴 30 秒~30 分钟，老板 2026-10-18：仿阅后
             // 即焚轴，档位吸附 + 轴下可点标注）。前台闲置锁与后台回来锁共用同一值；
             // 改它不需要验当前锁屏码，与前两组互不干扰。
@@ -10854,9 +10862,21 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               ],
             ),
           ],
+                ],
+              ),
+            ),
+          ),
+          // 错误红字固定在按钮区上方、不随内容滚动（老板 2026-10-20）：
+          // 在外层不滚的 Column 里、actions 之前，FullWidth 行左对齐 + 软换行，
+          // 长文案（如「两次输入不一致」英文句）自动折行不被截断。
           if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            ),
           ],
         ],
       ),
