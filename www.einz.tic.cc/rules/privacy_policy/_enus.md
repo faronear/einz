@@ -6,7 +6,7 @@
 
 ---
 
-Last updated: 2026-10-12
+Last updated: 2026-10-19
 
 ## What we cannot see
 
@@ -40,4 +40,5 @@ All of your content lives in the app's database on your device, and a PIN is req
 
 ## Contact us
 
-File an issue on [GitHub](https://github.com/faronear/einz), or reach us through whatever channel you already have.
+- Email: [einz@tic.cc](mailto:einz@tic.cc)
+- Or file an issue on [GitHub](https://github.com/faronear/einz).

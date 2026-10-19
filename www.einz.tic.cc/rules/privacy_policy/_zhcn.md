@@ -6,7 +6,7 @@
 
 ---
 
-最后更新：2026-10-12
+最后更新：2026-10-19
 
 ## 我们看不了什么
 
@@ -40,4 +40,5 @@
 
 ## 联系我们
 
-在 [GitHub](https://github.com/faronear/einz) 上提 issue，或通过你们现有的联系方式直接找我们。
+- 邮箱：[einz@tic.cc](mailto:einz@tic.cc)
+- 或在 [GitHub](https://github.com/faronear/einz) 上提 issue。
