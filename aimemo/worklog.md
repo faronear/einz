@@ -15233,3 +15233,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T13:05:13Z / ��**：老板反馈 group 空间状态条左侧大胶囊两个现象。① 右缘贴文字——group 胶囊内部 Padding 仍是右 6（duo 上轮已改 12），对称改为 12，宽度预算 `capsulePad` 同步 6→12（两处注释标明耦合，防 RenderFlex overflow）；② 老板觉得"胶囊整体右移、头像没贴左圆角"——排查确认左侧两层 padding 均为 0、头像条左缘 x=0，真实原因是几何对比：duo 头像 40px 与 40 高胶囊左圆弧（半径 20）同心所以"三面贴壁"，group 头像 32px 垂直居中、左圆弧大一圈，弧线在头像左上/下方收进去，视觉上像右移——自 32px 头像条起即如此，非本次回归。已向老板说明，是否把 group 头像条升到满高（需同步改 _stripAvatarCount/渐隐整套预算）待老板定夺。验证：flutter analyze 0 问题；2 hunks 全为本改动。
 
 **（2026-10-19T13:06:19Z / ��**：老板定夺：group 状态条头像条**保持 32px 现状**，不升 40px 满高（此前我在 worklog 里留的待定项就此关闭）。左圆弧留白是可接受的视觉特性，不再当问题处理。
+
+## 20261019 app-apk-boot2run 卡在「等待 adb 设备上线」根因修复
+
+**（2026-10-19T13:18:23Z / ��**：老板报最近几天 boot2run 总停在「等待 adb 设备上线」。排查链：adb devices 显示 emulator-5554 offline（qemu 进程活着但系统起不来）→ 模拟器日志 `Failed to load snapshot 'default_boot'`（goldfish_pipe error while loading state, Error -5）→ **根因 = AVD quick-boot 快照损坏**，普通启动每次都卡在加载坏快照。排查弯路：AVD 目录不在 `~/.android/avd/einz_emu.avd`——`einz_emu.ini` 的 path 指向 `~/.android/avd/Pixel_4_XL.avd`（AVD 改过名、目录沿用旧名），第一次 rm 删错了空目录。修法：kill 残留 qemu/netsimd → 删 `Pixel_4_XL.avd/snapshots/default_boot`（冷启动 `-no-snapshot` 仅作诊断）→ 普通启动实测 40s 开机 ✅。今后再遇到同样症状（进程在但 adb 一直 offline），直接删该快照即可。未改 package.json 脚本。
