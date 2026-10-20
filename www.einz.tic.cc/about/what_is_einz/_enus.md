@@ -6,7 +6,10 @@
 
 ---
 
-Einz is an end-to-end encrypted app for private messaging and sharing. It is not built for mass social networking — it belongs to two people, or a small circle of people you choose.
+Einz is a secret realm for private messaging and sharing — an
+end-to-end encrypted territory where you and your close companions keep
+small, secret spaces. It is not built for mass social networking — it
+belongs to two people, or a small circle of people you choose.
 
 ## No third party can read it
 

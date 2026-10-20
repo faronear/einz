@@ -132,10 +132,10 @@ CONTACT for review questions: einz@tic.cc
 ### 4.2 描述（Description，≤4000 字符）
 
 ```
-Einz is a private space for you and the people who matter — end-to-end
+Einz is a secret realm for you and the people who matter — end-to-end
 encrypted, local-first, and account-free.
 
-YOUR SECRET SPACE
+YOUR SECRET REALM
 Create a space and invite someone with a single link. Everything inside
 — messages, photos, videos, voice notes, and files — is encrypted on
 your device before it ever leaves it. Not even we can read it.
