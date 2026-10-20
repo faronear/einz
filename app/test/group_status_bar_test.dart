@@ -168,7 +168,7 @@ int _statusAvatars(WidgetTester tester) => tester
 void main() {
   disableAnimationsInTests();
 
-  testWidgets('群空间状态条左侧：成员头像条 + 群名/「在线/总数」，没有逐成员人名',
+  testWidgets('群空间状态条左侧：成员头像条（头像下方人名标签）+ 群名/「在线/总数」',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -180,11 +180,12 @@ void main() {
     expect(_statusAvatars(tester), 4,
         reason: '左侧应摆其他成员的头像（3 个），加我自己共 4 个');
 
-    // ② 左侧**没有人名**（原来的 "Member0、Member1、Member2" 已去掉）
+    // ② 头像下方各有**一个人名标签**（2026-10-20 试验方案：头像缩小、下方展示
+    // 用户名，宽度压在头像宽度内）
     for (var i = 0; i < 3; i++) {
       expect(find.descendant(of: _statusBar, matching: find.text('Member$i')),
-          findsNothing,
-          reason: '群空间状态条左侧不该再写人名');
+          findsOneWidget,
+          reason: '每个成员头像下方应有人名标签 Member$i');
     }
 
     // ③ 没有人形图标以外的旧元素（上一版那个 Icons.groups_outlined 已被头像条取代）

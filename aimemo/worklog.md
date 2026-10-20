@@ -15252,3 +15252,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 ## 20261020 整理本地与 origin/main 的分叉
 
 **（2026-10-20T00:30:00Z / 2026-10-20 08:30）**：本地 main 与 origin/main 走岔（本地 4 个 commit：锁屏码弹窗整改、PIN 单框、离线切秘境修复；远端 5 个：boot2run 快照修复、CI group_status_bar_test 修复），且工作区遗留一个进行中的 merge、卡在 aimemo/worklog.md 冲突。处理：worklog 为追加式日志，两侧条目（UTC 13:18–13:37 与 23:24–23:52）按时间顺序全保留；其余 7 个文件（chat_page.dart、l10n×5、chat_page_menu_test.dart）由 git 自动合并。完成 merge commit 5e9fd14c，flutter analyze 无问题。本地现领先 origin/main 5 个 commit，待老板确认后 push。
+
+## 20261020 group 状态条头像试验方案：缩小+人名标签+上下贴边
+
+**（2026-10-20T02:10:00Z / 2026-10-20 10:10）**：老板要求改 group 状态胶囊里的成员头像——缩小到胶囊一半略多、下方展示用户名。迭代四轮定稿：① 头像直径 40→28（`kStatusMemberAvatarSize*0.7`）；② 头像下方人名标签（10 号灰字，不限字数、宽度压在头像宽度内 clip 截断，底部留 2px 不压底缘，空名回落 "?"）；③ 头像列上下都贴胶囊边——外层大胶囊 Row 与 `_avatarStrip` 内部 Row 都改 `CrossAxisAlignment.stretch`，头像用 `Expanded+Center` 吃掉标签以上全部高度；④ 胶囊左内边距 0→8、`capsulePad` 12→20：左下角标签/头像左弧曾被 StadiumBorder 左端圆弧削掉，右移后完整显示。槽位布局/渐隐算法（`_stripAvatarCount`）未动。duo 空间不受影响；我方头像在 duo/group 本就同大（共享 `_statusAvatar`，40），确认不改。`group_status_bar_test` 旧断言「状态条不写逐成员人名」随方案改为「每个头像下方有人名标签」，10 项全绿；flutter analyze 无问题。老板确认后已提交。

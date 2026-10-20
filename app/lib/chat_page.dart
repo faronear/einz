@@ -2027,10 +2027,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 是 0——头像条左缘贴边，见 `_buildPeerStatus` 的 pad 注释）——不扣的话
     // 内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
     const leadingPad = 10.0;
-    // 再扣掉大胶囊自己的水平 Padding（老板 2026-10-12 起只留右：头像三面贴壁、
-    // 左 0；2026-10-19 右 6→12 与 duo 对称）——不扣的话 Row 内容会超出胶囊
+    // 再扣掉大胶囊自己的水平 Padding（老板 2026-10-12 起左 0；2026-10-19
+    // 右 6→12 与 duo 对称；2026-10-20 试验方案左 0→8：头像列上下贴满胶囊后，
+    // 左下角的名字标签/头像左弧会被 StadiumBorder 左端圆弧削掉，右移让它们
+    // 完整显示——上下贴边不受影响）——不扣的话 Row 内容会超出胶囊
     // （实测 RenderFlex overflow；此前左右各 6 = 12，头像贴壁后减半）。
-    const capsulePad = 12.0;
+    const capsulePad = 20.0;
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad - capsulePad;
 
@@ -2159,12 +2161,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           hoverColor: Colors.black.withValues(alpha: 0.05),
           highlightColor: Colors.black.withValues(alpha: 0.08),
           child: Padding(
-            // 只给右侧留白（头像条↔群名侧）：头像沿用「三面贴壁」约定（左/上/
-            // 下贴住胶囊内壁，老板 2026-10-12）——与 duo 大胶囊同款。
-            // 右侧 6→12（老板 2026-10-19：与 duo 对称，文字不贴胶囊右缘）。
-            padding: const EdgeInsets.fromLTRB(0, 0, 12, 0),
+            // 左 8 + 右 12（右 2026-10-19 起）：头像列上下贴满胶囊后，左缘 0 会
+            // 让左下角的名字标签/头像左弧被 StadiumBorder 左端圆弧削掉，左 8 把
+            // 头像条整体右移一点使其完整显示（老板 2026-10-20 试验方案）——
+            // 上下贴边不受影响。宽度预算同步见上方 capsulePad 注释。
+            padding: const EdgeInsets.fromLTRB(8, 0, 12, 0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              // stretch：让头像条（头像+名字标签列）上下都顶满胶囊内壁
+              //（老板 2026-10-20 试验方案），名字列随之通高。
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 avatarSlot,
                 const SizedBox(width: gap),
@@ -2226,11 +2232,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 都得跟着动，还容易被 `Flexible` 判溢出。代价是头像可见区被环吃掉约 2.5px，
   /// 在 32 的尺寸上可以接受（Instagram/故事环也是这个做法）。
   Widget _stripAvatar(String memberId) {
+    // 试验方案（老板 2026-10-20）：头像吃掉「胶囊高度 − 名字标签」的
+    // 全部高度（≈28-29 / 40），头像下方展示用户名——不限字数，宽度压在头像
+    // 宽度内、超宽省略。头像列**上下都贴胶囊边**：外层 Row 用 stretch 拉满
+    // 高度，Expanded 让头像占满标签以上的空间、标签钉在底缘。
+    const avatarDiameter = kStatusMemberAvatarSize * 0.7; // 28
     final avatar = _MessageAvatar(
       memberId: memberId,
       server: effectiveServer,
       api: widget.api,
-      radius: kStatusMemberAvatarSize / 2,
+      radius: avatarDiameter / 2,
       // 点按不打开头像全览：状态条这一串的点按应落到外层「我的同伴」胶囊。
       // 否则**有头像图片**的成员（与在线与否无关）会被 `_MessageAvatar` 抢走点击、
       // 误开全览页（老板 2026-10-08 报：离线头像点了开全览）。
@@ -2238,8 +2249,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     final Widget visual = _onlineOthers.contains(memberId)
         ? SizedBox(
-            width: kStatusMemberAvatarSize,
-            height: kStatusMemberAvatarSize,
+            width: avatarDiameter,
+            height: avatarDiameter,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -2261,7 +2272,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       message: name.isEmpty
           ? AppLocalizations.of(context)!.chatPageMembersUnnamed
           : name,
-      child: visual,
+      child: Column(
+        children: [
+          Expanded(child: Center(child: visual)),
+          Padding(
+            // 底部留 2px：标签不紧压胶囊底缘（老板 2026-10-20）。
+            padding: const EdgeInsets.only(bottom: 2),
+            child: SizedBox(
+              width: avatarDiameter,
+              child: Text(
+                name.isEmpty ? '?' : name,
+                maxLines: 1,
+                // 不省略号：能显示几个字符就显示几个（老板 2026-10-20）
+                overflow: TextOverflow.clip,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1.0,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2302,6 +2336,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     final row = Row(
       mainAxisSize: MainAxisSize.min,
+      // stretch：把胶囊高度原样传给每个「头像+名字标签」列，让标签贴底缘
+      //（与外层大胶囊 Row 的 stretch 配套，老板 2026-10-20 试验方案）。
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < shown.length; i++) ...[
           if (i > 0) const SizedBox(width: gap),
