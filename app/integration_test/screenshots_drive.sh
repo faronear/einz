@@ -5,8 +5,8 @@ set -e
 SIM="${1:-85FE339B-8A1E-4D2B-BD8A-74BEE7187668}"
 DIR=/tmp/einz_shots
 mkdir -p "$DIR"
-names=(01_chat_main 02_long_press_menu 03_burn_sheet)
-for i in 1 2 3; do
+names=(01_wizard_entry 02_chat_main 03_long_press_menu 04_burn_settings 05_attach_panel 06_pin_setup)
+for i in 1 2 3 4 5 6; do
   for _ in $(seq 1 600); do
     [ -f "$DIR/ready_$i" ] && break
     sleep 1
