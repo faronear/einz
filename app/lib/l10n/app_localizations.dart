@@ -1394,6 +1394,30 @@ abstract class AppLocalizations {
   /// **'Shared passphrase'**
   String get chatPagePassphraseFieldHint;
 
+  /// No description provided for @chatPagePassphraseVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get chatPagePassphraseVerify;
+
+  /// No description provided for @chatPagePassphraseWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect passphrase'**
+  String get chatPagePassphraseWrong;
+
+  /// No description provided for @chatPagePassphraseEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the shared passphrase'**
+  String get chatPagePassphraseEmpty;
+
+  /// No description provided for @chatPagePassphraseVerifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification failed, please try again'**
+  String get chatPagePassphraseVerifyFailed;
+
   /// No description provided for @chatPagePassphraseShow.
   ///
   /// In en, this message translates to:

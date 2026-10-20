@@ -738,6 +738,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePassphraseFieldHint => '共享口令';
 
   @override
+  String get chatPagePassphraseVerify => '验证';
+
+  @override
+  String get chatPagePassphraseWrong => '口令错误';
+
+  @override
+  String get chatPagePassphraseEmpty => '请输入共享口令';
+
+  @override
+  String get chatPagePassphraseVerifyFailed => '验证失败，请重试';
+
+  @override
   String get chatPagePassphraseShow => '显示';
 
   @override

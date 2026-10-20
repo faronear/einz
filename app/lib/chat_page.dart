@@ -1906,6 +1906,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return const Color(0xFFF1F1F1);
   }
 
+  /// 成员卡**悬浮/按压**的叠加色（老板 2026-10-20：跟着性别走——男 浅蓝→
+  /// 深蓝、女 浅粉→深粉）：用**品牌色本体**按 alpha 往 [_genderTint] 的浅底上
+  /// 叠。拿黑叠会发灰、色相跑掉，就不是"同色系的深档"了。悬浮一档轻、按压
+  /// 一档重（ InkWell 的 hoverColor / highlightColor）；性别未知 → 中性黑
+  /// （与其它淡灰底可点元素同口径）。
+  ({Color hover, Color press}) _genderFeedback(String gender) {
+    if (gender == 'female') {
+      const brand = Color(0xFFD6529C); // 品牌粉
+      return (
+        hover: brand.withValues(alpha: 0.14),
+        press: brand.withValues(alpha: 0.28),
+      );
+    }
+    if (gender == 'male') {
+      const brand = Color(0xFF3BAFFD); // 品牌天蓝
+      return (
+        hover: brand.withValues(alpha: 0.14),
+        press: brand.withValues(alpha: 0.28),
+      );
+    }
+    return (
+      hover: Colors.black.withValues(alpha: 0.10),
+      press: Colors.black.withValues(alpha: 0.14),
+    );
+  }
+
   /// 状态灯 + 时刻（老板 2026-09-26 新设计）：**绿灯旁是上线时间、红灯旁是下线时间**。
   ///
   /// [sinceMs] 缺失（还没问到 / 服务端没给）就只留灯：宁可少显示，也不摆一个假的
@@ -2578,6 +2604,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [targetName] 仅用于**找回**场景的说明文案（"把这个码发给「X」"）。调用方
   /// 已经知道要找的是谁，顺手传进来；缺省（拿不到名字）则文案退成"对方"。
   ///
+  /// [premadeResult]（老板 2026-10-20）：调用方已在口令弹窗里"验证即签发"
+  /// 拿到码（见 [_reinviteMemberIdentity]）——直接展示它，不再创建第二次；
+  /// 缺省（邀请/我的新通道等无口令场景）照旧现场创建。
+  ///
   /// 呈现为**底部弹层**（老板 2026-10-15，原来是 AlertDialog）：无输入框，点
   /// 遮罩/下滑即关，故底部不放「关闭」按钮，只留一个居中、不占满宽度的
   /// 「重新生成」（可按可不按，不做成满宽提交按钮那种"必须决定"的口气）。
@@ -2589,17 +2619,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     String? targetMemberId,
     String? targetName,
     String? passphrase,
+    JoinTokenResult? premadeResult,
   }) async {
     // 老板决策：点顶栏添加按钮直接生成通道码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      var r = await _withAuth((t) => api.createJoinToken(
-            widget.spaceId,
-            t,
-            purpose: purpose,
-            targetMemberId: targetMemberId,
-            passphrase: passphrase,
-          ));
+      // premadeResult = 口令弹窗里验证通过时一并签好的码（见 _reinviteMemberIdentity）：
+      // 直接用，省掉第二次 createJoinToken（否则同一个码创建两遍、审计两条）。
+      // ⚠️ `_withAuth` 必须显式给类型参数：`??` 的右操作数上下文类型是
+      // `JoinTokenResult?`，推断会把 T 吃成可空、r 也跟着可空（下面全炸）。
+      var r = premadeResult ??
+          await _withAuth<JoinTokenResult>((t) => api.createJoinToken(
+                widget.spaceId,
+                t,
+                purpose: purpose,
+                targetMemberId: targetMemberId,
+                passphrase: passphrase,
+              ));
       if (!mounted) return;
       // 「重新生成」进行中的标记（放在 builder 外：StatefulBuilder 用箭头函数，没地方声明）
       var busy = false;
@@ -3337,62 +3373,138 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// "现在谁在线"时不用退出弹层，也不用等 30s 的对方在线轮询。为它把弹层主体套进
   /// StatefulBuilder（卡片/失败提示读它承载的可变状态），拉取逻辑收在 `load()` 里
   /// 供"初次打开"与"刷新"共用。
-  /// 索要共享口令（2026-10-04）：**对别人的身份动手**时的授权因子——与"撤销
-  /// 别人的通道"同一档（`revokeEntrance` 也要口令）。返回 null = 用户取消。
+  ///
+  /// 索要共享口令：**对别人的身份动手**时的授权因子——与"撤销别人的通道"
+  /// 同一档授权。返回 null = 用户取消（或关了弹窗）。
+  ///
+  /// [verify]（老板 2026-10-20）：**弹窗内就地验证**。点「验证」后按钮转圈、
+  /// 等后台结果再收弹窗——口令错 → 输入框下方红字、弹窗不关、改了可重试；
+  /// 通过才 pop 并把 [verify] 的返回值带出去。改之前是"点了就关、下一步
+  /// 创建码时才发现错"：通知条姗姗来迟，整条流程被打断重来（老板原话：
+  /// "为何不在口令输入框里面，先等后台验证，出错就当场红字报错"）。
+  ///
+  /// 泛型 T = 验证通过时调用方想要的东西（见 [_reinviteMemberIdentity]：
+  /// 验证用的就是下一步那次 createJoinToken，通过即签发，返回值正是要展示的码）。
   ///
   /// 为什么不复用 `_ChangePassphraseDialog`：那个是"改口令"的完整表单（新旧两个
   /// 输入 + 轮换逻辑），这里只要一个"证明你是持口令者"的输入框。
-  Future<String?> _promptSharedPassphrase({
+  Future<T?> _promptSharedPassphrase<T>({
     required String title,
     required String hint,
+    required Future<T> Function(String passphrase) verify,
   }) async {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController();
     var obscure = true;
-    final ok = await showDialog<bool>(
+    // 两个可变状态放在 builder **外面**：StatefulBuilder 的 builder 每次重建
+    // 都会重新执行，声明在里面的变量会被重置（与改名弹窗的 notifier 同思路）
+    var verifying = false; // 验证中：确认钮转圈、禁重复提交
+    String? error; // 弹窗内联红字（口令错 / 网络失败）；一改输入就清
+    final result = await showDialog<T>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
         child: StatefulBuilder(
-          builder: (ctx, setLocal) => AlertDialog(
-            title: Center(child: Text(title)),
-            // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
-            contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: ctrl,
-                  autofocus: true,
-                  obscureText: obscure,
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    hintText: l10n.chatPagePassphraseFieldHint,
-                    suffixIcon: IconButton(
-                      icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                      tooltip: obscure
-                          ? l10n.chatPagePassphraseShow
-                          : l10n.chatPagePassphraseHide,
-                      onPressed: () => setLocal(() => obscure = !obscure),
+          builder: (ctx, setLocal) {
+            // 提交：先本地拦空值，再等后台验；任何失败都**留在弹窗里**红字报错
+            Future<void> submit() async {
+              final text = ctrl.text.trim();
+              if (text.isEmpty) {
+                setLocal(() => error = l10n.chatPagePassphraseEmpty);
+                return;
+              }
+              setLocal(() => verifying = true);
+              try {
+                final ok = await verify(text);
+                if (!ctx.mounted) return; // 用户已取消：结果丢弃
+                Navigator.of(ctx).pop(ok);
+              } on ApiException catch (e) {
+                if (!ctx.mounted) return;
+                setLocal(() {
+                  verifying = false;
+                  // 口令错 = 专属文案（服务端 assertSpacePassphrase 的 401）；
+                  // 其余（限速 429 / 未设口令 409 / 会话失效…）按仓库口径带
+                  // 「后台：」前缀透出服务端原话
+                  error = e.code == 'ESCROW_VERIFY_FAILED'
+                      ? l10n.chatPagePassphraseWrong
+                      : backendError(l10n, e.message);
+                });
+              } catch (_) {
+                if (!ctx.mounted) return;
+                setLocal(() {
+                  verifying = false;
+                  error = l10n.chatPagePassphraseVerifyFailed;
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: Center(child: Text(title)),
+              // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；老板 2026-10-15）
+              contentPadding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: ctrl,
+                    autofocus: true,
+                    obscureText: obscure,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      hintText: l10n.chatPagePassphraseFieldHint,
+                      suffixIcon: IconButton(
+                        icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                        tooltip: obscure
+                            ? l10n.chatPagePassphraseShow
+                            : l10n.chatPagePassphraseHide,
+                        onPressed: () => setLocal(() => obscure = !obscure),
+                      ),
                     ),
+                    // 一改输入就清红字（与改名弹窗的 nameError 同手法）
+                    onChanged: (_) {
+                      if (error != null) setLocal(() => error = null);
+                    },
+                    // 键盘「完成」= 点验证（不再直接关弹窗——要等后台结果）
+                    onSubmitted: (_) => submit(),
                   ),
-                  onSubmitted: (_) => Navigator.of(ctx).pop(true),
+                  // 内联红字：口令错 / 网络失败，显示在输入框**下方**
+                  // （老板 2026-10-20：出错就地报，别再关弹窗走通知条）
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        error!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                // 取消恒可点（验证中途也能走）：弹窗关掉后 in-flight 的验证
+                // 结果靠 ctx.mounted 丢弃，不会二次 pop
+                CancelButton(onPressed: () => Navigator.of(ctx).pop()),
+                FilledButton(
+                  onPressed: verifying ? null : submit,
+                  child: verifying
+                      // 转圈 18px：与邀请弹层「重新生成」进行中同款
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.4))
+                      : Text(l10n.chatPagePassphraseVerify),
                 ),
               ],
-            ),
-            actions: [
-              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -3402,8 +3514,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // **闪一下红底黄字又自己恢复**，因为错只发生在退出动画那几帧里）。
     // 与改名弹窗 / 设锁屏码弹窗同一手法（见 _showRenameEntranceDialog 等处的注释）。
     Future<void>.delayed(const Duration(milliseconds: 400), ctrl.dispose);
-    if (ok != true || text.isEmpty) return null;
-    return text;
+    if (result == null || text.isEmpty) return null;
+    return result;
   }
 
   /// 空间成员弹层。**group 与 duo 两套版式**（duo 2026-10-18 改版，老板定）：
@@ -3923,19 +4035,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     bool faintName = false, // 名字是"待加入"这类占位词 → 淡色
   }) {
     final hasName = (name ?? '').trim().isNotEmpty;
+    // 悬浮/按压叠加色跟着性别走（男 深蓝 / 女 深粉；未知性别 → 中性黑）
+    final feedback = _genderFeedback(muted ? '' : gender);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
         color: muted ? _genderTint('') : _genderTint(gender),
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-        // 整卡 InkWell（老板 2026-10-20）：悬浮/按住变色，与弹层里「邀请新
-        // 同伴」「退出群组」两个大按钮同口径（hover 10% / 按住 14%）
+        // 整卡 InkWell（老板 2026-10-20）：悬浮/按住变色**跟着性别走**——
+        // 男 浅蓝→深蓝、女 浅粉→深粉（品牌色本体按 alpha 叠，见 _genderFeedback）
         child: InkWell(
           onTap: onTap,
           mouseCursor: onTap == null ? null : SystemMouseCursors.click,
-          hoverColor: Colors.black.withValues(alpha: 0.10),
-          highlightColor: Colors.black.withValues(alpha: 0.14),
+          hoverColor: feedback.hover,
+          highlightColor: feedback.press,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
@@ -3978,8 +4092,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 这时只有别的成员能把他接回来。只要空间里还有一个安装存在，这个空间就不会
   /// 作废（这是结构性保证，不是给 duo 打的补丁）。
   ///
-  /// 对**别人的身份**动手要共享口令（与"撤销别人的通道"同一档授权）：先要口令，
-  /// 再签码；用户取消就什么都不做。
+  /// 对**别人的身份**动手要共享口令（与"撤销别人的通道"同一档授权）：先要口令
+  /// （弹窗内就地验证，老板 2026-10-20），再展示签好的码；用户取消就什么都不做。
   Future<void> _reinviteMemberIdentity(String memberId, String? memberName) async {
     final l10n = AppLocalizations.of(context)!;
     final who = (memberName ?? '').trim();
@@ -3989,11 +4103,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final name = who.isEmpty
         ? l10n.chatPageInviteDialogReinviteFallbackName
         : who;
-    final passphrase = await _promptSharedPassphrase(
+    final api = widget.api ?? ApiClient(effectiveServer);
+    // 就地验证（老板 2026-10-20）：口令弹窗里直接走**下一步那次**
+    // createJoinToken（attach + 目标 + 口令）当验证——服务端在签码前先验口令
+    // （app.ts 的 join-tokens 路由 → assertSpacePassphrase），口令错抛
+    // ESCROW_VERIFY_FAILED，由弹窗内联红字呈现、可改了重试；通过时拿到的码
+    // 正是紧接着要展示的那个，省掉第二次创建（premadeResult 带进去）。
+    final verified = await _promptSharedPassphrase<
+        ({String passphrase, JoinTokenResult token})>(
       title: l10n.chatPageReinvitePassphraseTitle,
       hint: l10n.chatPageReinvitePassphraseHint(name),
+      verify: (passphrase) async {
+        final token = await _withAuth((t) => api.createJoinToken(
+              widget.spaceId,
+              t,
+              purpose: 'attach',
+              targetMemberId: memberId,
+              passphrase: passphrase,
+            ));
+        return (passphrase: passphrase, token: token);
+      },
     );
-    if (passphrase == null || !mounted) return;
+    if (verified == null || !mounted) return;
     // 口令弹窗刚 pop（exit 动画还没跑完）→ 直接开通道码弹窗会交叉卸载，同上。
     await _waitRouteHandoff();
     if (!mounted) return;
@@ -4002,7 +4133,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       targetMemberId: memberId,
       // 说明文案里要出现"发给谁"；名字空 → 弹窗退成「对方」
       targetName: memberName,
-      passphrase: passphrase,
+      passphrase: verified.passphrase,
+      // 口令已验证过、码也签好了：直接用，不再创建第二次
+      premadeResult: verified.token,
     );
   }
 

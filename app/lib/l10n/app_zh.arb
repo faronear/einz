@@ -437,6 +437,10 @@
     }
   },
   "chatPagePassphraseFieldHint": "共享口令",
+  "chatPagePassphraseVerify": "验证",
+  "chatPagePassphraseWrong": "口令错误",
+  "chatPagePassphraseEmpty": "请输入共享口令",
+  "chatPagePassphraseVerifyFailed": "验证失败，请重试",
   "chatPagePassphraseShow": "显示",
   "chatPagePassphraseHide": "隐藏",
   "chatPageMembersInviteNew": "邀请新同伴",

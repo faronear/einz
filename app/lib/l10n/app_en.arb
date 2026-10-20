@@ -465,6 +465,10 @@
     }
   },
   "chatPagePassphraseFieldHint": "Shared passphrase",
+  "chatPagePassphraseVerify": "Verify",
+  "chatPagePassphraseWrong": "Incorrect passphrase",
+  "chatPagePassphraseEmpty": "Enter the shared passphrase",
+  "chatPagePassphraseVerifyFailed": "Verification failed, please try again",
   "chatPagePassphraseShow": "Show",
   "chatPagePassphraseHide": "Hide",
   "chatPageMembersInviteNew": "Invite a new companion",

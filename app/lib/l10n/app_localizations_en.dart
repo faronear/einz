@@ -785,6 +785,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePassphraseFieldHint => 'Shared passphrase';
 
   @override
+  String get chatPagePassphraseVerify => 'Verify';
+
+  @override
+  String get chatPagePassphraseWrong => 'Incorrect passphrase';
+
+  @override
+  String get chatPagePassphraseEmpty => 'Enter the shared passphrase';
+
+  @override
+  String get chatPagePassphraseVerifyFailed =>
+      'Verification failed, please try again';
+
+  @override
   String get chatPagePassphraseShow => 'Show';
 
   @override

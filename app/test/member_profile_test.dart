@@ -110,6 +110,34 @@ class _GroupApi extends ApiClient {
       NotifyEmailStatus(state: 'none');
 }
 
+/// 口令错**一次**后就放行的 fake：验证「口令弹窗就地验证」——错口令应在弹窗
+/// 内联红字、弹窗不关，改正后再通过。
+class _WrongPassThenOkApi extends _GroupApi {
+  _WrongPassThenOkApi(super.messages);
+
+  int _attempts = 0;
+
+  @override
+  Future<JoinTokenResult> createJoinToken(
+    String spaceId,
+    String token, {
+    required String purpose,
+    String? targetMemberId,
+    String? passphrase,
+  }) async {
+    _attempts++;
+    if (_attempts <= 1) {
+      // 与服务端 assertSpacePassphrase 同码同义（401 ESCROW_VERIFY_FAILED）
+      throw ApiException('ESCROW_VERIFY_FAILED', '口令错误', 401);
+    }
+    return const JoinTokenResult(
+      joinToken: 'e1_TEST',
+      link: 'https://einz.example/join/e1_TEST',
+      expiresAt: 0,
+    );
+  }
+}
+
 /// 成员弹层（按标题定位，限定断言范围用）。
 Finder get _membersSheet => find.ancestor(
     of: find.text(_zh.chatPageMembersTitle('group')),
@@ -138,8 +166,10 @@ Future<void> _tapCard(WidgetTester tester, Finder target) async {
 
 /// [spaceKey] 由调用方生成并先用于加密消息——必须与页面拿到的是同一把，
 /// 否则解密失败、消息根本不渲染（气泡旁头像就无从点起）。
+/// [api] 可换 fake（如口令错 N 次的 _WrongPassThenOkApi）。
 Future<void> _pumpChat(WidgetTester tester, LocalDatabase db,
-    Uint8List spaceKey, List<MessageEnvelope> messages) async {
+    Uint8List spaceKey, List<MessageEnvelope> messages,
+    {_GroupApi? api}) async {
   await tester.pumpWidget(MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -151,7 +181,7 @@ Future<void> _pumpChat(WidgetTester tester, LocalDatabase db,
       keyVersion: 1,
       token: 'tok',
       db: db,
-      api: _GroupApi(messages),
+      api: api ?? _GroupApi(messages),
       enableWs: false,
       memberId: 'member-me',
       memberName: 'Lukas',
@@ -261,7 +291,7 @@ void main() {
     expect(find.text(_zh.chatPageReinvitePassphraseTitle), findsOneWidget,
         reason: '应弹出共享口令验证框');
 
-    // 输口令 → 确定（FilledButton = 弹窗的确认键，用类型定位免得绑死文案）
+    // 输口令 → 验证（FilledButton = 弹窗的确认键，用类型定位免得绑死文案）
     await tester.enterText(
       find.descendant(
           of: find.byType(AlertDialog), matching: find.byType(TextField)),
@@ -283,6 +313,114 @@ void main() {
     // 最终应停在「重新邀请」的通道码弹窗上
     expect(find.text(_zh.chatPageInviteDialogTitleReinvite), findsOneWidget,
         reason: '验证口令后应弹出通道码弹窗');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('口令弹窗就地验证：空值/错口令红字留在弹窗里，改正后才放行',
+      (WidgetTester tester) async {
+    // 老板 2026-10-20：点「验证」后先等后台验——出错就地红字，别再"关弹窗 →
+    // 通知条姗姗来迟 → 整条流程重来"。按钮文案从「确定」改为「验证」。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await _pumpChat(tester, db, await generateSpaceKey(), const [],
+        api: _WrongPassThenOkApi(const []));
+    await _openMembersSheet(tester);
+
+    final cardAvatar = find
+        .descendant(of: _membersSheet, matching: find.byType(CircleAvatar))
+        .first;
+    await _tapCard(tester, cardAvatar);
+    expect(find.text(_zh.chatPageMemberProfileTitle), findsOneWidget);
+
+    // 资料页 →「重新邀请」→ 错峰 300ms 后的口令弹窗
+    await tester.tap(find.byKey(const ValueKey('duoPeerSheetActionButton')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageReinvitePassphraseTitle), findsOneWidget,
+        reason: '应弹出共享口令弹窗');
+
+    // 弹窗内的输入框与确认键（FilledButton 用类型定位，验证中它变成转圈）
+    final dialogField = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(TextField));
+    final verifyButton = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(FilledButton));
+
+    // ① 确认键文案 = 「验证」（老板点名：不再是「确定/OK」）
+    expect(find.text(_zh.chatPagePassphraseVerify), findsOneWidget);
+
+    // ② 空值 → 就地红字、弹窗不关（以前是静默当成取消）
+    await tester.tap(verifyButton);
+    await tester.pump();
+    expect(find.text(_zh.chatPagePassphraseEmpty), findsOneWidget,
+        reason: '空口令应就地提示');
+    expect(find.text(_zh.chatPageReinvitePassphraseTitle), findsOneWidget,
+        reason: '空值不关弹窗');
+
+    // ③ 错口令 → 红字「口令错误」、弹窗不关、邀请弹层不出现
+    await tester.enterText(dialogField, 'wrong-pass');
+    await tester.pump();
+    expect(find.text(_zh.chatPagePassphraseEmpty), findsNothing,
+        reason: '一改输入就清掉旧红字');
+    await tester.tap(verifyButton);
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+    }
+    expect(find.text(_zh.chatPagePassphraseWrong), findsOneWidget,
+        reason: '口令错应就地红字报错');
+    expect(find.text(_zh.chatPageReinvitePassphraseTitle), findsOneWidget,
+        reason: '口令错也不关弹窗——改了能重试');
+    expect(find.text(_zh.chatPageInviteDialogTitleReinvite), findsNothing,
+        reason: '口令没错过就不该进邀请弹层');
+
+    // ④ 改正 → 通过（fake 第二次放行）→ 收弹窗、错峰后开邀请弹层
+    await tester.enterText(dialogField, 'right-pass');
+    await tester.pump();
+    await tester.tap(verifyButton);
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull,
+          reason: '口令弹窗退出/衔接期间不应报错（真机上表现为闪一下红屏）');
+    }
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageInviteDialogTitleReinvite), findsOneWidget,
+        reason: '口令通过后应弹出通道码弹窗');
+    expect(find.text('https://einz.example/join/e1_TEST'), findsOneWidget,
+        reason: '弹窗里验证时签好的码应直接展示（premadeResult，不二次创建）');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('成员卡悬浮/按压叠加色跟着性别走（男深蓝/女深粉）',
+      (WidgetTester tester) async {
+    // 老板 2026-10-20：卡片底色是性别浅色（男浅蓝/女浅粉），悬浮/按压要变到
+    // **同色系的深档**（品牌色本体按 alpha 叠，不是黑——黑叠加会发灰色相跑掉）。
+    // ink 高亮是画进 Material 墨水层的，没法在 widget 树里断言"画出来的颜色"，
+    // 这里钉 InkWell 配置的两个色（hover 轻档 / 按压重档）；实际观感真机看。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await _pumpChat(tester, db, await generateSpaceKey(), const []);
+    await _openMembersSheet(tester);
+
+    // Alice（女，槽位 1 = 第一张）/ Bob（男，槽位 2 = 第二张）各自卡片的 InkWell
+    InkWell cardInkOf(String memberName) {
+      final name = find.descendant(of: _membersSheet, matching: find.text(memberName));
+      return tester.widget<InkWell>(find.ancestor(of: name, matching: find.byType(InkWell)));
+    }
+
+    final aliceInk = cardInkOf('Alice');
+    expect(aliceInk.hoverColor, const Color(0xFFD6529C).withValues(alpha: 0.14),
+        reason: '女成员的卡片悬浮应叠品牌粉（浅粉→深粉）');
+    expect(aliceInk.highlightColor, const Color(0xFFD6529C).withValues(alpha: 0.28),
+        reason: '女成员的卡片按压应叠更深的品牌粉');
+
+    final bobInk = cardInkOf('Bob');
+    expect(bobInk.hoverColor, const Color(0xFF3BAFFD).withValues(alpha: 0.14),
+        reason: '男成员的卡片悬浮应叠品牌天蓝（浅蓝→深蓝）');
+    expect(bobInk.highlightColor, const Color(0xFF3BAFFD).withValues(alpha: 0.28),
+        reason: '男成员的卡片按压应叠更深的品牌天蓝');
     expect(tester.takeException(), isNull);
   });
 
