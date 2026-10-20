@@ -1045,9 +1045,21 @@ class _SetupPageState extends State<SetupPage> {
   /// 然后推一个全离线的聊天页（isDemo=true——不触网、不入 Vault/空间列表）。
   Future<void> _enterDemo() async {
     final l10n = AppLocalizations.of(context)!;
+    final db = widget.db ?? LocalDatabase.shared;
     await DemoSpace.ensureSeeded(
-      widget.db ?? LocalDatabase.shared,
+      db,
       chinese: l10n.localeName.startsWith('zh'),
+    );
+    // 演示身份档案（老板 2026-10-20 定）：我=女（粉气泡）、对方 Einz=男（蓝气泡）
+    // ——不入 Vault，只写 per-space profile 键，与真实空间互不影响。
+    await AppLockService(db).saveProfile(
+      spaceId: DemoSpace.spaceId,
+      memberName: 'Me',
+      peerName: 'Einz',
+      entranceName: 'demo',
+      myGender: 'female',
+      peerGender: 'male',
+      mode: 'duo',
     );
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(

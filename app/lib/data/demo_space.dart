@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:drift/drift.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
 
 import 'local_database.dart';
 
@@ -174,5 +177,102 @@ class DemoSpace {
           AppStateCompanion.insert(key: _kSeeded, value: '1'),
           mode: InsertMode.insertOrReplace,
         );
+  }
+
+  // ---------- 演示头像（老板 2026-10-20：截图要有头像，两个卡通头像即可） ----------
+  //
+  // 纯 Dart 运行时绘制（ui.PictureRecorder → PNG bytes），不引入二进制资源：
+  // 演示空间没有服务端 memberId（api.getAvatar 走不通），ChatPage 的
+  // _loadMyAvatar/_loadPeerAvatar 在 isDemo 下改为取这里的 bytes。
+
+  static Uint8List? _myAvatarCache;
+  static Uint8List? _peerAvatarCache;
+
+  /// 我的头像（女，粉）。结果缓存在内存——聊天页多次进出不重复绘制。
+  static Future<Uint8List> myAvatar() async =>
+      _myAvatarCache ??= await _paintAvatar(girl: true);
+
+  /// 对方头像（男，蓝，Einz）。
+  static Future<Uint8List> peerAvatar() async =>
+      _peerAvatarCache ??= await _paintAvatar(girl: false);
+
+  /// 画一个卡通头像：圆脸 + 头发 + 五官 + 上衣，女孩加蝴蝶结、留长发。
+  /// 256×256 圆形构图（底色圆裁掉四角），输出 PNG bytes。
+  static Future<Uint8List> _paintAvatar({required bool girl}) async {
+    const size = 256.0;
+    final c = Offset(size / 2, size / 2);
+    final rec = ui.PictureRecorder();
+    final canvas = ui.Canvas(rec);
+
+    Paint fill(String hex) =>
+        Paint()..color = Color(int.parse('FF$hex', radix: 16))..style = PaintingStyle.fill;
+
+    // 底色圆（背景）
+    canvas.drawCircle(c, size / 2, fill(girl ? 'FDD6ED' : 'E3F2FD'));
+
+    // 上衣（底部梯形圆肩，先画、让脸盖在上面）
+    final shirt = RRect.fromRectAndCorners(
+      Rect.fromCenter(center: Offset(size / 2, size + 42), width: 132, height: 120),
+      topLeft: const Radius.circular(56),
+      topRight: const Radius.circular(56),
+    );
+    canvas.drawRRect(shirt, fill(girl ? 'D6529C' : '2271F7'));
+
+    // 头发：后层（女孩长两侧，男孩只露一圈边）
+    final hairBack = fill(girl ? '6D4C41' : '5D4037');
+    if (girl) {
+      canvas.drawOval(Rect.fromCenter(center: c - const Offset(0, 18), width: 150, height: 170), hairBack);
+    } else {
+      canvas.drawCircle(c - const Offset(0, 14), 70, hairBack);
+    }
+
+    // 脸
+    canvas.drawCircle(c - const Offset(0, 10), 58, fill('FFE3D0'));
+
+    // 前刘海：上半圆盖住额头
+    canvas.drawArc(
+      Rect.fromCenter(center: c - const Offset(0, 22), width: 124, height: 108),
+      3.34, // ~191°（左水平偏下）
+      2.94, // 到 ~359°（右水平偏下）——只盖上半
+      true,
+      fill(girl ? '6D4C41' : '5D4037'),
+    );
+
+    // 眼睛 + 微笑 + 腮红
+    final eye = fill('4E342E');
+    canvas.drawCircle(c - const Offset(20, 6), 5, eye);
+    canvas.drawCircle(c + const Offset(20, -6), 5, eye);
+    final smile = Paint()
+      ..color = const Color(0xFF4E342E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(Rect.fromCenter(center: c + const Offset(0, 6), width: 40, height: 32), 0.35, 2.45, false, smile);
+    final blush = fill(girl ? 'F8BBD0' : 'FFCCBC');
+    canvas.drawCircle(c - const Offset(38, 8), 8, blush);
+    canvas.drawCircle(c + const Offset(38, -8), 8, blush);
+
+    // 女孩：头顶蝴蝶结（两瓣 + 中心结）
+    if (girl) {
+      final bow = fill('EC407A');
+      final knot = c - const Offset(30, 74);
+      final path = ui.Path()
+        ..moveTo(knot.dx, knot.dy)
+        ..quadraticBezierTo(knot.dx - 30, knot.dy - 18, knot.dx - 26, knot.dy + 4)
+        ..quadraticBezierTo(knot.dx - 12, knot.dy + 12, knot.dx, knot.dy)
+        ..close();
+      canvas.drawPath(path, bow);
+      final path2 = ui.Path()
+        ..moveTo(knot.dx, knot.dy)
+        ..quadraticBezierTo(knot.dx + 30, knot.dy - 18, knot.dx + 26, knot.dy + 4)
+        ..quadraticBezierTo(knot.dx + 12, knot.dy + 12, knot.dx, knot.dy)
+        ..close();
+      canvas.drawPath(path2, bow);
+      canvas.drawCircle(knot, 7, fill('F06292'));
+    }
+
+    final image = await rec.endRecording().toImage(size.toInt(), size.toInt());
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data!.buffer.asUint8List();
   }
 }

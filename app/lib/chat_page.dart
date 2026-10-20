@@ -32,6 +32,7 @@ import 'data/tombstone_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
+import 'data/demo_space.dart';
 import 'data/local_database.dart';
 import 'data/server_config.dart';
 import 'error_text.dart';
@@ -4856,6 +4857,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadMyAvatar() async {
+    // 演示秘境：无服务端 memberId——用内置卡通头像（DemoSpace 运行时绘制）
+    if (widget.isDemo) {
+      try {
+        final bytes = await DemoSpace.myAvatar();
+        if (mounted) setState(() => _myAvatarBytes = bytes);
+      } catch (_) {}
+      return;
+    }
     var pid = _myMemberId;
     if (pid == null || pid.isEmpty) {
       pid = await _repo.resolveMyMemberId();
@@ -4877,6 +4886,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 为什么不复用消息流的 [_MessageAvatar]：那个直径写死 16（radius 16，是消息头像的
   /// 尺寸），状态条这里要更大，所以自己存一份 bytes 自己画。失败/未设置就保持默认人形。
   Future<void> _loadPeerAvatar() async {
+    // 演示秘境：无服务端 memberId——用内置卡通头像（DemoSpace 运行时绘制）
+    if (widget.isDemo) {
+      try {
+        final bytes = await DemoSpace.peerAvatar();
+        if (mounted) setState(() => _peerAvatarBytes = bytes);
+      } catch (_) {}
+      return;
+    }
     final pid = _peerMemberId;
     if (pid == null || pid.isEmpty) return;
     try {
