@@ -1896,35 +1896,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 状态条上的头像。
-  ///
-  /// 边长 = [kStatusAvatarSize]：跟随"名字 + 红绿灯"两行的高度，**上下不留白**，
-  /// 看着像嵌在胶囊两端（老板 2026-09-26）。
-  ///
-  /// - 没设头像时，底色按**性别**取淡粉/淡蓝（与空间卡片、状态芯片同一组色），
-  ///   未登记性别回退淡灰；
-  /// - 有头像时可点开**全屏大图**（老板 2026-09-26）；
-  /// - [icon] 覆盖"没头像时"的默认图标（群空间用 `Icons.groups_outlined`）。
-  /// - [saveName] 全屏大图「保存」图标圆钮用的文件名（通常传对方的显示名）。
-  Widget _statusAvatar({
-    Uint8List? bytes,
-    String gender = '',
-    VoidCallback? onTap,
-    IconData icon = Icons.person,
-    String? saveName,
-  }) {
-    return _StatusAvatar(
-      bytes: bytes,
-      tint: _genderTint(gender),
-      icon: icon,
-      // 默认：有头像才可点（看大图）；本人那头像由调用方传入 onTap（空头像也能点）
-      onTap: onTap ??
-          (bytes == null
-              ? null
-              : () => unawaited(_showAvatarFullscreen(bytes, saveName: saveName))),
-    );
-  }
-
   /// 性别底色：淡粉（女）/ 淡蓝（男）/ 淡灰（未登记）。
   /// 用**预乘到白的不透明色**，与状态芯片、空间卡片同一组（品牌粉 #D6529C /
   /// 品牌天蓝 #3BAFFD 的 18% tint）——半透明 tint 叠在 85% 白的胶囊上会透出背景
@@ -1933,30 +1904,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (gender == 'female') return const Color(0xFFF8E0ED);
     if (gender == 'male') return const Color(0xFFDCF1FF);
     return const Color(0xFFF1F1F1);
-  }
-
-  /// 全屏看头像大图：状态条头像入口（老板 2026-10-17 起走**共享**的
-  /// [showMyAvatarFullscreen]——与消息气泡旁头像 / 「我的资料」弹层头像同一份
-  /// 实现，不再各写一套）。
-  ///
-  /// [allowReplace]：**本人的**头像为 true → 大图带「更换头像」和
-  /// 「应用于本机所有秘境」按钮（后者把这份头像扇出到本机其它秘境）。
-  /// 对方的头像不传这些回调——我们没有权限改别人的头像。
-  /// 「保存」图标圆钮三处一致都给（[saveName] 是保存用的文件名）。
-  Future<void> _showAvatarFullscreen(Uint8List bytes,
-      {bool allowReplace = false, String? saveName}) async {
-    await showMyAvatarFullscreen(
-      context,
-      bytes: bytes,
-      onReplace:
-          allowReplace ? () => unawaited(_showAvatarUpload()) : null,
-      // 扇出用的就是全屏展示的这份 bytes（不再另读 _myAvatarBytes——状态可能
-      // 已变，扇出去的必须和用户看的一致）；单秘境时按钮不出现
-      onApplyAllSpaces: allowReplace && _hasMultipleSpaces
-          ? (b) => _applyAvatarAllSpaces(b)
-          : null,
-      onSave: (b) => _saveAvatarImage(saveName, b),
-    );
   }
 
   /// 状态灯 + 时刻（老板 2026-09-26 新设计）：**绿灯旁是上线时间、红灯旁是下线时间**。
@@ -3465,8 +3412,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 性别未知=中性灰）；左：真实头像 + 名字。
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
   /// - 未满员时列表末尾是「邀请新同伴」大按钮；
-  /// - **只有头像可点**（老板 2026-10-20）——点开该成员的个人资料页
-  ///   （[_showMemberProfileSheet]）；「重新邀请」收在资料页里，卡片上不再放；
+  /// - **整卡可点**（老板 2026-10-20 二轮定；2026-10-06 否掉整卡可点的理由
+  ///   "误触弹口令框"已随右侧按钮删除而消失）——开该成员的个人资料页
+  ///   （[_showMemberProfileSheet]），「重新邀请」收在资料页里；
   /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
   /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
   /// - 底部「退出群组」红字项（2026-10-19 自愿退群）：**身份级**离场——本机数据
@@ -3582,7 +3530,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       memberId: e.key,
                       gender: _memberGenders[e.key] ?? '',
                       name: _memberNames[e.key],
-                      onAvatarTap: () {
+                      onTap: () {
                         // 先收起成员弹层；**等它收完再开资料页**——紧接着
                         // showModalBottomSheet 会让两条 route 在 Overlay 里
                         // 交叉卸载（见 _waitRouteHandoff，与群名行同款）。
@@ -3960,56 +3908,62 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 成员卡（每行一张）：底色=性别色；左头像+名字，右侧**没有按钮**
   /// （老板 2026-10-20：「重新邀请」收进个人资料页，卡片上不再放）。
   ///
-  /// **只有头像可点**（老板 2026-10-20；沿用 2026-10-06「整卡可点不需要」的
-  /// 结论——整卡可点误触率太高）——点开该成员的个人资料页
-  /// （[_showMemberProfileSheet]）。
-  /// [memberId] 为空 = "尚未加入"的占位卡（默认头像、不显示名字、不可点）。
+  /// **整卡可点**（老板 2026-10-20 二轮定）→ 打开该成员的个人资料页
+  /// （[_showMemberProfileSheet]）。2026-10-06 否掉整卡可点的理由是"误触会
+  /// 直接弹出口令框"——那时卡片右侧就是口令框入口；现在卡上只剩"开资料页"
+  /// 一个无害动作，且符合"别让人去点中某个小控件"的一贯偏好。
+  /// 头像自己**不挂点击**（tap 落整卡 InkWell，与状态条头像条同款透明处理）。
+  /// [memberId] 为空 = "已满"占位卡（默认头像、不显示名字、不可点、无反馈）。
   Widget _membersCard({
     required String? memberId,
     required String gender,
     required String? name,
-    VoidCallback? onAvatarTap, // null = 头像不可点（"已满"占位卡）
+    VoidCallback? onTap, // null = 不可点（"已满"占位卡）
     bool muted = false,
     bool faintName = false, // 名字是"待加入"这类占位词 → 淡色
   }) {
     final hasName = (name ?? '').trim().isNotEmpty;
-    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
         color: muted ? _genderTint('') : _genderTint(gender),
         borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        // 卡片本体不是 InkWell（整卡 onTap 否掉过两轮：2026-10-06 误触口令框、
-        // 2026-10-20 确认只保留头像一个入口）；只留普通容器。
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              _MessageAvatar(
-                memberId: memberId,
-                server: effectiveServer,
-                api: widget.api,
-                radius: 20,
-                // 点头像 = 开该成员的个人资料页（不再开头像全屏——全屏大图
-                // 改由资料页内的头像提供，那里才分有图/没图）。memberId 为空
-                // （"已满"占位卡）→ 不给 onTap，也不开全屏。
-                openFullscreenOnTap: false,
-                onTap: memberId == null ? null : onAvatarTap,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  hasName ? name! : '', // 尚未加入：不显示名字
-                  style: TextStyle(
-                    fontSize: 15,
-                    color:
-                        (muted || faintName) ? scheme.onSurfaceVariant : null,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+        clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
+        // 整卡 InkWell（老板 2026-10-20）：悬浮/按住变色，与弹层里「邀请新
+        // 同伴」「退出群组」两个大按钮同口径（hover 10% / 按住 14%）
+        child: InkWell(
+          onTap: onTap,
+          mouseCursor: onTap == null ? null : SystemMouseCursors.click,
+          hoverColor: Colors.black.withValues(alpha: 0.10),
+          highlightColor: Colors.black.withValues(alpha: 0.14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                _MessageAvatar(
+                  memberId: memberId,
+                  server: effectiveServer,
+                  api: widget.api,
+                  radius: 20,
+                  // 头像不挂自己的点击（tap 落整卡 InkWell）——与状态条头像条
+                  // 同款：内层再包 Clickable 会抢走整卡的手势
+                  openFullscreenOnTap: false,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hasName ? name! : '', // 尚未加入：不显示名字
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: (muted || faintName)
+                          ? Theme.of(context).colorScheme.onSurfaceVariant
+                          : null,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -6672,7 +6626,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 的分隔横线（老板要求 2026-09-13）。
             // 墓碑消息不展示内容（已删/已焚毁）：改一条灰字占位（老板 2026-10-10
             // 起墓碑也可开菜单——只剩撤回一项）
-            m.deleted ? _tombstoneMenuPlaceholder() : _buildMessagePreviewRow(m),
+            m.deleted ? _tombstoneMenuPlaceholder() : _buildMessagePreviewRow(m, ctx),
             // 操作项改为圆角方形卡片（图标 + 文字），不再是列表式 ListTile
             // （老板要求 2026-09-13）
             Padding(
@@ -6881,6 +6835,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
   /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
   /// 2026-09-10 修复）。
+  ///
+  /// [sheetCtx] = 菜单弹层自己的 BuildContext：点头像开个人资料页时要先把它
+  /// 收起（见下方 openProfile 的 route 交接注释）。
   /// 长按菜单顶部占位行（墓碑消息专用，2026-10-10）：消息已删/已焚毁，
   /// 不展示内容，只留一条淡灰说明——菜单里只剩「撤回」一项
   Widget _tombstoneMenuPlaceholder() {
@@ -6900,10 +6857,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMessagePreviewRow(HistoryMessage m) {
+  Widget _buildMessagePreviewRow(HistoryMessage m, BuildContext sheetCtx) {
     final mine = m.sender == 'me';
     final avatarMemberId =
         m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
+    // 头像点击（老板 2026-10-20）：开个人资料页——与消息气泡旁头像、群成员卡
+    // 同一批入口。我的 → 「我的资料」弹层；别人的 → 对方资料页；memberId
+    // 解析不出（旧消息 + 通道映射也没兜到）时不猜：头像不可点。
+    // 先收菜单、错峰 300ms 再开弹层——紧接着 showModalBottomSheet 会让两条
+    // route 在 Overlay 里交叉卸载（见 _waitRouteHandoff，与成员弹层同款）。
+    final VoidCallback? openProfile;
+    if (mine) {
+      openProfile = () {
+        Navigator.of(sheetCtx).pop();
+        _menuAction(_showMyProfileSheet);
+      };
+    } else if (avatarMemberId != null) {
+      openProfile = () {
+        Navigator.of(sheetCtx).pop();
+        _menuAction(() => _showMemberProfileSheet(avatarMemberId));
+      };
+    } else {
+      openProfile = null;
+    }
     final preview = m.plaintext.trim();
     // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长（+ 音频文件的
     // 文件名一行），可点按播放（老板要求 2026-09-13）；文件消息**复用消息流那张
@@ -6958,8 +6934,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     memberId: avatarMemberId,
                     server: effectiveServer,
                     api: widget.api,
-                    onSaveImage: (bytes) =>
-                        _saveAvatarImage(_senderNameOf(avatarMemberId), bytes)),
+                    // 点别人的头像 = 开他的资料页（老板 2026-10-20）
+                    openFullscreenOnTap: false,
+                    onTap: openProfile),
                 const SizedBox(width: 8),
               ],
               Flexible(
@@ -6981,8 +6958,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               if (mine) ...[
                 const SizedBox(width: 8),
+                // 点我的头像 = 开「我的资料」弹层（老板 2026-10-20）
                 _MessageAvatar(
-                    memberId: avatarMemberId, server: effectiveServer, api: widget.api),
+                    memberId: avatarMemberId,
+                    server: effectiveServer,
+                    api: widget.api,
+                    openFullscreenOnTap: false,
+                    onTap: openProfile),
               ],
             ],
           ),
@@ -8469,8 +8451,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 背景 = kBrandGradient（老板 2026-09-15：全屏查看用首屏同款渐变，更有品牌感）。
   /// 底部「保存」按钮（老板 2026-10-08）：移动端存相册 / 桌面弹保存对话框。
   /// 轻触关闭（老板 2026-10-12）：点击屏幕任何地方都返回聊天页，不必非找右上角 ✕；
-  /// 与 _showAvatarFullscreen 同一套 Clickable 包裹——缩放/拖动仍归 InteractiveViewer，
-  /// 只有"轻触"（ pointer 未移动即抬起）才关，双指放大后误触不会关掉大图。
+  /// 与头像全屏 [showMyAvatarFullscreen] 同一套 Clickable 包裹——缩放/拖动仍归
+  /// InteractiveViewer，只有"轻触"（ pointer 未移动即抬起）才关，双指放大后误触
+  /// 不会关掉大图。
   Future<void> _showFullImage(HistoryMessage m, Uint8List bytes) async {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
@@ -9519,78 +9502,107 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 横向不给任何约束 —— 名字有多长，Column 就有多宽。
                             // 对方那半格一直是外侧包 Flexible 的写法（2026-09-24 修的），
                             // 我方这半漏了。
+                            // 「我的资料」大胶囊（老板 2026-10-20）：**头像 + 名字
+                            // （+ 状态行）合成一个** StadiumBorder 胶囊，整块可点
+                            // → 「我的资料」弹层（与汉堡菜单「我的资料」同入口）。
+                            // 原来头像/名字各自的点击效果**去掉**——改头像、改名
+                            // 从「我的资料」弹层里进（那里有完整的一套）。
+                            // 与左侧对方大胶囊同款：透明底 + Material/InkWell 水波；
+                            // 头像三面贴住胶囊右缘（左侧对方头像贴左缘，镜像对称）。
                             Flexible(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  if (_myMemberName.isNotEmpty)
-                                    Flexible(
-                                      // 名字做成**可点胶囊**（老板 2026-10-09）：点击开
-                                      // 「我的身份」弹窗（与菜单里「我的身份」同一入口），
-                                      // 悬浮/按住变色，与状态条其他可点元素同口径。
-                                      child: Tooltip(
-                                        // 状态条 tooltip 全量补齐（老板 2026-10-10）
-                                        message: l10n.chatPageMyNameTooltip,
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          shape: const StadiumBorder(),
-                                          clipBehavior: Clip.antiAlias,
-                                          child: InkWell(mouseCursor: SystemMouseCursors.click,
-                                            onTap: _showRenameDialog,
-                                            hoverColor:
-                                                Colors.black.withValues(alpha: 0.05),
-                                            highlightColor:
-                                                Colors.black.withValues(alpha: 0.08),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 6, vertical: 2),
-                                              child: Text(_myMemberName,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  // 不用 textAlign.end：长名被 ellipsis 截断后
-                                                  // Text 盒子=约束宽度，比截断文字略宽，end 对齐
-                                                  // 会把富余量挤到左侧（胶囊左边缘空一截）。
-                                                  // 默认 start 对齐，富余量落在"…"右侧，几乎不可见。
-                                                  // 与对方一侧同号（15），两侧视觉对称
-                                                  style: const TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight: FontWeight.w500)),
+                              child: Tooltip(
+                                // 桌面端悬停提示（状态条 tooltip 全量补齐，
+                                // 老板 2026-10-10）：整块胶囊一个提示
+                                message: l10n.chatPageMenuMyProfile,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  shape: const StadiumBorder(),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    mouseCursor: SystemMouseCursors.click,
+                                    onTap: () =>
+                                        unawaited(_showMyProfileSheet()),
+                                    hoverColor:
+                                        Colors.black.withValues(alpha: 0.05),
+                                    highlightColor:
+                                        Colors.black.withValues(alpha: 0.08),
+                                    child: Padding(
+                                      // 右 0：头像三面贴住胶囊右缘（与左侧对方
+                                      // 头像贴左缘同款，老板 2026-09-26 约定）；
+                                      // 左 10：名字↔胶囊左缘的留白
+                                      padding:
+                                          const EdgeInsets.fromLTRB(10, 0, 0, 0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Flexible 要包在 **Column 外面**（老板
+                                          // 2026-09-28 实测的溢出：名字长到 44 字时
+                                          // 这一行要 767px、只给 376px →
+                                          // "overflowed by 391 pixels on the right"）。
+                                          // 里面的 Flexible 只管**上下**（名字与
+                                          // 状态行挤不开时压名字）；横向不给任何
+                                          // 约束——名字有多长，Column 就有多宽。
+                                          // 对方那半格一直是外侧包 Flexible 的写法
+                                          // （2026-09-24 修的），我方这半同款。
+                                          Flexible(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                if (_myMemberName.isNotEmpty)
+                                                  Flexible(
+                                                    child: Text(_myMemberName,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        // 不用 textAlign.end：长名被
+                                                        // ellipsis 截断后 Text 盒子=
+                                                        // 约束宽度，比截断文字略宽，
+                                                        // end 对齐会把富余量挤到左侧。
+                                                        // 默认 start 对齐，富余量
+                                                        // 落在"…"右侧，几乎不可见。
+                                                        // 与对方一侧同号（15），
+                                                        // 两侧视觉对称
+                                                        style: const TextStyle(
+                                                            fontSize: 15,
+                                                            fontWeight:
+                                                                FontWeight.w500)),
+                                                  ),
+                                                const SizedBox(height: 1),
+                                                _statusLine(
+                                                  online: _ws?.connected.value ??
+                                                      false,
+                                                  // 四态思维模型（老板
+                                                  // 2026-10-08，与 TUI 同源）：
+                                                  // 灰=未连接服务 / 黄=连接中 /
+                                                  // 绿=已连接 / 红=断线重连
+                                                  offlineColor: _ws == null
+                                                      ? Colors.grey
+                                                      : Colors.red,
+                                                  connecting: _ws?.status
+                                                              .value ==
+                                                          WsStatus.connecting,
+                                                  sinceMs: _mySinceMs,
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 8),
+                                          // 头像：**不挂自己的点击**（onTap 缺省
+                                          // = null）——点击归外层大胶囊一个手势；
+                                          // 否则内层 Clickable 会抢走 tap，还会多
+                                          // 一层按压反馈（左侧对方胶囊那头像是用
+                                          // Ink 画的，本就不是独立可点，同款思路）。
+                                          _StatusAvatar(
+                                            bytes: _myAvatarBytes,
+                                            tint: _genderTint(_myGender),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  const SizedBox(height: 1),
-                                  _statusLine(
-                                    online: _ws?.connected.value ?? false,
-                                    // 四态思维模型（老板 2026-10-08，与 TUI 同源）：
-                                    // 灰=未连接服务 / 黄=连接中 / 绿=已连接 / 红=断线重连
-                                    offlineColor:
-                                        _ws == null ? Colors.grey : Colors.red,
-                                    connecting:
-                                        _ws?.status.value == WsStatus.connecting,
-                                    sinceMs: _mySinceMs,
                                   ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Tooltip(
-                              // 状态条 tooltip 全量补齐（老板 2026-10-10）
-                              message: l10n.chatPageMyAvatarTooltip,
-                              child: _statusAvatar(
-                                bytes: _myAvatarBytes,
-                                gender: _myGender,
-                                // 空头像：点它没有大图可看 → 直接进换头像流程；
-                                // 有头像：开大图（「更换头像」+「应用于本机所有
-                                // 秘境」+「保存」图标，三处一致）
-                                onTap: _myAvatarBytes == null
-                                    ? () => unawaited(_showAvatarUpload())
-                                    : () => unawaited(_showAvatarFullscreen(
-                                        _myAvatarBytes!,
-                                        allowReplace: true,
-                                        saveName: _myMemberName)),
+                                ),
                               ),
                             ),
                           ],
@@ -11502,74 +11514,33 @@ class _UnreadBadge extends StatelessWidget {
   }
 }
 
-/// 状态条上的头像（可点开全屏大图）。
+/// 状态条「我的资料」大胶囊里的头像（**纯展示，不挂自己的点击**——老板
+/// 2026-10-20：头像+名字合成一个胶囊，点击归外层 InkWell 一个手势；头像
+/// 自己再挂 Clickable 会抢走 tap，还多一层按压反馈）。
 ///
-/// **桌面端的悬浮反馈**（老板 2026-09-26）：鼠标移上去变手型 + 头像轻微放大（1.06，
-/// 用 [ClipOval] 关住，避免放大后顶出胶囊被裁）+ 压暗一层。触屏没有 hover，
-/// 这些层不会出现，等于零影响。
-class _StatusAvatar extends StatefulWidget {
-  const _StatusAvatar(
-      {this.bytes, required this.tint, this.onTap, this.icon = Icons.person});
+/// 边长 = [kStatusAvatarSize]：三面贴住胶囊右缘（与左侧对方头像贴左缘镜像
+/// 对称，老板 2026-09-26 约定）——StadiumBorder 的右端是半径 20 的半圆，
+/// 与半径 20 的头像圆正好重合，头像像嵌在胶囊两端。
+class _StatusAvatar extends StatelessWidget {
+  const _StatusAvatar({this.bytes, required this.tint});
 
   final Uint8List? bytes;
+
+  /// 没头像时的底色：按性别取淡粉/淡蓝（未登记回退淡灰）。
   final Color tint;
-  final VoidCallback? onTap;
-
-  /// 没头像时显示的图标。默认单人形；**群空间**传 `Icons.groups_outlined`
-  /// ——那一格代表的是一群人，不是某一个人（老板 2026-10-05）。
-  final IconData icon;
-
-  @override
-  State<_StatusAvatar> createState() => _StatusAvatarState();
-}
-
-class _StatusAvatarState extends State<_StatusAvatar> {
-  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final avatar = CircleAvatar(
-      backgroundColor: widget.tint,
-      backgroundImage: widget.bytes != null ? MemoryImage(widget.bytes!) : null,
-      child: widget.bytes == null ? Icon(widget.icon, size: 22) : null,
-    );
-    final body = SizedBox(
+    return SizedBox(
       width: kStatusAvatarSize,
       height: kStatusAvatarSize,
       child: ClipOval(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            AnimatedScale(
-              scale: _hovered ? 1.06 : 1,
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOut,
-              child: avatar,
-            ),
-            // 悬浮压暗一层（**只留遮罩**，不放放大镜图标——老板 2026-09-26）
-            if (widget.onTap != null)
-              IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: _hovered ? 1 : 0,
-                  duration: const Duration(milliseconds: 120),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        child: CircleAvatar(
+          backgroundColor: tint,
+          backgroundImage: bytes != null ? MemoryImage(bytes!) : null,
+          child: bytes == null ? const Icon(Icons.person, size: 22) : null,
         ),
       ),
-    );
-    if (widget.onTap == null) return body;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Clickable(onTap: widget.onTap, circle: true, child: body),
     );
   }
 }

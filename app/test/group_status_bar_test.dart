@@ -436,8 +436,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
   });
 
-  testWidgets('点我的名字 → 打开「我的身份」弹窗', (WidgetTester tester) async {
-    // 老板 2026-10-09：状态条里我的名字也做成可点（与菜单「我的身份」同入口）。
+  testWidgets('点我的名字/头像 → 打开「我的资料」弹层', (WidgetTester tester) async {
+    // 老板 2026-10-20：头像 + 名字合成**一个**「我的资料」大胶囊，整块可点
+    // （与汉堡菜单「我的资料」同入口）；原来各自的点击效果（名字→改名
+    // 弹窗、头像→全屏/换头像）去掉。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -463,13 +465,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
+    // ① 点名字（胶囊左半边）→ 「我的资料」弹层
     await tester.tap(find.descendant(
         of: _statusBar, matching: find.text('Lukas')));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageRenameNameTitle), findsOneWidget,
-        reason: '点我的名字应打开「我的身份」弹窗');
-    await tester.tap(find.text(_zh.cancel));
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
+        reason: '点我的名字应打开「我的资料」弹层（与汉堡菜单同入口）');
+    await _closeMembersSheet(tester);
+
+    // ② 点头像（同一个胶囊里，最右那枚 CircleAvatar）→ 同一个弹层
+    await tester.tap(find.descendant(
+        of: _statusBar, matching: find.byType(CircleAvatar).last));
     await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
+        reason: '点我的头像应打开同一个「我的资料」弹层');
     // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
     await tester.pump(const Duration(milliseconds: 450));
   });

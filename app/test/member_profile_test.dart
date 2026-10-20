@@ -2,12 +2,15 @@
 //
 // 三件事一起钉住：
 //  ① 「我的群组」成员弹层：右侧「重新邀请」按钮已删（收进资料页）；
-//  ② 点成员卡头像 → 该成员的资料页（标题「群组同伴」+ 名字 + 性别 + 右端
-//     「重新邀请」）——**有头像图片也不进全屏**（这正是本次改动的重点）；
+//  ② 点成员卡**任意位置**（整卡可点，头像自己不挂点击）→ 该成员的资料页
+//     （标题「群组同伴」+ 名字 + 性别 + 右端「重新邀请」）——**有头像图片
+//     也不进全屏**（这正是本次改动的重点）；
 //  ③ 消息气泡旁头像：点**别人的**开他的资料页；点**我的**开「我的资料」弹层。
 //
-// 另跑一遍资料页「重新邀请」→ 口令验证的完整链路，断言全程不闪红屏
-// （与 members_reinvite_test 同一类 route 交接回归）。
+// 另覆盖两个相邻入口：
+//  ④ 长按消息菜单顶部预览行的头像：点别人的开他的资料页、点我的开「我的资料」；
+//  ⑤ 资料页「重新邀请」→ 口令验证的完整链路，断言全程不闪红屏
+//     （与 members_reinvite_test 同一类 route 交接回归）。
 
 import 'dart:convert';
 import 'dart:typed_data';
@@ -126,9 +129,9 @@ Future<void> _openMembersSheet(WidgetTester tester) async {
       reason: '成员弹层应已打开');
 }
 
-/// 点成员弹层里某成员卡的头像 → 等它收完 + 错峰 300ms 再开的资料页。
-Future<void> _tapCardAvatar(WidgetTester tester, Finder avatar) async {
-  await tester.tap(avatar);
+/// 点成员弹层里某成员卡上的任意位置 → 等它收完 + 错峰 300ms 再开的资料页。
+Future<void> _tapCard(WidgetTester tester, Finder target) async {
+  await tester.tap(target);
   await tester.pump(const Duration(milliseconds: 400)); // pop 动画 + route 交接
   await tester.pumpAndSettle();
 }
@@ -168,7 +171,7 @@ void main() {
   // 菜单里的翻转沙漏是常驻动画，关掉免得 pumpAndSettle 超时。
   disableAnimationsInTests();
 
-  testWidgets('成员弹层无「重新邀请」按钮；点头像开资料页（有图也不进全屏）',
+  testWidgets('成员弹层无「重新邀请」按钮；整卡可点开资料页（有图也不进全屏）',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -185,11 +188,9 @@ void main() {
     expect(find.descendant(of: _membersSheet, matching: find.text('Bob')),
         findsOneWidget);
 
-    // ② 点头像（Alice 的卡，槽位 1 = 第一张）→ 她的资料页
-    final cardAvatar = find
-        .descendant(of: _membersSheet, matching: find.byType(CircleAvatar))
-        .first;
-    await _tapCardAvatar(tester, cardAvatar);
+    // ② 点卡片的**名字**（整卡可点，老板 2026-10-20 二轮定）→ 她的资料页
+    await _tapCard(
+        tester, find.descendant(of: _membersSheet, matching: find.text('Alice')));
 
     expect(find.text(_zh.chatPageMemberProfileTitle), findsOneWidget,
         reason: '应弹出该成员的资料页（标题「群组同伴」）');
@@ -206,7 +207,31 @@ void main() {
         reason: '资料页里应有「重新邀请」（成员卡上已删）');
     // 有头像图片也**不开全屏**——这是本次改动的重点
     expect(find.byType(InteractiveViewer), findsNothing,
-        reason: '点头像应进资料页，不再开头像全屏大图');
+        reason: '点卡片应进资料页，不再开头像全屏大图');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('成员卡点头像区也落整卡（头像自己不挂点击）',
+      (WidgetTester tester) async {
+    // 老板 2026-10-20：整卡可点后，头像的点击效果删掉——点头像应和点卡片
+    // 其他地方一样开资料页（与状态条头像条"tap 落外层胶囊"同款透明处理）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await _pumpChat(tester, db, await generateSpaceKey(), const []);
+    await _openMembersSheet(tester);
+
+    final cardAvatar = find
+        .descendant(of: _membersSheet, matching: find.byType(CircleAvatar))
+        .first; // Alice 的卡（槽位 1 = 第一张）
+    await _tapCard(tester, cardAvatar);
+
+    expect(find.text(_zh.chatPageMemberProfileTitle), findsOneWidget,
+        reason: '点头像应落整卡手势、同样开资料页');
+    expect(find.descendant(of: _profileSheet, matching: find.text('Alice')),
+        findsOneWidget);
+    expect(find.byType(InteractiveViewer), findsNothing,
+        reason: '不应再开头像全屏大图');
     expect(tester.takeException(), isNull);
   });
 
@@ -221,7 +246,7 @@ void main() {
     final cardAvatar = find
         .descendant(of: _membersSheet, matching: find.byType(CircleAvatar))
         .first;
-    await _tapCardAvatar(tester, cardAvatar);
+    await _tapCard(tester, cardAvatar);
     expect(find.text(_zh.chatPageMemberProfileTitle), findsOneWidget);
 
     // 点性别行右端的「重新邀请」→ 先收资料页、错峰后再弹口令框
@@ -319,6 +344,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
         reason: '点气泡旁我的头像应开「我的资料」弹层');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('长按菜单预览行头像：点别人的开资料页、点我的开「我的资料」',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    final fromPeer = await encryptMessage(
+      plaintext: 'hello',
+      spaceKey: spaceKey,
+      spaceId: 'space-demo',
+      senderEntranceId: 'dev-a',
+      messageId: 'msg-peer-1',
+      keyVersion: 1,
+    );
+    final fromMe = await encryptMessage(
+      plaintext: 'hi',
+      spaceKey: spaceKey,
+      spaceId: 'space-demo',
+      senderEntranceId: 'dev-me',
+      messageId: 'msg-me-1',
+      keyVersion: 1,
+    );
+
+    await _pumpChat(tester, db, spaceKey, [fromPeer, fromMe]);
+
+    // 预览行里的头像（菜单弹层内只有一枚）
+    Finder previewAvatar() => find.descendant(
+        of: find.byKey(const ValueKey('messagePreviewRow')),
+        matching: find.byType(CircleAvatar));
+
+    // ① 长按对方的消息 → 菜单；点头像 → 他的资料页
+    await tester.longPress(find.text('hello'));
+    await tester.pumpAndSettle();
+    expect(previewAvatar(), findsOneWidget, reason: '菜单顶部应有预览行头像');
+    await tester.tap(previewAvatar());
+    await tester.pump(const Duration(milliseconds: 400)); // 收菜单 + route 交接
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageMemberProfileTitle), findsOneWidget,
+        reason: '点预览行里别人的头像应开他的资料页');
+    expect(find.descendant(of: _profileSheet, matching: find.text('Alice')),
+        findsOneWidget);
+    await tester.tapAt(const Offset(20, 20)); // 关掉资料页
+    await tester.pumpAndSettle();
+
+    // ② 长按我的消息 → 菜单；点我的头像 → 「我的资料」弹层
+    await tester.longPress(find.text('hi'));
+    await tester.pumpAndSettle();
+    await tester.tap(previewAvatar());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
+        reason: '点预览行里我的头像应开「我的资料」弹层');
     expect(tester.takeException(), isNull);
   });
 }
