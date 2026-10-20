@@ -333,9 +333,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogPinDigitsOnly => 'PIN 只能是数字';
 
   @override
-  String get setPinDialogPinMismatch => '两次输入的 PIN 不一致';
-
-  @override
   String get setPinDialogOldWrong => '当前锁屏码错误';
 
   @override
@@ -365,9 +362,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageSetLockRowSet => '设置';
-
-  @override
-  String get chatPageSetLockRowConfirm => '确认';
 
   @override
   String get chatPageSetLockNewPinLabel => '新 PIN 或者留空不填';
@@ -783,7 +777,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPagePinMenuValue(String duration) {
-    return '已设 · $duration';
+    return '$duration';
   }
 
   @override
@@ -1303,8 +1297,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exitGroupTitle => '退出群组？';
 
   @override
-  String get exitGroupMessage =>
-      '退出后，这个群组会从你的所有设备上消失：本机立即删除全部数据，你名下的其他设备也会自动退出并清除本地数据。此操作无法撤销！';
+  String get exitGroupMessage => '退出后，这个群组会从你的所有设备上消失并删除本地数据。此操作无法撤销！';
 
   @override
   String get exitGroupConfirm => '退出';

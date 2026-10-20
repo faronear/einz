@@ -361,9 +361,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinDigitsOnly => 'Digits only';
 
   @override
-  String get setPinDialogPinMismatch => 'PINs do not match';
-
-  @override
   String get setPinDialogOldWrong => 'Wrong current PIN';
 
   @override
@@ -394,9 +391,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockRowSet => 'Set';
-
-  @override
-  String get chatPageSetLockRowConfirm => 'Confirm';
 
   @override
   String get chatPageSetLockNewPinLabel => 'New PIN or leave blank';
@@ -832,7 +826,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPagePinMenuValue(String duration) {
-    return 'Set · $duration';
+    return '$duration';
   }
 
   @override
@@ -1371,7 +1365,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitGroupMessage =>
-      'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. This cannot be undone!';
+      'Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!';
 
   @override
   String get exitGroupConfirm => 'Leave';

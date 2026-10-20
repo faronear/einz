@@ -692,12 +692,6 @@ abstract class AppLocalizations {
   /// **'Digits only'**
   String get setPinDialogPinDigitsOnly;
 
-  /// No description provided for @setPinDialogPinMismatch.
-  ///
-  /// In en, this message translates to:
-  /// **'PINs do not match'**
-  String get setPinDialogPinMismatch;
-
   /// No description provided for @setPinDialogOldWrong.
   ///
   /// In en, this message translates to:
@@ -751,12 +745,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set'**
   String get chatPageSetLockRowSet;
-
-  /// No description provided for @chatPageSetLockRowConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm'**
-  String get chatPageSetLockRowConfirm;
 
   /// No description provided for @chatPageSetLockNewPinLabel.
   ///
@@ -1481,7 +1469,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPagePinMenuValue.
   ///
   /// In en, this message translates to:
-  /// **'Set · {duration}'**
+  /// **'{duration}'**
   String chatPagePinMenuValue(String duration);
 
   /// No description provided for @chatPageNotifyLabel.
@@ -2357,7 +2345,7 @@ abstract class AppLocalizations {
   /// No description provided for @exitGroupMessage.
   ///
   /// In en, this message translates to:
-  /// **'Leaving removes this group from all your devices: this device erases everything right away, and your other devices (same identity) leave and erase their local data automatically. This cannot be undone!'**
+  /// **'Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!'**
   String get exitGroupMessage;
 
   /// No description provided for @exitGroupConfirm.
