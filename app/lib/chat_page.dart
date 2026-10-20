@@ -967,6 +967,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     // 头像加载要在 _repo 就绪后（重启路径要靠它反查本机 memberId）
     _loadMyAvatar();
+    _loadPeerAvatar(); // 演示秘境的服务端路径（member 事件/空间解析）永不触发，
+    // 这里补唯一调用点；非演示空间 _peerMemberId 为空时空操作，服务端路径随后覆盖
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
     _scrollController.addListener(_onScrollForRead);
