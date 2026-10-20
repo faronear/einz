@@ -4921,6 +4921,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
       return;
     }
+    // 演示秘境（老板 2026-10-20）：不上传、不落盘——只换本次会话的显示。
+    // 隐私加分项：用户的照片一张都不留存、不出设备；下次进演示回卡通头像。
+    // （旧实现没有此分支，会走真实上传路径 → 演示必弹「上传失败」）
+    if (widget.isDemo) {
+      if (!mounted) return;
+      setState(() => _myAvatarBytes = bytes);
+      return;
+    }
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
       // 服务端在上传响应里回 member_id：上传方收不到自己的 profile.updated 广播，
