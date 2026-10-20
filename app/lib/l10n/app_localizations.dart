@@ -1382,6 +1382,12 @@ abstract class AppLocalizations {
   /// **'Re-invite'**
   String get chatPageMembersReinvite;
 
+  /// No description provided for @chatPageMemberProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Group companion'**
+  String get chatPageMemberProfileTitle;
+
   /// No description provided for @chatPageReinvitePassphraseTitle.
   ///
   /// In en, this message translates to:

@@ -456,6 +456,7 @@
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvite": "Invite",
   "chatPageMembersReinvite": "Re-invite",
+  "chatPageMemberProfileTitle": "Group companion",
   "chatPageReinvitePassphraseTitle": "Verify passphrase",
   "chatPageReinvitePassphraseHint": "After verification you can re-invite “{name}”",
   "@chatPageReinvitePassphraseHint": {

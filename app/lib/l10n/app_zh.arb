@@ -428,6 +428,7 @@
   "chatPageMembersUnnamed": "未命名",
   "chatPageMembersInvite": "邀请",
   "chatPageMembersReinvite": "重新邀请",
+  "chatPageMemberProfileTitle": "群组同伴",
   "chatPageReinvitePassphraseTitle": "验证共享口令",
   "chatPageReinvitePassphraseHint": "验证后，即可重新邀请“{name}”",
   "@chatPageReinvitePassphraseHint": {

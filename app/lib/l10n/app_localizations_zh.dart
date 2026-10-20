@@ -730,6 +730,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersReinvite => '重新邀请';
 
   @override
+  String get chatPageMemberProfileTitle => '群组同伴';
+
+  @override
   String get chatPageReinvitePassphraseTitle => '验证共享口令';
 
   @override

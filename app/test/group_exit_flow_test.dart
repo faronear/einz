@@ -270,9 +270,15 @@ void main() {
 
     await _openMembersSheet(tester);
 
-    // 在册成员在列
-    expect(find.text('Alice'), findsOneWidget);
-    expect(find.text('Bob'), findsOneWidget);
+    // 在册成员在列（**限定在成员弹层内**：状态条头像条 2026-10-20 起也显示
+    // 成员名字标签，全局 find.text 会撞成两个——同 group_status_bar_test 口径）
+    final sheet = find.ancestor(
+        of: find.text(_zh.chatPageMembersTitle('group')),
+        matching: find.byType(SingleChildScrollView));
+    expect(find.descendant(of: sheet, matching: find.text('Alice')),
+        findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('Bob')),
+        findsOneWidget);
     // 墓碑成员不在列（名字保住了，但人已经退出——服务端 member_status='left'）
     expect(find.text('Gone'), findsNothing,
         reason: '退出者不该再出现在成员名单里');

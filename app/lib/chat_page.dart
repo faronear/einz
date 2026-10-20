@@ -3462,22 +3462,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 空间成员弹层。**group 与 duo 两套版式**（duo 2026-10-18 改版，老板定）：
   ///
   /// **group（我的群组）**：每行一张成员卡——底色=该成员性别色（男浅蓝 / 女浅粉 /
-  /// 性别未知=中性灰）；左：真实头像 + 名字；右：可点的文字按钮（已有成员=
-  /// 「重新邀请」）。
+  /// 性别未知=中性灰）；左：真实头像 + 名字。
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
   /// - 未满员时列表末尾是「邀请新同伴」大按钮；
-  /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
+  /// - **只有头像可点**（老板 2026-10-20）——点开该成员的个人资料页
+  ///   （[_showMemberProfileSheet]）；「重新邀请」收在资料页里，卡片上不再放；
   /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
   /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
   /// - 底部「退出群组」红字项（2026-10-19 自愿退群）：**身份级**离场——本机数据
   ///   全清、同身份其他设备一并掉线自毁、历史消息留在别人设备上。duo 没有这项
   ///   （ duo 想离开只有「销毁本通道」，身份仍在册）。
   ///
-  /// **duo（我的同伴）**：改走 [_showDuoPeerSheet]——与「我的资料」同款的单张
-  /// 只读身份卡（duo 只有对方一个人，成员卡列表反而零碎）。
+  /// **duo（我的同伴）**：改走 [_showMemberProfileSheet]——与「我的资料」同款的
+  /// 单张只读身份卡（duo 只有对方一个人，成员卡列表反而零碎）。
   Future<void> _showMembersSheet() async {
     if (!_isGroup) {
-      await _showDuoPeerSheet();
+      await _showMemberProfileSheet(null);
       return;
     }
     final l10n = AppLocalizations.of(context)!;
@@ -3582,13 +3582,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       memberId: e.key,
                       gender: _memberGenders[e.key] ?? '',
                       name: _memberNames[e.key],
-                      actionLabel: l10n.chatPageMembersReinvite,
-                      onAction: () {
-                        // 先收起成员弹层；**等它收完再弹口令框**——紧接着 showDialog
-                        // 会让两条 route 在 Overlay 里交叉卸载（见 _waitRouteHandoff）。
+                      onAvatarTap: () {
+                        // 先收起成员弹层；**等它收完再开资料页**——紧接着
+                        // showModalBottomSheet 会让两条 route 在 Overlay 里
+                        // 交叉卸载（见 _waitRouteHandoff，与群名行同款）。
                         Navigator.of(ctx).pop();
-                        _menuAction(() => _reinviteMemberIdentity(
-                            e.key, _memberNames[e.key]));
+                        _menuAction(
+                            () => _showMemberProfileSheet(e.key));
                       },
                     ),
                   // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
@@ -3630,7 +3630,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     )
                   else if (_isGroup)
                     // 群组满员：末尾那张卡变灰（不可点、无按钮），只说"已满"。
-                    // duo 满员不走这里——duo 用成员卡上的「重新邀请」表达"满"。
+                    // duo 满员不走这里——duo 用资料页里的「重新邀请」表达"满"。
                     _membersCard(
                       memberId: null,
                       gender: '',
@@ -3728,40 +3728,52 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await switchToSpace(context, next.spaceId, db: widget.db);
   }
 
-  /// duo 的「我的同伴」弹层（老板 2026-10-18 改版）：与「我的资料」弹层**同款
-  /// 布局的单张身份卡**，但**全部只读**——不能编辑（改名/换头像是「我的资料」
-  /// 的权利，对方的资料我们没有权限动）。
+  /// 个人资料页（老板 2026-10-20）：duo 的「我的同伴」与**群成员的资料卡**
+  /// 共用这一份实现——布局、头像全屏、邀请/重新邀请按钮完全一致；以后要往
+  /// 资料页里加东西也只改这一处。
   ///
+  /// - [memberId] 为空 = duo 的对方（状态胶囊/菜单入口）：按槽位表解析唯一
+  ///   对方（含未命名成员）；槽位里没有他 = 还没加入（duo 满 2 人即永久关闭
+  ///   邀请，见 [_canInvite]）——这一路与改版前逐字等价。
+  /// - [memberId] 非空 = 群成员卡头像 / 消息气泡旁头像的入口：名字、性别从
+  ///   全量成员表解析（墓碑成员保名，历史消息点了仍知道是谁）。
+  ///
+  /// 页面内容（**全部只读**——改名/换头像是「我的资料」的权利，对方的资料
+  /// 我们没有权限动）：
   /// - 左：头像（粉蓝渐变细环 + surface 留白，与「我的资料」同款）。**点头像 =
-  ///   打开头像全屏**——与消息气泡旁对方头像同一份共享全屏实现（底部「保存」
-  ///   可下载；没有「更换头像」：不给改别人的图）。没头像时点它没有动作
-  ///   （[_MessageAvatarState.handleTap] 自己按图缓存决策，我们不替它猜）。
-  /// - 右两行：名字（上）+ 性别（下），左对齐。
-  ///   - 名字：对方名字；没名字时按状态给占位词——还没加入 = 「待加入」
-  ///     （`memberPending`），已加入但没命名 = 「未命名」（`chatPageMembersUnnamed`）；
-  ///   - 性别：只读性别图标（老板 2026-10-18：不显示男/女文字；性别为空
-  ///     整行不显示性别部分）。
-  /// - **邀请 / 重新邀请按钮放在性别那一行、右端对齐**（老板 2026-10-18）：
-  ///   对方已加入 = 「重新邀请」（先要共享口令，见 [_reinviteMemberIdentity]）；
-  ///   还没加入 = 「邀请」（[_showInviteDialog] purpose=invite）。原来它们挂在
-  ///   成员卡右侧 / 状态条尾部，改版后收进身份卡；状态条尾部只留语音通话。
+  ///   打开头像全屏**——底部「保存」可下载，没有「更换头像」。没头像时点它
+  ///   没有动作（[_MessageAvatarState.handleTap] 自己按图缓存决策）。
+  /// - 右两行：名字（上，占位词单独降档）+ 性别（下，只读性别图标，老板
+  ///   2026-10-18：不显示男/女文字）+ 右端对齐的邀请/重新邀请按钮。
+  /// - 标题：duo = 「我的同伴」（`chatPageMembersTitle('duo')`）；群成员 =
+  ///   「群组同伴」（`chatPageMemberProfileTitle`）。
   ///
   /// 桌面端限宽 [kMyProfileSheetMaxWidth]（与「我的资料」同口径：宽屏下不拉成
   /// 空旷长带）；点按衔接同样走「先收弹层、错峰 300ms 再开下一条」。
-  Future<void> _showDuoPeerSheet() async {
+  Future<void> _showMemberProfileSheet(String? memberId) async {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
     // 对方 member：duo 只有一位——槽位表里除我之外那个（含未命名成员）；
     // 槽位里没有他 = 还没加入（duo 满 2 人即永久关闭邀请，见 [_canInvite]）。
-    final others = _memberSlots.entries
-        .where((e) => e.key != _myMemberId)
-        .toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-    final peerId = others.isNotEmpty ? others.first.key : null;
-    final peerJoined = peerId != null;
+    final String? peerId;
+    if (memberId != null) {
+      peerId = memberId; // 群成员/历史发送者：调用方已指明是谁
+    } else {
+      final others = _memberSlots.entries
+          .where((e) => e.key != _myMemberId)
+          .toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      peerId = others.isNotEmpty ? others.first.key : null;
+    }
+    // 已加入 = 槽位表里有他（含墓碑：退群者保名，点了仍能重新邀请接回来）
+    final joined = peerId != null && _memberSlots.containsKey(peerId);
+    // 性别：成员表优先（群成员/历史发送者）；duo 的对方兜底 _peerGender
+    // （离线重启时成员表还没拉到，本地 per-space 快照里有）
+    var gender = peerId == null ? '' : (_memberGenders[peerId] ?? '');
+    if (gender.isEmpty && !_isGroup) gender = _peerGender;
     // 性别配色：男女各用 Logo 里的粉/蓝（与「我的资料」、向导、改名弹窗同色）
-    final isFemale = _peerGender == 'female';
-    final isMale = _peerGender == 'male';
+    final isFemale = gender == 'female';
+    final isMale = gender == 'male';
     final genderColor = isFemale
         ? const Color(0xFFD6529C)
         : isMale
@@ -3769,13 +3781,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             : scheme.outline;
     final genderLabel =
         isFemale ? l10n.wizardGenderFemale : isMale ? l10n.wizardGenderMale : '';
-    // 名字占位词：还没来 = 「待加入」（与状态条同一口径）；来了没命名 = 「未命名」
-    final peerName = _peerName.isNotEmpty
-        ? _peerName
-        : peerJoined
+    // 名字：成员表优先；duo 的对方兜底 _peerName（同上）。
+    // 占位词：还没来 = 「待加入」（与状态条同一口径）；来了没命名 = 「未命名」
+    var name = peerId == null ? '' : (_memberNames[peerId] ?? '');
+    if (name.isEmpty && !_isGroup) name = _peerName;
+    final displayName = name.isNotEmpty
+        ? name
+        : joined
             ? l10n.chatPageMembersUnnamed
             : l10n.memberPending;
-    final nameIsPlaceholder = _peerName.isEmpty;
+    final nameIsPlaceholder = name.isEmpty;
     // 头像组件句柄：外层方形热区（头像 + 渐变环）通过它触发头像自己的点按决策
     // （有图 → 全屏 / 没图 → 无动作），内层传 openFullscreenOnTap:false 让出
     // 点击——与「我的资料」弹层同手法（老板 2026-10-17）。
@@ -3798,7 +3813,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 18),
                     child: Center(
-                      child: Text(l10n.chatPageMembersTitle('duo'),
+                      child: Text(
+                          _isGroup
+                              ? l10n.chatPageMemberProfileTitle
+                              : l10n.chatPageMembersTitle('duo'),
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
@@ -3858,7 +3876,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 带编辑图标的胶囊——那是在邀请点击，这里没有可点的）。
                             // 占位词单独降档（浅色），与「我的资料」未设名同口径。
                             Text(
-                              peerName,
+                              displayName,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 20,
@@ -3886,9 +3904,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     ),
                                   ),
                                 const Spacer(),
-                                // 已加入 = 「重新邀请」（需共享口令）；还没加入 =
-                                // 「邀请」。duo 满员后不再有邀请（_canInvite 关）。
-                                if (peerJoined || _canInvite)
+                                // 已加入（含墓碑）= 「重新邀请」（需共享口令）；
+                                // duo 还没加入且还能邀请 = 「邀请」（开新身份）。
+                                // duo 满员后不再有邀请（_canInvite 关）。
+                                // 显式传入却查不到槽位的 member（成员表没拉到）
+                                // 不猜——没有按钮，也别拿"邀请新身份"张冠李戴。
+                                if (joined || (memberId == null && _canInvite))
                                   TextButton(
                                     key: const ValueKey(
                                         'duoPeerSheetActionButton'),
@@ -3896,10 +3917,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       // 先收起弹层；等它收完再弹下一条
                                       // （route 交接，见 _waitRouteHandoff）
                                       Navigator.of(ctx).pop();
-                                      if (peerJoined) {
+                                      if (joined) {
                                         _menuAction(() =>
                                             _reinviteMemberIdentity(
-                                                peerId, _peerName));
+                                                peerId!, name));
                                       } else {
                                         _menuAction(() => _showInviteDialog(
                                             purpose: 'invite'));
@@ -3916,7 +3937,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600),
                                     ),
-                                    child: Text(peerJoined
+                                    child: Text(joined
                                         ? l10n.chatPageMembersReinvite
                                         : l10n.chatPageMembersInvite),
                                   ),
@@ -3936,15 +3957,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 成员卡（每行一张）：底色=性别色；左头像+名字，右文字按钮。
-  /// **只有右侧按钮可点**（老板 2026-10-06：整卡可点不需要，误触会直接弹出口令框）。
-  /// [memberId] 为空 = "尚未加入"的占位卡（默认头像、不显示名字）。
+  /// 成员卡（每行一张）：底色=性别色；左头像+名字，右侧**没有按钮**
+  /// （老板 2026-10-20：「重新邀请」收进个人资料页，卡片上不再放）。
+  ///
+  /// **只有头像可点**（老板 2026-10-20；沿用 2026-10-06「整卡可点不需要」的
+  /// 结论——整卡可点误触率太高）——点开该成员的个人资料页
+  /// （[_showMemberProfileSheet]）。
+  /// [memberId] 为空 = "尚未加入"的占位卡（默认头像、不显示名字、不可点）。
   Widget _membersCard({
     required String? memberId,
     required String gender,
     required String? name,
-    String? actionLabel, // null / muted = 不放按钮（"已满"卡）
-    VoidCallback? onAction, // null = 不可点
+    VoidCallback? onAvatarTap, // null = 头像不可点（"已满"占位卡）
     bool muted = false,
     bool faintName = false, // 名字是"待加入"这类占位词 → 淡色
   }) {
@@ -3956,7 +3980,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         color: muted ? _genderTint('') : _genderTint(gender),
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        // 卡片本体不再是 InkWell（原来整卡 onTap=onAction）；只留普通容器。
+        // 卡片本体不是 InkWell（整卡 onTap 否掉过两轮：2026-10-06 误触口令框、
+        // 2026-10-20 确认只保留头像一个入口）；只留普通容器。
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
@@ -3966,8 +3991,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 server: effectiveServer,
                 api: widget.api,
                 radius: 20,
-                onSaveImage: (bytes) =>
-                    _saveAvatarImage(_senderNameOf(memberId), bytes),
+                // 点头像 = 开该成员的个人资料页（不再开头像全屏——全屏大图
+                // 改由资料页内的头像提供，那里才分有图/没图）。memberId 为空
+                // （"已满"占位卡）→ 不给 onTap，也不开全屏。
+                openFullscreenOnTap: false,
+                onTap: memberId == null ? null : onAvatarTap,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -3981,17 +4009,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // 有动作才放按钮；"已满"卡（muted）没有按钮
-              if (actionLabel != null) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  child: Text(actionLabel),
-                ),
-              ],
             ],
           ),
         ),
@@ -9630,8 +9647,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   server: effectiveServer,
                                   api: widget.api,
                                   radius: kMessageAvatarDiameter / 2,
-                                  onSaveImage: (bytes) => _saveAvatarImage(
-                                      _senderNameOf(senderMemberId), bytes)),
+                                  // 点旁边别人的头像 = 开**他的个人资料页**
+                                  // （老板 2026-10-20；与群成员卡头像同入口），
+                                  // 不再开头像全屏——全屏大图改由资料页内的头像
+                                  // 提供（那里才分有图/没图）。senderMemberId
+                                  // 解析不出（旧消息+通道映射也没兜到）时不猜：
+                                  // 不给 onTap，头像不可点。
+                                  openFullscreenOnTap: false,
+                                  onTap: senderMemberId == null
+                                      ? null
+                                      : () => _showMemberProfileSheet(
+                                          senderMemberId)),
                               // 群空间才标名字（duo 两人世界里只有"对方"，状态条已写着）；
                               // 墓碑消息（已删除/焚毁）不标——正文都没了，署名无意义
                               if (_isGroup && !m.deleted) ...[
@@ -9947,20 +9973,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                       if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
-                        // 自己的头像也给「更换头像」「应用于本机所有秘境」
-                        // （老板 2026-10-17：气泡旁/状态条/「我的资料」三处
-                        // 同一份"我的头像全屏"）；「保存」人人都有
+                        // 自己头像点了 = 开「我的资料」弹层（老板 2026-10-20：
+                        // 气泡旁头像不论我的/别人的都进个人资料页）。换头像、
+                        // 扇出到所有秘境都在「我的资料」里，不再从这里进全屏。
                         _MessageAvatar(
                             memberId: senderMemberId,
                             server: effectiveServer,
                             api: widget.api,
                             radius: kMessageAvatarDiameter / 2,
-                            onReplaceAvatar: () => unawaited(_showAvatarUpload()),
-                            onApplyAllSpaces: _hasMultipleSpaces
-                                ? (bytes) => _applyAvatarAllSpaces(bytes)
-                                : null,
-                            onSaveImage: (bytes) => _saveAvatarImage(
-                                _senderNameOf(senderMemberId), bytes)),
+                            openFullscreenOnTap: false,
+                            onTap: () => unawaited(_showMyProfileSheet())),
                       ],
                     ],
                   ),
@@ -11740,7 +11762,8 @@ class _MessageAvatar extends StatefulWidget {
       this.onSaveImage,
       this.onReplaceAvatar,
       this.onApplyAllSpaces,
-      this.onTapWithoutImage});
+      this.onTapWithoutImage,
+      this.onTap});
 
   final String? memberId;
   final String server;
@@ -11777,6 +11800,12 @@ class _MessageAvatar extends StatefulWidget {
   /// 选图）或**死区**（没图却不开全屏）——2026-10-17 代码复查发现的竞态，
   /// 故把决策权收回到唯一的数据源。
   final VoidCallback? onTapWithoutImage;
+
+  /// 点按动作的**最高优先级覆写**（老板 2026-10-20）：非空时**一律**走它，
+  /// 不再按"有没有图"分流——消息气泡旁的头像（我的/别人的）与群成员卡的
+  /// 头像点了都进**个人资料页**，全屏大图改由资料页内的头像提供（那里才分
+  /// 有图/没图）。为 null 时维持原语义（[openFullscreenOnTap] 决定）。
+  final VoidCallback? onTap;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -11870,9 +11899,11 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
-    // 点按去向由**本组件**决定（有图 → 全屏；没图 → 调用方的 onTapWithoutImage），
+    // 点按去向：onTap 覆写优先（资料页入口，不分有无图）；否则维持原语义——
+    // 由**本组件**决定（有图 → 全屏；没图 → 调用方的 onTapWithoutImage），
     // 不靠调用方从外部猜缓存状态（见 onTapWithoutImage 注释）。
-    final onTap = widget.openFullscreenOnTap ? handleTap : null;
+    final onTap = widget.onTap ??
+        (widget.openFullscreenOnTap ? handleTap : null);
     return Clickable(
       onTap: onTap,
       circle: true,

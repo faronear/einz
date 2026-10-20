@@ -777,6 +777,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersReinvite => 'Re-invite';
 
   @override
+  String get chatPageMemberProfileTitle => 'Group companion';
+
+  @override
   String get chatPageReinvitePassphraseTitle => 'Verify passphrase';
 
   @override

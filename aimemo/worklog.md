@@ -4,6 +4,12 @@
 
 ---
 
+## 20261020 头像点击改开「个人资料页」
+
+**（2026-10-20T11:17:24Z / 2026-10-20 19:17）**：老板 2026-10-20 三项头像交互改动。①**「我的群组」成员弹层**：成员卡头像点击从「全屏大图」改为开该成员的资料页（与 duo 点对方状态胶囊弹出的资料页同款）；②**消息气泡旁头像**（不论我的/别人的）点击都开个人资料页——我的开「我的资料」弹层，别人的开对方资料页（老板原话"以后我还可以往个人资料页里加东西"，资料页从此是头像点击的统一归宿）；③**群成员卡右侧「重新邀请」按钮删除**（功能收进资料页，资料页性别行右端保留「重新邀请」，需共享口令）。实现：`_showDuoPeerSheet` 泛化为 `_showMemberProfileSheet(String? memberId)`——null=duo 槽位解析（行为逐字不变，duo_peer_sheet_test 全绿即证），非空=群成员/历史发送者（名字/性别从全量成员表解析，墓碑保名）；`_MessageAvatar` 新增 `onTap` 最高优先级覆写（非空时不再按有无图分流——"有图也进资料页"正是本次重点，成员卡/气泡两处头像的 onSaveImage/onReplaceAvatar/onApplyAllSpaces 随之删除，全屏大图只剩资料页内一个入口）；标题按模式分流：duo 仍「我的同伴」，群成员用新键 `chatPageMemberProfileTitle`（「群组同伴」/ Group companion，老板定）；l10n 手写同步后用 `flutter gen-l10n` 校验无 diff。成员卡头像走「先收弹层 + _menuAction 300ms 错峰」再开资料页（与群名行同款 route 交接，防交叉卸载闪红屏）。新增 member_profile_test.dart 3 用例（成员弹层无重新邀请/点头像开资料页且不进全屏/资料页重新邀请→口令链路无异常/气泡旁双头像分流）全绿。**顺带修**：group_exit_flow_test「成员弹层只列在册成员」在 HEAD 上即红（2026-10-20 状态条头像人名标签与成员卡名字撞车，全局 find.text 撞两个）——已用与 group_status_bar_test 相同的"限定弹层内"手法修好；本次未动任何生产逻辑。验证：scripts/testAll.sh app 全绿（analyze 0 + 361 测试通过）。
+
+---
+
 ## 2026-08-28
 
 ### 架构评审与 productLens 重构（v1.0 → v2.0）
@@ -15226,25 +15232,25 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 ## 20261019 状态条对方胶囊右侧内距 6→12
 
-**（2026-10-19T12:58:39Z / ��**：老板指出状态条左侧对方胶囊（头像+名字）名字/时间文字贴着胶囊右缘、没有内部留白。修法：duo 大胶囊 InkWell 内容 Padding 右侧 6→12（`app/lib/chat_page.dart` _buildPeerStatus，注释同步）；头像仍保持「三面贴壁」约定（左/上/下 0）。验证：`flutter analyze lib/chat_page.dart` 0 问题；diff 单 hunk 全为本改动。
+**（2026-10-19T12:58:39Z / ��**：老板指出状态条左侧对方胶囊（头像+名字）名字/时间文字贴着胶囊右缘、没有内部留白。修法：duo 大胶囊 InkWell 内容 Padding 右侧 6→12（`app/lib/chat_page.dart` _buildPeerStatus，注释同步）；头像仍保持「三面贴壁」约定（左/上/下 0）。验证：`flutter analyze lib/chat_page.dart` 0 问题；diff 单 hunk 全为本改动。
 
 ## 20261019 group 大胶囊右侧内距 6→12（与 duo 对称）
 
-**（2026-10-19T13:05:13Z / ��**：老板反馈 group 空间状态条左侧大胶囊两个现象。① 右缘贴文字——group 胶囊内部 Padding 仍是右 6（duo 上轮已改 12），对称改为 12，宽度预算 `capsulePad` 同步 6→12（两处注释标明耦合，防 RenderFlex overflow）；② 老板觉得"胶囊整体右移、头像没贴左圆角"——排查确认左侧两层 padding 均为 0、头像条左缘 x=0，真实原因是几何对比：duo 头像 40px 与 40 高胶囊左圆弧（半径 20）同心所以"三面贴壁"，group 头像 32px 垂直居中、左圆弧大一圈，弧线在头像左上/下方收进去，视觉上像右移——自 32px 头像条起即如此，非本次回归。已向老板说明，是否把 group 头像条升到满高（需同步改 _stripAvatarCount/渐隐整套预算）待老板定夺。验证：flutter analyze 0 问题；2 hunks 全为本改动。
+**（2026-10-19T13:05:13Z / ��**：老板反馈 group 空间状态条左侧大胶囊两个现象。① 右缘贴文字——group 胶囊内部 Padding 仍是右 6（duo 上轮已改 12），对称改为 12，宽度预算 `capsulePad` 同步 6→12（两处注释标明耦合，防 RenderFlex overflow）；② 老板觉得"胶囊整体右移、头像没贴左圆角"——排查确认左侧两层 padding 均为 0、头像条左缘 x=0，真实原因是几何对比：duo 头像 40px 与 40 高胶囊左圆弧（半径 20）同心所以"三面贴壁"，group 头像 32px 垂直居中、左圆弧大一圈，弧线在头像左上/下方收进去，视觉上像右移——自 32px 头像条起即如此，非本次回归。已向老板说明，是否把 group 头像条升到满高（需同步改 _stripAvatarCount/渐隐整套预算）待老板定夺。验证：flutter analyze 0 问题；2 hunks 全为本改动。
 
-**（2026-10-19T13:06:19Z / ��**：老板定夺：group 状态条头像条**保持 32px 现状**，不升 40px 满高（此前我在 worklog 里留的待定项就此关闭）。左圆弧留白是可接受的视觉特性，不再当问题处理。
+**（2026-10-19T13:06:19Z / ��**：老板定夺：group 状态条头像条**保持 32px 现状**，不升 40px 满高（此前我在 worklog 里留的待定项就此关闭）。左圆弧留白是可接受的视觉特性，不再当问题处理。
 
 ## 20261019 app-apk-boot2run 卡在「等待 adb 设备上线」根因修复
 
-**（2026-10-19T13:18:23Z / ��**：老板报最近几天 boot2run 总停在「等待 adb 设备上线」。排查链：adb devices 显示 emulator-5554 offline（qemu 进程活着但系统起不来）→ 模拟器日志 `Failed to load snapshot 'default_boot'`（goldfish_pipe error while loading state, Error -5）→ **根因 = AVD quick-boot 快照损坏**，普通启动每次都卡在加载坏快照。排查弯路：AVD 目录不在 `~/.android/avd/einz_emu.avd`——`einz_emu.ini` 的 path 指向 `~/.android/avd/Pixel_4_XL.avd`（AVD 改过名、目录沿用旧名），第一次 rm 删错了空目录。修法：kill 残留 qemu/netsimd → 删 `Pixel_4_XL.avd/snapshots/default_boot`（冷启动 `-no-snapshot` 仅作诊断）→ 普通启动实测 40s 开机 ✅。今后再遇到同样症状（进程在但 adb 一直 offline），直接删该快照即可。未改 package.json 脚本。
+**（2026-10-19T13:18:23Z / ��**：老板报最近几天 boot2run 总停在「等待 adb 设备上线」。排查链：adb devices 显示 emulator-5554 offline（qemu 进程活着但系统起不来）→ 模拟器日志 `Failed to load snapshot 'default_boot'`（goldfish_pipe error while loading state, Error -5）→ **根因 = AVD quick-boot 快照损坏**，普通启动每次都卡在加载坏快照。排查弯路：AVD 目录不在 `~/.android/avd/einz_emu.avd`——`einz_emu.ini` 的 path 指向 `~/.android/avd/Pixel_4_XL.avd`（AVD 改过名、目录沿用旧名），第一次 rm 删错了空目录。修法：kill 残留 qemu/netsimd → 删 `Pixel_4_XL.avd/snapshots/default_boot`（冷启动 `-no-snapshot` 仅作诊断）→ 普通启动实测 40s 开机 ✅。今后再遇到同样症状（进程在但 adb 一直 offline），直接删该快照即可。未改 package.json 脚本。
 
-**（2026-10-19T13:20:53Z / ��**：老板定夺：`app-apk-boot2run` 每次启动模拟器前先删 quick-boot 快照。改 `package.json` 该脚本：launch 前从 `~/.android/avd/einz_emu.ini` 的 path 动态解析 AVD 目录（不写死 Pixel_4_XL，AVD 再改名不怕），存在 `snapshots/default_boot` 就 rm 并提示「🗑 已清除」。代价 = 每次冷启动（约 40s 开机，无快照恢复的十几秒），换来不会再被坏快照卡死。已在运行则跳过启动、不删快照（避免与活着的 qemu 冲突）。验证：node 解析 package.json OK；AVD_DIR 解析正确。
+**（2026-10-19T13:20:53Z / ��**：老板定夺：`app-apk-boot2run` 每次启动模拟器前先删 quick-boot 快照。改 `package.json` 该脚本：launch 前从 `~/.android/avd/einz_emu.ini` 的 path 动态解析 AVD 目录（不写死 Pixel_4_XL，AVD 再改名不怕），存在 `snapshots/default_boot` 就 rm 并提示「🗑 已清除」。代价 = 每次冷启动（约 40s 开机，无快照恢复的十几秒），换来不会再被坏快照卡死。已在运行则跳过启动、不删快照（避免与活着的 qemu 冲突）。验证：node 解析 package.json OK；AVD_DIR 解析正确。
 
-**（2026-10-19T13:22:38Z / ��**：清快照步骤改由 CLEAN 门控（老板定）：默认 `npm run app-apk-boot2run` 走快照快速恢复；要冷启动才 `CLEAN=true npm run app-apk-boot2run`（删快照 + 冷启动；CLEAN 同时沿用到后续 app-apk-run 的 clean 安装，语义一致）。
+**（2026-10-19T13:22:38Z / ��**：清快照步骤改由 CLEAN 门控（老板定）：默认 `npm run app-apk-boot2run` 走快照快速恢复；要冷启动才 `CLEAN=true npm run app-apk-boot2run`（删快照 + 冷启动；CLEAN 同时沿用到后续 app-apk-run 的 clean 安装，语义一致）。
 
 ## 20261019 修 CI group_status_bar_test 失败（弹层变高引发的两处测试问题）
 
-**（2026-10-19T13:37:03Z / ��**：老板报 github CI 红。排查：二分锁定 `9939dfd8`（自愿退群）——非这几天的样式改动。根因两处：① 成员弹层加入「退出群组」项后变高，`_closeMembersSheet` 点 ModalBarrier **中心**（屏中 400,300）落进弹层内容、关不掉弹层，后续 tap 被残留屏障吞掉（插桩实证：失败时刻 sheet 仍开着）；② 412 后一条断言找占位词「群组名称」，但用例刚设了群名 Crew，弹层群名行本应显示 Crew（插桩 placeholder=0 crew=2），断言与自身 reason 矛盾。修法（均只动测试）：`_closeMembersSheet` 改 `tapAt(Offset(20,20))` 点顶部空白必中屏障（注释记根因）；断言改按 `membersSheetGroupNameRow` key 定位群名行里的 Crew。验证：group_status_bar_test 全 10 项通过。App 代码无 bug，未改。
+**（2026-10-19T13:37:03Z / ��**：老板报 github CI 红。排查：二分锁定 `9939dfd8`（自愿退群）——非这几天的样式改动。根因两处：① 成员弹层加入「退出群组」项后变高，`_closeMembersSheet` 点 ModalBarrier **中心**（屏中 400,300）落进弹层内容、关不掉弹层，后续 tap 被残留屏障吞掉（插桩实证：失败时刻 sheet 仍开着）；② 412 后一条断言找占位词「群组名称」，但用例刚设了群名 Crew，弹层群名行本应显示 Crew（插桩 placeholder=0 crew=2），断言与自身 reason 矛盾。修法（均只动测试）：`_closeMembersSheet` 改 `tapAt(Offset(20,20))` 点顶部空白必中屏障（注释记根因）；断言改按 `membersSheetGroupNameRow` key 定位群名行里的 Crew。验证：group_status_bar_test 全 10 项通过。App 代码无 bug，未改。
 **（2026-10-19T23:24:54Z / 2026-10-20 07:24）**：锁屏码弹窗整改（commit 95e36565）。手机上键盘弹起后「更改锁屏码」内容过长、错误红字压在最底部要滚动才看得见。改为：①滚动收进 content 内层（Flexible + SingleChildScrollView 包分组卡片），外层 Column 不滚；②错误红字固定在 actions 按钮区正上方、独占整行自动换行——老板定夺（先后否掉了"放内容顶部"和"随内容滚动"两个方案）；③间距收紧：标题→首卡、卡片间 12→8，内容底部 24→16，卡内标题行→内容 12→8（卡片 padding 14/12 与圆角 14 老板要求保留原样）。插曲：中途一次 dart format 波及全文件 5000+ 行假 diff，已用 HEAD 版本重建文件重新落改动。老板自己改的 exitGroupMessage 文案（l10n 5 文件）仍在工作区未提交，不代提交。
 
 **（2026-10-19T23:52:30Z / 2026-10-20 07:52）**：两项修复提交（commit 935c5f28）。①PIN 只输一次：删锁屏码弹窗确认框（老板拍板——防爆破是真防线，confirm 对数字误触防护有限还多占一行），chat_page_menu_test 3 个用例改单框语义，l10n 删 chatPageSetLockRowConfirm/setPinDialogPinMismatch 失效键；②离线切秘境 bug：initState 从 profile 恢复时漏读 mode（group 空间离线切入错显 duo 状态条/弹层），补 _spaceMode 恢复 + WS 重连时补拉 _refreshProfileFromServer 自动校正。备注：group_status_bar_test「大胶囊点群名」用例失败为既有问题（worktree baseline 验证过，HEAD 同样失败），未处理。测试期间曾误跑 dart format 波及全文件的教训已在更早条目记录——本次 diff 干净（42+/88-）。
