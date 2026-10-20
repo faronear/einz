@@ -15248,3 +15248,7 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-19T23:24:54Z / 2026-10-20 07:24）**：锁屏码弹窗整改（commit 95e36565）。手机上键盘弹起后「更改锁屏码」内容过长、错误红字压在最底部要滚动才看得见。改为：①滚动收进 content 内层（Flexible + SingleChildScrollView 包分组卡片），外层 Column 不滚；②错误红字固定在 actions 按钮区正上方、独占整行自动换行——老板定夺（先后否掉了"放内容顶部"和"随内容滚动"两个方案）；③间距收紧：标题→首卡、卡片间 12→8，内容底部 24→16，卡内标题行→内容 12→8（卡片 padding 14/12 与圆角 14 老板要求保留原样）。插曲：中途一次 dart format 波及全文件 5000+ 行假 diff，已用 HEAD 版本重建文件重新落改动。老板自己改的 exitGroupMessage 文案（l10n 5 文件）仍在工作区未提交，不代提交。
 
 **（2026-10-19T23:52:30Z / 2026-10-20 07:52）**：两项修复提交（commit 935c5f28）。①PIN 只输一次：删锁屏码弹窗确认框（老板拍板——防爆破是真防线，confirm 对数字误触防护有限还多占一行），chat_page_menu_test 3 个用例改单框语义，l10n 删 chatPageSetLockRowConfirm/setPinDialogPinMismatch 失效键；②离线切秘境 bug：initState 从 profile 恢复时漏读 mode（group 空间离线切入错显 duo 状态条/弹层），补 _spaceMode 恢复 + WS 重连时补拉 _refreshProfileFromServer 自动校正。备注：group_status_bar_test「大胶囊点群名」用例失败为既有问题（worktree baseline 验证过，HEAD 同样失败），未处理。测试期间曾误跑 dart format 波及全文件的教训已在更早条目记录——本次 diff 干净（42+/88-）。
+
+## 20261020 整理本地与 origin/main 的分叉
+
+**（2026-10-20T00:30:00Z / 2026-10-20 08:30）**：本地 main 与 origin/main 走岔（本地 4 个 commit：锁屏码弹窗整改、PIN 单框、离线切秘境修复；远端 5 个：boot2run 快照修复、CI group_status_bar_test 修复），且工作区遗留一个进行中的 merge、卡在 aimemo/worklog.md 冲突。处理：worklog 为追加式日志，两侧条目（UTC 13:18–13:37 与 23:24–23:52）按时间顺序全保留；其余 7 个文件（chat_page.dart、l10n×5、chat_page_menu_test.dart）由 git 自动合并。完成 merge commit 5e9fd14c，flutter analyze 无问题。本地现领先 origin/main 5 个 commit，待老板确认后 push。
