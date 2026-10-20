@@ -116,7 +116,7 @@ CONTACT for review questions: einz@tic.cc
 | 字段 | 填写 | 说明 |
 | --- | --- | --- |
 | Platform | iOS（+ macOS 可后建） | 先 iOS |
-| App Name | `Einz — Private Space` | 30 字符内；副标题带上定位词利于搜索 |
+| App Name | `Einz — Your Secret Realm` | 23 字符；老板 2026-10-20 定夺：名称吃 realm 品牌红利（原 `Einz — Private Space` 弃用） |
 | Subtitle | `End-to-end encrypted` | 30 字符内；核心卖点 |
 | Bundle ID | `cc.tic.einz` | 与 profile 一致 |
 | Primary Language | English (U.S.) | |
