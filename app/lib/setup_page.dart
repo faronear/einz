@@ -1032,7 +1032,6 @@ class _SetupPageState extends State<SetupPage> {
               style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF2271F7), // 品牌蓝：入口页卡片是白底，白字会隐形（老板 2026-10-19）
-                decoration: TextDecoration.underline,
               ),
             ),
           ),
