@@ -937,6 +937,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_peerGender.isEmpty) _peerGender = p['peerGender'] as String? ?? '';
         _mySlot = p['mySlot'] as int?; // 槽位无"空值语义"问题，直接恢复
         _peerSlot = p['peerSlot'] as int?;
+        // 空间类型：profile 里记过（/space 下发过一次就会落盘）就恢复——
+        // 否则离线启动/离线切换秘境时 _spaceMode 停在默认 'duo'：group 空间
+        // 状态条错显单人对方胶囊、点开也是 duo 弹层（老板 2026-10-20 实测）。
+        // 老记录没这个键 → 回退 'duo'（与 loadProfile 同口径）。
+        _spaceMode = p['mode'] as String? ?? 'duo';
         // 群组名字（仅本机）：无 widget 入参，直接以 profile 为准
         _groupName = p['groupName'] as String? ?? '';
       });
@@ -1503,6 +1508,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 顶）时把 /sync 打成一串。
     if (_consecutiveSyncFailures > 0 || _entranceUnrecognized) {
       unawaited(_refresh());
+      // 离线期间进来的空间是从本地 profile 恢复的快照（mode/成员名单）——重连后
+      // 重拉 /space 校正一遍，否则 group 空间在离线时切入会一直错显 duo 状态条/
+      // 弹层，要切走再切回才对（老板 2026-10-20 实测）。与上面同一触发条件：
+      // 正常在线不额外发请求，WS 抖动不会把 /space 打成一串。
+      unawaited(_refreshProfileFromServer());
     }
     _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
   }
@@ -10179,7 +10189,10 @@ class _SetLockDialog extends StatefulWidget {
 class _SetLockDialogState extends State<_SetLockDialog> {
   final _oldCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
+  // 确认框已删（老板 2026-10-20）：PIN 只输一次——连错 5 次锁 30 秒的防爆破
+  // 是真正的防线，confirm 对数字键盘误触防护有限（两次按错同一格概率不低），
+  // 却多占一行高度（正是键盘遮挡痛点的最大单项）。输错 PIN 的恢复出路 =
+  // 重装 app（Space Key 在服务器密保箱，口令可回）。
   String? _error;
   // 已设锁屏码 → 出「当前锁屏码」验证框（老板 2026-09-14）
   bool get _hasPin => widget.hasPin;
@@ -10240,11 +10253,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   @override
   void initState() {
     super.initState();
-    // 更换场景确认行的显隐跟随「新 PIN」行是否有内容（老板 2026-10-19）：TextField
-    // 自己改文本不会重建弹窗，这里用 controller 监听补一次 setState
-    _pinCtrl.addListener(() {
-      if (mounted) setState(() {});
-    });
     AppLockService(widget.db).loadLockSeconds().then((value) {
       if (!mounted) return;
       setState(() {
@@ -10260,7 +10268,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   void dispose() {
     _oldCtrl.dispose();
     _pinCtrl.dispose();
-    _confirmCtrl.dispose();
     super.dispose();
   }
 
@@ -10310,11 +10317,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     // 否则旧错误横在页面下方，容易误当成新提交的结果
     setState(() => _error = null);
     final pin = _pinCtrl.text;
-    final confirm = _confirmCtrl.text;
-    // 两框都空 = 不改 PIN（老板 2026-10-18 方案二：原先"两空=清空"的隐式语义
-    // 会和"只想调自动锁屏时长"撞车——时长改成可调后，空着提交反而把 PIN 清掉。
-    // 清空改由弹窗内显性「清除锁屏码」按钮承担，见 _clearPin）。
-    final changePin = pin.isNotEmpty || confirm.isNotEmpty;
+    // 确认框已删（老板 2026-10-20，PIN 只输一次）。原来"两框都空 = 不改 PIN"
+    // 退化为"单框空 = 不改 PIN"（老板 2026-10-18 方案二语义不变：空着提交只调
+    // 时长，不清 PIN；清空由弹窗内显性「清除锁屏码」按钮承担，见 _clearPin）。
+    final changePin = pin.isNotEmpty;
     // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活）
     final overlay = Overlay.of(context, rootOverlay: true);
     // 时长是否真的动过（初始值还没异步读回时不写盘）
@@ -10360,10 +10366,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         setState(() => _error = l10n.setPinDialogPinTooShort);
         return;
       }
-      if (pin != confirm) {
-        setState(() => _error = l10n.setPinDialogPinMismatch);
-        return;
-      }
+      // （pin != confirm 校验已随确认框删除，老板 2026-10-20）
       // 设置/重设不再弹二次确认（老板 2026-09-14：新码/确认两栏已足够，多一次确认多余）
       try {
         await AppLockService(widget.db).setPin(pin, payload: widget.payload, existing: existingVault);
@@ -10795,11 +10798,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               ),
               const SizedBox(height: 8),
             ],
-            // 第二组：新 PIN（设置 / 确认 两行同卡——新码的两行归一组）。
-            // 确认行仅在**已设 PIN 的更换场景**下随第一行显隐（老板 2026-10-19）：
-            // 首设场景保持常驻。此前撤回的原因是"第二个填了又清空第一个，确认行
-            // 隐藏后与报错对不上"——现在 _submit 先校验第一行非空，该矛盾已拆除。
-            // 顺带确认行清空：第一行清空即视作放弃更换，残留的确认值无意义。
+            // 第二组：新 PIN（确认框已删，老板 2026-10-20：PIN 只输一次，
+            // 详见 _SetLockDialogState 顶部注释与 _submit 对应说明）。
             _setLockGroup(
               children: [
                 _setLockPinRow(
@@ -10813,18 +10813,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
                   revealable: true, // 小眼睛（老板 2026-10-19）
                 ),
-                if (!_hasPin || _pinCtrl.text.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _setLockPinRow(
-                    label: l10n.chatPageSetLockRowConfirm,
-                    controller: _confirmCtrl,
-                    // 确认行与设置行同文案，靠左侧 设置/确认 标签区分
-                    // （老板 2026-10-18 原话："第一行标签设置、第二行标签确认"）
-                    fieldLabel: _hasPin
-                        ? l10n.chatPageSetLockNewPinLabel
-                        : l10n.chatPageSetLockNewPinLabelNoPin,
-                  ),
-                ],
               ],
             ),
             const SizedBox(height: 8),

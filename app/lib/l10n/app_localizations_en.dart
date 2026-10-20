@@ -361,9 +361,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinDigitsOnly => 'Digits only';
 
   @override
-  String get setPinDialogPinMismatch => 'PINs do not match';
-
-  @override
   String get setPinDialogOldWrong => 'Wrong current PIN';
 
   @override
@@ -394,9 +391,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockRowSet => 'Set';
-
-  @override
-  String get chatPageSetLockRowConfirm => 'Confirm';
 
   @override
   String get chatPageSetLockNewPinLabel => 'New PIN or leave blank';
@@ -832,7 +826,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPagePinMenuValue(String duration) {
-    return 'Set · $duration';
+    return '$duration';
   }
 
   @override

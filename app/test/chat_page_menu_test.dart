@@ -421,12 +421,11 @@ void main() {
     await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
     expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget);
 
-    // 输入有效 PIN（两次一致）——限定在弹窗内查找，避免匹配聊天页消息输入框
-    // （本机未设 PIN → 弹窗只有两框：新 PIN / 确认 PIN）
+    // 输入有效 PIN——限定在弹窗内查找，避免匹配聊天页消息输入框
+    // （确认框已删（老板 2026-10-20）：弹窗只有一框：新 PIN）
     final pinFields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(pinFields.at(0), '123456');
-    await tester.enterText(pinFields.at(1), '123456');
     // 点"提交"→ 直接设置（不再有二次确认弹窗——老板 2026-09-14 删除）
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
@@ -479,9 +478,11 @@ void main() {
     expect(await AppLockService(db).isSetup, false);
   });
 
-  testWidgets('未设 PIN：只填确认框/只填新 PIN，红字都指向真正的错误', (WidgetTester tester) async {
+  testWidgets('未设 PIN：留空提交红字指向真正的错误；太短也拦住', (WidgetTester tester) async {
     // 2026-10-19：只填确认框时旧逻辑落进 digitsOnly 校验，报"PIN 只能是数字"
     // 这种不着边的红字——新 PIN 非空校验必须先行。
+    // 2026-10-20 确认框删除（PIN 只输一次）：原"只填确认框"半边用例随之失效，
+    // 保留"留空提交"与"太短"两个校验路径。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -511,20 +512,18 @@ void main() {
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
 
-    // ① 只填确认框 → 红字"请输入新 PIN"，不是"只能是数字"
-    await tester.enterText(fields.at(1), '123456');
+    // ① 留空提交 → 红字"请输入新 PIN"，不是"只能是数字"
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageSetLockPinRequired), findsOneWidget);
     expect(find.text(_zh.setPinDialogPinDigitsOnly), findsNothing);
     expect(await AppLockService(db).isSetup, false);
 
-    // ② 只填新 PIN → 红字"两次输入的 PIN 不一致"
-    await tester.enterText(fields.at(0), '123456');
-    await tester.enterText(fields.at(1), '');
+    // ② 只填 3 位（太短）→ 红字"PIN 至少 6 位数字"，不动锁
+    await tester.enterText(fields.at(0), '123');
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.setPinDialogPinMismatch), findsOneWidget);
+    expect(find.text(_zh.setPinDialogPinTooShort), findsOneWidget);
     expect(await AppLockService(db).isSetup, false);
   });
 
@@ -562,18 +561,15 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
-    // 已设 PIN → 多出「当前锁屏码」框。确认行随「新 PIN」行显隐（老板 2026-10-19）：
-    // 初始只有 2 框（旧/新），填了新 PIN 才出现确认框（共 3 框）
+    // 已设 PIN → 多出「当前锁屏码」框。确认框已删（老板 2026-10-20）：
+    // 恒定 2 框（旧/新），不再随输入显隐
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    expect(fields.evaluate().length, 2, reason: '新 PIN 未填时确认行隐藏（旧/新 2 框）');
+    expect(fields.evaluate().length, 2, reason: '确认框已删：恒定旧/新 2 框');
 
     // 1) 旧码留空 + 新码非空 → 红字要求先输入旧码，不动锁
-    // （2026-10-18 方案二：新码非空才算"改码"；两空提交=不改 PIN，见用例 4）
+    // （2026-10-18 方案二：新码非空才算"改码"；新码空提交=不改 PIN，见用例 4）
     await tester.enterText(fields.at(1), '654321');
-    await tester.pumpAndSettle(); // 新 PIN 有内容 → 确认行出现
-    expect(fields.evaluate().length, 3, reason: '填了新 PIN 后确认行出现（旧/新/确认）');
-    await tester.enterText(fields.at(2), '654321');
     await tester.tap(find.text(_zh.chatPageSetLockSubmitChange));
     await tester.pumpAndSettle();
     expect(find.text('请先输入当前锁屏码'), findsOneWidget);
@@ -589,21 +585,19 @@ void main() {
     // 3) 旧码正确、新码与旧码相同 → 红字提示，不真去设置
     await tester.enterText(fields.at(0), '123456');
     await tester.enterText(fields.at(1), '123456');
-    await tester.enterText(fields.at(2), '123456');
     await tester.tap(find.text(_zh.chatPageSetLockSubmitChange));
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageSetLockSameAsOld), findsOneWidget);
     expect(await AppLockService(db).isSetup, true);
 
-    // 4) 新码两空 + 提交 → 不再清空（2026-10-18 方案二：两空=不改 PIN，只调时长），
+    // 4) 新码清空 + 提交 → 不再清空（2026-10-18 方案二：新码空=不改 PIN，只调时长），
     //    弹窗直接关闭、锁不动；清空走显性「清除锁屏码」按钮（见删除用例）
     await tester.enterText(fields.at(1), '');
-    await tester.pumpAndSettle(); // 新 PIN 清空 → 确认行隐藏
     await tester.tap(find.text(_zh.chatPageSetLockSubmitChange));
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing,
-        reason: '两空提交=不改 PIN：弹窗应直接关闭');
-    expect(await AppLockService(db).isSetup, true, reason: '两空提交不清锁');
+        reason: '新码空提交=不改 PIN：弹窗应直接关闭');
+    expect(await AppLockService(db).isSetup, true, reason: '新码空提交不清锁');
   });
 
   testWidgets('有 PIN 时删除锁屏码：菜单项立即刷新（不再显示「已设置」）', (WidgetTester tester) async {

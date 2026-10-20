@@ -333,9 +333,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogPinDigitsOnly => 'PIN 只能是数字';
 
   @override
-  String get setPinDialogPinMismatch => '两次输入的 PIN 不一致';
-
-  @override
   String get setPinDialogOldWrong => '当前锁屏码错误';
 
   @override
@@ -365,9 +362,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageSetLockRowSet => '设置';
-
-  @override
-  String get chatPageSetLockRowConfirm => '确认';
 
   @override
   String get chatPageSetLockNewPinLabel => '新 PIN 或者留空不填';
@@ -783,7 +777,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPagePinMenuValue(String duration) {
-    return '已设 · $duration';
+    return '$duration';
   }
 
   @override
