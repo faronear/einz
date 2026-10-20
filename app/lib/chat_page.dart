@@ -5764,13 +5764,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// iOS：认证后把 APNs device token 注册到 Server（PROTOCOL.md §7.3）。
+  /// iOS：进入真实空间时申请通知权限、注册 APNs、把 device token 注册到
+  /// Server（PROTOCOL.md §7.3）。启动时不注册（新版 iOS 冷启动/演示都会弹
+  /// 权限框，演示秘境全离线不需要——2026-10-20 实测）。
   /// 推送只发"有新消息"提示；注册失败不影响聊天（WS/轮询兜底）。
   Future<void> _registerPushToken() async {
     if (!Platform.isIOS) return;
     try {
       const channel = MethodChannel('einz/apns');
-      final apnsToken = await channel.invokeMethod<String>('getToken');
+      final apnsToken = await channel.invokeMethod<String>('registerAndToken');
       if (apnsToken != null && apnsToken.isNotEmpty) {
         await _withAuth((t) => _repo.api.registerPushToken('ios', apnsToken, t));
       }
