@@ -235,7 +235,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
+      'Einz is a secret chatting and sharing space for you and your close companions. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -1236,7 +1236,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.';
+      'Einz is a secret chatting and sharing space for you and your close companions, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';

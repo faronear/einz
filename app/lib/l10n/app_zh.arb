@@ -108,7 +108,7 @@
     }
   },
   "setupEntryTitle": "秘境向导",
-  "setupEntryHint": "秘境是你的私密聊天和共享空间，可以从头创建，或者受邀加入。",
+  "setupEntryHint": "秘境是你和亲密伙伴的私密聊天与共享空间，可以从头创建，或者受邀加入。",
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",
   "setupEntryDemo": "先看看演示",
@@ -725,7 +725,7 @@
   },
   "chatPageMenuAbout": "关于秘境",
   "aboutPageTitle": "关于秘境",
-  "aboutIntro": "秘境是你的私密聊天和共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。",
+  "aboutIntro": "秘境是你和亲密伙伴的私密聊天与共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。",
   "aboutVersionLabel": "版本号",
   "aboutDownloadLabel": "下载",
   "aboutServerLabel": "服务器地址",

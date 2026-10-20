@@ -122,7 +122,7 @@
     }
   },
   "setupEntryTitle": "Einz wizard",
-  "setupEntryHint": "Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.",
+  "setupEntryHint": "Einz is a secret chatting and sharing space for you and your close companions. You can create a new one, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
   "setupEntryDemo": "Take a look around first",
@@ -763,7 +763,7 @@
   },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",
-  "aboutIntro": "Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.",
+  "aboutIntro": "Einz is a secret chatting and sharing space for you and your close companions, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.",
   "aboutVersionLabel": "Version",
   "aboutDownloadLabel": "Download",
   "aboutServerLabel": "Server",

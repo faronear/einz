@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.'**
+  /// **'Einz is a secret chatting and sharing space for you and your close companions. You can create a new one, or join an existing one by invitation.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.
@@ -497,7 +497,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryDemo.
   ///
   /// In en, this message translates to:
-  /// **'Take a look around first (demo, no sign-up)'**
+  /// **'Take a look around first'**
   String get setupEntryDemo;
 
   /// No description provided for @setupEntryLegacyServer.
@@ -2117,7 +2117,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.'**
+  /// **'Einz is a secret chatting and sharing space for you and your close companions, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.
