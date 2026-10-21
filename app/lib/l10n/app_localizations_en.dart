@@ -1246,7 +1246,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is the secret realm where you and your close companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.';
+      'Einz is the secret realm where you and your close companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';

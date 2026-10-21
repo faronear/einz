@@ -216,7 +216,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryTitle => '秘境向导';
 
   @override
-  String get setupEntryHint => '秘境是你与亲密伙伴的秘密聊天和分享空间。你可以从零创建，或受邀加入。';
+  String get setupEntryHint =>
+      '秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。你可以从零创建，或受邀加入。';
 
   @override
   String get setupEntryCreate => '创建秘境';
@@ -1180,7 +1181,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      '秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上，不允许任何第三方（包括秘境自身）偷看内容，全力守护你的隐私。';
+      '秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上——没有账号，不留痕迹。没有任何第三方（包括秘境自身）能够偷看内容，全力守护你的隐私。';
 
   @override
   String get aboutVersionLabel => '版本号';
