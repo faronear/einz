@@ -38,8 +38,9 @@ class DemoSpace {
   static final Uint8List spaceKey =
       Uint8List.fromList(base64Decode('ZGVtb0RlbW9EZW1vRGVtb0RlbW9EZW1vRGVtbw=='));
 
-  /// seeding 是否已完成的 app_state 键（v1 = 内容结构版本，改演示内容时递增）。
-  static const String _kSeeded = 'demo_space.seeded_v1';
+  /// seeding 是否已完成的 app_state 键（内容结构版本，改演示内容时递增）。
+  /// v2 = 2026-10-21 新增预设图片消息（老板：截图画面更丰富）。
+  static const String _kSeeded = 'demo_space.seeded_v2';
 
   /// 我的/对方的演示显示名（走 l10n，见 setup 进入点传入）。
   static const String demoMemberName = 'Einz';
@@ -56,6 +57,14 @@ class DemoSpace {
           ..where((s) => s.key.equals(_kSeeded)))
         .getSingleOrNull();
     if (flag != null) return;
+    // 版本升级重种（如 v1→v2）：先清掉 demo 空间旧消息/附件，防止新旧两套并存。
+    // 只删 demo spaceId——真实空间的数据不受影响。
+    await (db.delete(db.localMessages)
+          ..where((t) => t.spaceId.equals(spaceId)))
+        .go();
+    await (db.delete(db.localAttachments)
+          ..where((t) => t.spaceId.equals(spaceId)))
+        .go();
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final day = const Duration(days: 1).inMilliseconds;
@@ -155,7 +164,8 @@ class DemoSpace {
       nonce: quoteEnv.nonce,
       ciphertext: quoteEnv.ciphertext,
       serverSequence: seq,
-      createdAt: now,
+      // 比图片消息早 1 分钟——图片是最后一条（聊天页滚到底，截图最显眼位置）
+      createdAt: now - 60000,
     );
     await db.into(db.localMessages).insert(
           LocalMessagesCompanion.insert(
@@ -166,6 +176,73 @@ class DemoSpace {
             keyVersion: 1,
             nonce: quoteEnv.nonce,
             ciphertext: jsonEncode(quoteEnvFinal.toJson()),
+            createdAt: now - 60000,
+            localCreatedAt: now - 60000,
+            status: const Value('read'),
+            serverSequence: Value(seq),
+          ),
+        );
+    seq++;
+
+    // 图片消息（2026-10-21 老板：演示空间预设一张"照片"，截图画面更丰富）：
+    // 我方发的日出风景照（纯 Dart 运行时绘制，零二进制资产），走**真实的**
+    // 附件链路——encryptAttachment 密文进 local_attachments.local_cipher，
+    // 渲染/点击全屏与真实图片消息完全一致。caption 不上气泡，仅作载荷文本。
+    final photoId = 'demo-msg-${seq.toString().padLeft(4, '0')}';
+    final photoAttId = 'demo-att-${seq.toString().padLeft(4, '0')}';
+    final photoBytes = await _paintPhoto();
+    final enc = await encryptAttachment(
+      fileBytes: photoBytes,
+      spaceKey: spaceKey,
+      attachmentId: photoAttId,
+      spaceId: spaceId,
+      keyVersion: 1,
+    );
+    await db.into(db.localAttachments).insert(
+          LocalAttachmentsCompanion.insert(
+            attachmentId: photoAttId,
+            messageId: photoId,
+            keyVersion: 1,
+            size: enc.size,
+            sha256: enc.sha256,
+            nonce: base64Encode(enc.nonce),
+            localCipher: Value(enc.cipher),
+            spaceId: Value(spaceId),
+            status: const Value('downloaded'),
+          ),
+        );
+    final photoCaption = chinese
+        ? '晨跑的日出 🌅 和这里的一切一样，是加密的。'
+        : 'Sunrise from my morning walk 🌅 — encrypted like everything else here.';
+    final photoEnv = await encryptMessage(
+      plaintext: photoCaption,
+      spaceKey: spaceKey,
+      spaceId: spaceId,
+      senderEntranceId: myEntranceId,
+      messageId: photoId,
+      type: 'image',
+      keyVersion: 1,
+    );
+    final photoEnvFinal = MessageEnvelope(
+      v: photoEnv.v,
+      type: photoEnv.type,
+      keyVersion: photoEnv.keyVersion,
+      messageId: photoEnv.messageId,
+      senderEntranceId: photoEnv.senderEntranceId,
+      nonce: photoEnv.nonce,
+      ciphertext: photoEnv.ciphertext,
+      serverSequence: seq,
+      createdAt: now,
+    );
+    await db.into(db.localMessages).insert(
+          LocalMessagesCompanion.insert(
+            messageId: photoId,
+            spaceId: spaceId,
+            senderEntranceId: myEntranceId,
+            type: 'image',
+            keyVersion: 1,
+            nonce: photoEnv.nonce,
+            ciphertext: jsonEncode(photoEnvFinal.toJson()),
             createdAt: now,
             localCreatedAt: now,
             status: const Value('read'),
@@ -272,6 +349,98 @@ class DemoSpace {
     }
 
     final image = await rec.endRecording().toImage(size.toInt(), size.toInt());
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data!.buffer.asUint8List();
+  }
+
+  /// 演示"照片"：纯 Dart 画的日出风景（与头像同一套零二进制资产手法）。
+  /// 1024×768（4:3 随手拍比例）：渐变晨空 + 太阳光晕 + 云 + 两层山剪影 +
+  /// 水面与太阳倒影。配色与 app 品牌粉蓝渐变呼应。
+  static Future<Uint8List> _paintPhoto() async {
+    const w = 1024.0, h = 768.0;
+    final rec = ui.PictureRecorder();
+    final canvas = ui.Canvas(rec);
+    final rect = Rect.fromLTWH(0, 0, w, h);
+
+    // 晨空：上冷下暖（晨蓝 → 粉 → 暖橙）
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset.zero,
+          Offset(0, h),
+          const [Color(0xFF7FA7E8), Color(0xFFF2A9B8), Color(0xFFFFD08A)],
+          const [0.0, 0.55, 1.0],
+        ),
+    );
+
+    // 太阳：光晕（大半透明圆）+ 亮核
+    final sun = Offset(w * 0.62, h * 0.46);
+    canvas.drawCircle(sun, 120, Paint()..color = const Color(0x66FFE9B8));
+    canvas.drawCircle(sun, 84, Paint()..color = const Color(0x99FFF0C8));
+    canvas.drawCircle(sun, 58, Paint()..color = const Color(0xFFFFF3C4));
+
+    // 云（半透明白椭圆组）
+    final cloud = Paint()..color = const Color(0x66FFFFFF);
+    canvas.drawOval(
+        Rect.fromCenter(center: Offset(w * 0.25, h * 0.22), width: 300, height: 58), cloud);
+    canvas.drawOval(
+        Rect.fromCenter(center: Offset(w * 0.32, h * 0.18), width: 180, height: 44), cloud);
+    canvas.drawOval(
+        Rect.fromCenter(center: Offset(w * 0.78, h * 0.30), width: 240, height: 48), cloud);
+
+    // 远山（淡紫）与近山（深紫）剪影
+    final back = ui.Path()
+      ..moveTo(0, h * 0.62)
+      ..quadraticBezierTo(w * 0.18, h * 0.46, w * 0.36, h * 0.60)
+      ..quadraticBezierTo(w * 0.52, h * 0.70, w * 0.68, h * 0.58)
+      ..quadraticBezierTo(w * 0.84, h * 0.48, w, h * 0.60)
+      ..lineTo(w, h * 0.74)
+      ..lineTo(0, h * 0.74)
+      ..close();
+    canvas.drawPath(back, Paint()..color = const Color(0xFF9B7EB8));
+    final front = ui.Path()
+      ..moveTo(0, h * 0.70)
+      ..quadraticBezierTo(w * 0.30, h * 0.58, w * 0.55, h * 0.70)
+      ..quadraticBezierTo(w * 0.78, h * 0.79, w, h * 0.68)
+      ..lineTo(w, h * 0.76)
+      ..lineTo(0, h * 0.76)
+      ..close();
+    canvas.drawPath(front, Paint()..color = const Color(0xFF6D5A8E));
+
+    // 水面：湖蓝渐变 + 高光提亮
+    const waterTop = 0.74;
+    canvas.drawRect(
+      Rect.fromLTWH(0, h * waterTop, w, h * (1 - waterTop)),
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, h * waterTop),
+          Offset(0, h),
+          const [Color(0xFF8E9BD8), Color(0xFF5C6BC0)],
+        ),
+    );
+    canvas.drawRect(Rect.fromLTWH(0, h * waterTop, w, h * (1 - waterTop)),
+        Paint()..color = const Color(0x26FFFFFF));
+
+    // 太阳倒影：一列渐短的横向亮条
+    final glint = Paint()..color = const Color(0x88FFE9B8);
+    for (var i = 0; i < 5; i++) {
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromCenter(
+              center: Offset(sun.dx, h * waterTop + 22.0 + i * 34),
+              width: 150 - i * 22,
+              height: 10),
+          topLeft: const Radius.circular(5),
+          topRight: const Radius.circular(5),
+          bottomLeft: const Radius.circular(5),
+          bottomRight: const Radius.circular(5),
+        ),
+        glint,
+      );
+    }
+
+    final image = await rec.endRecording().toImage(w.toInt(), h.toInt());
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     return data!.buffer.asUint8List();
   }
