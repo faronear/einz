@@ -37,7 +37,7 @@
 | --- | ------------------------------------------------------------------- | -------------------------- | ---------------------------------------- |
 | 1   | 命令行`--server <地址>`                                             | **本次进程**（仅本次生效） | 启动时传参                               |
 | 2   | 编译期`kEinzServer`（`--dart-define-from-file=localConfig.*.json`） | **这个包**（烘进二进制）   | 改配置文件 + 重新`flutter run` / `build` |
-| 3   | 出厂候选域名`kServerCandidates`                              | 这个包                     | 改常量 + 重新发布                        |
+| 3   | 出厂候选域名`kServerCandidates`                                     | 这个包                     | 改常量 + 重新发布                        |
 
 三层都不需要解锁就能读到（地址不在锁包里），所以**锁屏页显示的与解锁后实际连的必然是同一个值**。
 
@@ -47,14 +47,14 @@ TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localCo
 
 ## 3. 各端对照
 
-|              | TUI                                                                           | App（桌面端）                                                                           | App（手机端）            |
-| ------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| 硬编码托底   | `_kPrimaryServercli/bin/einz_tui.dart:181`                                    | `kPrimaryServerapp/lib/data/server_config.dart:32`                                      | 同桌面端                 |
+|              | TUI                                                                                                                                                                              | App（桌面端）                                                                                                                            | App（手机端）            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 硬编码托底   | `_kPrimaryServercli/bin/einz_tui.dart:181`                                                                                                                                       | `kPrimaryServerapp/lib/data/server_config.dart:32`                                                                                       | 同桌面端                 |
 | 配置文件     | `cli/localConfig.json`**运行时**读（`_configuredServers()`）；**支持单个地址或多个地址的数组**——多地址时只在数组内并发探测；没有配置则在出厂候选域名里探测（`_defaultServer()`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`）；没有则并发探测出厂候选域名（`resolveServer()`） | 同桌面端                 |
-| 启动参数     | `--server <地址>`                                                             | `--server <地址>`                                                                       | 无（移动端没有启动参数） |
-| 运行期命令   | `/server [地址]`、`/status`                                                   | 「关于秘境」页显示地址                                                                  | 同桌面端                 |
-| 配置读不到时 | 源码运行（`dart run`）：打一行提示再走候选域名（不静默）；**打包产物（AOT）：不打**——产物里本来就没有 localConfig.json，走出厂候选域名是预期行为（老板 2026-09-21） | —                                                                                       | —                        |
-| 持久化       | **无**                                                                        | **无**                                                                                  | **无**                   |
+| 启动参数     | `--server <地址>`                                                                                                                                                                | `--server <地址>`                                                                                                                        | 无（移动端没有启动参数） |
+| 运行期命令   | `/server [地址]`、`/status`                                                                                                                                                      | 「关于秘境」页显示地址                                                                                                                   | 同桌面端                 |
+| 配置读不到时 | 源码运行（`dart run`）：打一行提示再走候选域名（不静默）；**打包产物（AOT）：不打**——产物里本来就没有 localConfig.json，走出厂候选域名是预期行为（老板 2026-09-21）              | —                                                                                                                                        | —                        |
+| 持久化       | **无**                                                                                                                                                                           | **无**                                                                                                                                   | **无**                   |
 
 `cli/localConfig.json` 的查找顺序（TUI）：
 
@@ -139,10 +139,10 @@ open -a Einz --args --server http://localhost:3000      # macOS（走原生桥�
 
 `flutter run -d macos` 也能临时切服务器，两条路径都固化成 npm script 了：
 
-| 脚本                               | 走哪一层                                                      | 等价命令                                                                          |
-| ---------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `npm run app-mac-run-local`       | 第 1 层：运行期 `--server`                                    | `cd app && flutter run -d macos -a --server=http://localhost:3000`                 |
-| `npm run app-mac-run-localConfig` | 第 2 层：编译期 dart-define（读 `app/localConfig.macos.json`） | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json`   |
+| 脚本                              | 走哪一层                                                       | 等价命令                                                                        |
+| --------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `npm run app-mac-run-local`       | 第 1 层：运行期 `--server`                                     | `cd app && flutter run -d macos -a --server=http://localhost:3000`              |
+| `npm run app-mac-run-localConfig` | 第 2 层：编译期 dart-define（读 `app/localConfig.macos.json`） | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json` |
 
 `-a/--dart-entrypoint-args` 之所以能当 `--server` 用：桌面端工具把它拼进 app 可执行文件的
 argv（`flutter_tools/lib/src/desktop_device.dart:125`），而原生桥读的正是
@@ -173,8 +173,6 @@ argv（`flutter_tools/lib/src/desktop_device.dart:125`），而原生桥读的�
 **TUI**
 
 ```bash
-npm run tui2local-1     # 脚本里已绑定 --store + --server（tui2local = tui to localhost）
-
 # 想验"多入口容灾"（主入口挂了自动切备用）时，把 cli/localConfig.json 的 server
 # 写成数组即可——只在数组内并发探测，全不通就回第一个并追问地址，不会回落生产：
 #   { "server": ["http://localhost:3000", "http://127.0.0.1:3901"] }

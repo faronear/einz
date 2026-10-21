@@ -38,7 +38,7 @@
         "name": "tui--本机",
         "autoExecuteCommands": true,
         "commands": [
-          "cd ~/einz && npm run tui2local"
+          "cd ~/einz && npm run tui-run"
         ]
       },
       {
