@@ -18,7 +18,7 @@ HOW TO EXPLORE THE APP (no setup needed):
    tap the link at the bottom: "Take a look around first".
 2. This opens a fully functional demo conversation generated locally on
    the device (encrypted with the same code path as real messages).
-   You can send messages, long-press a bubble to recall it, open the
+   You can send messages, long-press an undelivered bubble to recall it, open the
    menu (top-left) to see settings, entrance list, space switching, etc.
    Messages in the demo space never leave the device.
 3. To see the real creation flow, go back and tap "Create" — you can
@@ -138,33 +138,25 @@ CONTACT for review questions: einz@tic.cc
 ### 4.2 描述（Description，≤4000 字符）
 
 ```
-Einz is a secret realm for you and the people who matter — end-to-end
-encrypted, local-first, and account-free.
+Einz is the secret realm where you and your close companions chat and share in your own spaces, away from the world — end-to-end encrypted, local-first, and account-free.
 
 YOUR SECRET REALM
-Create a space and invite someone with a single link. Everything inside
-— messages, photos, videos, voice notes, and files — is encrypted on
-your device before it ever leaves it. Not even we can read it.
+Create a space from the ground up, or join one by invitation. Everything inside — messages, photos, videos, voice notes, and files — is encrypted and decrypted on your own device. Not even we can read it.
 
 NO ACCOUNTS. NO TRACE.
-There is no sign-up, no phone number, no email, no profile to find.
-Who you are is a key pair on your device. Your server only ever sees
-ciphertext.
+There is no sign-up, no phone number, no email, no profile to find. Who you are is a key pair on your device. The server only ever sees ciphertext.
 
 BUILT FOR PRIVACY, BY DESIGN
 · End-to-end encryption (XChaCha20-Poly1305) on every message and file
-· Local-first: your history lives on your device, not in our cloud
+· Local-first: your history lives on your device, not in servers or cloud
 · Burn-after-read messages that vanish on a timer
-· Recall any message — for everyone
+· Recall undelivered messages before they ever reach anyone
 · PIN lock with auto-lock timer, and a demo mode to explore first
 
 GROUPS TOO
-Create a duo space for two, or a group space for the people you choose.
-Membership is by invitation only — there is no discovery, no search,
-no feed, and no public content. Ever.
+Create a duo space for two, or a group space for your close friends. Membership is by invitation only — there is no discovery, no search, no feed, and no public content. Ever.
 
-Einz will never show you ads, never profile you, and never sell data.
-Privacy isn't a feature here. It's the architecture.
+Einz will never show you ads, never profile you, and never sell data. Privacy isn't a feature here. It's the architecture.
 ```
 
 ### 4.3 Keywords（100 字符，逗号分隔无空格）
