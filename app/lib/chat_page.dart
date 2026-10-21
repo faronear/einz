@@ -11110,10 +11110,14 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   fieldLabel: _hasPin
                       ? l10n.chatPageSetLockNewPinLabel
                       : l10n.chatPageSetLockNewPinLabelNoPin,
-                  // 点按解锁：初始只读+编辑图标（示意可略过），点击进编辑+小眼睛
-                  // （老板 2026-10-20）。首设场景本框就是第一个框，解锁后自然取焦，
-                  // 不再走 autofocus（autofocus 与只读态冲突：自动取焦也弹不了键盘）
-                  unlockable: true,
+                  // 点按解锁（初始只读+编辑图标示意可略过）仅限**更换场景**（老板
+                  // 2026-10-21：还没设 PIN 时没东西可"略过只调时长"，首设就该直接
+                  // 能输入；桌面版打开弹窗焦点落进锁屏码输入框）。更换场景走解锁：
+                  // 点框任意处 → 进编辑态 + 小眼睛；首设场景 autofocus 直接取焦，
+                  // 小眼睛用 revealable 常驻。
+                  unlockable: _hasPin,
+                  autofocus: !_hasPin, // 首设：打开弹窗即可输入（含桌面焦点直落）
+                  revealable: !_hasPin, // 首设：小眼睛常驻（更换场景的眼睛由解锁态给）
                 ),
               ],
             ),
