@@ -277,9 +277,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupCreateCopy => '复制邀请链接';
 
   @override
-  String get setupCreateCopied => '已复制';
-
-  @override
   String get setupPageInitFailed => '初始化失败，正在自动重试…';
 
   @override
@@ -551,6 +548,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageCopy => '复制';
+
+  @override
+  String chatPageCopiedText(String text) {
+    return '已复制: $text';
+  }
 
   @override
   String get chatPageEdit => '编辑';

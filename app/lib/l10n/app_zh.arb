@@ -150,7 +150,6 @@
     }
   },
   "setupCreateCopy": "复制邀请链接",
-  "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
     "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示，不展示技术细节（如 SqliteException），自动重试中"
@@ -316,6 +315,14 @@
   },
   "chatPageRenameSameAsPeerError": "不能与同伴同名，请换个名字",
   "chatPageCopy": "复制",
+  "chatPageCopiedText": "已复制: {text}",
+  "@chatPageCopiedText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageEdit": "编辑",
   "chatPageRenameFailed": "修改失败: {error}",
   "@chatPageRenameFailed": {

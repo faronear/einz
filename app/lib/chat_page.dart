@@ -6837,8 +6837,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       setState(() => _quoteTarget = m);
       _inputFocusNode.requestFocus();
     } else if (action == 'copy') {
-      await Clipboard.setData(ClipboardData(text: m.plaintext.trim()));
-      if (mounted) _notice(context, l10n.setupCreateCopied);
+      final copied = m.plaintext.trim();
+      await Clipboard.setData(ClipboardData(text: copied));
+      if (mounted) {
+        // 通知带上被拷的内容，超一行按实测截断成省略号（老板 2026-10-21）
+        _notice(context,
+            ellipsizeToNoticeLine(context, l10n.chatPageCopiedText(copied)));
+      }
     } else if (action == 'save') {
       await _saveAttachment(m);
     } else if (action == 'burn') {
@@ -9949,11 +9954,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 iconSize: 15,
                                                 label: l10n.chatPageCopy,
                                                 onTap: () async {
+                                                  final copied =
+                                                      m.plaintext.trim();
                                                   await Clipboard.setData(
-                                                      ClipboardData(text: m.plaintext.trim()));
+                                                      ClipboardData(
+                                                          text: copied));
                                                   if (!mounted) return;
+                                                  // 通知带上被拷的内容，
+                                                  // 超一行按实测截断成
+                                                  // 省略号（老板 2026-10-21）
                                                   _notice(
-                                                      this.context, l10n.setupCreateCopied);
+                                                      this.context,
+                                                      ellipsizeToNoticeLine(
+                                                          this.context,
+                                                          l10n
+                                                              .chatPageCopiedText(
+                                                                  copied)));
                                                 },
                                               ),
                                             if (m.attachment != null)

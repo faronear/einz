@@ -299,9 +299,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupCreateCopy => 'Copy invite link';
 
   @override
-  String get setupCreateCopied => 'Copied';
-
-  @override
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
@@ -583,6 +580,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageCopy => 'Copy';
+
+  @override
+  String chatPageCopiedText(String text) {
+    return 'Copied: $text';
+  }
 
   @override
   String get chatPageEdit => 'Edit';

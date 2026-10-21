@@ -164,7 +164,6 @@
     }
   },
   "setupCreateCopy": "Copy invite link",
-  "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
   "@setupPageInitFailed": {
     "description": "Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying"
@@ -330,6 +329,14 @@
   },
   "chatPageRenameSameAsPeerError": "Can't use the same name as someone else — pick another",
   "chatPageCopy": "Copy",
+  "chatPageCopiedText": "Copied: {text}",
+  "@chatPageCopiedText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageEdit": "Edit",
   "chatPageRenameFailed": "Rename failed: {error}",
   "@chatPageRenameFailed": {

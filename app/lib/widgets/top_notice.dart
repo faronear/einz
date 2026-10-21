@@ -18,6 +18,67 @@ Timer? _dismissTimer;
 /// 它**下方**（消息列表顶部，那一带没有可点对象）。
 const double kNoticeExtraTopBelowStatusBar = 46;
 
+/// 通知条正文样式（深底浅字，老板 2026-10-05 定）。[ellipsizeToNoticeLine] 的实测
+/// 截断与 [_TopNoticeBanner] 共用这一份——"量得的宽度"必须等于"画出来的宽度"。
+const TextStyle kNoticeTextStyle = TextStyle(
+  color: Color(0xFFFFF5FA),
+  fontSize: 13,
+  fontWeight: FontWeight.w500,
+  height: 1.3,
+);
+
+/// 通知条里正文可排版的宽度：屏宽扣掉各层水平占位——外层 Padding 12×2、
+/// 内层 Padding 12+14、喇叭图标 16 + 间距 8。
+///
+/// 与 [_TopNoticeBanner] 的布局一一对应，改那里的数值要同步改这里。
+double noticeTextMaxWidth(BuildContext context) =>
+    MediaQuery.sizeOf(context).width - 12 * 2 - (12 + 14) - (16 + 8);
+
+/// 把文案收进通知条的**一行**：超宽按**实测排版**截断、补省略号（老板 2026-10-21：
+/// 拷贝文字消息的通知要显示被拷的内容，"Copied: xxx" 超一行就截断成省略号）。
+///
+/// 为什么用 TextPainter 实测而不是数字数：中英文宽度差一倍多，桌面窗口又能拖到
+/// 很宽——固定字数在窄屏会换行、在宽屏又截得莫名其妙。这里二分找出最长能排进
+/// 一行的前缀，layout 的样式与宽度和 [_TopNoticeBanner] 完全一致，结果即所见。
+/// 含换行的文案同理：排不下的第一处换行处即截断（"第一行…"）。
+String ellipsizeToNoticeLine(BuildContext context, String text) {
+  if (text.isEmpty) return text;
+  final maxWidth = noticeTextMaxWidth(context);
+  final style = (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+      .merge(kNoticeTextStyle);
+  final painter = TextPainter(
+    maxLines: 1,
+    textDirection: Directionality.of(context),
+  );
+  bool fits(String candidate) {
+    painter.text = TextSpan(text: candidate, style: style);
+    painter.layout(maxWidth: maxWidth);
+    return !painter.didExceedMaxLines;
+  }
+
+  try {
+    if (fits(text)) return text;
+    var low = 0;
+    var high = text.length - 1;
+    while (low < high) {
+      final mid = (low + high + 1) ~/ 2;
+      if (fits(text.substring(0, mid))) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    var kept = text.substring(0, low);
+    // 补上省略号可能又把这一行顶爆，继续收
+    while (kept.isNotEmpty && !fits('$kept…')) {
+      kept = kept.substring(0, kept.length - 1);
+    }
+    return '$kept…';
+  } finally {
+    painter.dispose();
+  }
+}
+
 /// 顶部通知（替代底部 SnackBar——不遮挡输入框等底部功能按钮）。
 ///
 /// 用法：`showTopNotice(context, '文案')`。如需在 async 间隙 / 路由 pop 之后
@@ -202,12 +263,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           // 浅字（深底上可读；不加粗、无任何装饰）
-                          style: const TextStyle(
-                            color: Color(0xFFFFF5FA),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                          ),
+                          style: kNoticeTextStyle,
                         ),
                       ),
                     ],

@@ -584,12 +584,6 @@ abstract class AppLocalizations {
   /// **'Copy invite link'**
   String get setupCreateCopy;
 
-  /// No description provided for @setupCreateCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Copied'**
-  String get setupCreateCopied;
-
   /// Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying
   ///
   /// In en, this message translates to:
@@ -1081,6 +1075,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy'**
   String get chatPageCopy;
+
+  /// No description provided for @chatPageCopiedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied: {text}'**
+  String chatPageCopiedText(String text);
 
   /// No description provided for @chatPageEdit.
   ///
