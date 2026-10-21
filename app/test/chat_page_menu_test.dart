@@ -422,9 +422,12 @@ void main() {
     expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget);
 
     // 输入有效 PIN——限定在弹窗内查找，避免匹配聊天页消息输入框
-    // （确认框已删（老板 2026-10-20）：弹窗只有一框：新 PIN）
+    // （确认框已删（老板 2026-10-20）：弹窗只有一框：新 PIN；新 PIN 框初始
+    // 只读+编辑图标（示意可略过），enterText 前要先点一下解锁）
     final pinFields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.tap(pinFields.at(0));
+    await tester.pumpAndSettle();
     await tester.enterText(pinFields.at(0), '123456');
     // 点"提交"→ 直接设置（不再有二次确认弹窗——老板 2026-09-14 删除）
     await tester.tap(find.text('启用'));
@@ -520,6 +523,9 @@ void main() {
     expect(await AppLockService(db).isSetup, false);
 
     // ② 只填 3 位（太短）→ 红字"PIN 至少 6 位数字"，不动锁
+    //    （① 是留空提交没点过框，这里先点一下解锁只读态再填）
+    await tester.tap(fields.at(0));
+    await tester.pumpAndSettle();
     await tester.enterText(fields.at(0), '123');
     await tester.tap(find.text('启用'));
     await tester.pumpAndSettle();
@@ -569,6 +575,9 @@ void main() {
 
     // 1) 旧码留空 + 新码非空 → 红字要求先输入旧码，不动锁
     // （2026-10-18 方案二：新码非空才算"改码"；新码空提交=不改 PIN，见用例 4）
+    // 新 PIN 框初始只读（点按解锁交互，老板 2026-10-20）：填前先点一下解锁
+    await tester.tap(fields.at(1));
+    await tester.pumpAndSettle();
     await tester.enterText(fields.at(1), '654321');
     await tester.tap(find.text(_zh.chatPageSetLockSubmitChange));
     await tester.pumpAndSettle();
@@ -651,8 +660,17 @@ void main() {
     expect(find.text(_zh.chatPageSetLockTabChange), findsOneWidget);
     await tester.tap(find.text(_zh.chatPageSetLockClearButton));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageSetLockRowVerify), findsOneWidget,
-        reason: '清除页旧码框是「验证」标签行');
+    // 标签带必填星号后是 Text.rich（纯文本为「验证 *」），find.text 精确匹配
+    // 找不到——用谓词匹配「以『验证』开头的富文本」
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is Text &&
+            w.data == null &&
+            w.textSpan != null &&
+            w.textSpan!.toPlainText()
+                .startsWith(_zh.chatPageSetLockRowVerify)),
+        findsOneWidget,
+        reason: '清除页旧码框是「验证」标签行（带必填星号）');
     await tester.enterText(fields.at(0), '123456');
     await tester.tap(find.text(_zh.chatPageLockClearConfirm));
     await tester.pumpAndSettle();

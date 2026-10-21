@@ -56,6 +56,7 @@ import 'data/vault_session.dart';
 import 'widgets/emoji_panel.dart';
 import 'widgets/immersive_fullscreen.dart';
 import 'widgets/passphrase_field.dart';
+import 'widgets/editable_field.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/labeled_checkbox.dart';
 import 'widgets/top_notice.dart';
@@ -10427,6 +10428,17 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   // 却多占一行高度（正是键盘遮挡痛点的最大单项）。输错 PIN 的恢复出路 =
   // 重装 app（Space Key 在服务器密保箱，口令可回）。
   String? _error;
+  // 新 PIN 框「点按解锁」交互（老板 2026-10-20）：初始只读 + 右侧编辑图标
+  // （示意"这框可以不填"——只调时长时略过），点框内任意位置 → 进编辑态、
+  // 尾标换成小眼睛。状态机在 EditableField（与改名弹窗同款交互），这里只补
+  // 焦点节点（解锁时手动取焦弹键盘）与眼睛的明暗态（3 秒自动回暗码）。
+  final _newPinFocus = FocusNode();
+  bool _newPinRevealed = false;
+  Timer? _newPinRevealTimer;
+  // 眼睛的焦点节点：skipTraversal → 桌面 TAB 跳过（与 PassphraseField 同款）；
+  // State 持有而非 build 里现建，避免每次重建泄漏
+  late final _newPinRevealFocus = FocusNode(
+      skipTraversal: true, debugLabel: 'set-lock-pin-reveal');
   // 已设锁屏码 → 出「当前锁屏码」验证框（老板 2026-09-14）
   bool get _hasPin => widget.hasPin;
   bool _busy = false; // 当前锁屏码校验中（Argon2id）：防连点重复提交
@@ -10501,6 +10513,9 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   void dispose() {
     _oldCtrl.dispose();
     _pinCtrl.dispose();
+    _newPinFocus.dispose();
+    _newPinRevealFocus.dispose();
+    _newPinRevealTimer?.cancel();
     super.dispose();
   }
 
@@ -10810,12 +10825,19 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   /// 占满剩余宽度。obscure + 纯数字是锁屏码输入框的共性，抽在这里少写三遍。
   /// [revealable]：true 时输入框右侧带小眼睛（老板 2026-10-19：老 PIN 与
   /// 第一个新 PIN），点按切换明文/暗码。
+  /// [requiredMark]：true 时标签尾带红色 *（老板 2026-10-20：表单惯例——
+  /// 标必填项，「验证」行标了它，其余行一眼可知是选填）。
+  /// [unlockable]：true 时走「点按解锁」模式（老板 2026-10-20，仅新 PIN 行）：
+  /// 初始只读 + 右侧编辑图标（示意"可略过"），点框内任意位置进编辑态、尾标
+  /// 换小眼睛。状态机在公用组件 EditableField（与改名弹窗同款交互）。
   Widget _setLockPinRow({
     required String label,
     required TextEditingController controller,
     required String fieldLabel,
     bool autofocus = false,
     bool revealable = false,
+    bool requiredMark = false,
+    bool unlockable = false,
   }) {
     final colors = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -10824,29 +10846,72 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       children: [
         SizedBox(
           width: 56, // 标签列：en 最长的 "Confirm"（13px w600）放得下
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: colors.onSurface,
+          child: Text.rich(
+            TextSpan(
+              text: label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
+              ),
+              // 必填星号：紧跟标签、红色、稍大——不占新行，两语言下都不挤
+              children: [
+                if (requiredMark)
+                  const TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: Colors.red, fontSize: 14),
+                  ),
+              ],
             ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          // 小眼睛统一走共用组件 PassphraseField（老板 2026-10-19：与修改口令
-          // 弹窗同款行为——3 秒后自动变回暗码 + tooltip + TAB 跳过眼睛；确认框
-          // 按组件惯例不给眼睛）。纯数字键盘 + digitsOnly 由调用参数传入。
-          child: PassphraseField(
-            controller: controller,
-            labelText: fieldLabel,
-            autofocus: autofocus,
-            showReveal: revealable,
-            revealTip: l10n.chatPagePassphraseRevealTip,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          ),
+          child: unlockable
+              // 点按解锁模式（新 PIN 行）：EditableField 管只读→编辑状态机，
+              // 小眼睛作为编辑态尾标注入（明暗态在本 State，3 秒自动回暗码——
+              // 与 PassphraseField 的眼睛同行为）。
+              ? EditableField(
+                  controller: controller,
+                  labelText: fieldLabel,
+                  focusNode: _newPinFocus,
+                  readOnly: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  obscureText: !_newPinRevealed,
+                  editIconTooltip: l10n.chatPageEdit,
+                  editableSuffix: IconButton(
+                    focusNode: _newPinRevealFocus, // TAB 跳过（State 持有，见上）
+                    icon: Icon(_newPinRevealed
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                    tooltip: l10n.chatPagePassphraseRevealTip,
+                    onPressed: () {
+                      setState(() => _newPinRevealed = !_newPinRevealed);
+                      _newPinRevealTimer?.cancel();
+                      if (_newPinRevealed) {
+                        // 明文只停留 3 秒（与 PassphraseField 同策略）
+                        _newPinRevealTimer = Timer(
+                            const Duration(seconds: 3),
+                            () => mounted
+                                ? setState(() => _newPinRevealed = false)
+                                : null);
+                      }
+                    },
+                  ),
+                )
+              // 常规模式：小眼睛统一走共用组件 PassphraseField（老板 2026-10-19：
+              // 与修改口令弹窗同款行为——3 秒后自动变回暗码 + tooltip + TAB 跳过
+              // 眼睛）。纯数字键盘 + digitsOnly 由调用参数传入。
+              : PassphraseField(
+                  controller: controller,
+                  labelText: fieldLabel,
+                  autofocus: autofocus,
+                  showReveal: revealable,
+                  revealTip: l10n.chatPagePassphraseRevealTip,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
         ),
       ],
     );
@@ -10999,6 +11064,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   fieldLabel: l10n.chatPageSetLockOldLabel,
                   autofocus: true, // 本页唯一输入框
                   revealable: true, // 小眼睛（老板 2026-10-19）
+                  requiredMark: true, // 必填星号（老板 2026-10-20）
                 ),
               ],
             ),
@@ -11026,6 +11092,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                     fieldLabel: l10n.chatPageSetLockOldLabel,
                     autofocus: true, // 已设锁屏码时这是第一个框
                     revealable: true, // 小眼睛（老板 2026-10-19）
+                    requiredMark: true, // 必填星号（老板 2026-10-20）
                   ),
                 ],
               ),
@@ -11043,8 +11110,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                   fieldLabel: _hasPin
                       ? l10n.chatPageSetLockNewPinLabel
                       : l10n.chatPageSetLockNewPinLabelNoPin,
-                  autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
-                  revealable: true, // 小眼睛（老板 2026-10-19）
+                  // 点按解锁：初始只读+编辑图标（示意可略过），点击进编辑+小眼睛
+                  // （老板 2026-10-20）。首设场景本框就是第一个框，解锁后自然取焦，
+                  // 不再走 autofocus（autofocus 与只读态冲突：自动取焦也弹不了键盘）
+                  unlockable: true,
                 ),
               ],
             ),

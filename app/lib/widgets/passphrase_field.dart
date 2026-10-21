@@ -3,12 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'editable_field.dart';
+
 /// 口令输入框：默认暗码，右侧眼睛点一下看明文、**3 秒后自动回到暗码**。
 ///
 /// 为什么抽成共用组件（2026-09-15）：ChatPage 的"改口令"弹窗与 SetupPage 的
 /// "设置/验证共享口令"步骤都要这个行为——两份实现必然漂移（此前只有弹窗有眼睛，
 /// 向导里没有）。眼睛的显隐规则由调用方决定（`showReveal`）：
 /// **确认输入框不给眼睛**——确认框的用途是复核，给"看一眼"反而容易顺手点开。
+///
+/// 2026-10-20 重构：框体（边框/label/焦点/键盘等）下沉到基础组件
+/// [EditableField]（「点按解锁编辑」状态机也在那里），本组件只保留**小眼睛**
+/// 这一个特性——眼睛作为 `editableSuffix` 注入，两特性不再互相纠缠。
 class PassphraseField extends StatefulWidget {
   const PassphraseField({
     super.key,
@@ -87,28 +93,30 @@ class _PassphraseFieldState extends State<PassphraseField> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return EditableField(
       controller: widget.controller,
-      style: widget.style,
-      obscureText: !_revealed,
-      onChanged: widget.onChanged,
-      autofocus: widget.autofocus,
+      labelText: widget.labelText,
+      hintText: widget.hintText,
       focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       keyboardType: widget.keyboardType,
       inputFormatters: widget.inputFormatters,
-      decoration: InputDecoration(
-        labelText: widget.labelText,
-        hintText: widget.hintText,
-        border: const OutlineInputBorder(),
-        suffixIcon: widget.showReveal
-            ? IconButton(
-                focusNode: _revealFocusNode, // TAB 跳过（见字段注释）
-                icon: Icon(_revealed ? Icons.visibility : Icons.visibility_off),
-                tooltip: widget.revealTip,
-                onPressed: _toggle,
-              )
-            : null,
-      ),
+      obscureText: !_revealed, // 恒暗码框架；明文态由眼睛的 _revealed 接管
+      style: widget.style,
+      onChanged: widget.onChanged,
+      // 白底观感与旧版保持一致（旧 PassphraseField 是普通 TextField，无
+      // "编辑态白底"切换）；只读/编辑状态机按需由上层另用 EditableField。
+      filled: false,
+      // 眼睛在**编辑与暗码两个维度都成立**：EditableField 的 suffix 随编辑态
+      // 恒展示（本组件不开只读态，所以等于常驻）；明/暗由 _revealed 决定。
+      editableSuffix: widget.showReveal
+          ? IconButton(
+              focusNode: _revealFocusNode, // TAB 跳过（见字段注释）
+              icon: Icon(_revealed ? Icons.visibility : Icons.visibility_off),
+              tooltip: widget.revealTip,
+              onPressed: _toggle,
+            )
+          : null,
     );
   }
 }
