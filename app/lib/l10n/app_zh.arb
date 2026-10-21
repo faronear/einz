@@ -108,13 +108,13 @@
     }
   },
   "setupEntryTitle": "秘境向导",
-  "setupEntryHint": "秘境是你和亲密伙伴的私密聊天与共享空间，可以从头创建，或者受邀加入。",
+  "setupEntryHint": "秘境是你与亲密伙伴的秘密聊天和分享空间。你可以从零创建，或受邀加入。",
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",
   "setupEntryDemo": "先看看演示",
   "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
-  "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）。请更新 App 后重试",
-  "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试（这不是通道码本身的问题）",
+  "setupTokenAppTooOld": "本机 App 版本过旧，已无法使用（{code}）。请更新 App 后重试",
+  "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试",
   "@setupTokenRateLimited": {
     "placeholders": {
       "seconds": {
@@ -728,7 +728,7 @@
   },
   "chatPageMenuAbout": "关于秘境",
   "aboutPageTitle": "关于秘境",
-  "aboutIntro": "秘境是你和亲密伙伴的私密聊天与共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。",
+  "aboutIntro": "秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上，不允许任何第三方（包括秘境自身）偷看内容，全力守护你的隐私。",
   "aboutVersionLabel": "版本号",
   "aboutDownloadLabel": "下载",
   "aboutServerLabel": "服务器地址",

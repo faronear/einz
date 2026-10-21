@@ -216,7 +216,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryTitle => '秘境向导';
 
   @override
-  String get setupEntryHint => '秘境是你和亲密伙伴的私密聊天与共享空间，可以从头创建，或者受邀加入。';
+  String get setupEntryHint => '秘境是你与亲密伙伴的秘密聊天和分享空间。你可以从零创建，或受邀加入。';
 
   @override
   String get setupEntryCreate => '创建秘境';
@@ -232,12 +232,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenAppTooOld(String code) {
-    return '本机 App 版本过旧，与服务器对不上（$code）。请更新 App 后重试';
+    return '本机 App 版本过旧，已无法使用（$code）。请更新 App 后重试';
   }
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return '请求太频繁：请 $seconds 秒后再试（这不是通道码本身的问题）';
+    return '请求太频繁：请 $seconds 秒后再试';
   }
 
   @override
@@ -1180,7 +1180,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      '秘境是你和亲密伙伴的私密聊天与共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。';
+      '秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上，不允许任何第三方（包括秘境自身）偷看内容，全力守护你的隐私。';
 
   @override
   String get aboutVersionLabel => '版本号';
