@@ -207,7 +207,7 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after inactivity for a while, you must unlock to enter the space again.",
+  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after keeping inactive for a while, then you must unlock to enter your space again.",
   "chatPageSetLockRowVerify": "Verify",
   "chatPageSetLockRowSet": "Set",
   "chatPageSetLockNewPinLabel": "New PIN or leave blank",

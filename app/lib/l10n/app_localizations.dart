@@ -725,7 +725,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockHintNoPin.
   ///
   /// In en, this message translates to:
-  /// **'Once set, Einz will lock itself everytime after inactivity for a while, you must unlock to enter the space again.'**
+  /// **'Once set, Einz will lock itself everytime after keeping inactive for a while, then you must unlock to enter your space again.'**
   String get chatPageSetLockHintNoPin;
 
   /// No description provided for @chatPageSetLockRowVerify.

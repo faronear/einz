@@ -353,7 +353,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockHintNoPin => '设置后，每次离开一定时间后就自动锁屏，必须解锁才能进入秘境。';
+  String get chatPageSetLockHintNoPin => '设置后，每次离开一定时间后就自动锁屏，然后必须解锁才能进入秘境。';
 
   @override
   String get chatPageSetLockRowVerify => '验证';

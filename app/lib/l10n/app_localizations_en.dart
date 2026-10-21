@@ -381,7 +381,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockHintNoPin =>
-      'Once set, Einz will lock itself everytime after inactivity for a while, you must unlock to enter the space again.';
+      'Once set, Einz will lock itself everytime after keeping inactive for a while, then you must unlock to enter your space again.';
 
   @override
   String get chatPageSetLockRowVerify => 'Verify';

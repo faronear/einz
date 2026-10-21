@@ -193,7 +193,7 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后就自动锁屏，必须解锁才能进入秘境。",
+  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后就自动锁屏，然后必须解锁才能进入秘境。",
   "chatPageSetLockRowVerify": "验证",
   "chatPageSetLockRowSet": "设置",
   "chatPageSetLockNewPinLabel": "新 PIN 或者留空不填",
