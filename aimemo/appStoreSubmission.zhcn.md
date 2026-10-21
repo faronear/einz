@@ -9,9 +9,10 @@
 > 说明：审核员读英文，Notes 用英文写；要点顺序按审核员关注度排（怎么进主功能 → 为什么没账号 → 隐私主张 → 联系方式）。
 
 ```
-Einz is a private, end-to-end-encrypted messaging app for small invited
-groups (usually two people). There is intentionally NO account or
-sign-up flow: access is by device key pairs and invitation links only.
+Einz is a privacy-first, end-to-end-encrypted messaging app for two
+people (usually a couple), or a small invited group of close friends.
+There is intentionally NO account or sign-up flow: access is by device
+key pairs and invitation links only.
 
 HOW TO EXPLORE THE APP (no setup needed):
 1. Launch the app. On the wizard entry screen ("Create" / "Join" cards),
@@ -19,7 +20,7 @@ HOW TO EXPLORE THE APP (no setup needed):
 2. This opens a fully functional demo conversation generated locally on
    the device (encrypted with the same code path as real messages).
    You can send messages, long-press a bubble to recall it, open the
-   menu (top-left) to see settings, entrance list, space switching, etc.
+   main menu (top-right) to see settings, entrance list, space switching, etc.
    Messages in the demo space never leave the device.
 3. To see the real creation flow, go back and tap "Create" — you can
    create a real space and chat; messages sync end-to-end-encrypted via
