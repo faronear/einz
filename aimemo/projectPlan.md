@@ -82,6 +82,12 @@
   断言炸 + `db.close()` 吊死 10 分钟——修法：两个连接路径 executor 外包
   `DatabaseConnection(closeStreamsSynchronously: true)`；② 新表曾塞进 `from < 10` 块，
   v10 已随 main 发布导致存量库永远补不到该表 → schemaVersion 10→11 独立迁移块。
+  **2026-10-22 再修三笔**（33e9976b，老板 MacBook 实测问题）：① 录音全静音根因=
+  `DebugProfile.entitlements` 缺 `com.apple.security.device.audio-input`（Release 已有、
+  Debug 漏——TCC 静默拒绝，同 09-26 FilePicker 款 Debug/Release 差异）；② "转写失败"
+  根因=转写 isolate 缺 `sherpa.initBindings()`（包要求每 isolate 各自初始化，缺了建
+  recognizer 即抛，重试耗尽落 failed）；③ 转写触发+气泡转写行扩展到 **wav 音频文件**
+  （非 wav 不入队不占位）。测试素材：say TTS 生成 16kHz wav 于老板桌面。
   **遗留 Phase 0 验证**：真机 A/B（SenseVoice vs Paraformer + wav 音质）、iOS/Android
   原生构建跑一遍（sherpa_onnx 重 FFI，唯一可能翻车点）。
 - `[x]` **3 个 pty E2E 测试 rot 修复**（2026-10-09 完成）：根因=e2421d6 新增「秘境类型」
