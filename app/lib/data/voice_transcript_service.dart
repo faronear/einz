@@ -117,6 +117,11 @@ class VoiceTranscriptService {
     required String path,
     required String modelDir,
   }) {
+    // 包要求**每个**用到 sherpa 的 isolate 先 initBindings 一次：缺了绑定表
+    // 全是 null → 建 recognizer 即抛 "Please initialize sherpa-onnx first"
+    // → 重试耗尽落 failed（老板 2026-10-22 实测"转写失败"的根因之一）。
+    // macOS/iOS 走 DynamicLibrary.process()（pod 链入进程即可解析）。
+    sherpa.initBindings();
     final rec = sherpa.OfflineRecognizer(sherpa.OfflineRecognizerConfig(
       model: sherpa.OfflineModelConfig(
         senseVoice: sherpa.OfflineSenseVoiceModelConfig(

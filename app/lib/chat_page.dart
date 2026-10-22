@@ -8652,12 +8652,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _enqueueVoiceTranscripts(msgs);
   }
 
-  /// 语音消息转写入队（§9）：明文音频走解密缓存的确定性路径（stored 模式
+  /// 语音/音频消息转写入队（§9）：明文音频走解密缓存的确定性路径（stored 模式
   /// 长期目录 / 否则临时缓存），密文 sha256 取附件元数据（音频变化 → stale）。
   /// 服务未就绪（如桌面未配模型）时 lazy 构造，行会落 `unavailable` 供手动入口。
   void _enqueueVoiceTranscripts(List<HistoryMessage> msgs) {
     final voices = msgs
-        .where((m) => !m.deleted && m.env.type == 'voice' && m.attachment != null)
+        .where((m) =>
+            !m.deleted &&
+            m.attachment != null &&
+            // 语音消息全部入队（旧 m4a 由 UI 明确提示"不支持转写"）；音频文件
+            // 只在容器本身是 wav 时入队——sherpa readWave 只吃 PCM wav，
+            // mp3/m4a 音乐文件入队只会产出 failed 行（纯噪音）
+            (m.env.type == 'voice' ||
+                (m.env.type == 'audio' &&
+                    _extOf(m.plaintext).toLowerCase() == 'wav')))
         .toList();
     if (voices.isEmpty) return;
     unawaited(() async {
@@ -9091,36 +9099,45 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 下行文件名。**文件名与波形左对齐**靠这个"左列/右列"结构天然保证，不用
       // 量播放键宽度再去凑缩进（之前那版第二行贴着气泡左边缘，跟播放键不齐）。
       // 乐符图标已按老板要求删掉：文件名本身就是"这是一首歌"的最好说明。
-      body = Row(
+      // wav 音频文件也挂转写行（老板 2026-10-22 测试路径：TTS 生成的 wav 以
+      // 音频文件发送验证转写；非 wav 无行不占位）。
+      body = Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          playButton,
-          // Flexible 包住右列：它是这个 Row 里唯一的 flex 子项 → 拿到**有界**宽度
-          // （父给的上限减去播放键），里面那行文件名才会按 ellipsis 截断。
-          // 少了这一层，右列变成非 flex 子项、宽度**无界**，长歌名直接撑破气泡
-          // （老板 2026-09-27 实测四处都破）。
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                waveformRow,
-                // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
-                Row(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              playButton,
+              // Flexible 包住右列：它是这个 Row 里唯一的 flex 子项 → 拿到**有界**宽度
+              // （父给的上限减去播放键），里面那行文件名才会按 ellipsis 截断。
+              // 少了这一层，右列变成非 flex 子项、宽度**无界**，长歌名直接撑破气泡
+              // （老板 2026-09-27 实测四处都破）。
+              Flexible(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    waveformRow,
+                    // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+          _buildVoiceTranscriptLine(m, foreground),
         ],
       );
     }

@@ -21,6 +21,13 @@
 	     platformexception entitlement_required_write）。 -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- 麦克风（语音消息/语音通话）。沙盒 + debug 构建同样需要显式声明：
+	     缺了 TCC 静默拒绝 → 录音全是静音（老板 2026-10-22 实测：npm run
+	     app-mac-run 录不到声音，语音备忘录正常——与 2026-09-26 FilePicker
+	     漏 user-selected 同款 Debug/Release 差异）。与 Info.plist 的
+	     NSMicrophoneUsageDescription 缺一不可。 -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)cc.tic.einz</string>
