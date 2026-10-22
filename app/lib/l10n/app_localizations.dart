@@ -2000,6 +2000,72 @@ abstract class AppLocalizations {
   /// **'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can'**
   String get voiceTranscriptLegacyAudio;
 
+  /// No description provided for @chatPageMenuVoiceTranscriptAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice transcription'**
+  String get chatPageMenuVoiceTranscriptAuth;
+
+  /// No description provided for @voiceTranscriptAuthNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how voice messages are transcribed on this device.'**
+  String get voiceTranscriptAuthNote;
+
+  /// No description provided for @voiceTranscriptAuthLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device'**
+  String get voiceTranscriptAuthLocal;
+
+  /// No description provided for @voiceTranscriptAuthLocalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Run the model locally. No network, the server never sees audio (requires a ~230MB model download).'**
+  String get voiceTranscriptAuthLocalDesc;
+
+  /// No description provided for @voiceTranscriptAuthServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get voiceTranscriptAuthServer;
+
+  /// No description provided for @voiceTranscriptAuthServerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The decrypted audio is sent to our server, transcribed by Whisper, and deleted immediately. The server briefly processes this recording.'**
+  String get voiceTranscriptAuthServerDesc;
+
+  /// No description provided for @voiceTranscriptAuthAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask per message'**
+  String get voiceTranscriptAuthAsk;
+
+  /// No description provided for @voiceTranscriptAuthAskDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask before each transcription (server path, or local if the model is ready).'**
+  String get voiceTranscriptAuthAskDesc;
+
+  /// No description provided for @voiceTranscriptAskTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe on server?'**
+  String get voiceTranscriptAskTitle;
+
+  /// No description provided for @voiceTranscriptAskBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The decrypted audio of this message will be sent to the server, transcribed by Whisper, and deleted immediately.'**
+  String get voiceTranscriptAskBody;
+
+  /// No description provided for @voiceTranscriptServerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Server transcription failed: {error}'**
+  String voiceTranscriptServerFailed(String error);
+
   /// No description provided for @voiceTranscriptPreparing.
   ///
   /// In en, this message translates to:

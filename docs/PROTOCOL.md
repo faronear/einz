@@ -85,6 +85,7 @@
 | GET | /sync?after=<seq>&limit=<n> | 增量拉取（§5） | Bearer |
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |
+| POST | /transcriptions | 服务端转写语音（方案 D'，§6.3；即转即删） | Bearer |
 | GET | /entrances | 通道列表 | Bearer |
 | POST | /entrances/:id/revoke | 撤销**别人**的通道（§7.2，需共享口令） | Bearer |
 | POST | /entrances/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
@@ -305,6 +306,35 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 - 鉴权 + 白名单校验后返回加密 blob（二进制流）。
 - 客户端解密后缓存于 App 私有目录（E2EE.md §6）。
+
+### 6.3 服务端转写 POST /transcriptions（方案 D'，2026-10-22）
+
+自建 whisper.cpp 的按需转写（设计：`aimemo/voiceTranscript.zhcn.md` §15.2；部署：`aimemo/whisperDeploy.zhcn.md`）。**请求**：
+
+- Header：`Authorization: Bearer <session>`；`X-Audio-Language: zh`（可选，ISO 639 小写 2-3 位，缺省 `zh`）
+- Body：**16kHz / 16bit / 单声道 PCM wav** 原文（客户端本地解密后的录音），上限 `EINZ_TRANSCRIBE_MAX_BYTES`（默认 10 MiB ≈ 5 分钟）
+
+**响应** `200`：
+
+```json
+{ "text": "转写文本", "audio_ms": 12345 }
+```
+
+**隐私承诺（实现与运维必须共同守住）**：
+
+1. 音频明文**全程只在内存**——经 stdin 管道喂给 whisper-cli 子进程，不写临时文件、不落盘；
+2. 转写文本不进任何服务端存储与日志；事件日志只记 entrance / 耗时 / 字符数；
+3. **即转即删**：子进程退出音频即消失，服务端不存在「转写历史」；
+4. 隐私边界：暴露面 = 运营者本人（与「服务端可见元数据」同级），不引入第三方。
+
+**启用条件**：服务端配置了 `EINZ_WHISPER_BIN` + `EINZ_WHISPER_MODEL` 才可用；
+`GET /health` 的响应在已启用时带 `transcribe: true`，客户端据此显示/隐藏入口。
+未启用时请求返回 `503 TRANSCRIBE_DISABLED`。
+
+**错误**：`INVALID_REQUEST`（非 wav/非 PCM/超限）、`TRANSCRIBE_DISABLED`（503，未配置）、
+`TRANSCRIBE_FAILED`（503，引擎退出非零）、`TRANSCRIBE_TIMEOUT`（504，推理超 2 分钟）。
+
+**限流**：每 IP 每小时 10 次（`EINZ_RATELIMIT_TRANSCRIBE` 可调）——转写是 CPU 重操作，全站最严桶。
 
 ## 7. 通道与推送
 
@@ -596,6 +626,9 @@ S→C 时服务端**统一补** `from_entrance_id`（帧的发起方通道），
 | NOT_FOUND | 404 | 资源不存在 |
 | CONFLICT | 409 | 重复 / 状态冲突 |
 | RATE_LIMITED | 429 | 触发限流 |
+| TRANSCRIBE_DISABLED | 503 | 服务端转写未配置启用（方案 D'） |
+| TRANSCRIBE_FAILED | 503 | 转写引擎退出非零（stderr 首行截断后透出，不含音频内容） |
+| TRANSCRIBE_TIMEOUT | 504 | 推理超时（2 分钟） |
 | INTERNAL | 500 | 内部错误（不暴露细节） |
 
 - 内部细节（SQL、路径、堆栈）只进受保护 Server 日志，禁止返回给客户端。

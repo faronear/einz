@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+// drift 的 Value 包装（服务端转写写 local_voice_transcripts 行用）：
+// show 导入避免与页面里其他同名符号冲突
+import 'package:drift/drift.dart' show Value;
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
@@ -29,6 +33,7 @@ import 'widgets/burn_duration_sheet.dart';
 import 'widgets/version_gate.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/tombstone_settings.dart';
+import 'data/voice_transcript_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
@@ -443,6 +448,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 墓碑消息显示模式（'keep'=保留消息状态 / 'hide'=彻底隐藏；默认 keep）。
   /// 只影响消息流里墓碑（已删除/已焚毁）的呈现，数据行为不变。
   String _tombstoneDisplay = 'keep';
+  /// 语音转写授权模式（'local'=本地模型 / 'server'=服务端转写 / 'ask'=每条询问；
+  /// 默认 local）。方案 D'（voiceTranscript.zhcn.md §15.1 ③），更多设置里可改。
+  String _voiceTranscriptAuth = 'local';
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
@@ -984,6 +992,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _input.addListener(_onInputInteraction);
     _loadBurnLabel();
     _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
+    _loadVoiceTranscriptAuth(); // 语音转写授权模式（方案 D'，更多设置里可改）
     _refreshPinStatus();
     _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 30s；两个计时器共用）
     // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
@@ -1540,6 +1549,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _tombstoneDisplay = mode);
   }
 
+  /// 加载语音转写授权模式（方案 D'，每设备、每空间独立）。
+  Future<void> _loadVoiceTranscriptAuth() async {
+    final s = VoiceTranscriptSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
+    final mode = await s.load();
+    if (mounted) setState(() => _voiceTranscriptAuth = mode);
+  }
+
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
   Future<void> _showLocalePicker() async {
     final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
@@ -1763,6 +1779,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 onTap: () => Navigator.of(ctx).pop('tombstone'),
               ),
+              ListTile(
+                leading: const Icon(Icons.graphic_eq),
+                title: Text(l10n.chatPageMenuVoiceTranscriptAuth),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_voiceTranscriptAuthLabel(l10n), style: valueStyle),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
+                onTap: () => Navigator.of(ctx).pop('voiceTranscriptAuth'),
+              ),
               // 底部留白（同「高级安全」弹层：末行不贴屏幕底边）
               const SizedBox(height: 16),
             ],
@@ -1778,7 +1807,61 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _showAttachmentStoragePicker();
     } else if (picked == 'tombstone') {
       await _showTombstonePicker();
+    } else if (picked == 'voiceTranscriptAuth') {
+      await _showVoiceTranscriptAuthPicker();
     }
+  }
+
+  /// 语音转写授权模式当前值的展示文案（与选择器选项同名）。
+  String _voiceTranscriptAuthLabel(AppLocalizations l10n) =>
+      switch (_voiceTranscriptAuth) {
+        'server' => l10n.voiceTranscriptAuthServer,
+        'ask' => l10n.voiceTranscriptAuthAsk,
+        _ => l10n.voiceTranscriptAuthLocal,
+      };
+
+  /// 语音转写授权模式（方案 D'，§15.1 ③）：三选一 + 提交（与附件存储/墓碑同构）。
+  /// 本设备设置，每台设备各选各的；「应用于本机所有秘境」勾选框同款。
+  Future<void> _showVoiceTranscriptAuthPicker() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showOptionPickerSheet<void>(
+      context: context,
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageMenuVoiceTranscriptAuth,
+        note: l10n.voiceTranscriptAuthNote,
+        selected: _voiceTranscriptAuth,
+        submitLabel: l10n.chatPageTombstoneSubmit,
+        scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
+        options: [
+          OptionPickerItem(
+            value: 'local',
+            label: l10n.voiceTranscriptAuthLocal,
+            description: l10n.voiceTranscriptAuthLocalDesc,
+          ),
+          OptionPickerItem(
+            value: 'server',
+            label: l10n.voiceTranscriptAuthServer,
+            description: l10n.voiceTranscriptAuthServerDesc,
+          ),
+          OptionPickerItem(
+            value: 'ask',
+            label: l10n.voiceTranscriptAuthAsk,
+            description: l10n.voiceTranscriptAuthAskDesc,
+          ),
+        ],
+        onApply: (mode, {bool scopeAll = false}) async {
+          final settings = VoiceTranscriptSettings(
+              widget.db ?? LocalDatabase.shared,
+              spaceId: widget.spaceId);
+          if (scopeAll) {
+            await settings.saveAll(mode);
+          } else {
+            await settings.save(mode);
+          }
+          if (mounted) setState(() => _voiceTranscriptAuth = mode);
+        },
+      ),
+    );
   }
 
   /// 墓碑消息显示模式当前值的展示文案（与选择器选项同名）。
@@ -9191,16 +9274,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return ok ?? false;
   }
 
-  /// 手动/重转入口（§10）：旧 m4a 明确提示不支持转写（别"点了没反应"）；
-  /// 模型未就绪先准备（进度对话框可取消，§11 模型随包分发）；就绪后清旧行
-  /// 重新入队。失败静默——转写是纯增强功能，行留在原状态下次还能点。
+  /// 手动/重转入口（§10）：按授权模式分流（方案 D'，§15.1 ③）——
+  /// local = 本地模型（原路径）；server/ask = 服务端转写（ask 先弹授权确认）。
+  /// 旧 m4a 明确提示不支持转写（别"点了没反应"）；失败静默——转写是纯增强
+  /// 功能，行留在原状态下次还能点。
   Future<void> _retryVoiceTranscript(HistoryMessage m) async {
     if (m.attachment == null) return;
-    // 旧格式（m4a）：sherpa readWave 只吃 PCM wav——直接说明，不打哑炮
+    // 旧格式（m4a）：本地 sherpa 与服务端 whisper 都按 wav 口径——直接说明，不打哑炮
     if (_voiceExtOf(m) != 'wav') {
       if (!mounted) return;
       _notice(context,
           AppLocalizations.of(context)!.voiceTranscriptLegacyAudio);
+      return;
+    }
+    final l10n = AppLocalizations.of(context)!;
+    final mode = _voiceTranscriptAuth;
+    if (mode == 'server' || mode == 'ask') {
+      // ask：每条先弹授权确认（老板定：不能无条件把录音送服务器）
+      if (mode == 'ask') {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.voiceTranscriptAskTitle),
+            content: Text(l10n.voiceTranscriptAskBody),
+            actions: [
+              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(l10n.confirm),
+              ),
+            ],
+          ),
+        );
+        if (ok != true || !mounted) return;
+      }
+      await _serverVoiceTranscribe(m);
       return;
     }
     try {
@@ -9231,6 +9339,60 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (_) {
       // 纯增强功能：失败静默（行留在原状态，下次还能点）
     }
+  }
+
+  /// 服务端转写路径（方案 D'，PROTOCOL.md §6.3）：本地解密后的 wav 明文
+  /// `POST /transcriptions`，服务端 whisper.cpp 即转即删，文本写本地转写表
+  /// （modelId='whisper-server'，与本地 sense-voice 行共用同一 UI 渲染）。
+  /// 失败置 failed 行（可再点重试），notice 带服务端错误原话。
+  Future<void> _serverVoiceTranscribe(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messageId = m.env.messageId;
+    final cipherSha256 = (m.attachment!['sha256'] as String?) ?? '';
+    // 先清旧行 + 置 pending（与本地重转同语义），UI 立刻显示"转写中"
+    await (_voiceDb.delete(_voiceDb.localVoiceTranscripts)
+          ..where((tbl) => tbl.messageId.equals(messageId)))
+        .go();
+    await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
+          LocalVoiceTranscriptsCompanion.insert(
+            messageId: messageId,
+            modelId: const Value('whisper-server'),
+            audioSha256: Value(cipherSha256),
+            status: const Value('pending'),
+            updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+          ),
+        );
+    _updateAudioPlayback(() {});
+    try {
+      final wav = await _attachmentBytes(m);
+      final r = await _withAuth(
+          (t) => (widget.api ?? ApiClient(effectiveServer)).transcribeWav(wav: wav, token: t));
+      await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
+            LocalVoiceTranscriptsCompanion.insert(
+              messageId: messageId,
+              transcript: Value(r.text),
+              modelId: const Value('whisper-server'),
+              audioSha256: Value(cipherSha256),
+              language: const Value(''),
+              status: const Value('done'),
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+            ),
+          );
+    } catch (e) {
+      await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
+            LocalVoiceTranscriptsCompanion.insert(
+              messageId: messageId,
+              modelId: const Value('whisper-server'),
+              audioSha256: Value(cipherSha256),
+              status: const Value('failed'),
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+            ),
+          );
+      if (mounted) {
+        _notice(context, l10n.voiceTranscriptServerFailed('$e'));
+      }
+    }
+    _updateAudioPlayback(() {});
   }
 
   /// 音频文件时长：h/m/s，为零的部分不显示（如 3s、1m 15s、2h 5s）。

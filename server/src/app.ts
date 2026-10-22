@@ -62,6 +62,7 @@ import {
 } from './guard.js'
 import { MAX_ATTACHMENT_BYTES, readBody, readJsonBody } from './body.js'
 import { limitByIp } from './ratelimit.js'
+import { MAX_TRANSCRIBE_AUDIO_BYTES, transcribeEnabled, transcribeWav } from './transcriptions.js'
 import {
   createJoinToken,
   createSpace,
@@ -196,6 +197,9 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
       capabilities: cfg.capabilities,
+      // 服务端转写（方案 D'）是否已配置启用：客户端据此显示/隐藏「服务端转写」选项
+      // 与入口（未配时不出现该键，老客户端无感）。纯配置布尔，非密。
+      ...(transcribeEnabled() ? { transcribe: true } : {}),
       // 附件 blob 大小上限（字节）：客户端据此在**读取/加密之前**预检——拖入超大文件
       // （如 1GB 视频）时即时给一句人话，而不是把内存读满再吃 413（2026-10-08）。
       // 纯静态配置值，非密、无元数据风险（与 capabilities 同级）。
@@ -543,6 +547,21 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   // 不落审计：它是幂等的派生读取，空间数个位数的客户端会常拉（同 /entrances/install-uid 的理由）。
   if (method === 'GET' && path === '/messages/unread') {
     sendJson(res, 200, unreadCount(bearerToken(req)))
+    return
+  }
+
+  // 服务端转写（方案 D'，voiceTranscript.zhcn.md §15.2）：客户端本地解密后的
+  // 16kHz/16bit/mono wav 原文上送，whisper.cpp 内存里过一遍即丢（不落盘、不进日志），
+  // 返回文本。限速最严桶（per-IP 每小时）；未配置 EINZ_WHISPER_BIN/MODEL 时
+  // transcribeWav 内部抛 TRANSCRIBE_DISABLED（503），不影响其余功能。
+  if (method === 'POST' && path === '/transcriptions') {
+    limitByIp(req, 'transcribe')
+    const token = bearerToken(req)
+    requireSession(token)
+    const wav = await readBody(req, MAX_TRANSCRIBE_AUDIO_BYTES)
+    const langRaw = req.headers['x-audio-lang']
+    const lang = typeof langRaw === 'string' && /^[a-z]{2,3}$/.test(langRaw) ? langRaw : 'zh'
+    sendJson(res, 200, await transcribeWav(token, wav, lang))
     return
   }
 

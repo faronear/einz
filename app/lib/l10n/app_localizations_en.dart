@@ -1156,6 +1156,46 @@ class AppLocalizationsEn extends AppLocalizations {
       'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can';
 
   @override
+  String get chatPageMenuVoiceTranscriptAuth => 'Voice transcription';
+
+  @override
+  String get voiceTranscriptAuthNote =>
+      'Choose how voice messages are transcribed on this device.';
+
+  @override
+  String get voiceTranscriptAuthLocal => 'On-device';
+
+  @override
+  String get voiceTranscriptAuthLocalDesc =>
+      'Run the model locally. No network, the server never sees audio (requires a ~230MB model download).';
+
+  @override
+  String get voiceTranscriptAuthServer => 'Server';
+
+  @override
+  String get voiceTranscriptAuthServerDesc =>
+      'The decrypted audio is sent to our server, transcribed by Whisper, and deleted immediately. The server briefly processes this recording.';
+
+  @override
+  String get voiceTranscriptAuthAsk => 'Ask per message';
+
+  @override
+  String get voiceTranscriptAuthAskDesc =>
+      'Ask before each transcription (server path, or local if the model is ready).';
+
+  @override
+  String get voiceTranscriptAskTitle => 'Transcribe on server?';
+
+  @override
+  String get voiceTranscriptAskBody =>
+      'The decrypted audio of this message will be sent to the server, transcribed by Whisper, and deleted immediately.';
+
+  @override
+  String voiceTranscriptServerFailed(String error) {
+    return 'Server transcription failed: $error';
+  }
+
+  @override
   String get voiceTranscriptPreparing => 'Preparing transcription model…';
 
   @override

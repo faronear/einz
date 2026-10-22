@@ -1094,6 +1094,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptLegacyAudio => '旧版语音（m4a）不支持转写，新录的语音才能转';
 
   @override
+  String get chatPageMenuVoiceTranscriptAuth => '语音转写';
+
+  @override
+  String get voiceTranscriptAuthNote => '选择本设备如何转写语音消息。';
+
+  @override
+  String get voiceTranscriptAuthLocal => '本机转写';
+
+  @override
+  String get voiceTranscriptAuthLocalDesc =>
+      '在本机跑模型转写，不联网、服务器完全接触不到音频（需下载约 230MB 模型）。';
+
+  @override
+  String get voiceTranscriptAuthServer => '服务端转写';
+
+  @override
+  String get voiceTranscriptAuthServerDesc =>
+      '解密后的录音发到服务器，由 Whisper 转写后立即删除——服务器会短暂处理这条录音。';
+
+  @override
+  String get voiceTranscriptAuthAsk => '每条询问';
+
+  @override
+  String get voiceTranscriptAuthAskDesc => '每次转写前先询问（走服务端；本机模型已就绪时也可选本机转写）。';
+
+  @override
+  String get voiceTranscriptAskTitle => '用服务端转写这条？';
+
+  @override
+  String get voiceTranscriptAskBody => '这条消息解密后的录音将发送到服务器，由 Whisper 转写后立即删除。';
+
+  @override
+  String voiceTranscriptServerFailed(String error) {
+    return '服务端转写失败：$error';
+  }
+
+  @override
   String get voiceTranscriptPreparing => '正在准备转写模型…';
 
   @override

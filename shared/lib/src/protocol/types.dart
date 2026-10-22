@@ -29,6 +29,8 @@ class Api {
   static const messages = '/messages';
   static const sync = '/sync';
   static const attachments = '/attachments';
+  // 服务端转写（方案 D'，PROTOCOL.md §6.3）：明文 wav 上送、即转即删
+  static const transcriptions = '/transcriptions';
   static const pushRegister = '/push/register';
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
