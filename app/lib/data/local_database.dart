@@ -178,10 +178,14 @@ class LocalDatabase extends _$LocalDatabase {
   /// 调用点一律用 [shared]；测试用 [forTesting] 自带 executor，不受影响。
   static final LocalDatabase shared = LocalDatabase();
 
-  LocalDatabase.forTesting(super.executor) : super();
+  /// 测试用连接：executor 外包一层 [DatabaseConnection]（同 [_openConnection]），
+  /// 保证测试与生产走同一条流store 语义（closeStreamsSynchronously 的缘由见
+  /// [_openConnection] 注释）。
+  LocalDatabase.forTesting(QueryExecutor executor)
+      : super(DatabaseConnection(executor, closeStreamsSynchronously: true));
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -270,15 +274,22 @@ class LocalDatabase extends _$LocalDatabase {
             }
           }
           if (from < 10) {
-            // v10-a（2026-10-09）：新增 local_voice_transcripts 表（语音消息本地转写，
-            // 纯本地派生缓存——aimemo/voiceTranscript.zhcn.md §7）。纯新表，无回填。
-            await m.createTable(localVoiceTranscripts); // CREATE TABLE IF NOT EXISTS
-            // v10-b（2026-10-11）：local_messages 加墓碑来路列（deleted_kind 可空，
+            // v10（2026-10-11）：local_messages 加墓碑来路列（deleted_kind 可空，
             // NULL=焚毁到期/旧墓碑）——气泡时间行据 'recall'/'delete' 显示对应图标，
             // 不再与阅后即焚的沙漏+时长混淆（老板 2026-10-11）。
             if (!await _hasColumn('local_messages', 'deleted_kind')) {
               await m.addColumn(localMessages, localMessages.deletedKind);
             }
+          }
+          if (from < 11) {
+            // v11（2026-10-22）：新增 local_voice_transcripts 表（语音消息本地转写，
+            // 纯本地派生缓存——aimemo/voiceTranscript.zhcn.md §7）。纯新表，无回填。
+            //
+            // **必须占独立版本号**：v10 已随 main 发布过（墓碑来路列），本分支起初把
+            // 新表塞进上面的 from<10 块——已升到 v10 的存量库（生产/dev 都是）再打开
+            // 时 from==10，整段迁移根本不会跑，local_voice_transcripts 不存在，
+            // 语音气泡下方的转写行（drift watch 流）直接报 "no such table"。
+            await m.createTable(localVoiceTranscripts); // CREATE TABLE IF NOT EXISTS
           }
         },
       );
@@ -289,24 +300,38 @@ class LocalDatabase extends _$LocalDatabase {
     return rows.any((r) => r.read<String>('name') == column);
   }
 
-  static QueryExecutor _openConnection() => driftDatabase(
-        name: 'einz',
-        native: DriftNativeOptions(
-          // dev 运行（npm run app-mac-run-local*）把库挪到 Documents/dev-*/ 下，
-          // 与装机那份正式库互不干扰；不启用时传 null = 用 drift 默认
-          // （getApplicationDocumentsDirectory()），生产路径一个字节都不动。
-          databaseDirectory:
-              devDataDirIsolated ? () => devSubDir(getApplicationDocumentsDirectory) : null,
-          // 锁竞争容错（启动偶发 SqliteException(5) database is locked 根因）：
-          // - journal_mode=WAL：读（SELECT）不再被写阻塞——"while selecting"
-          //   锁错误来源消除；WAL 模式持久化在库文件头，每次连接再设一遍兜底
-          // - busy_timeout=5000：写写竞争等待 5s 而非立即 SQLITE_BUSY（默认 0）
-          // - synchronous=NORMAL：WAL 推荐档位（配 checkpoint 足够安全，写入更快）
-          setup: (db) {
-            db.execute('PRAGMA journal_mode = WAL');
-            db.execute('PRAGMA busy_timeout = 5000');
-            db.execute('PRAGMA synchronous = NORMAL');
-          },
+  /// 连接外包 [DatabaseConnection] 并开 `closeStreamsSynchronously`：
+  /// drift 的 select 流在**最后一个监听者取消**时，默认会起一个 `Timer.run`
+  /// （把缓存流多留一个事件循环迭代，给同一帧内重新订阅的 StreamBuilder 复用）。
+  /// 该定时器在 flutter_test 的 FakeAsync 里没人推进时钟 → 永不触发：
+  ///   1. 测试卸载 widget 树时 `timersPending` 断言炸（"A Timer is still
+  ///      pending even after the widget tree was disposed."）；
+  ///   2. `db.close()` 里 StreamQueryStore.close() 会 await 这个永不完成的
+  ///      timer completer → 整个测试吊死到 10 分钟超时。
+  /// 2026-10-22 语音转写行的 drift 流（_buildVoiceTranscriptLine）首次把流
+  /// 带进 widget 树，两个症状同时踩到（chat_page_menu_test 实测）。
+  /// 全 App 仅此一处 drift 流，同步回收缓存无感知；测试与生产同一语义。
+  static QueryExecutor _openConnection() => DatabaseConnection(
+        driftDatabase(
+          name: 'einz',
+          native: DriftNativeOptions(
+            // dev 运行（npm run app-mac-run-local*）把库挪到 Documents/dev-*/ 下，
+            // 与装机那份正式库互不干扰；不启用时传 null = 用 drift 默认
+            // （getApplicationDocumentsDirectory()），生产路径一个字节都不动。
+            databaseDirectory:
+                devDataDirIsolated ? () => devSubDir(getApplicationDocumentsDirectory) : null,
+            // 锁竞争容错（启动偶发 SqliteException(5) database is locked 根因）：
+            // - journal_mode=WAL：读（SELECT）不再被写阻塞——"while selecting"
+            //   锁错误来源消除；WAL 模式持久化在库文件头，每次连接再设一遍兜底
+            // - busy_timeout=5000：写写竞争等待 5s 而非立即 SQLITE_BUSY（默认 0）
+            // - synchronous=NORMAL：WAL 推荐档位（配 checkpoint 足够安全，写入更快）
+            setup: (db) {
+              db.execute('PRAGMA journal_mode = WAL');
+              db.execute('PRAGMA busy_timeout = 5000');
+              db.execute('PRAGMA synchronous = NORMAL');
+            },
+          ),
         ),
+        closeStreamsSynchronously: true,
       );
 }

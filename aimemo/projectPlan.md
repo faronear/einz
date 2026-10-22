@@ -67,16 +67,21 @@
 - `[ ]` 文档债：`projectPlan` 之外的旧文档复核（`docs/DATABASE.md`/`PROTOCOL.md` 的
   Draft v0.1 头、`aimemo/upgradeToMultiverse.md` 是否仍与实际一致）
 - `[x]` **语音转写 Phase 1 MVP**（2026-10-09，feat/voice-transcript 分支 b856c75）：按
-  `aimemo/voiceTranscript.zhcn.md` 落地——`local_voice_transcripts` 表（schema v10，
+  `aimemo/voiceTranscript.zhcn.md` 落地——`local_voice_transcripts` 表（schema **v11**，
   随消息级联删除、不进密文/不同步/不入备份）；`VoiceTranscriptService` 后台 isolate 串行
   跑 sherpa-onnx SenseVoice（isolate 只收纯值参数防捕获 drift 句柄；重试 2 次；模型未
   就绪置 unavailable）；语音明文落盘后自动入队（`_autoStoreAttachments` 统一钩子）；气泡
   下方转写行四态（done/pending/failed·stale·unavailable 可点入口，watch 单行刷新）。
-  验证：全量 analyze 零告警、迁移测试更新到 v10 通过、group/multi_space 测试全过。
-  `chat_page_menu_test` 语音用例**基线（cf2eb0a worktree）同点失败**（25s 断言，媒体
-  mock 既有问题）非回归。2026-10-10 补齐两块：录音改 16kHz 单声道 WAV（§8 方案 1，
+  验证：全量 analyze 零告警、迁移测试（含 v10 存量库补建回归）全过、group/multi_space
+  测试全过。2026-10-10 补齐两块：录音改 16kHz 单声道 WAV（§8 方案 1，
   `meta.voiceContainerWav` 标识新消息，`_voiceExtOf` 统一四处扩展名口径）+ 模型首次
-  使用下载（§11，hf-mirror 双源、Range 续传、sha256 校验，~228MB 不进 git/不打包）。
+  使用下载（§11，hf-mirror 双源、Range 续传，sha256 校验，~228MB 不进 git/不打包）。
+  **2026-10-22 修复两笔**（详见 worklog 当日条目）：① 转写行的 drift watch 流是全 App
+  第一处 widget 内 drift 流，其卸载时 drift 内部 `Timer.run`（markAsClosed 缓存流）
+  在 flutter_test FakeAsync 里永不触发 → chat_page_menu_test 语音用例 `!timersPending`
+  断言炸 + `db.close()` 吊死 10 分钟——修法：两个连接路径 executor 外包
+  `DatabaseConnection(closeStreamsSynchronously: true)`；② 新表曾塞进 `from < 10` 块，
+  v10 已随 main 发布导致存量库永远补不到该表 → schemaVersion 10→11 独立迁移块。
   **遗留 Phase 0 验证**：真机 A/B（SenseVoice vs Paraformer + wav 音质）、iOS/Android
   原生构建跑一遍（sherpa_onnx 重 FFI，唯一可能翻车点）。
 - `[x]` **3 个 pty E2E 测试 rot 修复**（2026-10-09 完成）：根因=e2421d6 新增「秘境类型」

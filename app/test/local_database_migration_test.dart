@@ -6,6 +6,7 @@
 // 耗尽 → 界面停在"启动初始化失败"，且无出路（iMac 生产库撞到）。
 //
 // 本测试构造这种"版本戳落后"的库，断言迁移能一路升到当前版本且列改名正确。
+// 另覆盖 v10 存量库（main 已发布的 schema）→ v11 补建语音转写表的回归。
 
 import 'dart:io';
 
@@ -18,8 +19,12 @@ Future<bool> _has(LocalDatabase db, String table, String column) async {
   return rows.any((r) => r.read<String>('name') == column);
 }
 
+Future<int> _userVersion(LocalDatabase db) async =>
+    (await db.customSelect('PRAGMA user_version').getSingle())
+        .read<int>('user_version');
+
 void main() {
-  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v10 且列改名正确', () async {
+  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v11 且列改名正确', () async {
     final dir = Directory.systemTemp.createTempSync('einz-mig-');
     final path = '${dir.path}/einz.sqlite';
     final script = '''
@@ -44,11 +49,10 @@ PRAGMA user_version = 6;
     // 触发打开 → 迁移（原先就在这里抛 "duplicate column name: space_id"）。
     await db.select(db.spaces).get();
 
-    final uv = (await db.customSelect('PRAGMA user_version').getSingle())
-        .read<int>('user_version');
-    expect(uv, 10, reason: '迁移后版本戳应升到当前 schema 版本（v10：+voice_transcripts）');
+    expect(await _userVersion(db), 11,
+        reason: '迁移后版本戳应升到当前 schema 版本（v11：+voice_transcripts）');
 
-    // v10 新表已建（语音转写派生缓存）。
+    // v11 新表已建（语音转写派生缓存）。
     expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue);
 
     // v8 列改名已生效，旧列不残留。
@@ -61,6 +65,34 @@ PRAGMA user_version = 6;
     expect(await _has(db, 'local_messages', 'sender_entrance_id'), isTrue);
     expect(await _has(db, 'local_messages', 'sender_device_id'), isFalse);
     // v10：墓碑来路列（deleted_kind）已补上。
+    expect(await _has(db, 'local_messages', 'deleted_kind'), isTrue);
+  });
+
+  test('v10 存量库（main 已发布的 schema）打开 → 补建 local_voice_transcripts 并升到 v11',
+      () async {
+    final dir = Directory.systemTemp.createTempSync('einz-mig-v10-');
+    final path = '${dir.path}/einz.sqlite';
+    // 造一份"v10 形状"的库：先按当前 schema 建全表，再删掉 v11 新表、版本戳改回 10
+    // ——即 main 分支构建留给存量用户的库（from==10，from<10 的迁移块永不再跑）。
+    final seed = LocalDatabase.forTesting(NativeDatabase(File(path)));
+    await seed.select(seed.localMessages).get(); // 触发建表
+    await seed.customStatement('DROP TABLE local_voice_transcripts');
+    await seed.customStatement('PRAGMA user_version = 10');
+    await seed.close();
+
+    final db = LocalDatabase.forTesting(NativeDatabase(File(path)));
+    addTearDown(() async {
+      await db.close();
+      dir.deleteSync(recursive: true);
+    });
+
+    // 触发打开 → 迁移（回归：新表曾塞进 from<10 块，v10 存量库打不开它）。
+    await db.select(db.localVoiceTranscripts).get();
+
+    expect(await _userVersion(db), 11, reason: 'v10 存量库应升到 v11');
+    expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue,
+        reason: 'v10 存量库必须补建语音转写表，否则转写行报 no such table');
+    // v10 已引入的列不受影响。
     expect(await _has(db, 'local_messages', 'deleted_kind'), isTrue);
   });
 }
