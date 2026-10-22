@@ -10,7 +10,7 @@
 
 ```
 Einz is a privacy-first, end-to-end-encrypted messaging app for two
-people (usually a couple), or a small invited group of close friends.
+people (usually a couple), or a small group of selected members.
 There is intentionally NO account or sign-up flow: access is by device
 key pairs and invitation links only.
 
@@ -33,7 +33,7 @@ pair; spaces are joined via invitation links. Adding accounts is not
 required for any functionality.
 
 PRIVACY: No ads, no analytics SDKs, no tracking. Messages, photos,
-videos, voice notes and files are encrypted on-device; the server cannot
+videos, voice notes and files are encrypted and decrypted on your device; the server cannot
 decrypt them. Privacy policy: https://www.einz.tic.cc/rules/privacy_policy/
 
 ENCRYPTION EXPORT COMPLIANCE: The app uses only publicly available
@@ -134,12 +134,12 @@ CONTACT for review questions: einz@tic.cc
 | Marketing URL       | `https://www.einz.tic.cc/about/what_is_einz/`（可留空） |                                                                                        |
 | Privacy Policy URL  | `https://www.einz.tic.cc/rules/privacy_policy/`         | 必填                                                                                   |
 | 邮箱（审核联系）    | `einz@tic.cc`                                           |                                                                                        |
-| Release on approval | **Manual release**（建议）                              | 首版过审后自己挑时间发布；也可自动                                                     |
+| Release on approval | **Automatic release**                                   | 首版过审后自动发布                                                                     |
 
 ### 4.2 描述（Description，≤4000 字符）
 
 ```
-Einz is the secret realm where you and your close companions chat and share in your own spaces, away from the world — end-to-end encrypted, local-first, and account-free.
+Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world — end-to-end encrypted, local-first, and account-free.
 
 YOUR SECRET REALM
 Create a space from the ground up, or join one by invitation. Everything inside — messages, photos, videos, voice notes, and files — is encrypted and decrypted on your own device. Not even we can read it.
@@ -155,7 +155,7 @@ BUILT FOR PRIVACY, BY DESIGN
 · PIN lock with auto-lock timer, and a demo mode to explore first
 
 GROUPS TOO
-Create a duo space for two, or a group space for your close friends. Membership is by invitation only — there is no discovery, no search, no feed, and no public content. Ever.
+Create a duo space for two, or a group space for selected members. Membership is by invitation only — there is no discovery, no search, no feed, and no public content. Ever.
 
 Einz will never show you ads, never profile you, and never sell data. Privacy isn't a feature here. It's the architecture.
 ```
