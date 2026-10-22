@@ -30,9 +30,16 @@ services:
       # 由 compose 自动读取本目录 .env 文件提供（serverDocker/.env 已在 .gitignore，
       # 不入库、git pull 不覆盖）。未配置时 npm run backup 会拒绝执行（防明文备份）。
       - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
+      # 服务端转写（方案 D'，PROTOCOL.md §6.3）：二进制在镜像内 /opt/whisper，
+      # 模型走卷（首次部署前放一份 ggml 模型到 ./data/whisper/models/，见
+      # aimemo/whisperDeploy.zhcn.md §3）。两个变量都配 = 转写启用；
+      # 模型文件缺失时 whisper-cli 启动即失败 → 503 TRANSCRIBE_FAILED。
+      - EINZ_WHISPER_BIN=/opt/whisper/whisper-cli
+      - EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin
     volumes:
       - ./config:/config:ro
       - ./data:/data
+      - ./data/whisper/models:/opt/whisper/models:ro
     expose:
       - "3000"
     networks:

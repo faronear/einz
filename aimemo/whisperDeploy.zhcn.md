@@ -94,10 +94,17 @@ EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
 
 重启 server 生效：pm2 `pm2 restart einz` / docker `docker compose up -d`。
 
-**⚠️ Docker 跑 server 的例外**：容器内 spawn 不了宿主机二进制（动态库/路径隔离）。
-两个解法：
-- **推荐**：server 保持裸 Node 跑（`node dist/app.js` + pm2），whisper 装宿主机；
-- 坚持 Docker：镜像里重新编译 whisper.cpp（Dockerfile 加一层），模型目录 `-v /opt/whisper/models:/opt/whisper/models` 挂载，env 指容器内路径。
+**⚠️ Docker 跑 server 的两条路**：
+
+- **内置镜像（推荐，2026-10-22 已落地）**：`server/Dockerfile` 新增 whisper 编译阶段
+  ——二进制 + libggml 动态库烤进镜像（`/opt/whisper/`），模型**不进镜像**，走卷
+  `./data/whisper/models:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
+  `EINZ_WHISPER_BIN=/opt/whisper/whisper-cli` + `EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin`。
+  首次部署只剩一步：往 `serverDocker/data/whisper/models/` 放一份模型文件
+  （§3 下载，或在有网的机器下了 scp 过去），然后照常 `docker compose build && up -d`。
+  优点：换服务器 = 搬镜像 + 搬模型目录，零宿主机依赖；换模型档位不用重新 build。
+- **裸 Node + 宿主机 whisper**：§2-§5 的原方案，whisper 装宿主机、server 用绝对路径
+  spawn（容器隔离问题不存在）。适合不想给镜像加编译时间的场景。
 
 ## 6. 验证与运维
 
