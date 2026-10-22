@@ -98,10 +98,12 @@ EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
 
 - **内置镜像（推荐，2026-10-22 已落地）**：`server/Dockerfile` 新增 whisper 编译阶段
   ——二进制 + libggml 动态库烤进镜像（`/opt/whisper/`），模型**不进镜像**，走卷
-  `./data/whisper/models:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
+  `./models/whisper:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
   `EINZ_WHISPER_BIN=/opt/whisper/whisper-cli` + `EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin`。
-  首次部署只剩一步：往 `serverDocker/data/whisper/models/` 放一份模型文件
-  （§3 下载，或在有网的机器下了 scp 过去），然后照常 `docker compose build && up -d`。
+  首次部署只剩一步：往 `serverDocker/models/whisper/` 放一份模型文件
+  （**老板 2026-10-22 定**：模型是固定二进制资产，不进 `data/` 用户数据目录；
+  `models/` 是**通用模型目录**（gitignore 整个目录），将来换/加其他模型放它下面
+  同级子目录即可；466MB+ 绝不可入库）
   优点：换服务器 = 搬镜像 + 搬模型目录，零宿主机依赖；换模型档位不用重新 build。
 - **裸 Node + 宿主机 whisper**：§2-§5 的原方案，whisper 装宿主机、server 用绝对路径
   spawn（容器隔离问题不存在）。适合不想给镜像加编译时间的场景。

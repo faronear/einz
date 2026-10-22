@@ -49,7 +49,7 @@ services:
       - EINZ_SMTP_PASS=${EINZ_SMTP_PASS}
       - EINZ_MAIL_FROM=${EINZ_MAIL_FROM}
       # 服务端转写（方案 D'，PROTOCOL.md §6.3）：二进制在镜像内 /opt/whisper，
-      # 模型走卷（首次部署前放一份 ggml 模型到 ./data/whisper/models/，见
+      # 模型走卷（首次部署前放一份 ggml 模型到 ./models/whisper/，见
       # aimemo/whisperDeploy.zhcn.md §3）。两个变量都配 = 转写启用；
       # 模型文件缺失时 whisper-cli 启动即失败 → 503 TRANSCRIBE_FAILED。
       - EINZ_WHISPER_BIN=/opt/whisper/whisper-cli
@@ -59,4 +59,4 @@ services:
     volumes:
       - ./config:/config:ro
       - ./data:/data
-      - ./data/whisper/models:/opt/whisper/models:ro
+      - ./models/whisper:/opt/whisper/models:ro
