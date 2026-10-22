@@ -362,7 +362,16 @@ jobs:
           # zip 必须用 ditto（保留 Frameworks 符号链接，zip 命令会破坏结构导致公证失败）
           ditto -c -k --keepParent --sequesterRsrc "$APP" notary-upload.zip
           xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait
-          xcrun stapler staple "$APP"
+          # stapler 要到 Apple CloudKit 查公证记录；submit --wait 成功后记录同步到
+          # stapler 侧偶发延迟（"CloudKit query ... Record not found"，2026-10-22
+          # CI run 39729360308 实测），加退避重试——通常 1-2 分钟内可查。
+          STAPLE_OK=0
+          for i in 1 2 3 4 5 6; do
+            if xcrun stapler staple "$APP"; then STAPLE_OK=1; break; fi
+            echo "staple attempt $i failed; notary record not queryable yet, waiting 30s..."
+            sleep 30
+          done
+          [ "$STAPLE_OK" = 1 ] || { echo "staple failed after 6 attempts"; exit 1; }
           xcrun stapler validate "$APP"
           spctl -a -vv -t exec "$APP"
           rm -f notary-upload.zip
