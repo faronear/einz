@@ -122,7 +122,7 @@
     }
   },
   "setupEntryTitle": "Einz wizard",
-  "setupEntryHint": "Einz is the secret realm where you and your close companions chat and share in your own spaces, away from the world. You can create a new one from the ground up, or join an existing one by invitation.",
+  "setupEntryHint": "Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. You can create a new one from the ground up, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
   "setupEntryDemo": "Take a look around first",
@@ -773,7 +773,7 @@
   },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",
-  "aboutIntro": "Einz is the secret realm where you and your close companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.",
+  "aboutIntro": "Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.",
   "aboutVersionLabel": "Version",
   "aboutDownloadLabel": "Download",
   "aboutServerLabel": "Server",

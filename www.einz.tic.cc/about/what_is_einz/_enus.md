@@ -6,16 +6,15 @@
 
 ---
 
-Einz is a secret realm for private messaging and sharing — an
-end-to-end encrypted territory where you and your close companions keep
-small, secret spaces. It is not built for mass social networking — it
-belongs to two people, or a small circle of people you choose.
+Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world — end-to-end encrypted, local-first, and account-free.
+
+It is not built for mass social networking — it belongs to two people, or a small circle of people you choose.
 
 ## No third party can read it
 
 Not even the one running the server.
 
-- Messages, photos, videos, voice notes, and files are encrypted **on your device**; the server only ever sees ciphertext;
+- Messages, photos, videos, voice notes, and files are encrypted and decrypted **on your device**; the server only ever sees ciphertext;
 - Keys never enter the server's database — they live only on your device and your companion's;
 - If the server goes down, gets dumped, or gets audited, all anyone finds is noise.
 

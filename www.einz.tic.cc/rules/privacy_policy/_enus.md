@@ -10,7 +10,7 @@ Last updated: 2026-10-19
 
 ## What we cannot see
 
-Einz is an end-to-end encrypted app. Your messages, photos, videos, voice notes, and files are encrypted **on your device**, and the keys exist only on your device and your companion's. The server — including the people running it — **cannot decrypt** any content.
+Einz is an end-to-end encrypted app. Your messages, photos, videos, voice notes, and files are encrypted and decrypted **on your device**, and the keys exist only on your device and your companion's. The server — including the people running it — **cannot decrypt** any content.
 
 ## What the server stores
 
