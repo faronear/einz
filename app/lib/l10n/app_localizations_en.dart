@@ -34,19 +34,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsScopeAllDone => 'Applied to all spaces on this device';
 
   @override
-  String get skip => 'Skip';
-
-  @override
   String get close => 'Close';
-
-  @override
-  String setupPageEnvelopeKeyHint(String mode) {
-    String _temp0 = intl.Intl.selectLogic(mode, {
-      'duo': 'your companion',
-      'other': 'your companions',
-    });
-    return 'A key envelope is an asymmetrically encrypted text handed over in person. Ask $_temp0 for it.';
-  }
 
   @override
   String get setupPageNeedPassphrase => 'Enter a shared passphrase';
@@ -130,9 +118,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardAppBarJoin => 'Join a space';
 
   @override
-  String get wizardAppBarOffline => 'Import key envelope';
-
-  @override
   String get wizardNext => 'Next';
 
   @override
@@ -176,12 +161,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseTitle => 'Verify passphrase';
-
-  @override
-  String get wizardTitlePin => 'Set PIN';
-
-  @override
-  String get wizardTitleEnvelope => 'Verify key envelope';
 
   @override
   String get wizardEnrollExists =>
@@ -234,16 +213,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardJoinPassphraseWrong => 'Wrong passphrase.';
 
   @override
-  String get wizardSwitchToEnvelope => 'Use key envelope instead (offline)';
-
-  @override
-  String get wizardSwitchToPassphrase => 'Use a shared passphrase instead';
-
-  @override
-  String get wizardPinHint =>
-      'Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.';
-
-  @override
   String get welcomeDialogTitleCreate => 'All set!';
 
   @override
@@ -266,13 +235,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
+      'Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. You can create a new one from the ground up, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
 
   @override
   String get setupEntryJoin => 'Join';
+
+  @override
+  String get setupEntryDemo => 'Take a look around first';
 
   @override
   String get setupEntryLegacyServer =>
@@ -285,7 +257,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return 'Too many requests — retry in ${seconds}s (this is not a problem with the entrance token)';
+    return 'Too many requests — retry in ${seconds}s';
   }
 
   @override
@@ -327,9 +299,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupCreateCopy => 'Copy invite link';
 
   @override
-  String get setupCreateCopied => 'Copied';
-
-  @override
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
@@ -352,9 +321,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get startupInitClearedRestart =>
       'Local data cleared. Fully quit and reopen the app.';
-
-  @override
-  String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override
   String get setupPageScanInvite => 'Scan entrance token QR code';
@@ -380,13 +346,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinLabel => 'New PIN (at least 6 digits)';
 
   @override
-  String get setPinDialogPinHint => 'At least 6 digits';
-
-  @override
   String get setPinDialogConfirmLabel => 'Confirm new PIN';
-
-  @override
-  String get setPinDialogConfirmHint => 'Type it again to confirm';
 
   @override
   String get setPinDialogSetPin => 'Apply';
@@ -396,9 +356,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setPinDialogPinDigitsOnly => 'Digits only';
-
-  @override
-  String get setPinDialogPinMismatch => 'PINs do not match';
 
   @override
   String get setPinDialogOldWrong => 'Wrong current PIN';
@@ -423,41 +380,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockTitle => 'Set PIN';
 
   @override
-  String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.';
+  String get chatPageSetLockHintNoPin =>
+      'Once set, Einz will lock itself everytime after keeping inactive for a while, then you must unlock to enter your space again.';
 
   @override
-  String get chatPageSetLockHintNoPin =>
-      'Once set, you\'ll unlock every time you enter the space.';
+  String get chatPageSetLockRowVerify => 'Verify';
+
+  @override
+  String get chatPageSetLockRowSet => 'Set';
+
+  @override
+  String get chatPageSetLockNewPinLabel => 'New PIN or leave blank';
+
+  @override
+  String get chatPageSetLockNewPinLabelNoPin => 'New PIN (at least 6 digits)';
+
+  @override
+  String get chatPageSetLockSubmitChange => 'Change';
+
+  @override
+  String get chatPageSetLockDurationLabel => 'Auto-lock after inactivity';
+
+  @override
+  String get chatPageSetLockTabChange => 'Change PIN';
+
+  @override
+  String get chatPageSetLockClearButton => 'Clear PIN';
+
+  @override
+  String lockDurationSecs(int n) {
+    return '$n sec';
+  }
+
+  @override
+  String lockDurationMin(int n) {
+    return '$n min';
+  }
 
   @override
   String get chatPageSetLockOldLabel => 'Current PIN';
 
   @override
-  String get chatPageSetLockOldRequired => 'Enter current PIN first';
+  String get chatPageSetLockOldRequired => 'Enter current PIN to verify';
 
   @override
   String get chatPageSetLockSameAsOld =>
-      'New PIN is the same as the current one, nothing is changed.';
+      'New PIN must be different than the current one.';
 
   @override
-  String get chatPageSetLockNoPinNotice =>
-      'No PIN set. Next launch goes straight into the space.';
+  String get chatPageSetLockPinRequired => 'Enter a new PIN';
 
   @override
-  String get chatPageSetLockDone =>
-      'PIN set. You must enter PIN to unlock the space at next launch.';
+  String get chatPageSetLockNothingChanged => 'You haven\'t changed anything';
+
+  @override
+  String chatPageSetLockDone(String duration) {
+    return 'PIN set. Einz will lock itself everytime after inactivity of $duration.';
+  }
 
   @override
   String get chatPageSetLockCleared =>
-      'PIN cleared. You can enter the space directly at next launch.';
-
-  @override
-  String get chatPageClearLockTitle => 'Clear PIN?';
-
-  @override
-  String get chatPageClearLockMessage =>
-      'Clear the PIN? After clearing, next app launch will go straight into chat.';
+      'PIN cleared. Anyone who has access to this device can visit your space.';
 
   @override
   String get chatPageLockClearConfirm => 'Clear';
@@ -555,12 +538,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGroupNameEditTooltip => 'Change group name';
 
   @override
-  String get chatPageMyAvatarTooltip => 'Change my avatar';
-
-  @override
-  String get chatPageMyNameTooltip => 'Change my name';
-
-  @override
   String get chatPageGroupNameLabel => 'Name';
 
   @override
@@ -603,6 +580,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageCopy => 'Copy';
+
+  @override
+  String chatPageCopiedText(String text) {
+    return 'Copied: $text';
+  }
 
   @override
   String get chatPageEdit => 'Edit';
@@ -791,6 +773,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersReinvite => 'Re-invite';
 
   @override
+  String get chatPageMemberProfileTitle => 'Group companion';
+
+  @override
   String get chatPageReinvitePassphraseTitle => 'Verify passphrase';
 
   @override
@@ -800,6 +785,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPagePassphraseFieldHint => 'Shared passphrase';
+
+  @override
+  String get chatPagePassphraseVerify => 'Verify';
+
+  @override
+  String get chatPagePassphraseWrong => 'Incorrect passphrase';
+
+  @override
+  String get chatPagePassphraseEmpty => 'Enter the shared passphrase';
+
+  @override
+  String get chatPagePassphraseVerifyFailed =>
+      'Verification failed, please try again';
 
   @override
   String get chatPagePassphraseShow => 'Show';
@@ -839,7 +837,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageLockNow => 'Lock now';
 
   @override
-  String get chatPagePinSetValue => 'Set';
+  String chatPagePinMenuValue(String duration) {
+    return '$duration';
+  }
 
   @override
   String get chatPageNotifyLabel => 'My email alerts';
@@ -914,14 +914,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageTombstoneKeepDesc =>
-      'Show a placeholder: content hidden, time and record kept, message flow unbroken';
+      'Show a time and status bar without content, message flow unbroken';
 
   @override
   String get chatPageTombstoneHide => 'Hide completely';
 
   @override
   String get chatPageTombstoneHideDesc =>
-      'Tombstones disappear from the message flow entirely';
+      'Disappear from the message flow entirely';
 
   @override
   String get chatPageTombstoneSubmit => 'Apply';
@@ -1272,7 +1272,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.';
+      'Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';
@@ -1397,7 +1397,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaveSpaceConfirm => 'Destroy';
 
   @override
-  String get setupPinReuseNotice => 'This space will share the current PIN.';
+  String get exitGroupTitle => 'Leave group?';
+
+  @override
+  String get exitGroupMessage =>
+      'Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!';
+
+  @override
+  String get exitGroupConfirm => 'Leave';
+
+  @override
+  String exitGroupNameHint(String name) {
+    return 'Type the group name “$name”';
+  }
+
+  @override
+  String exitGroupNameLabel(String name) {
+    return '$name';
+  }
+
+  @override
+  String get exitGroupNameMismatch => 'Enter the correct group name to confirm';
+
+  @override
+  String exitGroupConfirmWordHint(String word) {
+    return 'This group has no name yet. Type “$word” to confirm';
+  }
+
+  @override
+  String get exitGroupConfirmWordMismatch =>
+      'Enter the correct confirmation word';
+
+  @override
+  String get exitGroupFailed =>
+      'Couldn\'t leave the group — you\'re still in it';
+
+  @override
+  String get exitGroupMenuItem => 'Leave group';
+
+  @override
+  String chatPageMemberLeftNotice(String name) {
+    return '$name left the group';
+  }
 
   @override
   String errorBackend(String message) {

@@ -333,8 +333,8 @@ v1 时代那份《一次性配置手册》（静态白名单 config.json + 密�
    TUI store 是明文 JSON 的测试驱动）。
 2. **Space Key 分发**：创建者本地生成 32B Space Key，用**口令（Argon2id）加密**成密保箱托管
    到 Server（`POST /spaces` 创建时一并上传）；加入方用同一口令取回
-   （`POST /spaces/{id}/key-escrow`，免认证、防爆破靠限速）。另有密保信封（用对方公钥
-   `crypto_box_seal` 密封）作为离线备用路径（E2EE.md §7.1）。
+   （`POST /spaces/{id}/key-escrow`，免认证、防爆破靠限速）。（密保信封离线备用路径
+   2026-10-19 已整条删除，E2EE.md §7.1 关于 `crypto_box_seal` 密封的说明仅存历史意义。）
 3. **通道登记**：由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭一次性 join token）完成，
    同时签发绑定该空间的会话——不再有独立的登记步骤，也没有静态白名单文件。
 4. **恢复码**：TUI `/backup` 生成 12 词恢复码（E2EE.md §10；App 侧导出入口已删），

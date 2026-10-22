@@ -219,7 +219,8 @@ POST /spaces/join
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
        ENTRANCE_LIMIT_REACHED（通道数上限，409）/
        SPACE_FULL（group 成员数达 maxMembersPerSpace，409）/
-       DUO_FULL（duo 已满 2 人——双人秘境不许第三个身份，409）
+       DUO_FULL（duo 已满 2 人——双人秘境不许第三个身份，409）/
+       MEMBER_LEFT（attach 目标身份已自愿退群——墓碑不可"复活"，410）
 ```
 
 ### 4.2 成员端点（加入后/创建者）
@@ -238,11 +239,41 @@ POST /spaces/{spaceId}/join-tokens
       （与撤销别人通道同档）；目标必须是本空间成员，否则 400
   → 201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
   错误：NOT_A_MEMBER / DUO_FULL（duo 满 2 人签 invite，409）/ INVALID_REQUEST（400：
-       invite 带 target、attach 无目标、目标不属于本空间）/ ESCROW_VERIFY_FAILED（401：
-       attach 指向他人但口令错）/ PASSPHRASE_NOT_SET（409：未托管口令）
+       invite 带 target、attach 无目标、目标不属于本空间）/
+       MEMBER_LEFT（attach 目标已自愿退群——墓碑身份签不出码，410）/
+       ESCROW_VERIFY_FAILED（401：attach 指向他人但口令错）/ PASSPHRASE_NOT_SET（409：未托管口令）
 
 DELETE /spaces/{spaceId}/join-tokens/{tokenHash}
   撤销未用 token（创建者补救手段）。
+
+POST /spaces/{spaceId}/leave
+  **自愿退群**（2026-10-19，aimemo/groupExitDesign.md）：**身份级**离场——不是
+  "退出一台设备"。请求体为空 {}；鉴权 = 该空间成员会话。
+  事务内（单事务，全部成功或全部不做）：
+  ① 批量退役**本人身份名下全部通道**（retireEntrance 的批量版，无口令——自助
+     语义，session 即所有权）：status='revoked' + last_seen=0 + offline_since=now，
+     并删这些通道的 push_tokens / sessions / challenges；
+  ② space_members 行转**墓碑**：status='left'、left_at=now；**保留**
+     member_id / display_name / gender（历史消息的发送者名字解析依赖——`GET /space`
+     仍全量下发，见 §4.3）；**slot 让位**（移到 max(slot)+1，最小空槽分配自然
+     回收原 slot，group 可补人）；
+  ③ email 解绑（置 NULL + purgeEmailIfUnused：没有别处再用就物理删）；
+  ④ receipts 行删除（PK (space_id, member_id)，无下游依赖）；
+  ⑤ issuer 或 target 指向退出者的**未用 join token 作废**（防 24h 内的 attach
+     码把墓碑身份"复活"，也防退出者的待发邀请继续拉人）；
+  ⑥ avatars 文件保留（历史消息头像按 member_id 取）。
+  事务后（在线设备处置，老板 2026-10-19 决策 2）：
+  - 发起设备的连接**静默摘除**（不发 entrance.revoked——它自己发起的退出，
+    收尾在客户端；对端照常看到 peer.offline）；
+  - 同身份的**其他**在线通道逐个 `entrance.revoked` + WS 4403 → 那些设备自毁
+    本地数据（"就像被撤回一样"）；
+  - 剩余在线通道收 `member.left`（刷新名单 + 顶部通知）。
+  - **离线设备无需推送**：下次任何请求吃 403 `ENTRANCE_REVOKED` → 同一自毁路径。
+  幂等：member 已是墓碑 → 直接 {ok:true}（并发双退的窄窗）。
+  **仅 group**：duo 不支持退群（409 `LEAVE_NOT_ALLOWED`——双人秘境是二人契约，
+  身份一旦入群永不退群；想"离开"只有既有「销毁本通道」，身份仍在册、对方可
+  re-invite 接回**同一身份**）。日后回 group = 剩余成员发新 invite（**新身份**）。
+  错误：NOT_A_MEMBER / LEAVE_NOT_ALLOWED（duo，409）/ SPACE_NOT_FOUND（404）
 
 POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离）
   口令托管密封包读写；加入方验证口令后取回 Space Key 密封包。
@@ -289,6 +320,8 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `ENTRANCE_LIMIT_REACHED` | 该空间的通道（登记项）数量已达上限（serverConfig.json 的 maxEntrancesPerSpace；**计数含已撤销**——销毁不退额度，防反复开通/销毁刷量） | 409 |
 | `SPACE_FULL` | group 空间成员（身份）数已达上限（serverConfig.json 的 maxMembersPerSpace；同身份多通道不重复计数） | 409 |
 | `DUO_FULL` | duo 空间已满 2 人（双人秘境不允许第三个身份；签发 invite 与 join 两处都会落到此码） | 409 |
+| `LEAVE_NOT_ALLOWED` | 自愿退群只对 group 开放（duo 是二人契约，想离开请「销毁本通道」） | 409 |
+| `MEMBER_LEFT` | 目标身份已自愿退群（墓碑）：attach 码进不去该身份、也签不出指向它的码（回来 = 新 invite 开新身份） | 410 |
 
 | `SPACE_NOT_FOUND` | 空间不存在/已归档 | 404 |
 | `NOT_A_MEMBER` | 当前 session 不是该 Space 成员 | 403 |

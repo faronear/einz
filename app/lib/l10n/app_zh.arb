@@ -8,9 +8,7 @@
   "settings": "设置",
   "settingsScopeAll": "应用于本机所有秘境",
   "settingsScopeAllDone": "已应用到本机所有秘境",
-  "skip": "跳过",
   "close": "关闭",
-  "setupPageEnvelopeKeyHint": "密保信封是私下交接的一段加密文字。请询问你的同伴获取。",
   "setupPageNeedPassphrase": "请设置共享口令",
   "upgradeFrozenTitle": "必须升级",
   "upgradeFrozenBody": "您的应用版本 {current} 已经过期，最低需要 {min}。升级后才能继续使用。",
@@ -66,7 +64,6 @@
   "wizardGenderRequired": "请选择性别",
   "wizardAppBarCreate": "创建秘境",
   "wizardAppBarJoin": "加入秘境",
-  "wizardAppBarOffline": "导入密保信封",
   "wizardNext": "下一步",
   "wizardBack": "上一步",
   "wizardDone": "完成",
@@ -81,8 +78,6 @@
   "wizardSpaceLimit": "秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境",
   "wizardTitlePassphrase": "设置共享口令",
   "wizardJoinPassphraseTitle": "验证共享口令",
-  "wizardTitlePin": "设置锁屏码",
-  "wizardTitleEnvelope": "解析密保信封",
   "wizardEnrollExists": "该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性通道码加入。",
   "wizardEnrollGoJoin": "改用“加入”向导",
   "wizardEnrollFailed": "❌ 登记失败: {error}",
@@ -100,9 +95,6 @@
   "wizardPassphraseMismatch": "两次输入的口令不一致",
   "wizardJoinPassphraseHint": "共享口令是打开秘境的唯一钥匙，由你和同伴共同保管。不知道口令？询问你的秘境同伴。",
   "wizardJoinPassphraseWrong": "口令错误！请询问你的秘境同伴获取正确的口令。",
-  "wizardSwitchToEnvelope": "改用线下密保信封",
-  "wizardSwitchToPassphrase": "改用共享口令",
-  "wizardPinHint": "在本机上保护你的秘境，任何人启动app时将需要验证锁屏码。当前也可先跳过，进入秘境后能够随时设置。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
   "welcomeDialogMessage": "你的秘境已开启，所有消息端到端加密，确保绝对隐私。进入秘境，开始聊天吧！",
@@ -116,12 +108,13 @@
     }
   },
   "setupEntryTitle": "秘境向导",
-  "setupEntryHint": "秘境是你的私密聊天和共享空间，可以从头创建，或者受邀加入。",
+  "setupEntryHint": "秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。你可以从零创建，或受邀加入。",
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",
+  "setupEntryDemo": "先看看演示",
   "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
-  "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）。请更新 App 后重试",
-  "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试（这不是通道码本身的问题）",
+  "setupTokenAppTooOld": "本机 App 版本过旧，已无法使用（{code}）。请更新 App 后重试",
+  "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试",
   "@setupTokenRateLimited": {
     "placeholders": {
       "seconds": {
@@ -157,7 +150,6 @@
     }
   },
   "setupCreateCopy": "复制邀请链接",
-  "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
     "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示，不展示技术细节（如 SqliteException），自动重试中"
@@ -171,7 +163,6 @@
   "startupInitClearDataTitle": "清除本机数据？",
   "startupInitClearDataMessage": "这会清除本机全部本地数据（秘境、消息、附件、锁屏码与密钥），并回到入网向导。仅在反复重试仍失败时使用——不可恢复。",
   "startupInitClearedRestart": "本机数据已清除。请完全退出并重新打开 App。",
-  "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
   "setupPageScanInvite": "扫码填入通道码",
   "setupPageScannerHint": "把通道码二维码对准取景框",
   "setupPageNoEscrow": "❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。",
@@ -185,13 +176,10 @@
   },
   "setupJoinEntranceLimitReached": "该秘境的通道数量已达服务器上限，无法再开通新通道。",
   "setPinDialogPinLabel": "新 PIN（至少 6 位数字）",
-  "setPinDialogPinHint": "至少 6 位数字",
   "setPinDialogConfirmLabel": "确认新 PIN",
-  "setPinDialogConfirmHint": "再输一次以确认",
   "setPinDialogSetPin": "启用",
   "setPinDialogPinTooShort": "PIN 至少 6 位数字",
   "setPinDialogPinDigitsOnly": "PIN 只能是数字",
-  "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
   "setPinDialogOldWrong": "当前锁屏码错误",
   "verifyPinRequired": "请输入锁屏码以验证",
   "verifyPinWrong": "锁屏码错误",
@@ -205,16 +193,52 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置锁屏码",
-  "chatPageSetLockClearHint": "设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。",
-  "chatPageSetLockHintNoPin": "设置后，每次进入秘境都要解锁，更安全。",
+  "chatPageSetLockHintNoPin": "设置后，每次离开一定时间后就自动锁屏，然后必须解锁才能进入秘境。",
+  "chatPageSetLockRowVerify": "验证",
+  "chatPageSetLockRowSet": "设置",
+  "chatPageSetLockNewPinLabel": "新 PIN 或者留空不填",
+  "chatPageSetLockNewPinLabelNoPin": "新 PIN（至少 6 位数字）",
+  "chatPageSetLockSubmitChange": "更改",
+  "chatPageSetLockDurationLabel": "自动锁屏每当离开",
+  "chatPageSetLockTabChange": "更改锁屏码",
+  "chatPageSetLockClearButton": "清除锁屏码",
+  "lockDurationSecs": "{n} 秒",
+  "@lockDurationSecs": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lockDurationMin": "{n} 分钟",
+  "@lockDurationMin": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "chatPageSetLockOldLabel": "当前锁屏码",
   "chatPageSetLockOldRequired": "请先输入当前锁屏码",
-  "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",
-  "chatPageSetLockNoPinNotice": "锁屏码仍然为空，下次启动应用可直接进入秘境。",
-  "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
-  "chatPageSetLockCleared": "已清除锁屏码，下次启动应用可直接进入秘境。",
-  "chatPageClearLockTitle": "清除锁屏码？",
-  "chatPageClearLockMessage": "确定要清除锁屏码吗？清除后下次启动将直接进入聊天。",
+  "chatPageSetLockSameAsOld": "新锁屏码不能与当前锁屏码相同",
+  "chatPageSetLockPinRequired": "请输入新 PIN",
+  "@chatPageSetLockPinRequired": {
+    "description": "未设锁屏码时两框全空点「启用」的红字提示"
+  },
+  "chatPageSetLockNothingChanged": "你没有做任何修改",
+  "@chatPageSetLockNothingChanged": {
+    "description": "已设锁屏码的更改弹窗里，PIN 和自动锁屏时长都没动就点「更改」的红字提示"
+  },
+  "chatPageSetLockDone": "锁屏码已设置，每次离开 {duration} 后自动锁屏。",
+  "@chatPageSetLockDone": {
+    "description": "初设/更改锁屏码成功后的顶部提示（duration=自动锁屏时长，如「5 分钟」）",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageSetLockCleared": "已清除锁屏码，其他人拿到这台设备就能进入秘境。",
   "chatPageLockClearConfirm": "清除",
   "chatPageInviteDialogTitleInvite": "邀请",
   "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
@@ -265,8 +289,6 @@
   "chatPageRenameNameLabel": "名字",
   "chatPageGroupNameTitle": "群组名称",
   "chatPageGroupNameEditTooltip": "修改群名",
-  "chatPageMyAvatarTooltip": "修改我的头像",
-  "chatPageMyNameTooltip": "修改我的名字",
   "chatPageGroupNameLabel": "名称",
   "chatPageGenderLabel": "性别",
   "chatPageRenameEntranceTitle": "当前通道",
@@ -293,6 +315,14 @@
   },
   "chatPageRenameSameAsPeerError": "不能与同伴同名，请换个名字",
   "chatPageCopy": "复制",
+  "chatPageCopiedText": "已复制: {text}",
+  "@chatPageCopiedText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageEdit": "编辑",
   "chatPageRenameFailed": "修改失败: {error}",
   "@chatPageRenameFailed": {
@@ -325,13 +355,13 @@
       }
     }
   },
-  "chatPageEscrowRotatedNotice": "同伴已重设共享口令，以后必须使用新口令",
+  "chatPageEscrowRotatedNotice": "同伴已更换共享口令，以后必须使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
   "chatPageMenuMoreSettings": "更多设置",
   "chatPageMoreSettingsTitle": "更多设置",
   "chatPageMoreSettingsStorage": "附件存储",
-  "chatPageMoreSettingsTombstone": "墓碑消息",
+  "chatPageMoreSettingsTombstone": "消息留痕",
   "chatPageAttachmentStorageNote": "图片、视频、音频、文件等附件存放在哪里？",
   "chatPageAttachmentStorageSecured": "远程托管",
   "chatPageAttachmentStorageSecuredDesc": "每次打开都重新下载并解密，本机不留明文副本，更私密。",
@@ -403,6 +433,7 @@
   "chatPageMembersUnnamed": "未命名",
   "chatPageMembersInvite": "邀请",
   "chatPageMembersReinvite": "重新邀请",
+  "chatPageMemberProfileTitle": "群组同伴",
   "chatPageReinvitePassphraseTitle": "验证共享口令",
   "chatPageReinvitePassphraseHint": "验证后，即可重新邀请“{name}”",
   "@chatPageReinvitePassphraseHint": {
@@ -413,6 +444,10 @@
     }
   },
   "chatPagePassphraseFieldHint": "共享口令",
+  "chatPagePassphraseVerify": "验证",
+  "chatPagePassphraseWrong": "口令错误",
+  "chatPagePassphraseEmpty": "请输入共享口令",
+  "chatPagePassphraseVerifyFailed": "验证失败，请重试",
   "chatPagePassphraseShow": "显示",
   "chatPagePassphraseHide": "隐藏",
   "chatPageMembersInviteNew": "邀请新同伴",
@@ -424,7 +459,7 @@
   "chatPageEntranceListRefresh": "刷新",
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
-  "chatPagePinSetValue": "已设置",
+  "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
   "chatPageNotifyHint": "你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。",
@@ -471,9 +506,9 @@
   "chatPageBurnHeading": "阅后即焚",
   "chatPageBurnNote": "倒计时自动删除已阅读的新消息",
   "chatPageTombstoneHeading": "消息留痕",
-  "chatPageTombstoneNote": "已删除/已焚毁/已撤回的消息是否留痕？",
+  "chatPageTombstoneNote": "已删除/已焚毁/已撤回的消息是否显示？",
   "chatPageTombstoneKeep": "占位留痕",
-  "chatPageTombstoneKeepDesc": "显示为消息墓碑：正文隐藏，时间记录仍在，不打破消息流水",
+  "chatPageTombstoneKeepDesc": "显示为时间和状态条，正文隐藏，不打破消息流水",
   "chatPageTombstoneHide": "彻底消失",
   "chatPageTombstoneHideDesc": "完全不再显示，从消息流中彻底消失",
   "chatPageTombstoneSubmit": "启用",
@@ -714,7 +749,7 @@
   },
   "chatPageMenuAbout": "关于秘境",
   "aboutPageTitle": "关于秘境",
-  "aboutIntro": "秘境是你的私密聊天和共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。",
+  "aboutIntro": "秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上——没有账号，不留痕迹。不允许任何第三方（包括秘境自身）偷看内容，全力守护你的隐私。",
   "aboutVersionLabel": "版本号",
   "aboutDownloadLabel": "下载",
   "aboutServerLabel": "服务器地址",
@@ -772,7 +807,47 @@
   "promptLockCodeTitle": "输入锁屏码",
   "promptLockCodeHint": "请先验证本机锁屏码",
   "leaveSpaceConfirm": "销毁",
-  "setupPinReuseNotice": "本秘境将共用当前的锁屏码。",
+  "exitGroupTitle": "退出群组？",
+  "exitGroupMessage": "退出后，这个群组会从你的所有设备上消失并删除本地数据。此操作无法撤销！",
+  "exitGroupConfirm": "退出",
+  "exitGroupNameHint": "请输入群组名称“{name}”",
+  "@exitGroupNameHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameLabel": "{name}",
+  "@exitGroupNameLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameMismatch": "请输入正确的群组名称以确认",
+  "exitGroupConfirmWordHint": "群组还没有命名。请输入“{word}”以确认",
+  "@exitGroupConfirmWordHint": {
+    "description": "群名未设置时退群确认闸门的提示（expected 退化为固定确认词，与未命名通道的销毁流程同机制）",
+    "placeholders": {
+      "word": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupConfirmWordMismatch": "请输入正确的确认词",
+  "exitGroupFailed": "退出失败，仍留在群组中",
+  "exitGroupMenuItem": "退出群组",
+  "chatPageMemberLeftNotice": "{name} 退出了群组",
+  "@chatPageMemberLeftNotice": {
+    "description": "别人自愿退群时的顶部通知（member.left 广播；与 member.joined 同构）",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "errorBackend": "后台：{message}",
   "@errorBackend": {
     "description": "后台（服务端）错误的前缀：只有服务端响应产出的错误才带它，本机判定的错误不带",
@@ -896,5 +971,12 @@
   "chatPageAttachmentTooLargeUnknown": "文件太大，服务器拒收了",
   "@chatPageAttachmentTooLargeUnknown": {
     "description": "附件超限被服务器拒绝，但客户端不知道具体上限（旧服务端）"
+  },
+  "@chatPagePinMenuValue": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }

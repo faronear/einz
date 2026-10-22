@@ -149,9 +149,14 @@ Future<void> _openGroupNameDialog(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// 关闭「我的同伴」弹层（点最上层的 ModalBarrier 消散；页面里有两个 barrier）。
+/// 关闭「我的同伴」弹层（点屏幕顶部空白处的 ModalBarrier 消散）。
+///
+/// 不再点 barrier 的**中心**（2026-10-19）：成员弹层加入「退出群组」项后变高，
+/// 屏幕中心 (400,300) 会落进弹层内容里、点不到屏障——弹层关不掉，下一个用例
+/// 的 tap 全被残留屏障吞掉（CI group_status_bar_test 失败的根因）。
+/// 点顶部空白（y=20 恒在弹层上方）必中屏障。
 Future<void> _closeMembersSheet(WidgetTester tester) async {
-  await tester.tap(find.byType(ModalBarrier).last, warnIfMissed: false);
+  await tester.tapAt(const Offset(20, 20));
   await tester.pumpAndSettle();
 }
 
@@ -163,7 +168,7 @@ int _statusAvatars(WidgetTester tester) => tester
 void main() {
   disableAnimationsInTests();
 
-  testWidgets('群空间状态条左侧：成员头像条 + 群名/「在线/总数」，没有逐成员人名',
+  testWidgets('群空间状态条左侧：成员头像条（头像下方人名标签）+ 群名/「在线/总数」',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -175,11 +180,12 @@ void main() {
     expect(_statusAvatars(tester), 4,
         reason: '左侧应摆其他成员的头像（3 个），加我自己共 4 个');
 
-    // ② 左侧**没有人名**（原来的 "Member0、Member1、Member2" 已去掉）
+    // ② 头像下方各有**一个人名标签**（2026-10-20 试验方案：头像缩小、下方展示
+    // 用户名，宽度压在头像宽度内）
     for (var i = 0; i < 3; i++) {
       expect(find.descendant(of: _statusBar, matching: find.text('Member$i')),
-          findsNothing,
-          reason: '群空间状态条左侧不该再写人名');
+          findsOneWidget,
+          reason: '每个成员头像下方应有人名标签 Member$i');
     }
 
     // ③ 没有人形图标以外的旧元素（上一版那个 Icons.groups_outlined 已被头像条取代）
@@ -410,7 +416,13 @@ void main() {
     await tester.tap(find.descendant(of: _statusBar, matching: find.text('Crew')));
     await tester.pumpAndSettle();
     expect(membersSheet, findsOneWidget, reason: '群名也属于大胶囊可点区');
-    expect(find.text(_zh.chatPageGroupNameTitle), findsOneWidget,
+    // 有名字 → 群名行显示群名本身（占位词只在没有名字时出现）；
+    // 用行 key 定位，避开状态条上同文案的 Text（老板 2026-10-19 修 CI）
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('membersSheetGroupNameRow')),
+            matching: find.text('Crew')),
+        findsOneWidget,
         reason: '弹层里的群名行：没名字时显示占位词，有名字显示群名本身');
     await _closeMembersSheet(tester);
 
@@ -424,8 +436,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
   });
 
-  testWidgets('点我的名字 → 打开「我的身份」弹窗', (WidgetTester tester) async {
-    // 老板 2026-10-09：状态条里我的名字也做成可点（与菜单「我的身份」同入口）。
+  testWidgets('点我的名字/头像 → 打开「我的资料」弹层', (WidgetTester tester) async {
+    // 老板 2026-10-20：头像 + 名字合成**一个**「我的资料」大胶囊，整块可点
+    // （与汉堡菜单「我的资料」同入口）；原来各自的点击效果（名字→改名
+    // 弹窗、头像→全屏/换头像）去掉。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -451,13 +465,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
+    // ① 点名字（胶囊左半边）→ 「我的资料」弹层
     await tester.tap(find.descendant(
         of: _statusBar, matching: find.text('Lukas')));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageRenameNameTitle), findsOneWidget,
-        reason: '点我的名字应打开「我的身份」弹窗');
-    await tester.tap(find.text(_zh.cancel));
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
+        reason: '点我的名字应打开「我的资料」弹层（与汉堡菜单同入口）');
+    await _closeMembersSheet(tester);
+
+    // ② 点头像（同一个胶囊里，最右那枚 CircleAvatar）→ 同一个弹层
+    await tester.tap(find.descendant(
+        of: _statusBar, matching: find.byType(CircleAvatar).last));
     await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
+        reason: '点我的头像应打开同一个「我的资料」弹层');
     // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
     await tester.pump(const Duration(milliseconds: 450));
   });

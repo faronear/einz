@@ -157,6 +157,10 @@ export function openDb(path?: string): Database.Database {
       status       TEXT NOT NULL DEFAULT 'active',
       -- 伴侣预置行未加入 → joined_at 为 NULL，激活时写入
       joined_at    INTEGER,
+      -- 自愿退群墓碑时刻（status='left' 时写；aimemo/groupExitDesign.md）。
+      -- 墓碑行保留 member_id/display_name/gender（历史消息名字解析依赖），
+      -- slot 让位给新成员（见 spaces.leaveSpace）。
+      left_at      INTEGER,
       -- 邮件通知的目标地址（NOT NULL 约束没有：未设置用 NULL，不用空串）。
       -- 写进来 ≠ 可发信：必须先点验证链接（见 notify_emails.verified_at）。
       email        TEXT,
@@ -315,6 +319,13 @@ export function openDb(path?: string): Database.Database {
   // 迁移：space_members 补 email（邮件通知的目标地址；未设置是 NULL，不用空串）
   try {
     db.exec(`ALTER TABLE space_members ADD COLUMN email TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：space_members 补 left_at（自愿退群墓碑时刻，2026-10-19；
+  // 存量库没有墓碑行 → 全为 NULL，无需回填）
+  try {
+    db.exec(`ALTER TABLE space_members ADD COLUMN left_at INTEGER`);
   } catch {
     // 列已存在（新库）→ 忽略
   }

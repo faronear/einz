@@ -88,7 +88,7 @@ export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
  *  entrances 表，跨空间泄漏 member/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
   token: string
-): { space_id: string; entrances: unknown[]; member_names: Record<string, string>; member_genders: Record<string, string>; member_slots: Record<string, number>; mode: string; max_members: number } {
+): { space_id: string; entrances: unknown[]; member_names: Record<string, string>; member_genders: Record<string, string>; member_slots: Record<string, number>; member_status: Record<string, string>; mode: string; max_members: number } {
   const sess = requireSession(token);
   const cfg = loadConfig();
   const scope = entranceScopeClause(sess.space_id);
@@ -99,13 +99,19 @@ export function getSpace(
   const memberNames: Record<string, string> = {};
   const memberGenders: Record<string, string> = {};
   const memberSlots: Record<string, number> = {};
+  // 自愿退群（2026-10-19）：成员状态下发（'active' | 'left'）。**查询刻意不带
+  // status 过滤**——墓碑行（left）保留 member_id/display_name，历史消息的发送者
+  // 名字解析（_senderNameOf）才能继续工作；名单/计数/邀请判定由客户端按这个
+  // map 过滤（aimemo/groupExitDesign.md §4.2/§4.3）。
+  const memberStatus: Record<string, string> = {};
   const members = getDb()
-    .prepare(`SELECT member_id, display_name, gender, slot FROM space_members WHERE space_id = ? AND member_id IS NOT NULL`)
-    .all(sess.space_id) as { member_id: string; display_name: string | null; gender: string | null; slot: number }[];
+    .prepare(`SELECT member_id, display_name, gender, slot, status FROM space_members WHERE space_id = ? AND member_id IS NOT NULL`)
+    .all(sess.space_id) as { member_id: string; display_name: string | null; gender: string | null; slot: number; status: string }[];
   for (const m of members) {
     if (m.display_name != null) memberNames[m.member_id] = m.display_name;
     if (m.gender != null) memberGenders[m.member_id] = m.gender;
     memberSlots[m.member_id] = m.slot;
+    memberStatus[m.member_id] = m.status;
   }
   // 群聊一期（2026-10-03）：mode + 成员上限下发客户端——客户端据此隐藏群空间
   // 的通话入口、满员时隐藏邀请入口、升格确认里显示"最多 N 人"。客户端不该
@@ -119,6 +125,7 @@ export function getSpace(
     member_names: memberNames,
     member_genders: memberGenders,
     member_slots: memberSlots,
+    member_status: memberStatus,
     mode: modeRow?.mode === 'group' ? 'group' : 'duo',
     max_members: cfg.max_members_per_space,
   };

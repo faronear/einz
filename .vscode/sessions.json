@@ -38,7 +38,7 @@
         "name": "tui--本机",
         "autoExecuteCommands": true,
         "commands": [
-          "cd ~/einz && npm run tui2local"
+          "cd ~/einz && npm run tui-cli"
         ]
       },
       {
@@ -46,7 +46,7 @@
         "autoExecuteCommands": true,
         "commands": [
           "cd ~/einz",
-          "npm run app-mac-run-local"
+          "npm run app-mac-run"
         ]
       },
       {
@@ -62,7 +62,7 @@
         "autoExecuteCommands": true,
         "commands": [
           "cd ~/einz",
-          "if [ $(hostname) = 'DoomBase' ]; then npm run app-ios-boot && npm run app-ios-run-local; else exit; fi;"
+          "if [ $(hostname) = 'DoomBase' ]; then npm run app-ios-boot && npm run app-ios-run; else exit; fi;"
         ]
       },
       {

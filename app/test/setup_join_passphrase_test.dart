@@ -5,10 +5,12 @@
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz/data/server_config.dart';
@@ -122,6 +124,15 @@ final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 void main() {
   setUpAll(() async {
     await sodium(); // 自动建钥需要 libsodium（macOS 经 LIBSODIUM_PATH/brew 可用）
+    // PIN 步骤已移除（老板 2026-10-19）：口令页「下一步」直接 savePlain 落盘
+    // （SecureStore/Keychain）——测试环境必须给 mock，否则写入挂起、欢迎弹窗不出现
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
+  setUp(() {
+    // 「正确口令」等用例的 savePlain 会 publish 全局 VaultSession（内存会话跨
+    // 用例残留）：不清掉的话，后续用例被「本机已有通道」闸门拦截
+    VaultSession.publish(null);
   });
 
   final payload =
@@ -136,15 +147,19 @@ void main() {
         reason: '错误口令必须被拦截并提示');
     expect(find.text(_zh.wizardJoinPassphraseHint('duo')),
         findsOneWidget, reason: '应停留在口令页');
-    expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '不应进入 PIN 页');
   });
 
-  testWidgets('正确口令：通过验证进入 PIN 页', (WidgetTester tester) async {
+  testWidgets('正确口令：通过验证放行进完成路径（欢迎弹窗）', (WidgetTester tester) async {
     await pumpToJoinPassphrase(tester, correctPass: '正确口令-abc', payload: payload);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
+    // PIN 步骤已移除（老板 2026-10-19）：口令页是最后一个输入页，放行后直接
+    // join → 跳过设锁落盘 → 完成页 + 欢迎弹窗
+    expect(find.text(_zh.welcomeDialogMessage), findsOneWidget,
+        reason: '正确口令应直接走完进完成页（欢迎弹窗）');
+    expect(find.text(_zh.wizardJoinPassphraseWrong), findsNothing,
+        reason: '正确口令不应报错');
   });
 
   testWidgets('先输错再输对：token 只被消费一次，重输正确口令仍可加入', (WidgetTester tester) async {
@@ -178,7 +193,6 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '重输正确口令应放行进 PIN 步骤');
     expect(joinCalls, 1, reason: 'token 只应被消费一次');
   });
 
@@ -197,40 +211,12 @@ void main() {
 
     expect(find.textContaining('后台：${_zh.setupTokenSpaceAlreadyAdded}'), findsOneWidget,
         reason: '服务端说的错误必须带「后台：」前缀');
-    expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '被拒后不得放行');
   });
 
-  testWidgets('PIN 页退回口令页再前进：不重复消费 token（仍能进 PIN 页）', (WidgetTester tester) async {
-    var joinCalls = 0;
-    Future<SpaceJoinResult> fakeJoin(String token) async {
-      joinCalls++;
-      if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
-      return const SpaceJoinResult(
-          spaceId: 'space-test',
-          memberId: 'memberB',
-          slot: 1,
-          sessionToken: 'tok',
-          entranceId: 'dev2',
-          spaceAddress: '0x00');
-    }
-
-    await pumpToJoinPassphrase(
-        tester, correctPass: '正确口令-abc', payload: payload, join: fakeJoin);
-    await tester.enterText(find.byType(TextField), '正确口令-abc');
-    await tester.tap(find.text(_zh.wizardNext));
-    await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '首次应放行进 PIN 步骤');
-    expect(joinCalls, 1);
-
-    // 退回口令页 → 再点下一步：不应再调 joinSpace（token 是一次性的）
-    await tester.tap(find.text(_zh.wizardBack));
-    await tester.pumpAndSettle();
-    expect(find.text(_zh.wizardJoinPassphraseTitle), findsOneWidget, reason: '应退回口令页');
-    await tester.tap(find.text(_zh.wizardNext));
-    await tester.pumpAndSettle();
-    expect(joinCalls, 1, reason: '重复前进不应再消费 token');
-    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '应再次放行进 PIN 步骤');
-  });
+  // 原「PIN 页退回口令页再前进：不重复消费 token」用例已删（老板 2026-10-19 移除
+  // PIN 步骤后场景消失：口令页「下一步」成功即进完成页，无"退回再前进"路径）。
+  // 其回归意图（token 不被重复消费）由「先输错再输对」用例的 joinCalls 断言覆盖；
+  // _verifyJoinPassphrase 内的 alreadyJoined 防御分支保留为死代码防护。
 
   testWidgets('通道码验证通过后即锁定：退回本页再前进不重复校验', (WidgetTester tester) async {
     var preflightCalls = 0;

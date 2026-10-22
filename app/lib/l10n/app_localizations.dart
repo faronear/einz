@@ -146,23 +146,11 @@ abstract class AppLocalizations {
   /// **'Applied to all spaces on this device'**
   String get settingsScopeAllDone;
 
-  /// No description provided for @skip.
-  ///
-  /// In en, this message translates to:
-  /// **'Skip'**
-  String get skip;
-
   /// No description provided for @close.
   ///
   /// In en, this message translates to:
   /// **'Close'**
   String get close;
-
-  /// No description provided for @setupPageEnvelopeKeyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.'**
-  String setupPageEnvelopeKeyHint(String mode);
 
   /// No description provided for @setupPageNeedPassphrase.
   ///
@@ -308,12 +296,6 @@ abstract class AppLocalizations {
   /// **'Join a space'**
   String get wizardAppBarJoin;
 
-  /// No description provided for @wizardAppBarOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Import key envelope'**
-  String get wizardAppBarOffline;
-
   /// No description provided for @wizardNext.
   ///
   /// In en, this message translates to:
@@ -398,18 +380,6 @@ abstract class AppLocalizations {
   /// **'Verify passphrase'**
   String get wizardJoinPassphraseTitle;
 
-  /// No description provided for @wizardTitlePin.
-  ///
-  /// In en, this message translates to:
-  /// **'Set PIN'**
-  String get wizardTitlePin;
-
-  /// No description provided for @wizardTitleEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify key envelope'**
-  String get wizardTitleEnvelope;
-
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
@@ -470,24 +440,6 @@ abstract class AppLocalizations {
   /// **'Wrong passphrase.'**
   String get wizardJoinPassphraseWrong;
 
-  /// No description provided for @wizardSwitchToEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'Use key envelope instead (offline)'**
-  String get wizardSwitchToEnvelope;
-
-  /// No description provided for @wizardSwitchToPassphrase.
-  ///
-  /// In en, this message translates to:
-  /// **'Use a shared passphrase instead'**
-  String get wizardSwitchToPassphrase;
-
-  /// No description provided for @wizardPinHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.'**
-  String get wizardPinHint;
-
   /// No description provided for @welcomeDialogTitleCreate.
   ///
   /// In en, this message translates to:
@@ -527,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.'**
+  /// **'Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. You can create a new one from the ground up, or join an existing one by invitation.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.
@@ -541,6 +493,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Join'**
   String get setupEntryJoin;
+
+  /// No description provided for @setupEntryDemo.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a look around first'**
+  String get setupEntryDemo;
 
   /// No description provided for @setupEntryLegacyServer.
   ///
@@ -557,7 +515,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenRateLimited.
   ///
   /// In en, this message translates to:
-  /// **'Too many requests — retry in {seconds}s (this is not a problem with the entrance token)'**
+  /// **'Too many requests — retry in {seconds}s'**
   String setupTokenRateLimited(String seconds);
 
   /// No description provided for @setupTokenRateLimitedNoWait.
@@ -626,12 +584,6 @@ abstract class AppLocalizations {
   /// **'Copy invite link'**
   String get setupCreateCopy;
 
-  /// No description provided for @setupCreateCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Copied'**
-  String get setupCreateCopied;
-
   /// Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying
   ///
   /// In en, this message translates to:
@@ -674,12 +626,6 @@ abstract class AppLocalizations {
   /// **'Local data cleared. Fully quit and reopen the app.'**
   String get startupInitClearedRestart;
 
-  /// No description provided for @setupPagePasteEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Paste the key envelope (base64)'**
-  String get setupPagePasteEnvelope;
-
   /// No description provided for @setupPageScanInvite.
   ///
   /// In en, this message translates to:
@@ -716,23 +662,11 @@ abstract class AppLocalizations {
   /// **'New PIN (at least 6 digits)'**
   String get setPinDialogPinLabel;
 
-  /// No description provided for @setPinDialogPinHint.
-  ///
-  /// In en, this message translates to:
-  /// **'At least 6 digits'**
-  String get setPinDialogPinHint;
-
   /// No description provided for @setPinDialogConfirmLabel.
   ///
   /// In en, this message translates to:
   /// **'Confirm new PIN'**
   String get setPinDialogConfirmLabel;
-
-  /// No description provided for @setPinDialogConfirmHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Type it again to confirm'**
-  String get setPinDialogConfirmHint;
 
   /// No description provided for @setPinDialogSetPin.
   ///
@@ -751,12 +685,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Digits only'**
   String get setPinDialogPinDigitsOnly;
-
-  /// No description provided for @setPinDialogPinMismatch.
-  ///
-  /// In en, this message translates to:
-  /// **'PINs do not match'**
-  String get setPinDialogPinMismatch;
 
   /// No description provided for @setPinDialogOldWrong.
   ///
@@ -794,17 +722,71 @@ abstract class AppLocalizations {
   /// **'Set PIN'**
   String get chatPageSetLockTitle;
 
-  /// No description provided for @chatPageSetLockClearHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.'**
-  String get chatPageSetLockClearHint;
-
   /// No description provided for @chatPageSetLockHintNoPin.
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space.'**
+  /// **'Once set, Einz will lock itself everytime after keeping inactive for a while, then you must unlock to enter your space again.'**
   String get chatPageSetLockHintNoPin;
+
+  /// No description provided for @chatPageSetLockRowVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get chatPageSetLockRowVerify;
+
+  /// No description provided for @chatPageSetLockRowSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get chatPageSetLockRowSet;
+
+  /// No description provided for @chatPageSetLockNewPinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN or leave blank'**
+  String get chatPageSetLockNewPinLabel;
+
+  /// No description provided for @chatPageSetLockNewPinLabelNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN (at least 6 digits)'**
+  String get chatPageSetLockNewPinLabelNoPin;
+
+  /// No description provided for @chatPageSetLockSubmitChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get chatPageSetLockSubmitChange;
+
+  /// No description provided for @chatPageSetLockDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-lock after inactivity'**
+  String get chatPageSetLockDurationLabel;
+
+  /// No description provided for @chatPageSetLockTabChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get chatPageSetLockTabChange;
+
+  /// No description provided for @chatPageSetLockClearButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear PIN'**
+  String get chatPageSetLockClearButton;
+
+  /// No description provided for @lockDurationSecs.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} sec'**
+  String lockDurationSecs(int n);
+
+  /// No description provided for @lockDurationMin.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} min'**
+  String lockDurationMin(int n);
 
   /// No description provided for @chatPageSetLockOldLabel.
   ///
@@ -815,44 +797,38 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockOldRequired.
   ///
   /// In en, this message translates to:
-  /// **'Enter current PIN first'**
+  /// **'Enter current PIN to verify'**
   String get chatPageSetLockOldRequired;
 
   /// No description provided for @chatPageSetLockSameAsOld.
   ///
   /// In en, this message translates to:
-  /// **'New PIN is the same as the current one, nothing is changed.'**
+  /// **'New PIN must be different than the current one.'**
   String get chatPageSetLockSameAsOld;
 
-  /// No description provided for @chatPageSetLockNoPinNotice.
+  /// Inline error when submit is tapped with both PIN fields empty and no PIN set
   ///
   /// In en, this message translates to:
-  /// **'No PIN set. Next launch goes straight into the space.'**
-  String get chatPageSetLockNoPinNotice;
+  /// **'Enter a new PIN'**
+  String get chatPageSetLockPinRequired;
 
-  /// No description provided for @chatPageSetLockDone.
+  /// Inline error when the change-PIN dialog is submitted with neither the PIN nor the auto-lock delay modified
   ///
   /// In en, this message translates to:
-  /// **'PIN set. You must enter PIN to unlock the space at next launch.'**
-  String get chatPageSetLockDone;
+  /// **'You haven\'t changed anything'**
+  String get chatPageSetLockNothingChanged;
+
+  /// Top notice after PIN is set (duration = auto-lock delay, e.g. "5 minutes")
+  ///
+  /// In en, this message translates to:
+  /// **'PIN set. Einz will lock itself everytime after inactivity of {duration}.'**
+  String chatPageSetLockDone(String duration);
 
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
-  /// **'PIN cleared. You can enter the space directly at next launch.'**
+  /// **'PIN cleared. Anyone who has access to this device can visit your space.'**
   String get chatPageSetLockCleared;
-
-  /// No description provided for @chatPageClearLockTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear PIN?'**
-  String get chatPageClearLockTitle;
-
-  /// No description provided for @chatPageClearLockMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear the PIN? After clearing, next app launch will go straight into chat.'**
-  String get chatPageClearLockMessage;
 
   /// No description provided for @chatPageLockClearConfirm.
   ///
@@ -1028,18 +1004,6 @@ abstract class AppLocalizations {
   /// **'Change group name'**
   String get chatPageGroupNameEditTooltip;
 
-  /// No description provided for @chatPageMyAvatarTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Change my avatar'**
-  String get chatPageMyAvatarTooltip;
-
-  /// No description provided for @chatPageMyNameTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Change my name'**
-  String get chatPageMyNameTooltip;
-
   /// No description provided for @chatPageGroupNameLabel.
   ///
   /// In en, this message translates to:
@@ -1111,6 +1075,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy'**
   String get chatPageCopy;
+
+  /// No description provided for @chatPageCopiedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied: {text}'**
+  String chatPageCopiedText(String text);
 
   /// No description provided for @chatPageEdit.
   ///
@@ -1400,6 +1370,12 @@ abstract class AppLocalizations {
   /// **'Re-invite'**
   String get chatPageMembersReinvite;
 
+  /// No description provided for @chatPageMemberProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Group companion'**
+  String get chatPageMemberProfileTitle;
+
   /// No description provided for @chatPageReinvitePassphraseTitle.
   ///
   /// In en, this message translates to:
@@ -1417,6 +1393,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shared passphrase'**
   String get chatPagePassphraseFieldHint;
+
+  /// No description provided for @chatPagePassphraseVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get chatPagePassphraseVerify;
+
+  /// No description provided for @chatPagePassphraseWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect passphrase'**
+  String get chatPagePassphraseWrong;
+
+  /// No description provided for @chatPagePassphraseEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the shared passphrase'**
+  String get chatPagePassphraseEmpty;
+
+  /// No description provided for @chatPagePassphraseVerifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification failed, please try again'**
+  String get chatPagePassphraseVerifyFailed;
 
   /// No description provided for @chatPagePassphraseShow.
   ///
@@ -1484,11 +1484,11 @@ abstract class AppLocalizations {
   /// **'Lock now'**
   String get chatPageLockNow;
 
-  /// No description provided for @chatPagePinSetValue.
+  /// No description provided for @chatPagePinMenuValue.
   ///
   /// In en, this message translates to:
-  /// **'Set'**
-  String get chatPagePinSetValue;
+  /// **'{duration}'**
+  String chatPagePinMenuValue(String duration);
 
   /// No description provided for @chatPageNotifyLabel.
   ///
@@ -1613,7 +1613,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneKeepDesc.
   ///
   /// In en, this message translates to:
-  /// **'Show a placeholder: content hidden, time and record kept, message flow unbroken'**
+  /// **'Show a time and status bar without content, message flow unbroken'**
   String get chatPageTombstoneKeepDesc;
 
   /// No description provided for @chatPageTombstoneHide.
@@ -1625,7 +1625,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHideDesc.
   ///
   /// In en, this message translates to:
-  /// **'Tombstones disappear from the message flow entirely'**
+  /// **'Disappear from the message flow entirely'**
   String get chatPageTombstoneHideDesc;
 
   /// No description provided for @chatPageTombstoneSubmit.
@@ -2177,7 +2177,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.'**
+  /// **'Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.
@@ -2396,11 +2396,71 @@ abstract class AppLocalizations {
   /// **'Destroy'**
   String get leaveSpaceConfirm;
 
-  /// No description provided for @setupPinReuseNotice.
+  /// No description provided for @exitGroupTitle.
   ///
   /// In en, this message translates to:
-  /// **'This space will share the current PIN.'**
-  String get setupPinReuseNotice;
+  /// **'Leave group?'**
+  String get exitGroupTitle;
+
+  /// No description provided for @exitGroupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!'**
+  String get exitGroupMessage;
+
+  /// No description provided for @exitGroupConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get exitGroupConfirm;
+
+  /// No description provided for @exitGroupNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the group name “{name}”'**
+  String exitGroupNameHint(String name);
+
+  /// No description provided for @exitGroupNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}'**
+  String exitGroupNameLabel(String name);
+
+  /// No description provided for @exitGroupNameMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the correct group name to confirm'**
+  String get exitGroupNameMismatch;
+
+  /// Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed entrance)
+  ///
+  /// In en, this message translates to:
+  /// **'This group has no name yet. Type “{word}” to confirm'**
+  String exitGroupConfirmWordHint(String word);
+
+  /// No description provided for @exitGroupConfirmWordMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the correct confirmation word'**
+  String get exitGroupConfirmWordMismatch;
+
+  /// No description provided for @exitGroupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t leave the group — you\'re still in it'**
+  String get exitGroupFailed;
+
+  /// No description provided for @exitGroupMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave group'**
+  String get exitGroupMenuItem;
+
+  /// Top notice when someone leaves the group voluntarily (member.left broadcast; mirrors member.joined)
+  ///
+  /// In en, this message translates to:
+  /// **'{name} left the group'**
+  String chatPageMemberLeftNotice(String name);
 
   /// Prefix for errors reported by the server; errors decided on this device carry no prefix
   ///

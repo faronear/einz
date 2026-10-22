@@ -494,8 +494,9 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
   服务器上**所有空间**的通道全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
   只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方通道全丢 =
   双方放弃该空间，重新建一个即可（v1 只有一个空间才不得不支持恢复）。
-  新通道接入仍走：**一次性 join token（邀请链接）/ 共享口令 / 密保信封**
-  （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除）。
+  新通道接入仍走：**一次性 join token（邀请链接）/ 共享口令**
+  （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除；
+  密保信封导入线 2026-10-19 整条删除，见 aimemo/worklog）。
 
 ## 8. WebSocket（实时通道）
 
@@ -531,6 +532,7 @@ Authorization: Bearer <session_token>
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成通道码/改口令时按需检测 updated_at 再要求输入新口令） |
 | S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
 | S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加设备（attach token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
+| S→C | `member.left` | `{ "space_id": "…", "member_id": "…", "display_name": "…" }` | 自愿退群（2026-10-19，`PROTOCOL_MULTIVERSE.md` §4.2；**仅 group**）：某成员**身份级**退出（名下全部通道一并注销、成员行转墓碑）。与 `member.joined` 对偶——客户端刷新名单 + 顶部通知；`display_name` 只供通知文案，权威标识是 `member_id`。退出者自己的连接收不到这帧（已被静默摘除 / 撤销关闭）。老客户端忽略未知帧即可（`PROTOCOL_VERSION` 不为此升） |
 
 ### 8.3 顺序与重连
 

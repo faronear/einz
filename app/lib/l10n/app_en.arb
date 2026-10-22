@@ -8,16 +8,7 @@
   "settings": "Settings",
   "settingsScopeAll": "Apply to all spaces on this device",
   "settingsScopeAllDone": "Applied to all spaces on this device",
-  "skip": "Skip",
   "close": "Close",
-  "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.",
-  "@setupPageEnvelopeKeyHint": {
-    "placeholders": {
-      "mode": {
-        "type": "String"
-      }
-    }
-  },
   "setupPageNeedPassphrase": "Enter a shared passphrase",
   "upgradeFrozenTitle": "Update required",
   "upgradeFrozenBody": "Your app version {current} is no longer supported, you need at least {min}. Please update to continue.",
@@ -73,7 +64,6 @@
   "wizardGenderRequired": "Select a gender",
   "wizardAppBarCreate": "Create a space",
   "wizardAppBarJoin": "Join a space",
-  "wizardAppBarOffline": "Import key envelope",
   "wizardNext": "Next",
   "wizardBack": "Back",
   "wizardDone": "Done",
@@ -88,8 +78,6 @@
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
   "wizardTitlePassphrase": "Set passphrase",
   "wizardJoinPassphraseTitle": "Verify passphrase",
-  "wizardTitlePin": "Set PIN",
-  "wizardTitleEnvelope": "Verify key envelope",
   "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
@@ -121,9 +109,6 @@
     }
   },
   "wizardJoinPassphraseWrong": "Wrong passphrase.",
-  "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
-  "wizardSwitchToPassphrase": "Use a shared passphrase instead",
-  "wizardPinHint": "Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.",
   "welcomeDialogTitleCreate": "All set!",
   "welcomeDialogTitleJoin": "All set!",
   "welcomeDialogMessage": "Your space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!",
@@ -137,12 +122,13 @@
     }
   },
   "setupEntryTitle": "Einz wizard",
-  "setupEntryHint": "Einz is your secret space for private chatting and sharing. You can create a new one, or join an existing one by invitation.",
+  "setupEntryHint": "Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. You can create a new one from the ground up, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
+  "setupEntryDemo": "Take a look around first",
   "setupEntryLegacyServer": "Server version too old — please upgrade",
   "setupTokenAppTooOld": "This app is too old for the server ({code}). Please update the app and try again",
-  "setupTokenRateLimited": "Too many requests — retry in {seconds}s (this is not a problem with the entrance token)",
+  "setupTokenRateLimited": "Too many requests — retry in {seconds}s",
   "@setupTokenRateLimited": {
     "placeholders": {
       "seconds": {
@@ -178,7 +164,6 @@
     }
   },
   "setupCreateCopy": "Copy invite link",
-  "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
   "@setupPageInitFailed": {
     "description": "Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying"
@@ -192,7 +177,6 @@
   "startupInitClearDataTitle": "Clear local data?",
   "startupInitClearDataMessage": "Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.",
   "startupInitClearedRestart": "Local data cleared. Fully quit and reopen the app.",
-  "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
   "setupPageScanInvite": "Scan entrance token QR code",
   "setupPageScannerHint": "Point the camera at the entrance token QR code",
   "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first entrance first",
@@ -206,13 +190,10 @@
   },
   "setupJoinEntranceLimitReached": "This space has reached the server's entrance limit — no new entrance can be opened.",
   "setPinDialogPinLabel": "New PIN (at least 6 digits)",
-  "setPinDialogPinHint": "At least 6 digits",
   "setPinDialogConfirmLabel": "Confirm new PIN",
-  "setPinDialogConfirmHint": "Type it again to confirm",
   "setPinDialogSetPin": "Apply",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
-  "setPinDialogPinMismatch": "PINs do not match",
   "setPinDialogOldWrong": "Wrong current PIN",
   "verifyPinRequired": "Enter your PIN to verify",
   "verifyPinWrong": "Wrong PIN",
@@ -226,16 +207,52 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set PIN",
-  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space. You can also leave the new PIN blank to clear the current PIN.",
-  "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you enter the space.",
+  "chatPageSetLockHintNoPin": "Once set, Einz will lock itself everytime after keeping inactive for a while, then you must unlock to enter your space again.",
+  "chatPageSetLockRowVerify": "Verify",
+  "chatPageSetLockRowSet": "Set",
+  "chatPageSetLockNewPinLabel": "New PIN or leave blank",
+  "chatPageSetLockNewPinLabelNoPin": "New PIN (at least 6 digits)",
+  "chatPageSetLockSubmitChange": "Change",
+  "chatPageSetLockDurationLabel": "Auto-lock after inactivity",
+  "chatPageSetLockTabChange": "Change PIN",
+  "chatPageSetLockClearButton": "Clear PIN",
+  "lockDurationSecs": "{n} sec",
+  "@lockDurationSecs": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lockDurationMin": "{n} min",
+  "@lockDurationMin": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "chatPageSetLockOldLabel": "Current PIN",
-  "chatPageSetLockOldRequired": "Enter current PIN first",
-  "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
-  "chatPageSetLockNoPinNotice": "No PIN set. Next launch goes straight into the space.",
-  "chatPageSetLockDone": "PIN set. You must enter PIN to unlock the space at next launch.",
-  "chatPageSetLockCleared": "PIN cleared. You can enter the space directly at next launch.",
-  "chatPageClearLockTitle": "Clear PIN?",
-  "chatPageClearLockMessage": "Clear the PIN? After clearing, next app launch will go straight into chat.",
+  "chatPageSetLockOldRequired": "Enter current PIN to verify",
+  "chatPageSetLockSameAsOld": "New PIN must be different than the current one.",
+  "chatPageSetLockPinRequired": "Enter a new PIN",
+  "@chatPageSetLockPinRequired": {
+    "description": "Inline error when submit is tapped with both PIN fields empty and no PIN set"
+  },
+  "chatPageSetLockNothingChanged": "You haven't changed anything",
+  "@chatPageSetLockNothingChanged": {
+    "description": "Inline error when the change-PIN dialog is submitted with neither the PIN nor the auto-lock delay modified"
+  },
+  "chatPageSetLockDone": "PIN set. Einz will lock itself everytime after inactivity of {duration}.",
+  "@chatPageSetLockDone": {
+    "description": "Top notice after PIN is set (duration = auto-lock delay, e.g. \"5 minutes\")",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageSetLockCleared": "PIN cleared. Anyone who has access to this device can visit your space.",
   "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
   "chatPageInviteDialogTitleAttachSelf": "Add my new entrance",
@@ -286,8 +303,6 @@
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",
   "chatPageGroupNameEditTooltip": "Change group name",
-  "chatPageMyAvatarTooltip": "Change my avatar",
-  "chatPageMyNameTooltip": "Change my name",
   "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
@@ -314,6 +329,14 @@
   },
   "chatPageRenameSameAsPeerError": "Can't use the same name as someone else — pick another",
   "chatPageCopy": "Copy",
+  "chatPageCopiedText": "Copied: {text}",
+  "@chatPageCopiedText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageEdit": "Edit",
   "chatPageRenameFailed": "Rename failed: {error}",
   "@chatPageRenameFailed": {
@@ -438,6 +461,7 @@
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvite": "Invite",
   "chatPageMembersReinvite": "Re-invite",
+  "chatPageMemberProfileTitle": "Group companion",
   "chatPageReinvitePassphraseTitle": "Verify passphrase",
   "chatPageReinvitePassphraseHint": "After verification you can re-invite “{name}”",
   "@chatPageReinvitePassphraseHint": {
@@ -448,6 +472,10 @@
     }
   },
   "chatPagePassphraseFieldHint": "Shared passphrase",
+  "chatPagePassphraseVerify": "Verify",
+  "chatPagePassphraseWrong": "Incorrect passphrase",
+  "chatPagePassphraseEmpty": "Enter the shared passphrase",
+  "chatPagePassphraseVerifyFailed": "Verification failed, please try again",
   "chatPagePassphraseShow": "Show",
   "chatPagePassphraseHide": "Hide",
   "chatPageMembersInviteNew": "Invite a new companion",
@@ -469,7 +497,7 @@
   "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
-  "chatPagePinSetValue": "Set",
+  "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
   "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification will be sent to your email address.",
@@ -518,9 +546,9 @@
   "chatPageTombstoneHeading": "Tombstone messages",
   "chatPageTombstoneNote": "How deleted/burned/recalled messages appear?",
   "chatPageTombstoneKeep": "Keep message status",
-  "chatPageTombstoneKeepDesc": "Show a placeholder: content hidden, time and record kept, message flow unbroken",
+  "chatPageTombstoneKeepDesc": "Show a time and status bar without content, message flow unbroken",
   "chatPageTombstoneHide": "Hide completely",
-  "chatPageTombstoneHideDesc": "Tombstones disappear from the message flow entirely",
+  "chatPageTombstoneHideDesc": "Disappear from the message flow entirely",
   "chatPageTombstoneSubmit": "Apply",
   "chatPageBurnOff": "Burn-after-read is disabled on this message",
   "chatPageBurnFailed": "Failed to set burn-after-read",
@@ -759,7 +787,7 @@
   },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",
-  "aboutIntro": "Einz is your secret space for private chatting and sharing, end-to-end encrypted, everything under your free control, and no third party — including Einz itself — can peek at the content, fully safeguarding your privacy.",
+  "aboutIntro": "Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.",
   "aboutVersionLabel": "Version",
   "aboutDownloadLabel": "Download",
   "aboutServerLabel": "Server",
@@ -827,7 +855,47 @@
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Verify this device's lock screen code first",
   "leaveSpaceConfirm": "Destroy",
-  "setupPinReuseNotice": "This space will share the current PIN.",
+  "exitGroupTitle": "Leave group?",
+  "exitGroupMessage": "Leaving removes this group from all your devices and erases local data immediately. This cannot be undone!",
+  "exitGroupConfirm": "Leave",
+  "exitGroupNameHint": "Type the group name “{name}”",
+  "@exitGroupNameHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameLabel": "{name}",
+  "@exitGroupNameLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupNameMismatch": "Enter the correct group name to confirm",
+  "exitGroupConfirmWordHint": "This group has no name yet. Type “{word}” to confirm",
+  "@exitGroupConfirmWordHint": {
+    "description": "Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed entrance)",
+    "placeholders": {
+      "word": {
+        "type": "String"
+      }
+    }
+  },
+  "exitGroupConfirmWordMismatch": "Enter the correct confirmation word",
+  "exitGroupFailed": "Couldn't leave the group — you're still in it",
+  "exitGroupMenuItem": "Leave group",
+  "chatPageMemberLeftNotice": "{name} left the group",
+  "@chatPageMemberLeftNotice": {
+    "description": "Top notice when someone leaves the group voluntarily (member.left broadcast; mirrors member.joined)",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "errorBackend": "Server: {message}",
   "@errorBackend": {
     "description": "Prefix for errors reported by the server; errors decided on this device carry no prefix",
@@ -962,5 +1030,12 @@
   "chatPageAttachmentTooLargeUnknown": "The file is too large and was rejected by the server",
   "@chatPageAttachmentTooLargeUnknown": {
     "description": "Oversized attachment rejected by the server, but the client does not know the limit (old server)"
+  },
+  "@chatPagePinMenuValue": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }

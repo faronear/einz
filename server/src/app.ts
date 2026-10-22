@@ -66,6 +66,7 @@ import {
   createJoinToken,
   createSpace,
   joinSpace,
+  leaveSpace,
   lookupSpace,
   preflightJoin
 } from './spaces.js'
@@ -377,6 +378,33 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 口令取包分支免认证（加入方尚无 session），上传分支在 escrowForSpace 内校验成员
     const r = await escrowForSpace(optionalBearerToken(req), spaceId, body)
     sendJson(res, 200, r)
+    return
+  }
+  // 自愿退群（2026-10-19，aimemo/groupExitDesign.md）：**身份级**离场——本身份
+  // 全部通道一并注销、成员行转墓碑（保名让 slot）、旧 join token 作废。仅 group
+  // （duo 在 leaveSpace 内 409 兜底）。与 /entrances/retire 的区别：retire 只退役
+  // **本机这一条通道**（身份仍在册），leave 是**整个身份退出空间**。
+  // 授权：成员会话（requireSpaceMember）——自助语义，session 即所有权，不校验
+  // 共享口令（客户端已过"群组名 + 本机 PIN"闸门，同 retireEntrance 档）。
+  if (
+    method === 'POST' &&
+    path.startsWith('/spaces/') &&
+    path.endsWith('/leave')
+  ) {
+    limitByIp(req, 'auth')
+    const spaceId = path.slice('/spaces/'.length, -'/leave'.length)
+    const token = bearerToken(req)
+    const sess = requireSpaceMember(token, spaceId)
+    leaveSpace(sess, spaceId)
+    // 审计：自愿退群（谁退了哪个空间；墓碑行保留 member_id 供回溯）
+    logActivity({
+      entranceId: sess.entrance_id,
+      spaceId,
+      kind: 'member.leave',
+      detail: { member_id: sess.member_id },
+      meta: metaOf(req)
+    })
+    sendJson(res, 200, { ok: true })
     return
   }
 

@@ -6,11 +6,11 @@
 
 ---
 
-Last updated: 2026-10-12
+Last updated: 2026-10-19
 
 ## What we cannot see
 
-Einz is an end-to-end encrypted app. Your messages, photos, videos, voice notes, and files are encrypted **on your device**, and the keys exist only on your device and your companion's. The server — including the people running it — **cannot decrypt** any content.
+Einz is an end-to-end encrypted app. Your messages, photos, videos, voice notes, and files are encrypted and decrypted **on your device**, and the keys exist only on your device and your companion's. The server — including the people running it — **cannot decrypt** any content.
 
 ## What the server stores
 
@@ -30,7 +30,7 @@ All of your content lives in the app's database on your device, and a PIN is req
 
 - No ads, no user profiling, no data selling;
 - No collection or analysis of your chat content (we can't, and we wouldn't);
-- No app store listings, no third-party analytics SDKs.
+- No third-party analytics SDKs.
 
 ## Data deletion
 
@@ -40,4 +40,5 @@ All of your content lives in the app's database on your device, and a PIN is req
 
 ## Contact us
 
-File an issue on [GitHub](https://github.com/faronear/einz), or reach us through whatever channel you already have.
+- Email: [einz@tic.cc](mailto:einz@tic.cc)
+- Or file an issue on [GitHub](https://github.com/faronear/einz).

@@ -16,11 +16,20 @@ class ConfirmDialogCopy {
     required this.title,
     required this.message,
     required this.confirmLabel,
+    this.nameHint,
+    this.nameLabel,
+    this.nameMismatch,
   });
 
   final String title;
   final String message;
   final String confirmLabel;
+
+  /// 名字输入区的三套文案（缺省 = 通道名口径；退群传群组名口径）。
+  /// 空 = 用 [_ConfirmDestructiveDialog] 里的 resetEntrance* 默认键。
+  final String? nameHint;
+  final String? nameLabel;
+  final String? nameMismatch;
 }
 
 /// 弹出闸门（通道名 + 已设时的锁屏码），两道都对返回 true。
@@ -150,6 +159,80 @@ Future<bool> confirmLeaveSpace(
   return true;
 }
 
+/// 「退出群组」——group 空间的**自愿退群**（2026-10-19，aimemo/groupExitDesign.md；
+/// 老板三项拍板：duo 不开放、多设备一并退、顶部通知+名单刷新）。
+///
+/// 与 [confirmLeaveSpace]（销毁本通道）的本质区别——**身份级离场**：
+/// - 销毁通道：只退役**本机这一条通道**，身份仍在册，对方可 re-invite 接回**同一身份**；
+/// - 退出群组：服务端把本人身份名下**全部**通道一并注销、成员行转墓碑（名字保留，
+///   slot 让位）、本身份其他设备自动销毁本地数据（"就像被撤回一样"）。日后回来 =
+///   剩余成员发新 invite，以**新身份**加入。
+///
+/// 语义边界（服务端同款兜底）：
+/// - **仅 group**：duo 空间没有这个入口（服务端 409 LEAVE_NOT_ALLOWED）；
+/// - **不校验共享口令**：自助语义，session 即所有权（同退役）；本地闸门 =
+///   群组名 + 已设时的本机 PIN（[_confirmDestructive] 既有两条因子）；
+/// - **失败不清本地**：leaveSpace 抛错 → 顶部报错、返回 false，调用方留在群内。
+///
+/// 返回 true = 已完成服务端退出 + 本地 removeSpace（调用方负责导航收尾）。
+Future<bool> confirmExitGroup(
+  BuildContext context, {
+  LocalDatabase? db,
+  ApiClient? api,
+  required String spaceId,
+  required SpaceSession session,
+  required String groupName,
+  bool hasPin = false,
+}) async {
+  final database = db ?? LocalDatabase.shared;
+  final l10n = AppLocalizations.of(context)!;
+  // 群组名是确认因子（用户自己起的名字）；没起过名 → 弹窗内部退化为固定确认词
+  // （resetEntranceConfirmWord，与未命名通道的销毁流程同一机制）。此时三套文案
+  // 必须换成"确认词"口径——否则提示写"请输入群组名称「重置」"，而「重置」显然不是
+  // 群名，用户不知道该输什么（老板 2026-10-19 实测）。
+  final name = groupName.trim();
+  final hasName = name.isNotEmpty;
+  final confirmWord = l10n.resetEntranceConfirmWord;
+  final ok = await _confirmDestructive(
+    context,
+    db: database,
+    // 群名仅本机存储（服务端没有空间名字段），所以这里只能用它
+    entranceName: groupName,
+    hasPin: hasPin,
+    copy: ConfirmDialogCopy(
+      title: l10n.exitGroupTitle,
+      message: l10n.exitGroupMessage,
+      confirmLabel: l10n.exitGroupConfirm,
+      nameHint: hasName
+          ? l10n.exitGroupNameHint(name)
+          : l10n.exitGroupConfirmWordHint(confirmWord),
+      nameLabel: hasName ? l10n.exitGroupNameLabel(name) : confirmWord,
+      nameMismatch:
+          hasName ? l10n.exitGroupNameMismatch : l10n.exitGroupConfirmWordMismatch,
+    ),
+  );
+  if (!ok || !context.mounted) return false;
+
+  // 服务端退出（顺序不能反——凭证在本地，清完就再也调不动它了）。
+  // 走 [SpaceSession] 而不是裸 token：会话 24h 就过期（同 retireSpaceQuietly）。
+  try {
+    await session.call(
+        (t) => (api ?? ApiClient(effectiveServer)).leaveSpace(spaceId, t));
+  } catch (_) {
+    // 失败不清本地（老板拍板的口径：留在群里，数据完好，可重试）。
+    // 顶部通知挂在根 Overlay 上，随后本页继续显示也不影响它。
+    if (context.mounted) {
+      showTopNotice(context, l10n.exitGroupFailed,
+          extraTop: kNoticeExtraTopBelowStatusBar);
+    }
+    return false;
+  }
+  // PIN 模式下这里没有 pin（聊天页不持有）→ removeSpace 走"挂 pending + 立即清数据"，
+  // 凭证条目等下次解锁再摘（见 AppLockService.removeSpace 文档）。
+  await AppLockService(database).removeSpace(spaceId);
+  return true;
+}
+
 // 「清除本设备全部数据」（本机级）**已删除**（老板 2026-09-22：太危险，不呈现给用户）。
 // 用户的等价路径：逐个空间「销毁本秘境通道」，或直接卸载重装（ensureFreshInstall
 // 会清掉残留密钥）。`data/local_reset.dart` 的 resetLocalData() 作为"整机清空"原语保留。
@@ -195,7 +278,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
 
     // ① 通道名：精确比对（trim 后大小写敏感——通道名是用户自己起的，不像邮箱该宽容）
     if (name != widget.entranceName) {
-      setState(() => _error = l10n.resetEntranceNameMismatch);
+      setState(() => _error = widget.copy.nameMismatch ?? l10n.resetEntranceNameMismatch);
       return;
     }
     // ② 锁屏码（已设才验）：走 AppLockService.unlock —— 与锁屏同一套防爆破
@@ -243,6 +326,8 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final nameHint = widget.copy.nameHint ?? l10n.resetEntranceNameHint(widget.entranceName);
+    final nameLabel = widget.copy.nameLabel ?? l10n.resetEntranceNameLabel(widget.entranceName);
     return AlertDialog(
       // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
       title: Center(child: Text(widget.copy.title)),
@@ -259,7 +344,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
           ),
           const SizedBox(height: 10),
           Text(
-            l10n.resetEntranceNameHint(widget.entranceName),
+            nameHint,
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.outline,
@@ -270,7 +355,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
             controller: _nameCtrl,
             autofocus: true, // 闸门第一个框：打开弹窗即待输入
             decoration: InputDecoration(
-              hintText: l10n.resetEntranceNameLabel(widget.entranceName),
+              hintText: nameLabel,
               border: const OutlineInputBorder(),
             ),
           ),

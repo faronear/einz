@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/lock_timer.dart';
 import 'package:einz/data/secure_store.dart';
 import 'package:einz_shared/einz_shared.dart';
 
@@ -206,5 +207,18 @@ void main() {
         '{"version":1,"active_space_id":null,"spaces":[]}');
     expect(await lock.loadPlain(), isNull);
     expect(await db.select(db.spaces).get(), hasLength(1), reason: '空 Vault 不动表');
+  });
+
+  test('锁屏时长：默认 30s，保存后读回，越界值钳到范围首尾', () async {
+    // 未设置 → 默认 kLockSeconds（前台闲置锁与后台锁共用，老板 2026-10-18）
+    expect(await lock.loadLockSeconds(), kLockSeconds);
+    // 保存 10 分钟档 → 读回
+    await lock.saveLockSeconds(600);
+    expect(await lock.loadLockSeconds(), 600);
+    // 越界/非法值钳到范围首尾（30 秒~30 分钟），不崩
+    await lock.saveLockSeconds(99999);
+    expect(await lock.loadLockSeconds(), kLockMaxSeconds);
+    await lock.saveLockSeconds(1);
+    expect(await lock.loadLockSeconds(), kLockMinSeconds);
   });
 }

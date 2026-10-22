@@ -4,9 +4,11 @@
 #      无效输入原地重问；**空回车 = 退回上一问**（老板 2026-10-13）——本用例在口令步
 #      起连续空回车，一路退到秘境入口，再边走边补答，验证回退与重问都正常
 #      （旧规则是必填问答空回车静默拒绝，2026-09-23；/exit 逃生门 2026-10-13 废除）
-#   1) 锁屏码规则（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
+#   1) 入网收尾 + 锁屏码规则：create 成功后**不再询问锁屏码**（2026-10-19 移除
+#      _askSetPin，与 App 向导同口径——必设时代的遗留步骤，随时可 /pin 补设），
+#      直接欢迎辞 → 5s 倒计时 → 清 system 消息进聊天态；锁屏码规则改在聊天态用
+#      /pin 验证（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
 #      数字」；5 位数字 → 提示「锁屏码至少 6 位数字」；6 位数字 → 设置成功
-#      （向导里唯一允许空回车跳过的是锁屏码——_askSetPin，空间建立后的普通设置）
 #   2) join 口令验证：空回车 → 退回上一问（性别）；口令输错 → 停在口令环节提示重输，
 #      且**同一个** join token 仍可用（旧实现先 joinSpace 消费 token 再验口令 →
 #      一输错就被踢回通道码环节，已接受的 token 作废——老板 2026-09-12 反馈）
@@ -194,9 +196,6 @@ def main():
             return 1
         print('✅ create：回退后重走问答链，补输口令创建成功')
 
-        # ---------- 锁屏码规则：纯数字 + 至少 6 位 ----------
-        # 文案实为「✅ 锁屏码 🔢 已设置」：中间有 emoji，且渲染会插入 ANSI 着色，
-        # 不能整串匹配——🔢 在全 TUI 仅此一处，作为"锁屏码已设置"的判定锚点。
         def input_until(payload, expect, tries=6, timeout=8):
             out = ''
             for _ in range(tries):
@@ -213,24 +212,44 @@ def main():
                 out += drain(master, 0.8)
             return out
 
+        # ---------- 入网收尾：欢迎辞倒计时 → 聊天态（PIN 询问已移除，2026-10-19） ----------
+        # create 成功后不再问锁屏码（_askSetPin 删除）：直接 _finalizeOnboarding——
+        # 欢迎辞 → 5s 倒计时（processing 吞输入）→ 清空 system 消息 = 进聊天态。
+        out = wait_text(m, '一切就绪', timeout=40)
+        if '一切就绪' not in out:
+            print('❌ 建空间后未出现欢迎辞倒计时'); print(ANSI.sub('', out)[-800:]); return 1
+        deadline = time.time() + 40
+        while time.time() < deadline:
+            chunk = drain(m, 0.8)
+            # 聊天态 = 出现不含欢迎辞块的完整帧（标题栏 'Einz' 在，倒计时/分隔线已清）
+            if chunk and 'Einz' in chunk and '一切就绪' not in chunk and '----------------' not in chunk:
+                break
+        else:
+            print('❌ 倒计时后未进入聊天态（system 消息未清空）'); print(ANSI.sub('', out)[-800:]); return 1
+        print('✅ 入网完成：欢迎辞倒计时后直接进入聊天态（PIN 询问已移除）')
+
+        # ---------- 锁屏码规则：聊天态 /pin（纯数字 + 至少 6 位） ----------
+        # 规则与 _pinError 实现未变，只是入口从向导询问改为 /pin 命令：
+        # 字母 → 「锁屏码只能是数字」；5 位 → 「锁屏码至少 6 位数字」；6 位 → 已设置
         for wrong, expect in (
-            ('abc\r', '锁屏码只能是数字'),      # 字母
-            ('12345\r', '锁屏码至少 6 位数字'),  # 位数不足
+            ('/pin abc\r', '锁屏码只能是数字'),       # 字母
+            ('/pin 12345\r', '锁屏码至少 6 位数字'),  # 位数不足
         ):
             out = input_until(wrong, expect)
             if expect not in out:
-                print(f'❌ 锁屏码 {wrong.strip()!r} 未被拦住（未提示「{expect}」）')
+                print(f'❌ {wrong.strip()!r} 未被拦住（未提示「{expect}」）')
                 print(ANSI.sub('', out)[-800:])
                 return 1
-            if '🔢' in out:
-                print(f'❌ 非法锁屏码 {wrong.strip()!r} 竟被接受')
-                return 1
-        out = input_until('123456\r', '🔢')
-        if '🔢' not in out:
-            print('❌ 6 位数字锁屏码未被接受')
-            print(ANSI.sub('', out)[-800:])
-            return 1
-        print('✅ 锁屏码规则：字母/不足 6 位被拒，6 位数字通过')
+            if '锁屏码已设置' in out:
+                print(f'❌ 非法锁屏码 {wrong.strip()!r} 竟被接受'); return 1
+        out = input_until('/pin 123456\r', '锁屏码已设置')
+        if '锁屏码已设置' not in out:
+            print('❌ 6 位数字锁屏码未被接受'); print(ANSI.sub('', out)[-800:]); return 1
+        # 无参数：报当前状态 + 用法卡片
+        out = input_until('/pin\r', '【🔧 用法】')
+        if '锁屏码：已设置' not in out:
+            print('❌ /pin 无参数未报当前状态'); print(ANSI.sub('', out)[-800:]); return 1
+        print('✅ 锁屏码规则：/pin 字母/不足 6 位被拒，6 位数字通过，无参数报状态')
 
         # ---------- 通道 B：join 口令验证：空回车回退 + 输错停在口令步 ----------
         with open(store) as f:

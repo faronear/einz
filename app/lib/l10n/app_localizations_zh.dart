@@ -34,15 +34,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScopeAllDone => '已应用到本机所有秘境';
 
   @override
-  String get skip => '跳过';
-
-  @override
   String get close => '关闭';
-
-  @override
-  String setupPageEnvelopeKeyHint(String mode) {
-    return '密保信封是私下交接的一段加密文字。请询问你的同伴获取。';
-  }
 
   @override
   String get setupPageNeedPassphrase => '请设置共享口令';
@@ -125,9 +117,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardAppBarJoin => '加入秘境';
 
   @override
-  String get wizardAppBarOffline => '导入密保信封';
-
-  @override
   String get wizardNext => '下一步';
 
   @override
@@ -170,12 +159,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseTitle => '验证共享口令';
 
   @override
-  String get wizardTitlePin => '设置锁屏码';
-
-  @override
-  String get wizardTitleEnvelope => '解析密保信封';
-
-  @override
   String get wizardEnrollExists =>
       '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性通道码加入。';
 
@@ -213,16 +196,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseWrong => '口令错误！请询问你的秘境同伴获取正确的口令。';
 
   @override
-  String get wizardSwitchToEnvelope => '改用线下密保信封';
-
-  @override
-  String get wizardSwitchToPassphrase => '改用共享口令';
-
-  @override
-  String get wizardPinHint =>
-      '在本机上保护你的秘境，任何人启动app时将需要验证锁屏码。当前也可先跳过，进入秘境后能够随时设置。';
-
-  @override
   String get welcomeDialogTitleCreate => '一切就绪！';
 
   @override
@@ -243,7 +216,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryTitle => '秘境向导';
 
   @override
-  String get setupEntryHint => '秘境是你的私密聊天和共享空间，可以从头创建，或者受邀加入。';
+  String get setupEntryHint =>
+      '秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。你可以从零创建，或受邀加入。';
 
   @override
   String get setupEntryCreate => '创建秘境';
@@ -252,16 +226,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryJoin => '加入秘境';
 
   @override
+  String get setupEntryDemo => '先看看演示';
+
+  @override
   String get setupEntryLegacyServer => '服务器版本过低，请升级后再使用';
 
   @override
   String setupTokenAppTooOld(String code) {
-    return '本机 App 版本过旧，与服务器对不上（$code）。请更新 App 后重试';
+    return '本机 App 版本过旧，已无法使用（$code）。请更新 App 后重试';
   }
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return '请求太频繁：请 $seconds 秒后再试（这不是通道码本身的问题）';
+    return '请求太频繁：请 $seconds 秒后再试';
   }
 
   @override
@@ -300,9 +277,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupCreateCopy => '复制邀请链接';
 
   @override
-  String get setupCreateCopied => '已复制';
-
-  @override
   String get setupPageInitFailed => '初始化失败，正在自动重试…';
 
   @override
@@ -325,9 +299,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupInitClearedRestart => '本机数据已清除。请完全退出并重新打开 App。';
 
   @override
-  String get setupPagePasteEnvelope => '⚠️ 请粘贴密保信封（base64）';
-
-  @override
   String get setupPageScanInvite => '扫码填入通道码';
 
   @override
@@ -348,13 +319,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogPinLabel => '新 PIN（至少 6 位数字）';
 
   @override
-  String get setPinDialogPinHint => '至少 6 位数字';
-
-  @override
   String get setPinDialogConfirmLabel => '确认新 PIN';
-
-  @override
-  String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
   String get setPinDialogSetPin => '启用';
@@ -364,9 +329,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setPinDialogPinDigitsOnly => 'PIN 只能是数字';
-
-  @override
-  String get setPinDialogPinMismatch => '两次输入的 PIN 不一致';
 
   @override
   String get setPinDialogOldWrong => '当前锁屏码错误';
@@ -391,10 +353,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可清除当前锁屏码。';
+  String get chatPageSetLockHintNoPin => '设置后，每次离开一定时间后就自动锁屏，然后必须解锁才能进入秘境。';
 
   @override
-  String get chatPageSetLockHintNoPin => '设置后，每次进入秘境都要解锁，更安全。';
+  String get chatPageSetLockRowVerify => '验证';
+
+  @override
+  String get chatPageSetLockRowSet => '设置';
+
+  @override
+  String get chatPageSetLockNewPinLabel => '新 PIN 或者留空不填';
+
+  @override
+  String get chatPageSetLockNewPinLabelNoPin => '新 PIN（至少 6 位数字）';
+
+  @override
+  String get chatPageSetLockSubmitChange => '更改';
+
+  @override
+  String get chatPageSetLockDurationLabel => '自动锁屏每当离开';
+
+  @override
+  String get chatPageSetLockTabChange => '更改锁屏码';
+
+  @override
+  String get chatPageSetLockClearButton => '清除锁屏码';
+
+  @override
+  String lockDurationSecs(int n) {
+    return '$n 秒';
+  }
+
+  @override
+  String lockDurationMin(int n) {
+    return '$n 分钟';
+  }
 
   @override
   String get chatPageSetLockOldLabel => '当前锁屏码';
@@ -403,22 +396,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockOldRequired => '请先输入当前锁屏码';
 
   @override
-  String get chatPageSetLockSameAsOld => '新锁屏码与当前锁屏码相同，未作修改';
+  String get chatPageSetLockSameAsOld => '新锁屏码不能与当前锁屏码相同';
 
   @override
-  String get chatPageSetLockNoPinNotice => '锁屏码仍然为空，下次启动应用可直接进入秘境。';
+  String get chatPageSetLockPinRequired => '请输入新 PIN';
 
   @override
-  String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
+  String get chatPageSetLockNothingChanged => '你没有做任何修改';
 
   @override
-  String get chatPageSetLockCleared => '已清除锁屏码，下次启动应用可直接进入秘境。';
+  String chatPageSetLockDone(String duration) {
+    return '锁屏码已设置，每次离开 $duration 后自动锁屏。';
+  }
 
   @override
-  String get chatPageClearLockTitle => '清除锁屏码？';
-
-  @override
-  String get chatPageClearLockMessage => '确定要清除锁屏码吗？清除后下次启动将直接进入聊天。';
+  String get chatPageSetLockCleared => '已清除锁屏码，其他人拿到这台设备就能进入秘境。';
 
   @override
   String get chatPageLockClearConfirm => '清除';
@@ -516,12 +508,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGroupNameEditTooltip => '修改群名';
 
   @override
-  String get chatPageMyAvatarTooltip => '修改我的头像';
-
-  @override
-  String get chatPageMyNameTooltip => '修改我的名字';
-
-  @override
   String get chatPageGroupNameLabel => '名称';
 
   @override
@@ -562,6 +548,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageCopy => '复制';
+
+  @override
+  String chatPageCopiedText(String text) {
+    return '已复制: $text';
+  }
 
   @override
   String get chatPageEdit => '编辑';
@@ -625,7 +616,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageEscrowRotatedNotice(String mode) {
-    return '同伴已重设共享口令，以后必须使用新口令';
+    return '同伴已更换共享口令，以后必须使用新口令';
   }
 
   @override
@@ -644,7 +635,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMoreSettingsStorage => '附件存储';
 
   @override
-  String get chatPageMoreSettingsTombstone => '墓碑消息';
+  String get chatPageMoreSettingsTombstone => '消息留痕';
 
   @override
   String get chatPageAttachmentStorageNote => '图片、视频、音频、文件等附件存放在哪里？';
@@ -736,6 +727,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersReinvite => '重新邀请';
 
   @override
+  String get chatPageMemberProfileTitle => '群组同伴';
+
+  @override
   String get chatPageReinvitePassphraseTitle => '验证共享口令';
 
   @override
@@ -745,6 +739,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPagePassphraseFieldHint => '共享口令';
+
+  @override
+  String get chatPagePassphraseVerify => '验证';
+
+  @override
+  String get chatPagePassphraseWrong => '口令错误';
+
+  @override
+  String get chatPagePassphraseEmpty => '请输入共享口令';
+
+  @override
+  String get chatPagePassphraseVerifyFailed => '验证失败，请重试';
 
   @override
   String get chatPagePassphraseShow => '显示';
@@ -782,7 +788,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageLockNow => '锁屏';
 
   @override
-  String get chatPagePinSetValue => '已设置';
+  String chatPagePinMenuValue(String duration) {
+    return '$duration';
+  }
 
   @override
   String get chatPageNotifyLabel => '我的邮件通知';
@@ -845,13 +853,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTombstoneHeading => '消息留痕';
 
   @override
-  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否留痕？';
+  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否显示？';
 
   @override
   String get chatPageTombstoneKeep => '占位留痕';
 
   @override
-  String get chatPageTombstoneKeepDesc => '显示为消息墓碑：正文隐藏，时间记录仍在，不打破消息流水';
+  String get chatPageTombstoneKeepDesc => '显示为时间和状态条，正文隐藏，不打破消息流水';
 
   @override
   String get chatPageTombstoneHide => '彻底消失';
@@ -1198,7 +1206,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      '秘境是你的私密聊天和共享空间，端到端加密，一切由你自由掌控，没有任何第三方（包括秘境自身）能够偷看内容，全力保障你的隐私安全。';
+      '秘境是一个秘密王国，你和亲密伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上——没有账号，不留痕迹。不允许任何第三方（包括秘境自身）偷看内容，全力守护你的隐私。';
 
   @override
   String get aboutVersionLabel => '版本号';
@@ -1321,7 +1329,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get leaveSpaceConfirm => '销毁';
 
   @override
-  String get setupPinReuseNotice => '本秘境将共用当前的锁屏码。';
+  String get exitGroupTitle => '退出群组？';
+
+  @override
+  String get exitGroupMessage => '退出后，这个群组会从你的所有设备上消失并删除本地数据。此操作无法撤销！';
+
+  @override
+  String get exitGroupConfirm => '退出';
+
+  @override
+  String exitGroupNameHint(String name) {
+    return '请输入群组名称“$name”';
+  }
+
+  @override
+  String exitGroupNameLabel(String name) {
+    return '$name';
+  }
+
+  @override
+  String get exitGroupNameMismatch => '请输入正确的群组名称以确认';
+
+  @override
+  String exitGroupConfirmWordHint(String word) {
+    return '群组还没有命名。请输入“$word”以确认';
+  }
+
+  @override
+  String get exitGroupConfirmWordMismatch => '请输入正确的确认词';
+
+  @override
+  String get exitGroupFailed => '退出失败，仍留在群组中';
+
+  @override
+  String get exitGroupMenuItem => '退出群组';
+
+  @override
+  String chatPageMemberLeftNotice(String name) {
+    return '$name 退出了群组';
+  }
 
   @override
   String errorBackend(String message) {

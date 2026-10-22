@@ -21,6 +21,12 @@ const String kWsTypeReceiptUpdated = 'receipt.updated';
 /// 都要刷新成员名单。
 const String kWsTypeMemberJoined = 'member.joined';
 
+/// 自愿退群（2026-10-19，aimemo/groupExitDesign.md）：某成员**身份级**退出
+/// （其名下全部通道一并注销）。与 member.joined 对偶——人人刷新成员名单，
+/// 客户端另发一条顶部通知（display_name 仅供通知文案，查表仍以 member_id 准）。
+/// 仅 group 空间会有（duo 不开放退群，服务端 409 兜底）。
+const String kWsTypeMemberLeft = 'member.left';
+
 /// 语音通话信令（PROTOCOL.md §8.4）。
 ///
 /// 服务端只做**同空间哑转发**：不解析 sdp/candidate、不落库、不进 `server_sequence`。
@@ -121,6 +127,20 @@ class WsMemberJoinedEvent extends WsEvent {
   const WsMemberJoinedEvent({required super.type, required this.memberId});
 
   final String memberId;
+}
+
+/// member.left（自愿退群，2026-10-19）：某成员身份退出。member_id 是权威标识；
+/// [displayName] 只是给顶部通知用的便利字段（可能为 null——未命名成员），
+/// 名单刷新仍以 GET /space 为准。
+class WsMemberLeftEvent extends WsEvent {
+  const WsMemberLeftEvent({
+    required super.type,
+    required this.memberId,
+    this.displayName,
+  });
+
+  final String memberId;
+  final String? displayName;
 }
 
 /// 对方回执（已送达/已读）更新：单调高水位，按 member 一行。
@@ -384,6 +404,13 @@ class WsClient {
           onEvent?.call(WsMemberJoinedEvent(
             type: type,
             memberId: payload['member_id'] as String? ?? '',
+          ));
+          break;
+        case kWsTypeMemberLeft:
+          onEvent?.call(WsMemberLeftEvent(
+            type: type,
+            memberId: payload['member_id'] as String? ?? '',
+            displayName: payload['display_name'] as String?,
           ));
           break;
         case kWsTypeReceiptUpdated:

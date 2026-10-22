@@ -57,6 +57,7 @@ class MessageRepository {
     this.settings,
     this.reauth,
     String? memberId,
+    this.isDemo = false,
   }) {
     // 向导完成时已知本端 memberId：立即种入映射，保证首帧就按 member 判定归属
     // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshEntranceMap 落盘）。
@@ -104,6 +105,10 @@ class MessageRepository {
   /// 401（session 过期）时自动重新认证的回调（由上层注入：setup_page 的
   /// challenge-response 流程），返回新 token 供 [_withAutoAuth] 重试。
   final Future<String> Function()? reauth;
+
+  /// 演示秘境模式（2026-10-19，App Store 审核演示通道方案 A）：发送只做本地
+  /// 加密落库并立即标已读（'read'），**不触网**——演示空间没有服务端对端。
+  final bool isDemo;
 
   /// 401（session 过期）自动续期：调 [reauth] 拿新 token → 更新 [token] → 重试一次。
   /// 保证 24h 会话过期后 app 请求无感恢复；其他错误原样抛出。
@@ -287,6 +292,22 @@ class MessageRepository {
     await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
     await _notifyPersisted(onPersisted, messageId);
 
+    // 演示秘境：本地落库即"对方已读"，不进发送队列（无服务端对端）。
+    // 补一个**合成 serverSequence**（演示空间内最大 seq+1，与 DemoSpace 种入的
+    // 1..N 续接）：撤回入口的可见条件含 `serverSequence != null`（_messageRecallable），
+    // 不补的话审核员自己发的消息长按没有撤回（2026-10-19 老板实测）。
+    // status 用 _markSent 的 'sent'（单勾、未送达）——与"撤回=还没人拉到"语义一致。
+    if (isDemo) {
+      final row = await (db.selectOnly(db.localMessages)
+            ..addColumns([db.localMessages.serverSequence.max()])
+            ..where(db.localMessages.spaceId.equals(spaceId)))
+          .getSingle();
+      final maxSeq = row.read(db.localMessages.serverSequence.max());
+      await _markSent(messageId, (maxSeq ?? 0) + 1,
+          env.createdAt ?? DateTime.now().millisecondsSinceEpoch);
+      return messageId;
+    }
+
     final t = token;
     if (t != null) {
       _pendingUploads.add(messageId);
@@ -370,6 +391,23 @@ class MessageRepository {
     await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
     await _notifyPersisted(onPersisted, messageId);
 
+    // 演示秘境：本地落库即"对方已读"，blob 也不上传（无服务端对端）。
+    // local_cipher 副本已落库（步骤 2）→ 图片/语音气泡照常显示。
+    // 合成 serverSequence 同 send()——撤回入口需要它（2026-10-19）。
+    if (isDemo) {
+      final row = await (db.selectOnly(db.localMessages)
+            ..addColumns([db.localMessages.serverSequence.max()])
+            ..where(db.localMessages.spaceId.equals(spaceId)))
+          .getSingle();
+      final maxSeq = row.read(db.localMessages.serverSequence.max());
+      await _markSent(messageId, (maxSeq ?? 0) + 1,
+          env.createdAt ?? DateTime.now().millisecondsSinceEpoch);
+      await (db.update(db.localAttachments)
+            ..where((a) => a.attachmentId.equals(attachmentId)))
+          .write(const LocalAttachmentsCompanion(status: Value('downloaded')));
+      return messageId;
+    }
+
     final t = token;
     if (t != null) {
       try {
@@ -446,12 +484,30 @@ class MessageRepository {
   /// （UI 提示）；403 非本人；404 消息不在服务端（可能已被撤）——404 也按
   /// 成功处理（本地照常墓碑，结果一致：这条消息没了）。
   Future<void> recallMessage(String messageId) async {
+    // 演示秘境：没有服务端对端——本地直接打墓碑（语义与 404 一致：这条消息没了）。
+    if (isDemo) {
+      await tombstoneMessage(messageId, kind: 'recall');
+      return;
+    }
     try {
       await _withAutoAuth((tok) => api.recallMessage(messageId, tok));
     } on ApiException catch (e) {
       if (e.httpStatus != 404) rethrow;
     }
     await tombstoneMessage(messageId, kind: 'recall');
+    await _ensureNotPendingAfterRecall(messageId);
+  }
+
+  /// 撤回后把消息从补发队列里摘出来：`_flushPending` 刻意**不排除墓碑**
+  /// （本机删除≠对方收不到，未确认的消息仍应补发）——但撤回恰恰要求它**永远
+  /// 不到达**。所以撤回一条 status 还是 pending/failed 的消息（离线没到服务端）
+  /// 后，必须把状态改成终态（'sent'——墓碑行的回执恒显单勾，状态只影响补发
+  /// 取数与重试 UI），否则补发队列会把已撤回的消息原样发出去（2026-10-19）。
+  Future<void> _ensureNotPendingAfterRecall(String messageId) async {
+    await (db.update(db.localMessages)
+          ..where((m) => m.messageId.equals(messageId))
+          ..where((m) => m.status.isIn(['pending', 'failed'])))
+        .write(const LocalMessagesCompanion(status: Value('sent')));
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。

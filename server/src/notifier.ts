@@ -888,8 +888,9 @@ function bindMembersEmail (
     .run(email, spaceId, memberId)
 }
 
-/** 没有 space_members 再引用这个地址 → 连同 token 一起物理删除（"彻底不留"）。 */
-function purgeEmailIfUnused (email: string): void {
+/** 没有 space_members 再引用这个地址 → 连同 token 一起物理删除（"彻底不留"）。
+ *  导出给 spaces.leaveSpace 用（自愿退群的邮箱解绑走同一模式，2026-10-19）。 */
+export function purgeEmailIfUnused (email: string): void {
   const db = getDb()
   const used = db
     .prepare(`SELECT 1 FROM space_members WHERE email = ? LIMIT 1`)

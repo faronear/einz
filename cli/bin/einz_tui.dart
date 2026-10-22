@@ -454,8 +454,9 @@ Future<(bool, String, List<String>)> _probeDirect(String server) async {
 }
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
-/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
-/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧用密保信封导入）。
+/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)。
+/// （曾有的"sealed 信封导入"选项早已不在 TUI 引导里——App 侧信封线也于
+///  2026-10-19 整条删除，Space Key 接入统一走邀请 token + 共享口令。）
 ///
 /// 地址**永不落盘**（与 App 端同构）：`--server` 与引导手输都只本次生效，出厂默认值
 /// 每次启动重读。默认地址连不上时每次启动都会再问一次——那是"该去改 localConfig.json
@@ -566,37 +567,6 @@ Future<bool> _verifyPin(String hash, String pin) async {
   return s.crypto.pwhash.strVerify(passwordHash: hash, password: pin);
 }
 
-/// 入网最后一步：询问设置 锁屏码（直接回车跳过 = 不设置；以后可以 /pin 设置）。
-/// **明文输入**（设置机密 = 明文回显——老板 2026-10-13 策略：只有"验证"机密才
-/// 隐藏回显且不认 /exit，见 _unlockPin）。空间已建立后的普通设置：空回车 =
-/// 取消设置（老板 2026-10-13 确认口径）。
-Future<void> _askSetPin(ChatSession session, String storePath) async {
-  if (!_state!.running) return;
-  while (true) {
-    if (!_state!.running) return;
-    final pin = await _prompt(session,
-        '❓ 设置锁屏码（$_kPinMinLength 位数字。以后每次进入秘境需要解锁；也可暂时留空跳过，以后随时用 /pin 重设）:',
-        hidden: false);
-    if (!_state!.running) return;
-    if (pin.isEmpty) {
-      session.messages.add(_systemMessage(session, '⚠️ 没有设置锁屏码'));
-      break;
-    }
-    final err = _pinError(pin);
-    if (err != null) {
-      session.messages.add(_systemMessage(session, '⚠️ $err（留空可跳过）'));
-      _scheduleRender();
-      continue;
-    }
-    session.store.pinHash = await _hashPin(pin);
-    session.store.save(storePath);
-    session.messages.add(_systemMessage(session, '✅ 锁屏码 🔢 已设置'));
-    break;
-  }
-  // 欢迎辞不在此处：由 _finalizeOnboarding 统一致欢迎辞并等待回车切换到聊天态
-  _scheduleRender();
-}
-
 /// 启动进对话前：store 已设 PIN 则校验解锁（错误重试）；未设直接进。
 ///
 /// **这一步只认两种输入**（老板 2026-10-13 定，与 App 锁屏页同口径）：
@@ -605,7 +575,7 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
 ///   落地完整退出序列；启动期没有"取消后回到哪里"，退个干净）。
 ///
 /// PIN **不明文回显**（hidden：输入行回显 *）——TUI 整体策略（老板 2026-10-13）：
-/// **设置**机密时明文回显、随时可 /exit（[_askSetPin]、/pin、入网口令问答）；
+/// **设置**机密时明文回显、随时可 /exit（/pin、入网口令问答）；
 /// **验证**机密时隐藏回显、不认 /exit、直接回车=取消/退出（相当于 App 弹窗
 /// 里按取消按钮）。
 ///
@@ -828,19 +798,19 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // 绑定空间后激活会话（同步通道名 → 增量同步 → 设锁屏码 → 启动 WS）——
+  // 绑定空间后激活会话（同步通道名 → 增量同步 → 启动 WS；入网路径先致欢迎辞）——
   // Multiverse：/space create、/space join 命令绑定成功后与启动引导共用
   await _activateAfterBind(session, store, storePath, server);
 }
 
 /// 绑定空间后激活会话。顺序随是否入网而不同：
 /// - 正常启动：增量同步 → 启动 WS（立刻可收发）
-/// - 新入网（[_onboarded]）：设锁屏码 → 致欢迎辞并**等用户回车**显性进入聊天态
-///   → 才增量同步 + 启动 WS
+/// - 新入网（[_onboarded]）：致欢迎辞 → 自动读秒倒计时 → 清 system 消息进聊天态
+///   → 才增量同步 + 启动 WS（锁屏码询问 2026-10-19 已移除，随时可 /pin 补设）
 ///
 /// **入网向导期间不 sync、不启 WS**（老板 2026-09-14）：否则对方消息会直接流进
-/// 消息流、插在向导的 system 消息之间。入网期间错过的消息由回车后的那次增量同步
-/// 一次性补齐。
+/// 消息流、插在向导的 system 消息之间。入网期间错过的消息由进聊天态后的那次增量
+/// 同步一次性补齐。
 Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String storePath, String server) async {
   // 已登记通道启动时把本地通道名称同步到后台（TUI 里改名后服务端 dev1 的
   // entranceName 同步更新；首条通道 enroll 已带上 entranceName，此处幂等覆盖）
@@ -928,11 +898,9 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
     startWs();
   }
 
-  // 锁屏码：本次刚入网 → 询问设置（可空跳过）；重启解锁已由 main 在
-  // loadHistory 前处理（_unlockPin）——此处不再重复
-  if (_onboarded) {
-    await _askSetPin(session, storePath);
-  }
+  // 锁屏码：向导不再询问设置（老板 2026-10-19，与 App 向导同口径——必设时代的
+  // 遗留步骤，随时可 /pin 补设）；重启解锁已由 main 在 loadHistory 前处理
+  // （_unlockPin），此处无额外动作
 
   // 认证后立即拉取 member 名称/性别表（向导刚结束时 token 才就绪——启动时
   // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
@@ -1223,7 +1191,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
   // 兼容完整邀请链接：https://host/join/<token> → 提取 token
   final token = input.contains('/join/') ? input.split('/join/').last.trim() : input.trim();
   if (token.isEmpty) {
-    session.messages.add(_systemMessage(session, '🔧 用法: /space join <通道码或邀请链接>'));
+    session.messages.add(_systemMessage(session, '【🔧 用法】\n/space join <通道码或邀请链接>'));
     return;
   }
   try {
@@ -1508,7 +1476,7 @@ Future<void> main(List<String> args) async {
   // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成通道凭证；
   // 无 Space Key → 口令接入（escrow）；未激活 → auth。全部就绪后才进入 TUI。
   final onboard = await _onboard(storePath, server);
-  if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
+  if (exitCode != 0) return; // 非交互终端等启动期致命错误：提示后退出
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/myeinz.json）
@@ -1542,7 +1510,7 @@ Future<void> main(List<String> args) async {
   session.onChanged = _scheduleRender;
   // 锁屏码：已有 PIN 时先解锁——**先起输入循环**（raw 模式 + stdin 订阅），
   // 解锁问答作为消息流里的隐藏回显提示进行（_unlockPin 走 _prompt）。历史消息
-  // 在解锁成功前不加载/不显示（防泄漏；刚入网的 _askSetPin 仍在 _runGuide 内处理）。
+  // 在解锁成功前不加载/不显示（防泄漏；重启解锁由 main 在 loadHistory 前处理）。
   //
   // 解锁期退出（空回车 / Ctrl+C / EOF）→ running=false → 下方整段启动被跳过，
   // 直接走收尾退出——**绝不在未验证时加载或渲染历史**（2026-10-13 bug 根因：
@@ -4080,12 +4048,15 @@ Future<void> _execCommand(String line) async {
       // 命令列表作为 system 消息进消息流（随消息区滚动，不占顶部状态栏）。
       // 按命令字母序输出（老板 2026-10-08）：列表 + sort，新增命令时只需往列表
       // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
+      // 带参数（/help attach / /help /attach）只输出该命令的帮助（老板 2026-10-18）。
       const helpEntries = <(String, String)>[
         ('/attach <文件路径>', '上传文件（不带参数 = 选文件：有 GUI 弹系统窗口，SSH 自动用内置浏览器；'
-            '选中后把路径填进输入行，回车才发。敲路径时按 Tab 可补全）'),
+            '选中后把路径填进输入行，回车才发。敲路径时按 Tab 可补全；'
+            '设 EINZ_TUI_PICKER=browser 固定用内置浏览器）'),
         ('/auth', '激活/续期当前服务器的机密线路；未绑定时 /auth <通道码或邀请链接> 直接加入'),
         ('/avatar <图片路径>', '设置我的头像（图片发给服务端覆盖旧头像；App 与 TUI 共用同一头像；'
-            '不带参数 = 选图片，只列图片；Tab 补全路径）'),
+            '不带参数 = 选图片，只列图片；Tab 补全路径；'
+            '设 EINZ_TUI_PICKER=browser 固定用内置浏览器）'),
         ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
         ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
         ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
@@ -4110,7 +4081,25 @@ Future<void> _execCommand(String line) async {
       ];
       // 合并为**一条**系统消息（老板 2026-10-08）：此前每条命令一条消息，
       // 每行都带 [时间 秘境] 前缀，视觉零散；单条消息内按 \n 分行，只有一个前缀。
+      // /help <命令名>：只输出该命令的帮助（不带 <用法> 尖括号也能匹配，别名如
+      // invite 也直接命中自己的条目；查不到按未知命令提示）。
       final sorted = [...helpEntries]..sort((a, b) => a.$1.compareTo(b.$1));
+      final helpArg = arg.trim().replaceFirst(RegExp(r'^/'), '');
+      if (helpArg.isNotEmpty) {
+        final query = '/$helpArg';
+        final hit = sorted
+            .where((e) => e.$1.split(' ').first == query)
+            .toList();
+        s.session.messages.add(_systemMessage(
+            s.session,
+            hit.isEmpty
+                ? '未知命令: $query（/help 查看全部命令）'
+                : (hit.first.$2.isEmpty
+                    ? hit.first.$1
+                    : '${hit.first.$1} 👉 ${hit.first.$2}')));
+        s.status = '';
+        break;
+      }
       final helpText = StringBuffer('可输入以下系统命令：\n');
       for (final (cmd, desc) in sorted) {
         helpText.writeln(desc.isEmpty ? cmd : '$cmd 👉 $desc\n');
@@ -4124,7 +4113,7 @@ Future<void> _execCommand(String line) async {
       // 无参数：先输出当前服务器（状态），再给出详细用法
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '✅ 当前服务器: ${s.session.server}'));
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /server <地址> 👉 切换本次会话的服务器并激活，仅本次生效，不长期保留。'));
+        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/server <地址> 👉 切换本次会话的服务器并激活，仅本次生效，不长期保留。'));
         s.status = '';
       } else {
         try {
@@ -4246,7 +4235,7 @@ Future<void> _execCommand(String line) async {
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前通道尚未绑定秘境'));
         }
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
+        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
         break;
       }
       {
@@ -4269,7 +4258,7 @@ Future<void> _execCommand(String line) async {
         if (sub == 'join') {
           final rest = arg.trim().substring('join'.length).trim();
           if (rest.isEmpty) {
-            s.session.messages.add(_systemMessage(s.session, '🔧 用法: /space join <邀请链接或 token>'));
+            s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space join <邀请链接或 token>'));
             break;
           }
           await _spaceJoin(s.session, s.session.store, s.storePath, rest);
@@ -4301,7 +4290,7 @@ Future<void> _execCommand(String line) async {
             s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '🔧 用法: \n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 重置为空（取消锁屏码）'));
+            '【🔧 用法】\n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 重置为空（取消锁屏码）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
@@ -4461,7 +4450,7 @@ Future<void> _execCommand(String line) async {
         final path = _expandHomePath(arg.trim());
         if (path.isEmpty) {
           s.session.messages
-              .add(_systemMessage(s.session, '🔧 用法: /switch <store 文件路径>'));
+              .add(_systemMessage(s.session, '【🔧 用法】\n/switch <store 文件路径>'));
           break;
         }
         if (path == s.storePath) {
@@ -4489,7 +4478,14 @@ Future<void> _execCommand(String line) async {
     case '/attach':
       if (arg.isEmpty) {
         // 不带参数 = 选文件（老板 2026-10-17）：有 GUI 弹系统窗口，没有（SSH）
-        // 自动落内置浏览器；选中后把 `/attach <路径>` 填进输入行待确认
+        // 自动落内置浏览器；选中后把 `/attach <路径>` 填进输入行待确认。
+        // 先补一条用法消息（老板 2026-10-18：GUI 升级后丢了，找回），含固定用
+        // 内置浏览器的环境变量开关。
+        s.session.messages.add(_systemMessage(s.session,
+            '【🔧 用法】\n/attach <📎文件路径> 👉 上传文件（Tab 补全路径）\n'
+            '   不带参数 = 选文件：默认有 GUI 弹系统窗口、无 GUI 落内置浏览器；\n'
+            '   设环境变量 EINZ_TUI_PICKER=browser 可固定用内置浏览器（system = 固定系统窗口）'));
+        s.status = '';
         await _pickFileIntoInputOrBrowser('/attach');
       } else {
         // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
@@ -4502,7 +4498,13 @@ Future<void> _execCommand(String line) async {
       // TUI 本身不渲染头像，但头像是 per-member 的共享资料：这里设的就是对方 App /
       // TUI 里看到的我的头像（与 App「我的资料」弹层同一个服务端存储）。
       if (arg.isEmpty) {
-        // 不带参数 = 选图片：系统窗口（只列图片）优先，不可用落内置浏览器
+        // 不带参数 = 选图片：系统窗口（只列图片）优先，不可用落内置浏览器。
+        // 用法消息同 /attach（老板 2026-10-18）。
+        s.session.messages.add(_systemMessage(s.session,
+            '【🔧 用法】\n/avatar <🖼️图片路径> 👉 设置我的头像（App 与 TUI 共用；Tab 补全路径）\n'
+            '   不带参数 = 选图片：默认有 GUI 弹系统窗口、无 GUI 落内置浏览器；\n'
+            '   设环境变量 EINZ_TUI_PICKER=browser 可固定用内置浏览器（system = 固定系统窗口）'));
+        s.status = '';
         await _pickFileIntoInputOrBrowser('/avatar', imagesOnly: true);
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
@@ -4519,7 +4521,7 @@ Future<void> _execCommand(String line) async {
       //   /entoken reinvite  → 给其他成员生成专属码（需共享口令：
       //                        duo 直接出码；group 验口令后列成员选择）
       await _execEntoken(arg);
-      s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/entoken 👉 为自己生成通道码\n/entoken invite 👉 为尚未加入的同伴生成通道码\n/entoken reinvite 👉 为已加入的同伴生成通道码（需共享口令，duo 直接出码、group 选成员）'));
+      s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/entoken 👉 为自己生成通道码\n/entoken invite 👉 为尚未加入的同伴生成通道码\n/entoken reinvite 👉 为已加入的同伴生成通道码（需共享口令，duo 直接出码、group 选成员）'));
       break;
     case '/invite':
       // /entoken invite 的别名（给新人生成通道码）。旧写法 /invite attach* 已
@@ -4550,7 +4552,7 @@ Future<void> _execCommand(String line) async {
             s.memberNames[s.session.store.memberId] ??
             '(未设置)';
         s.session.messages.add(_systemMessage(s.session, '当前名字: $current'));
-        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /myname <名字> 👉 修改我的显示名字（如 /myname Lukas）'));
+        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/myname <名字> 👉 修改我的显示名字（如 /myname Lukas）'));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
@@ -4596,7 +4598,7 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, 
         '当前通道名: $current\n'
         '通道公钥: ${s.session.store.publicKey}\n'
-        '🔧 用法: /entrance <通道名> 👉 修改本通道名称（如 /entrance MyMac）'
+        '【🔧 用法】\n/entrance <通道名> 👉 修改本通道名称（如 /entrance MyMac）'
         ));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
@@ -5345,7 +5347,7 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 /// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase`、`/switch`、`/entoken`
 ///   这类可从聊天里放弃的操作）→ 用 [_promptAction]；
 /// - **机密验证**（启动解锁、/switch、/reset、/revoke、/entoken 的 PIN/口令授权）
-///   → `hidden: true`：不明文回显。设置机密（`/pin`、`_askSetPin`、入网口令）
+///   → `hidden: true`：不明文回显。设置机密（`/pin`、入网口令）
 ///   不隐藏：那些明文回显（老板 2026-09-14：隐藏时连自己敲了什么都看不见）。
 Future<String> _prompt(ChatSession session, String message,
     {bool hidden = false, bool exitOnEmpty = false}) {

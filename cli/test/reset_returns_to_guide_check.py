@@ -23,7 +23,6 @@ CLI = os.path.join(ROOT, 'cli')
 WORK = tempfile.mkdtemp(prefix='einz-reset-restart-')
 PASSPHRASE = 'abc12345'  # ≥ 8 位（策略要求）
 CREATOR = 'Lukas'
-MEMBER = 'Alice'
 
 
 def free_port():
@@ -100,13 +99,14 @@ def main():
         m, p = start_tui(store, port)
         spawned.append((m, p))
 
-        # ---------- 入网：create（锁屏码留空跳过，/reset 就只需通道名一道闸门） ----------
+        # ---------- 入网：create（向导不再问锁屏码——2026-10-19 移除；/reset 就只需通道名一道闸门） ----------
         for expect, payload in [
             ('秘境向导', 'c\r'),
             ('我的名字', f'{CREATOR}\r'),
             ('我的性别', '1\r'),
-            ('伴侣的名字', f'{MEMBER}\r'),
-            ('伴侣的性别', '2\r'),
+            # 2026-10-04 起 create 不再预置伴侣（原「伴侣的名字/性别」两问已删），
+            # 第三问是秘境类型（创建时定死）：1=双人秘境 / 2=群组秘境
+            ('秘境类型', '1\r'),
         ]:
             out = wait_text(m, expect, timeout=30)
             if expect not in out:
@@ -119,18 +119,20 @@ def main():
         out = wait_text(m, '成功创建秘境', timeout=40)
         if '成功创建秘境' not in out:
             print('❌ 未创建成功'); print(strip(out[-600:])); return 1
-        # 锁屏码：留空回车 = 跳过（唯一允许空回车的向导问答）。
-        # 注意：TUI 在 `processing`（_busy 打包/上传/建会话）期间**吞掉所有输入**
-        # （:2517），所以不能"发一次就等"——按本仓库探针的惯例重发直到命中。
-        out = ''
-        for _ in range(10):
-            send(m, '\r')
-            out = wait_text(m, '没有设置锁屏码', timeout=5)
-            if '没有设置锁屏码' in out:
+        # 入网收尾：欢迎辞 → 5s 倒计时（processing 期间吞掉所有输入）→ 清 system
+        # 消息 = 进聊天态。PIN 询问已移除（2026-10-19，与 App 向导同口径），
+        # 倒计时结束前发任何命令都会被吞——必须等进聊天态再发 /reset。
+        out = wait_text(m, '一切就绪', timeout=40)
+        if '一切就绪' not in out:
+            print('❌ 未出现欢迎辞倒计时'); print(strip(out[-800:])); return 1
+        deadline = time.time() + 40
+        while time.time() < deadline:
+            chunk = drain(m, 0.8)
+            if chunk and 'Einz' in chunk and '一切就绪' not in chunk and '----------------' not in chunk:
                 break
-        if '没有设置锁屏码' not in out:
-            print('❌ 未能跳过锁屏码'); print(strip(out[-1200:])); return 1
-        print('✅ 入网完成（锁屏码已跳过）')
+        else:
+            print('❌ 倒计时后未进入聊天态'); print(strip(out[-800:])); return 1
+        print('✅ 入网完成（欢迎辞倒计时后进聊天态，无锁屏码询问）')
 
         old = load_store(store)
         old_pub = old.get('public_key')

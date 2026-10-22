@@ -536,6 +536,25 @@ class ApiClient {
     await _post(Api.entranceRetire, {}, token: token);
   }
 
+  /// **自愿退群**（POST /spaces/{id}/leave，2026-10-19，aimemo/groupExitDesign.md）：
+  /// 身份级离场——本人身份名下**全部**通道一并注销，成员行转墓碑（名字保留供
+  /// 历史消息解析），本机数据由调用方随后清理。
+  ///
+  /// 与 [retireEntrance] 的关键差异： retire 只退役**本机这一条通道**（身份仍在册，
+  /// 对方可 re-invite 接回同一身份）；leave 是**整个身份退出空间**（墓碑 + 批量
+  /// 退役 + slot 让位），日后回来 = 剩余成员发新 invite（新身份）。
+  ///
+  /// 语义边界（老板 2026-10-19 拍板）：
+  /// - **仅 group**：duo 不开放退群（服务端 409 `LEAVE_NOT_ALLOWED` 兜底）；
+  /// - **不校验共享口令**：自助语义，session 即所有权（同 retireEntrance 档），
+  ///   本地闸门（群组名 + 已设时的本机 PIN）在调用方弹窗里完成；
+  /// - **失败不清本地**：异常按 [ApiException] 上抛，调用方应提示并留在群内。
+  ///
+  /// 调用约定同 retire：**先调它、成功之后再清本地数据**。
+  Future<void> leaveSpace(String spaceId, String token) async {
+    await _post('/spaces/$spaceId/leave', {}, token: token);
+  }
+
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body,
       {String? token, bool withToken = true}) {
     return _send('POST', path, body, token: token, withToken: withToken);

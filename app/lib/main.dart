@@ -90,6 +90,10 @@ class _EinzAppState extends State<EinzApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Einz',
+      // 关掉 Flutter 默认的 DEBUG 角标（右上角斜条）：该角标只是 debug 模式
+      // 提示，正式 App Store 截图/提审不允许出现（有被拒先例）；
+      // debug 与正式包的其他差异（性能、断言）不受影响。
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           // 新 Logo（粉蓝图标）里的天蓝作种子：派生 primary 保持深蓝，交互对比达标
