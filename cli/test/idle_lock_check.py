@@ -126,6 +126,15 @@ def main():
         print('[3] 错码仍锁:', still)
         ok = ok and still
 
+        # 3.5) 只收数字（老板 2026-10-23）：字母被无声丢弃 → 回车等同于空输入
+        before_hint = out.count('⚠️ 请输入锁屏码')
+        send(master, 'abc\r')
+        time.sleep(2)
+        out += drain(master, 1)
+        letters_dropped = out.count('⚠️ 请输入锁屏码') > before_hint
+        print('[3.5] 字母被丢弃（走空输入分支）:', letters_dropped)
+        ok = ok and letters_dropped
+
         # 4) 空回车 = 原地重问（不退出——决策 #2）
         before = len(out)
         send(master, '\r')

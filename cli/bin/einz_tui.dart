@@ -149,6 +149,10 @@ class _TuiState {
   /// 机密输入模式（口令等）：输入行回显 *（而非原文）。
   bool hiddenInput = false;
 
+  /// 当前问答只收数字（锁屏码验证，老板 2026-10-23）：非数字字符直接忽略
+  /// （与 App 的 digitsOnly 输入过滤器同口径——输错字符无声丢弃，不回显）。
+  bool promptDigitsOnly = false;
+
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
 
@@ -641,8 +645,8 @@ Future<bool> _promptUnlock(ChatSession session,
       : '❓ 验证锁屏码（Ctrl+C 退出）:'; // 空闲锁：空回车不退出，只重问
   while (_state!.running) {
     _state!.pendingExitOnEmpty = exitOnEmpty;
-    final pin =
-        await _prompt(session, promptText, hidden: true, exitOnEmpty: exitOnEmpty);
+    final pin = await _prompt(session, promptText,
+        hidden: true, exitOnEmpty: exitOnEmpty, digitsOnly: true);
     if (!_state!.running) return false; // 解锁期 Ctrl+C / EOF：退出序列已由输入循环跑完
     final answer = pin.trim();
     if (answer.isEmpty) {
@@ -3215,6 +3219,7 @@ Future<void> _runInputLoop() async {
           // 引导问答回答：提交（含留空——调用方自行判定回退/跳过/取消）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
+          _state!.promptDigitsOnly = false;
           _state!.pendingExitOnEmpty = false;
           if (!gc.isCompleted) gc.complete(answer);
           try {
@@ -3310,6 +3315,11 @@ Future<void> _runInputLoop() async {
         if (_state!.browser != null) {
           _browserChar(_state!, ch);
           inputChanged = true;
+          continue;
+        }
+        // 锁屏码问答只收数字（老板 2026-10-23）：非数字字符无声丢弃——
+        // 与 App 的 digitsOnly 输入过滤器同口径（回显 * 也看不到输过什么）
+        if (_state!.promptDigitsOnly && (code < 48 || code > 57)) {
           continue;
         }
         _insertAtCursor(_state!, ch);
@@ -5494,10 +5504,11 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 ///   → `hidden: true`：不明文回显。设置机密（`/pin`、入网口令）
 ///   不隐藏：那些明文回显（老板 2026-09-14：隐藏时连自己敲了什么都看不见）。
 Future<String> _prompt(ChatSession session, String message,
-    {bool hidden = false, bool exitOnEmpty = false}) {
+    {bool hidden = false, bool exitOnEmpty = false, bool digitsOnly = false}) {
   final s = _state!;
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
+  s.promptDigitsOnly = digitsOnly; // 锁屏码问答：只收数字（与 App 同口径）
   s.pendingExitOnEmpty = exitOnEmpty; // 空回车 = 退出整个 TUI（无上一问可回退的门）
   session.messages.add(_systemMessage(session, message));
   _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
@@ -5529,6 +5540,7 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
+  _state?.promptDigitsOnly = false;
   _state?.pendingExitOnEmpty = false;
 }
 
