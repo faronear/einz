@@ -150,3 +150,6 @@ turnserver.*.conf
 # （"unable to find directory entry"）。
 app/assets/voice_model/*
 !app/assets/voice_model/.gitkeep
+
+server/models
+serverDocker/models
