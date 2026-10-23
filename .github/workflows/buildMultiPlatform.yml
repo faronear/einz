@@ -366,12 +366,11 @@ jobs:
           codesign -f -s "$IDENTITY" --timestamp --options runtime --entitlements "$ENT" "$APP"
           codesign --verify -v --strict "$APP"
           # 公证凭据存入临时 keychain profile（secrets 不落日志）。
-          # **优先 ASC API key**（与 iOS 上传同一套 secrets）：2026-10-22/23 连续两次
-          # 用 Apple ID + App 密码公证后，stapler 查询公证记录持续 "CloudKit query
-          # ... Record not found"（run 39729360308 / 39875227075，重试 3 分钟仍查不到
-          # ——不是同步延迟，是 Apple ID 私有 CloudKit 库查询通道不稳）；改用 ASC
-          # key 后 stapler 走 App Store Connect API 查询，社区普遍反馈该问题消失。
-          # 缺 ASC secrets 时回退 Apple ID 方式（旧行为）。
+          # **优先 ASC API key**（与 iOS 上传同一套 secrets）：免 App 专用密码、
+          # 凭据与 TestFlight 上传同源。注：staple 失败与凭据通道无关——真正
+          # root cause 是 Frameworks 下的裸 dylib 未签名（见上），公证 Accepted
+          # 后 stapler 一次成功（run 39879626235 实测）。缺 ASC secrets 时回退
+          # Apple ID + App 密码方式。
           mkdir -p ~/private_keys
           printf '%s' "$ASC_P8_KEY" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
           chmod 600 "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
@@ -403,16 +402,10 @@ jobs:
             xcrun notarytool log "$SUB_ID" --keychain-profile notary-ci || true
             exit 1
           fi
-          # stapler 要到 Apple CloudKit 查公证记录；submit --wait 成功后记录同步到
-          # stapler 侧偶发延迟（"CloudKit query ... Record not found"，2026-10-22
-          # CI run 39729360308 实测），加退避重试——通常 1-2 分钟内可查。
-          STAPLE_OK=0
-          for i in 1 2 3 4 5 6; do
-            if xcrun stapler staple "$APP"; then STAPLE_OK=1; break; fi
-            echo "staple attempt $i failed; notary record not queryable yet, waiting 30s..."
-            sleep 30
-          done
-          [ "$STAPLE_OK" = 1 ] || { echo "staple failed after 6 attempts"; exit 1; }
+          # stapler staple：公证 Accepted 后一次即成（run 39879626235 实测）。
+          # 若再遇 "CloudKit query ... Record not found"：那是公证 Invalid 的下游
+          # 症状，真凶看上面 notarytool log 的 issues，不要往 stapler/凭据方向修。
+          xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
           spctl -a -vv -t exec "$APP"
           rm -f notary-upload.zip
