@@ -15477,3 +15477,14 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **（2026-10-23T06:04:58Z / 2026-10-23 14:04）**：TUI 锁屏码提示只收数字（老板 2026-10-23 要求，对齐 App 的 digitsOnly 过滤器）。落点：_TuiState 新增 promptDigitsOnly 旗标，_prompt 增 digitsOnly 参数，_promptUnlock（启动/空闲两路共用）传 true；输入循环可打印字符分支对非数字（code<48||code>57）直接 continue——无声丢弃、不回显（回显本就是 *，与 App 输错字符不显示同口径）；提示提交与 _abortPendingGuide 两处重置旗标。口令/通道码等问答不受影响（digitsOnly 默认 false）。回归补断言：锁屏态敲 'abc' + 回车 → 走空输入分支（'⚠️ 请输入锁屏码' 出现），证明字母被丢弃；idle_lock_check 11 场景全过，其余回归无影响。另答老板：设置离开阈值的命令就是已上线的 /lock <秒>（20~1200s，默认 30s，会话级——重启恢复默认；要持久化需往 store 加字段，待老板定）。
 
 **（2026-10-23T05:56:45Z / 2026-10-23 13:56）**：代提交老板的文案修订批次 + 补落地漏掉的「Show metadata」。① **英文**：chatPageTombstoneKeep 定为 **Show metadata**（老板认同我的建议——占位项显示的是时间+状态=剥掉正文的元数据，比 Show status 覆盖全；此前一轮只提交了老板手改的 Show status，本轮修正），gen-l10n 同步。② **中文统一「清除→清空」**（老板批量改）：startupInitClearData/Title/Message/ClearedRestart、chatPageEntranceRevoked、resetEntranceServerResidualHint 六处。③ **TUI 措辞**（老板改）：解锁提示「输入锁屏码」→「验证锁屏码」（启动/空闲两路）；空回车提示「Ctrl+C 退出」→「Ctrl+C 彻底退出」；「尚未设置共享口令」→「没有共享口令」（含两处注释）；/pin 用法与结果文案改为「清除锁屏码」口径并明示"不再自动锁屏"；/lock 无 PIN 提示「尚未设置」→「没有」。idle_lock_check.py 的提示词常量同步更新（LOCK_PROMPT/STARTUP_PROMPT），十场景复跑全过；guide_exit/store_path/dart test 28 例、app flutter analyze 全量复跑无影响。
+
+**（2026-10-23T07:35:00Z / 2026-10-23 15:35）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：serverDocker/ 融合进 server/
+- 决策背景：本机 `npm run dev` 与 docker compose 两种运行形态共享同一份 data/config/models/.env（老板定）。
+- `git mv serverDocker/* → server/docker/`（compose×4、coturn/、env.sh、Caddyfile.example；.env 与 models/ 为 ignored 文件用 mv 一并搬）。
+- compose 3 个 server 变体：`build.context: ..` + `dockerfile: docker/Dockerfile`；卷改 `../config ../data ../models/whisper`。coturn 变体无需改。
+- `server/package.json` dev script：env-file 改 `./docker/.env`；mailProbe.ts 路径改 `../docker/.env`（脚本自身位置相对）。
+- 根 `.dockerignore` 重写：context 现在是仓库根（服务 cli + server 两个构建），排除 server/data、server/models、server/docker、server/.env 等。
+- `.gitignore`：serverDocker/* 路径全部改 server/docker/*。
+- 文档同步：DEPLOYMENT/ONBOARDING/TURN/updateServer/E2EE/README/whisperDeploy + server 内注释，全部 serverDocker → server/docker；修正 mailProbe 与回滚 checkout 的相对路径。
+- 验证：4 个 compose `docker compose config` 全过；`node --env-file-if-exists=./docker/.env` 能读到密钥变量（未打印值）；env.sh 幂等通过。
+- 注意：VPS 上 /opt/... 旧目录结构需在下次部署时同步 mv；同一时刻只能跑一个实例（共享 SQLite）。

@@ -1,9 +1,22 @@
-# Docker 构建上下文精简：仅需 cli/ + shared/ 的源码与 pubspec
+# Docker 构建上下文精简（根 context 服务两个构建：
+#   1) cli/Dockerfile.dart-sodium —— 仅需 cli/ + shared/ 源码
+#   2) server/docker/Dockerfile —— 仅需 server/ 源码（data/models/env 绝不入镜像）
 .git
 .atomcode/
 aimemo/
-cli/build/
+app/
+docs/
+logo/
+www.einz.tic.cc/
+_release.gitomit/
+simsim.gitomit.sfomit/
 **/node_modules/
 **/dist/
 **/.dart_tool/
 **/build/
+cli/build/
+server/data/
+server/models/
+server/config/
+server/docker/
+server/.env

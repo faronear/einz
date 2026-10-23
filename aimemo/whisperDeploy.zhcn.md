@@ -87,7 +87,7 @@ ffmpeg 转换参数别漏 `-ar 16000 -ac 1`。
 server 侧只认两个环境变量：
 
 ```bash
-# serverDocker/.env（或 pm2 ecosystem 的 env 块，与现有 EINZ_* 变量同处）
+# server/docker/.env（或 pm2 ecosystem 的 env 块，与现有 EINZ_* 变量同处）
 EINZ_WHISPER_BIN=/opt/whisper/whisper.cpp/build/bin/whisper-cli
 EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
 ```
@@ -100,7 +100,7 @@ EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
   ——二进制 + libggml 动态库烤进镜像（`/opt/whisper/`），模型**不进镜像**，走卷
   `./models/whisper:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
   `EINZ_WHISPER_BIN=/opt/whisper/whisper-cli` + `EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin`。
-  首次部署只剩一步：往 `serverDocker/models/whisper/` 放一份模型文件
+  首次部署只剩一步：往 `server/docker/models/whisper/` 放一份模型文件
   （**老板 2026-10-22 定**：模型是固定二进制资产，不进 `data/` 用户数据目录；
   `models/` 是**通用模型目录**（gitignore 整个目录），将来换/加其他模型放它下面
   同级子目录即可；466MB+ 绝不可入库）
@@ -123,7 +123,7 @@ EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
 - [ ] `scp -r` 老机器 `/opt/whisper/whisper.cpp/build/bin/whisper-cli` + `models/ggml-*.bin`
       （模型文件与老机器版本一致，不必重新下载）
 - [ ] 新机器冒烟测试（§4，用同一段 test.wav 对比新旧机器输出一致）
-- [ ] serverDocker/.env 两个变量指到新路径
+- [ ] server/docker/.env 两个变量指到新路径
 - [ ] 重启 server + App 端到端验证一条
 - [ ] DNS 切换后观察 `pm2 logs` 第一条转写事件的耗时（新机房到用户的延迟）
 

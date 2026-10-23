@@ -11,7 +11,7 @@ import { requireSession } from "./guard.js";
  * - 审计/事件日志只记「事件发生 + 耗时 + 音频时长」，**绝不记音频内容与转写文本**；
  * - 暴露面 = 运营者本人（server 已能看到密文元数据），不引入第三方。
  *
- * 配置（serverDocker/.env，两个都配才启用；缺任一 → 端点报 TRANSCRIBE_DISABLED）：
+ * 配置（server/docker/.env，两个都配才启用；缺任一 → 端点报 TRANSCRIBE_DISABLED）：
  *   EINZ_WHISPER_BIN    whisper-cli 可执行文件绝对路径
  *   EINZ_WHISPER_MODEL  ggml 模型文件绝对路径
  *   EINZ_WHISPER_THREADS  推理线程数（默认 1，防止小 VPS 被单次转写打满）
