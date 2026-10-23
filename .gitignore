@@ -112,12 +112,10 @@ build/
 *.db-wal
 *.db-shm
 server/data/
-serverDocker/data/
-serverDocker/config/serverConfig.json
 # 通用模型目录（固定二进制资产，非用户数据；不进 data/ 用户数据目录——老板
 # 2026-10-22 定；whisper 在 models/whisper/，将来其他模型放同级子目录；
 # 466MB+ 绝不可入库）
-serverDocker/models/
+server/models
 
 # --- 密钥与配置（禁止提交） ---
 .env
@@ -150,6 +148,3 @@ turnserver.*.conf
 # （"unable to find directory entry"）。
 app/assets/voice_model/*
 !app/assets/voice_model/.gitkeep
-
-server/models
-serverDocker/models

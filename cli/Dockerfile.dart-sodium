@@ -7,9 +7,9 @@
 # 仍会报"无法加载 libsodium"。
 #
 # 构建（仓库根执行，一条命令）：
-#   docker build -f cli/Dockerfile.dev -t dart-sodium .
+#   docker build -f cli/Dockerfile.dart-sodium -t dart-sodium cli/
 # 升级 dart 后重建（先拉新版基础镜像再 --pull 重建）：
-#   docker pull dart:stable && docker build --pull -f cli/Dockerfile.dev -t dart-sodium .
+#   docker pull dart:stable && docker build --pull -f cli/Dockerfile.dart-sodium -t dart-sodium cli/
 # 之后 ./cli/dart-docker.sh（setup/tui/dartc/build）会自动优先使用 dart-sodium 镜像
 # （也可设 DART_IMAGE=<镜像> 覆盖）。
 

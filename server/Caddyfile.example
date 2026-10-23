@@ -1,4 +1,7 @@
 # Einz Caddy 配置：TLS 自动签发 + 反向代理 + WSS 升级
+# 模板文件（Docker 与裸 node 两种部署形态通用）：
+#   - Docker 部署：拷贝为 server/docker/Caddyfile（withcaddy compose 挂载它）再改域名；
+#   - 裸 node 部署：照它配置系统级 /etc/caddy/Caddyfile。
 # 把 private.example.com 替换为真实域名；Caddy 自动申请/续期证书。
 
 private.example.com {

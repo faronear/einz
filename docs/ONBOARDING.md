@@ -52,13 +52,14 @@ B 加入（口令取钥）→ 双端互通对话。
 ```bash
 # ① VPS：拉最新代码 + 重建 server
 ssh 你的VPS
-cd /faronear/only            # ← 你的实际部署目录（下同，按需替换）
+cd /faronear/einz            # ← 你的实际部署目录（下同，按需替换）
 git pull
-cd serverDocker
+cd server/docker
 # 首次部署（或 .env 丢失后重建）：生成备份密钥
-bash serverDocker/env.sh         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
+bash env.sh                       # 脚本在仓库里（.gitignore 不覆盖，git pull 不影响）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 EINZ_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
+# （env.sh 已能自动生成并写入 .env；手动 python 路线是二选一的备选）
 docker compose up -d --build server
 curl -s https://einz.tic.cc/health
 # {"status":"ok","protocol_version":"v2-multiverse","version":"1.0.0","capabilities":["spaces","join-tokens"],...}

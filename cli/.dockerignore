@@ -1,0 +1,7 @@
+# dart-sodium 镜像构建排除（context = cli/，见 cli/dart-docker.sh 的 build_image）
+# Dockerfile.dart-sodium 没有任何 COPY——它是纯基座镜像（dart:stable + libsodium），
+# 排除规则不为"该进镜像什么"服务，只为压缩传给 docker daemon 的 context：
+# .dart_tool/ 是大头（pub 缓存 + TUI 内核 dill，43MB+；运行时容器挂的是宿主 /app，
+# 用的是宿主那份，不需要进 context）。server 镜像另有 server/.dockerignore，与此无关。
+.dart_tool/
+build/
