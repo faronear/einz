@@ -211,7 +211,7 @@ void main() {
           token: 'tok-123',
         ));
 
-    const forgotHint = '真的忘了锁屏码？您可以卸载重装，通过邀请码和共享口令重新加入您的秘境。';
+    const forgotHint = '真的忘了锁屏码？您可以卸载重装，然后通过邀请码和共享口令重新加入您的秘境。';
 
     await _pushLockPage(tester, db, canDismiss: false);
     await tester.pumpAndSettle();

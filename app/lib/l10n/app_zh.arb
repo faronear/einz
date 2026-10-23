@@ -733,7 +733,7 @@
       }
     }
   },
-  "lockPageForgotPinHint": "真的忘了锁屏码？您可以卸载重装，通过邀请码和共享口令重新加入您的秘境。",
+  "lockPageForgotPinHint": "真的忘了锁屏码？您可以卸载重装，然后通过邀请码和共享口令重新加入您的秘境。",
   "@lockPageForgotPinHint": {
     "description": "锁屏页连续输错冻结期间的提示：忘记 PIN 时的恢复路径（卸载重装 + 邀请码 + 共享口令重新加入）。只在冻结时出现——平时挂着会暗示忘 PIN 有捷径、削弱 PIN 威慑"
   },
