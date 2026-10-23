@@ -9141,8 +9141,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 音频条：播放键 + 固定波形图 + 时长（录音只写秒数 `25s`，上限 60s；音频文件
   /// 用 h/m/s，零的部分省略）。音频文件**多一行文件名**，与波形左对齐（老板
-  /// 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；**整块**可点（含
-  /// 时长、文件名），不必非点中播放键（老板 2026-09-27）。
+  /// 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；**播放区整块**可点
+  /// （含时长、文件名），不必非点中播放键（老板 2026-09-27）；下方的转写区**不在**
+  /// 播放点击范围内，自带半透明面板底色与播放区区分（老板 2026-10-23）。
   ///
   /// 消息流气泡、长按菜单预览行、输入栏引用条、气泡里的引用块**共用这一个 widget**
   /// （老板 2026-09-27：这几处要一个样）。
@@ -9150,6 +9151,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   靠 ambient 主题必然有一处看不见（已踩过：菜单里图标变黑）。
   /// - [tappable] 为 false 时不挂整块点击：**气泡引用块的单击是"跳到原消息"**，不能
   ///   被"点哪都播放"抢掉；播放键本身仍可点（内层 IconButton 照旧）。
+  /// - [inlineTranscribeEntry]：仅消息流气泡传 true——手动模式下尚无转写行时在
+  ///   转写区显示行内「转写」入口（见 [_buildVoiceTranscriptLine]）。
   ///
   /// 外层监听播放状态版本：菜单在独立路由、页面 setState 重建不到它。
   Widget _buildAudioBar(
@@ -9215,37 +9218,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ],
     );
-    final Widget body;
-    if (isVoice) {
-      // 语音消息：波形行下方挂本地转写行（aimemo/voiceTranscript.zhcn.md §10——
-      // 仅消息流气泡有；无转写数据/纯音频文件消息不加这一行）
-      // 手动模式（自动转写关）且还没有任何转写行时，转写行位置显示「图标+转写」
-      // 的行内入口（老板 2026-10-23）：点击直接按当前方式发起转写，入队后被
-      // pending/done 行顶替。转写行只在消息流气泡挂（inlineTranscribeEntry
-      // 由调用点控制），引用块/菜单预览的点击语义不同，不给。
-      body = Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [playButton, waveformRow],
-          ),
-          _buildVoiceTranscriptLine(m, foreground, manualEntry: inlineTranscribeEntry),
-        ],
-      );
-    } else {
-      // 音频文件：播放键独占左列，右边一列两行（老板 2026-09-27）——上行波形+时长、
-      // 下行文件名。**文件名与波形左对齐**靠这个"左列/右列"结构天然保证，不用
-      // 量播放键宽度再去凑缩进（之前那版第二行贴着气泡左边缘，跟播放键不齐）。
-      // 乐符图标已按老板要求删掉：文件名本身就是"这是一首歌"的最好说明。
-      // wav 音频文件也挂转写行（老板 2026-10-22 测试路径：TTS 生成的 wav 以
-      // 音频文件发送验证转写；非 wav 无行不占位）。
-      body = Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    // 播放胶囊只包播放区（播放键+波形+时长[+文件名]，老板 2026-10-23：点转写区
+    // 不再触发播放）；转写行在外面，自带面板底色与独立点击语义（重试/行内入口）。
+    final Widget playArea = isVoice
+        ? Row(mainAxisSize: MainAxisSize.min, children: [playButton, waveformRow])
+        : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               playButton,
@@ -9276,22 +9253,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
               ),
             ],
-          ),
-          _buildVoiceTranscriptLine(m, foreground),
-        ],
-      );
-    }
-    // 气泡引用块（[tappable] = false）：不挂整块点击，把单击让给外层的"跳到原消息"。
-    if (!tappable) return body;
-    // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长、文件名都在范围里
-    // （老板 2026-09-27，与图片"点消息本体就是看大图"对齐）。播放键保留（它仍能点）。
-    // behavior=opaque：否则容器自身不参与命中测试，只有子控件占的那几块能点——
-    // 播放键与波形之间的空隙、两行之间的空隙都会漏掉（文件卡片同理）。
-    return Clickable(
-      onTap: () => _playAudioMessage(m),
-      behavior: HitTestBehavior.opaque,
-      child: body,
+          );
+    final Widget playAreaTappable = tappable
+        ? Clickable(
+            // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长都在范围里
+            // （老板 2026-09-27）。behavior=opaque：否则容器自身不参与命中测试，
+            // 只有子控件占的那几块能点——播放键与波形之间的空隙会漏掉（文件卡片同理）。
+            onTap: () => _playAudioMessage(m),
+            behavior: HitTestBehavior.opaque,
+            child: playArea,
+          )
+        : playArea;
+    final Widget body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        playAreaTappable,
+        // 语音消息：波形行下方挂本地转写行（aimemo/voiceTranscript.zhcn.md §10——
+        // 仅消息流气泡有；纯音频文件消息挂 wav 转写行，非 wav 不占位）
+        // 手动模式（自动转写关）且还没有任何转写行时，转写行位置显示「图标+转写」
+        // 的行内入口（老板 2026-10-23）：点击直接按当前方式发起转写，入队后被
+        // pending/done 行顶替。转写行只在消息流气泡挂（inlineTranscribeEntry
+        // 由调用点控制），引用块/菜单预览的点击语义不同，不给。
+        _buildVoiceTranscriptLine(m, foreground,
+            manualEntry: isVoice && inlineTranscribeEntry),
+      ],
     );
+    return body;
   }
 
   /// 录音时长：只用秒（25s；录音上限 60s，老板要求 2026-09-13）。
@@ -9324,6 +9312,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               .watchSingleOrNull(),
       builder: (context, snap) {
         final t = snap.data;
+        // 转写区内嵌面板（老板 2026-10-23：转写区原先与播放区同底色、又同在播放
+        // 胶囊里，分不清）：半透明圆角底 + 内边距，与气泡本体/播放区区分开。
+        // 底色取前景色 10%——渐变深气泡前景是白 → 浅白块；素雅浅气泡/引用条
+        // 前景是主题蓝 → 淡蓝块，两种主题下都可见且不刺眼。
+        Widget panel(Widget child) => Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: foreground.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: child,
+            );
         if (t == null) {
           // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
           // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
@@ -9331,9 +9332,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final l10n = AppLocalizations.of(context)!;
           final TextStyle style =
               TextStyle(fontSize: 13, color: foreground.withValues(alpha: 0.85));
-          return Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Row(
+          return panel(
+            Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -9361,11 +9361,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         switch (t.status) {
           case 'done':
             if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
+            return panel(
               // mainAxisSize.min：Row 默认 max 会占满气泡最大宽，把整条语音气泡
               // 拉到全宽（转写再短也一样，2026-10-23 实测），必须收缩到内容宽。
-              child: Row(
+              Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -9379,9 +9378,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             );
           case 'pending':
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
+            return panel(
+              Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -9397,9 +9395,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 行首同样带来源图标（老板 2026-10-23）：失败行的 modelId 在写入时
             // 就已落定（本地失败=sense-voice-small，服务端失败=whisper-server），
             // 与 done/pending 同一判断，点按重试不改变来源语义。
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
+            return panel(
+              Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

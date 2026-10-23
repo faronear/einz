@@ -15613,3 +15613,16 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **口径：** 入口只挂语音消息气泡（isVoice 分支）；wav 音频文件气泡不加（转写入口仍在长按菜单，与自动入队口径一致——音频文件是低频场景）。
 
 **验证：** flutter analyze 干净；真机效果待老板确认。
+
+## 2026-10-23 语音气泡：播放胶囊收窄到播放区 + 转写区半透明面板
+
+**（2026-10-23T17:05:00Z / 2026-10-24 01:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板两需求：① 转写区与播放区同底色无区分，要视觉方案区分；② 点击播放的大胶囊局限在播放键+波形图区域，不要与转写区合并。
+
+**实现（_buildAudioBarBody + _buildVoiceTranscriptLine）：**
+- **播放胶囊收窄**：原来 `Clickable(播放)` 包整个 body（播放行+转写行）→ 改为只包 playArea（播放键+波形+时长[+文件名]）。语音与音频文件两分支统一为「playArea → tappable 时包 Clickable → Column(playAreaTappable, 转写行)」结构。点转写区不再触发播放；转写区自己的点击语义（重试/行内入口）不受影响。
+- **转写区内嵌面板**：`_buildVoiceTranscriptLine` 的四个状态行（无行入口/done/pending/failed|stale|unavailable）统一包进 `panel()` 容器：前景色 10% 透明度圆角底（radius 8）+ 水平 8/垂直 4 内边距 + top 4 外边距。渐变深气泡（前景=白）显示浅白块、素雅浅气泡（前景=主题蓝）显示淡蓝块，两种主题都可区分。
+- 引用块/菜单预览（tappable:false）同样生效：面板区分视觉全场景一致，播放点击范围同步收窄。
+
+**验证：** flutter analyze 干净。
