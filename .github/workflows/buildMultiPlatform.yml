@@ -355,6 +355,14 @@ jobs:
           IDENTITY="Developer ID Application"
           find "$APP/Contents/Frameworks" -name "*.framework" \
             -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
+          # 裸 dylib（voice 分支引入的 sherpa-onnx FFI 插件是 .dylib 不是 .framework）：
+          # 不签/无 secure timestamp 会被公证判 Invalid（run 39878450056 实测：
+          # libsherpa-onnx-c-api.dylib x86_64+arm64 四条 "not signed with a valid
+          # Developer ID certificate" / "does not include a secure timestamp"），
+          # 且 Invalid 时 notarytool submit 也 exit 0，报错被误导到 stapler 的
+          # "CloudKit query ... Record not found"。
+          find "$APP/Contents/Frameworks" -name "*.dylib" \
+            -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
           codesign -f -s "$IDENTITY" --timestamp --options runtime --entitlements "$ENT" "$APP"
           codesign --verify -v --strict "$APP"
           # 公证凭据存入临时 keychain profile（secrets 不落日志）。
