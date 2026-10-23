@@ -145,14 +145,18 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 **已拍板（老板 2026-10-10）：采用方案 1**——录音改 `AudioEncoder.wav` + 16kHz 单声道（`record` 直接支持）。
 
 > **⚠️ macOS 容器的坑（2026-10-23 实测修复）**：`record` 插件在 macOS 走
-> AVCaptureAudioFileOutput，把标准 PCM16 录音写成 **WAVE_FORMAT_EXTENSIBLE**
-> 容器（tag=0xFFFE，JUNK + 40 字节 fmt + FLLR 填充 + data）——数据本身是标准
-> 16bit 交错 PCM，但 sherpa-onnx 的 wave-reader 明确不支持该容器
-> （"We don't support WAVE_FORMAT_EXTENSIBLE files."），服务端当时也只认 tag=1，> 两侧同时 400/失败。修法：`VoiceTranscriptService.normalizeWavBytes` 把容器重写成
-> 标准 44 字节头（数据一个采样点不动），在**录音落库前**（`_stopVoice`）、
-> **本地转写喂 isolate 前**（`_processOne`，覆盖存量老消息）、**服务端上送前**
-> （`_serverVoiceTranscribe`）三个点调用；服务端 `wavDurationMs` 同时改成接受
-> extensible（子格式 GUID 为 PCM 时），双保险。
+> AVCaptureAudioFileOutput，录音产出形态不稳定，实测踩到两个坑：
+> ① **WAVE_FORMAT_EXTENSIBLE 容器**（tag=0xFFFE，JUNK + 40 字节 fmt + FLLR + data）：
+> 数据是标准 16bit 交错 PCM，但 sherpa-onnx 的 wave-reader 明确不支持该容器
+> （"We don't support WAVE_FORMAT_EXTENSIBLE files."），服务端当时也只认 tag=1；
+> ② **44.1kHz/32bit IEEE float 的 extensible**（GUID=3）：录音器没拿到 16kHz 时
+> 回落写设备原生格式——采样率/位深都不对，且实测真实录音里还混有 NaN/Inf 故障帧
+> （float 采集毛刺，直接让量化抛 "Infinity or NaN toInt"）。
+> 修法：`VoiceTranscriptService.normalizeWavBytes` 全形态归一——16k PCM 只换 44 字节
+> 标准头（数据一个采样点不动）；float/非 16k 线性重采样到 16kHz + 转 int16，
+> NaN/Inf 按静音处理。三个调用点：**录音落库前**（`_stopVoice`）、**本地转写喂
+> isolate 前**（`_processOne`，覆盖存量）、**服务端上送前**（`_serverVoiceTranscribe`）。
+> 服务端 `wavDurationMs` 同时改成接受 extensible（子格式 GUID 为 PCM 时），双保险。
 协议层加 `meta.voiceContainerWav=true` 标识新消息（旧消息无此键 = m4a；`docs/PROTOCOL.md` §5.1 已登记），
 `_voiceExtOf` 在播放/转写/留存目录/手动入口四处统一扩展名口径；旧 m4a 消息播放照常（系统 AAC 解码），
 手动转写入口点按提示"旧格式不支持转写"，不打哑炮。体积代价 60s≈1.9MB 可接受；wav 音质
