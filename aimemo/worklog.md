@@ -15516,4 +15516,11 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 验证：`docker build --check -f cli/Dockerfile.dart-sodium cli/` 通过（context 传输 569B，无警告）；真构建在本机后台跑（doomship 无 dart-sodium 镜像缓存，正在拉 241MB dart:stable，网络 ~40KB/s 较慢；Dockerfile 无 COPY，基座层与本次改动无关）。
 - 遗留未动（无依据不改）：DEPLOYMENT §9.1 的 git remote 写 `git.tic.cc/fon/only`、updateServer 写 `fon/einz`，哪个是真 remote 待老板确认。
 
+**（2026-10-23T09:20:00Z / 2026-10-23 17:20）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：only 时代命名清理——git remote 与本地路径全部落到 einz
+- 老板确认：`git.tic.cc/fon/einz` 是正确 remote，`only` 是早期未定名时的临时用名（与本机 `git remote -v` 实际配置一致）。
+- 清理 5 处：DEPLOYMENT §9.1 `git remote add origin .../fon/only` → `fon/einz`；§9.2 本机 push 路径 `/Users/Shared/productX/only` → `/Users/Shared/productX/einz`；ONBOARDING 阶段 0② 与阶段 1、阶段 3 的 `/Users/Shared/productX/only[/cli]` → `einz`（该目录实际存在，server/models 符号链接就指向它）。aimemo 历史记录不改。
+- 老板指示：不要在本机构建 dart-sodium（不拉 dart:stable）——这台 MacBook always 直接跑原生 dart，dart-docker.sh 容器路线是给没装 dart 的机器用的。上轮为验证拉起的后台 docker build 本想停，但环境分类器持续拦截 kill 类命令（试 5 次约 10 分钟），进程仍在（仅是 241MB dart:stable 慢速拉取，~40KB/s，无其他副作用；已请老板一键 pkill 或等它自行拉完——拉完也只是本地多一个 dart-sodium 镜像，dart-docker.sh 首次使用本来也会建）。
+- 发现分叉（重要，已向老板 flag）：~/einz（本 session 工作区，line A：2f1ac41e→a555893f→61009e26→5cc1c706，已推 origin）与 /Users/Shared/productX/einz（老板工作区，line B：2f1ac41e→fcda12cc「refactor(voice): 转写设置拆两组」17:19）已分叉——B 线不含 serverDocker 融合四件套，需要合并（voice 设置重构 vs server docker/文档，预估无冲突，待老板定谁来合）。
+
+
 
