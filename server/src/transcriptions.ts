@@ -6,7 +6,7 @@ import { requireSession } from "./guard.js";
  * 方案 D'：服务端自建 Whisper 转写（voiceTranscript.zhcn.md §15.2）。
  *
  * 隐私承诺（设计文档定稿，部署文档 aimemo/whisperDeploy.zhcn.md §0）：
- * - 明文音频**全程只在内存**——通过 /dev/stdin 管道喂给 whisper-cli 子进程，
+ * - 明文音频**全程只在内存**——通过 stdin 管道（whisper-cli `-f -`）喂给子进程，
  *   不写临时文件、不落盘、不进日志；
  * - 审计/事件日志只记「事件发生 + 耗时 + 音频时长」，**绝不记音频内容与转写文本**；
  * - 暴露面 = 运营者本人（server 已能看到密文元数据），不引入第三方。
@@ -100,14 +100,20 @@ export function parseWhisperStdout(out: string): string {
 
 type WhisperRunner = (wav: Buffer, lang: string) => Promise<string>;
 
-/** 默认 runner：spawn whisper-cli，音频经 /dev/stdin 管道进子进程（不落盘）。 */
+/** 默认 runner：spawn whisper-cli，音频经 stdin 管道进子进程（不落盘）。
+ *  ⚠ 必须传 `-f -`（短横）而不是 `-f /dev/stdin`：whisper.cpp 的 read_audio_data
+ *  对 `-` 是把 stdin 全量读进内存再解析（管道安全）；对 `/dev/stdin` 会当普通
+ *  文件走 ma_decoder_init_file——stdin 是管道、不可 seek，miniaudio 打开即失败，
+ *  再回落 ffmpeg（多数机器没装）→ exit 11「read_audio_data from /dev/stdin」。
+ *  2026-10-23 macOS 实测踩到（此前各次测试都在到达 whisper 前就失败，从未真正
+ *  跑通过这条管道）。 */
 const realWhisperRunner: WhisperRunner = (wav, lang) => {
   const cfg = whisperConfig();
   if (cfg == null) throw new ApiError("TRANSCRIBE_DISABLED", "server transcription not configured", 503);
   return new Promise((resolvePromise, reject) => {
     const child = spawn(
       cfg.bin,
-      ["-m", cfg.model, "-f", "/dev/stdin", "-l", lang, "-np", "-t", String(cfg.threads)],
+      ["-m", cfg.model, "-f", "-", "-l", lang, "-np", "-t", String(cfg.threads)],
       { stdio: ["pipe", "pipe", "pipe"] }
     );
     let stdout = "";
@@ -132,7 +138,7 @@ const realWhisperRunner: WhisperRunner = (wav, lang) => {
       }
       resolvePromise(stdout);
     });
-    // 音频走 stdin：wav 缓冲写完即关，子进程经 /dev/stdin 读取
+    // 音频走 stdin：wav 缓冲写完即关，子进程经 `-f -` 从 stdin 读取
     child.stdin.on("error", () => {/* whisper 读完即退出，EPIPE 竞态属正常 */});
     child.stdin.end(wav);
   });
