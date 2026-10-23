@@ -47,8 +47,9 @@ git status --short                                          # 应只显示本地
 
 - 本地化文件 `server/docker/.env`（备份密钥）、`server/data/`、`*.db`
   全部在仓库 .gitignore 中 → git 操作不触碰，**本地数据零风险**；
-- 唯一例外 `server/docker/Caddyfile`：仓库内是占位域名 `private.example.com`，
-  VPS 部署时已 sed 成真实域名（einz.tic.cc）→ 用 `assume-unchanged` 标记，pull 不覆盖。
+- 唯一例外 `server/docker/Caddyfile`：仓库模板 `server/Caddyfile.example` 是占位域名
+  `private.example.com`，VPS 部署时拷贝为 `server/docker/Caddyfile` 并 sed 成真实域名
+  （einz.tic.cc）→ 用 `assume-unchanged` 标记，pull 不覆盖。
 
 ---
 

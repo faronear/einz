@@ -15497,3 +15497,14 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 勘误两连：①「server 构建需要 shared/」经查为错误推断（src 无 shared import，tsconfig 仅 include src，Dockerfile 只 COPY package/tsconfig/src）；② compose 相对路径以文件所在目录为基准，server/docker/ 下的 `..` 就是 server/，此前写的 `../server` 实指不存在的 server/server。
 - 定案（老板选 B）：compose 3 变体 `context: ..`（=server/）+ `dockerfile: Dockerfile`；新建 `server/.dockerignore`（排除 node_modules/dist/data/models/config/docker/.env）；根 `.dockerignore` 回退为 cli 构建原内容。
 - 验证：4 个 compose config 全过；server/ 下 `docker build --call check` 确认 ignore 加载无警告。
+
+**（2026-10-23T08:11:56Z / 2026-10-23 16:11）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：复审 serverDocker→server/docker 融合四连 commit（另一 agent 所做），修其中遗留错误 + 落地老板两项新要求
+- 背景：老板发现融合批次连续出错，要求独立复审。复审对象：b957441f（cli Dockerfile 改名）、398fff04（融合）、40497367（Dockerfile 路径"修正"）、a555893f（方案 B）。
+- 查出错误：① 398fff04 写 `dockerfile: docker/Dockerfile`——Dockerfile 从来在 server/Dockerfile，路径不存在；② 40497367 "修正"为 `dockerfile: server/Dockerfile` 但 context 仍是 `..`（=server/）→ 解析成 server/server/Dockerfile，**依然不存在**（修正没修对）；③ .gitignore 把 ignore 规则改成 server/docker/{data,config,models}，但卷实际指向 ../config ../data ../models（server/ 下）——新增 4 条死规则，真实位置靠旧规则兜底未酿成安全事故；④ 文档没跟上：DEPLOYMENT §3.1 目录树还是融合前结构、mkdir -p server/docker/config 建错目录、whisperDeploy 让往 server/docker/models/whisper 放模型（实际 server/models/whisper）；⑤ server-run-docker 的 `rm -fr data/*` 没随 cd server/docker 改，CLEAN=true 静默失效；⑥ cli/Dockerfile.dart-sodium 头部注释还写着 Dockerfile.dev（两处）；⑦ ONBOARDING 在 cd server/docker 后写 `bash server/docker/env.sh`（嵌套路径，跑不通；融合前同错）。
+- 关键教训（实测）：`docker compose config` **不校验 dockerfile 是否存在**（瞎编不存在路径也 exit 0）——前两个 commit 的"config 全过"验证是无效验证；有效验证是 `docker build --check`（本次实测通过）或真 build。
+- 老板两项新要求已落地：A) server/package.json `start`（裸 node/pm2 形态）加 `--env-file-if-exists=${EINZ_ENV_FILE:-./docker/.env}`，与 dev 一致——此前 pm2 跑法丢 EINZ_DB_BACKUP_KEY/SMTP/WHISPER 全部变量；B) Caddyfile.example 从 server/docker/ 移到 server/（docker 与裸 node 两种形态通用），文件头注明两种拷贝/参照方式。
+- 顺手修正：.gitignore 删 4 条死规则；DEPLOYMENT/whisperDeploy/updateServer/ONBOARDING 全部路径对齐新布局（server/config、server/models/whisper、env.sh 调用）；3 个 compose + server/Dockerfile 的 ./config ./models 注释改为 ../config ../models；§3.2 补 cp ../Caddyfile.example Caddyfile 步骤；§3.1 目录树按"Node dev 与 Docker 共用运行根"重写。
+- 验证：4 个 compose config 全过；`docker build --check -f server/Dockerfile server/` 无警告；server/ 下 `node --env-file-if-exists=./docker/.env` 实测读到密钥与 SMTP 变量（未打印值）。
+- 附带发现（未改，待老板定）：root package.json `server-update-remote` 还在调 a7f62f8e 起已合并掉的 `server-run-docker-mirror`（应改 `MIRROR=true npm run server-run-docker` 或类似）；且文档里 VPS 路径 /opt/einz 与 /faronear/einz 混用。
+- 并行改动注意：server/models 是指向 /Users/Shared/productX/einz/server/models 的符号链接（老板 15:53 建，两机同步位；gitignore `server/models` 覆盖，无需处理）。
+

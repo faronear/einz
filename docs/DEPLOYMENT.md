@@ -183,13 +183,26 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫通道�
 ### 3.1 目录与前置
 
 ```text
-server/docker/
-├── Caddyfile             # 域名 + TLS 自动签发 + 反代 + WSS 升级
-├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
-├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
-├── config/               # 可选：serverConfig.json（服务端参数，见下；整个目录已 gitignore）
-└── data/                 # 数据卷映射：einz.sqlite.db + files/ + avatars/ + backups/
+server/
+├── Caddyfile.example     # Caddy 模板（docker / 裸 node 两种形态通用）：docker 部署拷贝为
+│                         #   docker/Caddyfile 后改域名；裸 node 部署照它改系统级 Caddyfile
+├── config/               # 可选：serverConfig.json（服务端参数，见下；gitignore，不入库）
+├── data/                 # 运行数据：einz.sqlite.db + files/ + avatars/ + backups/（gitignore）
+├── models/whisper/       # whisper 模型文件（466MB+ 固定资产，gitignore；不入镜像，走卷）
+└── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models/whisper——
+    ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server（部署时拷贝为 docker-compose.yml）
+    ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000
+    ├── docker-compose.nocaddy.cftunnel.yml  # 模板：中国 origin + CF 隧道双入口
+    ├── docker-compose.coturn.yml     # TURN（独立 compose，项目名 einz-turn，可单独启停）
+    ├── env.sh              # 生成 .env（EINZ_DB_BACKUP_KEY 等；.env gitignore，pull 不覆盖）
+    ├── coturn/             # turnserver.conf.example
+    ├── .env                # 本地化密钥/配置（gitignore）
+    └── Caddyfile           # 部署时由 Caddyfile.example 拷贝生成（gitignore）
 ```
+
+> **Node dev 与 Docker 共用同一份运行根**（老板 2026-10-23 定）：`config/` `data/`
+> `models/` 都在 `server/` 下，`npm run dev` 与 `docker compose` 跑的是同一份数据/
+> 配置/模型——同一时刻只能跑一个实例（共享同一个 SQLite）。
 
 > ⚠️ **头像目录必须挂在卷上**：server 的默认路径是容器内 `/app/data/avatars`，
 > **不在任何卷里**——每次 `docker compose up -d --build server` 重建容器都会清空，
@@ -201,7 +214,7 @@ server/docker/
 
 前置：一台 VPS（域名 DNS 指向它，开放 80/443）、Docker + Compose。
 
-**服务端配置（可选）**：`server/docker/config/serverConfig.json` 会被挂到容器
+**服务端配置（可选）**：`server/config/serverConfig.json` 会被挂到容器
 `/config/`，由 `EINZ_CONFIG` 指向。字段：`maxSpaces`（新空间数量上限）、
 `maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`coldAppVersion`（冻结
 > 线，当前可用最低版本）/ `hotAppVersion`（当前正热用版本）/ `appDownloadUrl`（升级窗口下载按钮
@@ -210,29 +223,31 @@ server/docker/
 > "配置热加载"）；文件不存在时服务端照常启动（走默认值）。示例：
 
 ```bash
-mkdir -p server/docker/config
-echo '{"maxSpaces": 1}' > server/docker/config/serverConfig.json
+mkdir -p server/config
+echo '{"maxSpaces": 1}' > server/config/serverConfig.json
 ```
 
 > **容器内数据文件路径以 `EINZ_DB` 为准**（compose 里 `/data/einz.sqlite.db`，指向挂载卷）。
 > 既然设了 `EINZ_DB`，它优先于 `dataStore`——所以生产不需要、也不应该用 `dataStore` 改路径，
 > 免得库落到卷外、重建容器即丢。`dataStore` 是给本机开发用的（见 §2.2）。
 
-> 本机开发（非 Docker）同理：放 `server/config/serverConfig.json`（同名字段、
-> 同样不入 git，见 §2.2）——两种形态都是"config/ 目录 + serverConfig.json"，
-> 只是部署时由 `EINZ_CONFIG` 指到容器里的 `/config/`。
+> Docker 与 `npm run dev` 读的是**同一个** `server/config/serverConfig.json`（compose 卷
+> `../config:/config`）——改一处两端生效，不必维护两份。
 
 ### 3.2 部署步骤
 
 ```bash
-# 1) 改域名：server/docker/Caddyfile 中 private.example.com → 你的域名
+# 1) 准备 Caddyfile：仓库里只有模板 server/Caddyfile.example，拷贝到 server/docker/ 再改域名
+cd server/docker
+cp ../Caddyfile.example Caddyfile
+sed -i 's/private.example.com/你的域名/' Caddyfile
 
 # 3) 备份密钥：生成 32 字节 base64 密钥（npm run backup 需要，见 §5）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
 # 记下输出，写入服务器环境（例如 docker-compose.yml 或 .env，勿入库）
+# （或跑 bash env.sh 自动写进 .env，见 docs/ONBOARDING.md 阶段 0）
 
 # 4) 起服务
-cd server/docker
 EINZ_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
 docker compose ps                       # 两个服务均 healthy/running
 ```
@@ -451,7 +466,8 @@ python3 -c "import json;print(open('server/config/serverConfig.json').read())"  
 docker compose up -d
 ```
 
-- **别删配置**：`server/config/serverConfig.json`（Docker 为 `server/docker/config/`）在
+- **别删配置**：`server/config/serverConfig.json`（Docker 与裸 node 共用这一份，卷挂
+  `../config:/config`）在
   `data/` 之外，保留；顺手确认 `maxSpaces` / `maxEntrancesPerSpace` 已按预期设好
   （两者都是 `0` = 不限，等于对公网敞开）。
 - 清完 `data/files/` 从第一天起就是**纯 per-space 结构**（`files/<space_id>/<前两位>/<id>`）。
