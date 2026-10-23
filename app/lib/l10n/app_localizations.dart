@@ -2036,18 +2036,6 @@ abstract class AppLocalizations {
   /// **'The audio is sent to a cloud server for transcription, and deleted immediately after processing.'**
   String get voiceTranscriptAuthServerDesc;
 
-  /// No description provided for @voiceTranscriptAuthAsk.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask per message'**
-  String get voiceTranscriptAuthAsk;
-
-  /// No description provided for @voiceTranscriptAuthAskDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask before each transcription.'**
-  String get voiceTranscriptAuthAskDesc;
-
   /// No description provided for @voiceTranscriptAskTitle.
   ///
   /// In en, this message translates to:
@@ -2071,6 +2059,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Server transcription isn\'t enabled — used the local model instead'**
   String get voiceTranscriptServerDisabled;
+
+  /// No description provided for @voiceTranscriptGroupEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get voiceTranscriptGroupEngine;
+
+  /// No description provided for @voiceTranscriptAutoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-transcribe'**
+  String get voiceTranscriptAutoLabel;
+
+  /// No description provided for @voiceTranscriptAutoDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, you\'ll be asked before each transcription (default — saves data). When on, messages are transcribed automatically with the method above.'**
+  String get voiceTranscriptAutoDesc;
+
+  /// No description provided for @voiceTranscriptEngineLocalShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get voiceTranscriptEngineLocalShort;
+
+  /// No description provided for @voiceTranscriptEngineServerShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get voiceTranscriptEngineServerShort;
+
+  /// No description provided for @voiceTranscriptAutoOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get voiceTranscriptAutoOn;
+
+  /// No description provided for @voiceTranscriptAutoOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get voiceTranscriptAutoOff;
+
+  /// No description provided for @voiceTranscriptAskLocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe this voice message?'**
+  String get voiceTranscriptAskLocalTitle;
+
+  /// No description provided for @voiceTranscriptAskLocalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This uses the on-device model. The first transcription downloads a ~230MB model; after that, nothing leaves your device.'**
+  String get voiceTranscriptAskLocalBody;
+
+  /// No description provided for @voiceTranscriptMenuTranscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe'**
+  String get voiceTranscriptMenuTranscribe;
 
   /// No description provided for @voiceTranscriptPreparing.
   ///

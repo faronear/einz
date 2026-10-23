@@ -1177,12 +1177,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The audio is sent to a cloud server for transcription, and deleted immediately after processing.';
 
   @override
-  String get voiceTranscriptAuthAsk => 'Ask per message';
-
-  @override
-  String get voiceTranscriptAuthAskDesc => 'Ask before each transcription.';
-
-  @override
   String get voiceTranscriptAskTitle => 'Transcribe on server?';
 
   @override
@@ -1197,6 +1191,38 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get voiceTranscriptServerDisabled =>
       'Server transcription isn\'t enabled — used the local model instead';
+
+  @override
+  String get voiceTranscriptGroupEngine => 'Method';
+
+  @override
+  String get voiceTranscriptAutoLabel => 'Auto-transcribe';
+
+  @override
+  String get voiceTranscriptAutoDesc =>
+      'When off, you\'ll be asked before each transcription (default — saves data). When on, messages are transcribed automatically with the method above.';
+
+  @override
+  String get voiceTranscriptEngineLocalShort => 'Local';
+
+  @override
+  String get voiceTranscriptEngineServerShort => 'Server';
+
+  @override
+  String get voiceTranscriptAutoOn => 'Auto';
+
+  @override
+  String get voiceTranscriptAutoOff => 'Ask';
+
+  @override
+  String get voiceTranscriptAskLocalTitle => 'Transcribe this voice message?';
+
+  @override
+  String get voiceTranscriptAskLocalBody =>
+      'This uses the on-device model. The first transcription downloads a ~230MB model; after that, nothing leaves your device.';
+
+  @override
+  String get voiceTranscriptMenuTranscribe => 'Transcribe';
 
   @override
   String get voiceTranscriptPreparing => 'Preparing transcription model…';

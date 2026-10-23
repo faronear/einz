@@ -680,12 +680,20 @@
   "voiceTranscriptAuthLocalDesc": "The audio is transcribed locally (requires a ~230MB model download for the first use). No data leaves your device.",
   "voiceTranscriptAuthServer": "Remote",
   "voiceTranscriptAuthServerDesc": "The audio is sent to a cloud server for transcription, and deleted immediately after processing.",
-  "voiceTranscriptAuthAsk": "Ask per message",
-  "voiceTranscriptAuthAskDesc": "Ask before each transcription.",
   "voiceTranscriptAskTitle": "Transcribe on server?",
   "voiceTranscriptAskBody": "The audio will be sent to a cloud server, and deleted immediately after transcription.",
   "voiceTranscriptServerFailed": "Server transcription failed: {error}",
   "voiceTranscriptServerDisabled": "Server transcription isn't enabled — used the local model instead",
+  "voiceTranscriptGroupEngine": "Method",
+  "voiceTranscriptAutoLabel": "Auto-transcribe",
+  "voiceTranscriptAutoDesc": "When off, you'll be asked before each transcription (default — saves data). When on, messages are transcribed automatically with the method above.",
+  "voiceTranscriptEngineLocalShort": "Local",
+  "voiceTranscriptEngineServerShort": "Server",
+  "voiceTranscriptAutoOn": "Auto",
+  "voiceTranscriptAutoOff": "Ask",
+  "voiceTranscriptAskLocalTitle": "Transcribe this voice message?",
+  "voiceTranscriptAskLocalBody": "This uses the on-device model. The first transcription downloads a ~230MB model; after that, nothing leaves your device.",
+  "voiceTranscriptMenuTranscribe": "Transcribe",
   "@voiceTranscriptServerFailed": {
     "placeholders": {
       "error": {

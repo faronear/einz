@@ -455,9 +455,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 墓碑消息显示模式（'keep'=保留消息状态 / 'hide'=彻底隐藏；默认 keep）。
   /// 只影响消息流里墓碑（已删除/已焚毁）的呈现，数据行为不变。
   String _tombstoneDisplay = 'keep';
-  /// 语音转写授权模式（'local'=本地模型 / 'server'=服务端转写 / 'ask'=每条询问；
-  /// 默认 local）。方案 D'（voiceTranscript.zhcn.md §15.1 ③），更多设置里可改。
-  String _voiceTranscriptAuth = 'local';
+  /// 语音转写方式（'local'=本机模型 / 'server'=服务端 whisper；默认 local）。
+  /// 方案 D'（voiceTranscript.zhcn.md §15.1 ③），更多设置里可改。
+  /// 2026-10-23 起与自动开关 [_voiceTranscriptAuto] 拆成两组（原三选一里的
+  /// 「每条询问」改为自动关闭时的行为，不再是并列选项）。
+  String _voiceTranscriptEngine = 'local';
+  /// 是否自动转写（默认 false = 每条询问：不论本机还是服务端，执行前都会问；
+  /// true = 按 [_voiceTranscriptEngine] 自动转写）。
+  bool _voiceTranscriptAuto = false;
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
@@ -999,7 +1004,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _input.addListener(_onInputInteraction);
     _loadBurnLabel();
     _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
-    _loadVoiceTranscriptAuth(); // 语音转写授权模式（方案 D'，更多设置里可改）
+    _loadVoiceTranscriptSettings(); // 语音转写设置（方式+自动，方案 D'，更多设置里可改）
     _refreshPinStatus();
     _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 30s；两个计时器共用）
     // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
@@ -1556,11 +1561,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _tombstoneDisplay = mode);
   }
 
-  /// 加载语音转写授权模式（方案 D'，每设备、每空间独立）。
-  Future<void> _loadVoiceTranscriptAuth() async {
+  /// 加载语音转写设置（方式 + 自动开关；每设备、每空间独立，方案 D'）。
+  Future<void> _loadVoiceTranscriptSettings() async {
     final s = VoiceTranscriptSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
-    final mode = await s.load();
-    if (mounted) setState(() => _voiceTranscriptAuth = mode);
+    final engine = await s.loadEngine();
+    final auto = await s.loadAuto();
+    if (mounted) {
+      setState(() {
+        _voiceTranscriptEngine = engine;
+        _voiceTranscriptAuto = auto;
+      });
+    }
   }
 
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
@@ -1792,7 +1803,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_voiceTranscriptAuthLabel(l10n), style: valueStyle),
+                    Text(_voiceTranscriptLabel(l10n), style: valueStyle),
                     const SizedBox(width: 2),
                     const Icon(Icons.chevron_right, size: 18),
                   ],
@@ -1815,57 +1826,49 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (picked == 'tombstone') {
       await _showTombstonePicker();
     } else if (picked == 'voiceTranscriptAuth') {
-      await _showVoiceTranscriptAuthPicker();
+      await _showVoiceTranscriptPicker();
     }
   }
 
-  /// 语音转写授权模式当前值的展示文案（与选择器选项同名）。
-  String _voiceTranscriptAuthLabel(AppLocalizations l10n) =>
-      switch (_voiceTranscriptAuth) {
-        'server' => l10n.voiceTranscriptAuthServer,
-        'ask' => l10n.voiceTranscriptAuthAsk,
-        _ => l10n.voiceTranscriptAuthLocal,
-      };
+  /// 语音转写菜单行当前值：「方式 · 自动/询问」（如「服务端 · 询问」）。
+  /// 方式与开关都用短标签——与附件存储等行的当前值同款长度风格。
+  String _voiceTranscriptLabel(AppLocalizations l10n) {
+    final engine = _voiceTranscriptEngine == 'server'
+        ? l10n.voiceTranscriptEngineServerShort
+        : l10n.voiceTranscriptEngineLocalShort;
+    final auto =
+        _voiceTranscriptAuto ? l10n.voiceTranscriptAutoOn : l10n.voiceTranscriptAutoOff;
+    return '$engine · $auto';
+  }
 
-  /// 语音转写授权模式（方案 D'，§15.1 ③）：三选一 + 提交（与附件存储/墓碑同构）。
-  /// 本设备设置，每台设备各选各的；「应用于本机所有秘境」勾选框同款。
-  Future<void> _showVoiceTranscriptAuthPicker() async {
+  /// 语音转写设置弹层（方案 D'，§15.1 ③；2026-10-23 老板重构为两组）：
+  /// 第一组「转写方式」本机/服务端二选一；第二组「自动转写」开关（默认关=
+  /// 每条询问，省流量/上传）。单选 + 提交（有副作用数据写入，与附件存储/墓碑
+  /// 同构）；「应用于本机所有秘境」勾选框同款。
+  Future<void> _showVoiceTranscriptPicker() async {
     final l10n = AppLocalizations.of(context)!;
     await showOptionPickerSheet<void>(
       context: context,
-      builder: (ctx) => OptionPickerSheet(
-        title: l10n.chatPageMenuVoiceTranscriptAuth,
-        note: l10n.voiceTranscriptAuthNote,
-        selected: _voiceTranscriptAuth,
-        submitLabel: l10n.chatPageTombstoneSubmit,
+      builder: (ctx) => _VoiceTranscriptSheet(
+        engine: _voiceTranscriptEngine,
+        auto: _voiceTranscriptAuto,
         scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
-        options: [
-          OptionPickerItem(
-            value: 'local',
-            label: l10n.voiceTranscriptAuthLocal,
-            description: l10n.voiceTranscriptAuthLocalDesc,
-          ),
-          OptionPickerItem(
-            value: 'server',
-            label: l10n.voiceTranscriptAuthServer,
-            description: l10n.voiceTranscriptAuthServerDesc,
-          ),
-          OptionPickerItem(
-            value: 'ask',
-            label: l10n.voiceTranscriptAuthAsk,
-            description: l10n.voiceTranscriptAuthAskDesc,
-          ),
-        ],
-        onApply: (mode, {bool scopeAll = false}) async {
+        onApply: (engine, auto, {required bool scopeAll}) async {
           final settings = VoiceTranscriptSettings(
               widget.db ?? LocalDatabase.shared,
               spaceId: widget.spaceId);
           if (scopeAll) {
-            await settings.saveAll(mode);
+            await settings.saveAll(engine: engine, auto: auto);
           } else {
-            await settings.save(mode);
+            await settings.saveEngine(engine);
+            await settings.saveAuto(auto);
           }
-          if (mounted) setState(() => _voiceTranscriptAuth = mode);
+          if (mounted) {
+            setState(() {
+              _voiceTranscriptEngine = engine;
+              _voiceTranscriptAuto = auto;
+            });
+          }
         },
       ),
     );
@@ -6831,6 +6834,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   已不可靠——复杂度失控，干脆墓碑不提供任何菜单入口）。
   bool _messageHasActions(HistoryMessage m) => !m.deleted;
 
+  /// 是否可转写（长按菜单「转写」卡的显示条件；与自动入队 filter 同口径）：
+  /// 语音消息（任意容器）+ wav 音频文件。mp3/m4a 等音乐文件不显示（ sherpa
+  /// 与服务端都只吃 PCM16 wav，入了队也只会产出 failed 行）。
+  bool _voiceTranscriptEligible(HistoryMessage m) =>
+      m.attachment != null &&
+      (m.env.type == 'voice' ||
+          (m.env.type == 'audio' &&
+              _extOf(m.plaintext).toLowerCase() == 'wav'));
+
   /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
   /// [_messageHasActions]）：自己消息 + 以下其一——
   /// - 已有 serverSequence：服务端已收下、且**纯粹单勾**——还没有任何人收到
@@ -6907,6 +6919,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       label: l10n.chatPageActionSave,
                       onTap: () => Navigator.of(ctx).pop('save'),
                     ),
+                  // 语音转写（2026-10-23 老板重构「每条询问」后，这是**自动转写
+                  // 关闭时的唯一入口**——没有行就没有行内提示，必须从菜单进；
+                  // 自动开启时也可用它手动重转）。显示条件与自动入队同口径：
+                  // 语音消息（任意容器——旧 m4a 点了由 _transcribeVoiceMessage
+                  // 出「不支持」说明，比藏起来更 informative）+ wav 音频文件。
+                  // 放「保存」后面：转写是音频专属动作，挨着音频相关的卡。
+                  if (_voiceTranscriptEligible(m))
+                    _buildActionCard(
+                      icon: Icons.graphic_eq,
+                      label: l10n.voiceTranscriptMenuTranscribe,
+                      onTap: () => Navigator.of(ctx).pop('transcribe'),
+                    ),
                   // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
                   _buildActionCard(
                     icon: Icons.timer_outlined,
@@ -6954,6 +6978,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } else if (action == 'save') {
       await _saveAttachment(m);
+    } else if (action == 'transcribe') {
+      await _transcribeVoiceMessage(m);
     } else if (action == 'burn') {
       await _setMessageBurn(m);
     }
@@ -8699,12 +8725,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 长期目录 / 否则临时缓存），密文 sha256 取附件元数据（音频变化 → stale）。
   /// 服务未就绪（如桌面未配模型）时 lazy 构造，行会落 `unavailable` 供手动入口。
   ///
-  /// **按授权模式路由（老板 2026-10-23 实测 bug 修复）**：此前只有手动重转读
-  /// [_voiceTranscriptAuth]，本自动路径恒定走本地——server 模式下自动转写也落
-  /// 芯片图标。现在：`server` → 自动走服务端（§15.2「全部语音自动转写仅在用户
-  /// 显式选择后生效」——选 server 即显式选择）；`ask` → 自动仍走本地（本地链路
-  /// 零网络零上传，不违背「上传前先问」——问的是服务端上传、只发生在手动点按；
-  /// 且 ask 下没有行就没有手动入口，不能整条跳过）；`local` → 不变。
+  /// **自动转写开关（老板 2026-10-23 重构）**：关闭时（默认）本方法直接返回——
+  /// 什么都不自动做，用户经长按菜单「转写」逐条询问后执行（见
+  /// [_transcribeVoiceMessage]；省流量/上传）。开启时按**转写方式**路由：
+  /// `server` → 自动走上送（§15.2「全部语音自动转写仅在用户显式选择后生效」——
+  /// 显式选择即勾了自动 + 方式选服务端）；`local` → 自动走本地。
   void _enqueueVoiceTranscripts(List<HistoryMessage> msgs) {
     final voices = msgs
         .where((m) =>
@@ -8718,7 +8743,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _extOf(m.plaintext).toLowerCase() == 'wav')))
         .toList();
     if (voices.isEmpty) return;
-    final serverAuto = _voiceTranscriptAuth == 'server';
+    if (!_voiceTranscriptAuto) return;
+    final serverAuto = _voiceTranscriptEngine == 'server';
     unawaited(() async {
       try {
         for (final m in voices) {
@@ -8740,10 +8766,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }());
   }
 
-  /// 本地模型转写入队（自动路径与 server 回落共用）：明文走解密缓存的确定性
-  /// 路径；service 内部串行 + 幂等（当前模型版本的有效 done 行不重算，模型未
-  /// 就绪落 `unavailable` 供手动入口）。
-  Future<void> _enqueueLocalVoiceTranscript(HistoryMessage m) async {
+  /// 本地模型转写入队（自动路径与 server 回落、手动本机路径共用）：明文走解密
+  /// 缓存的确定性路径；service 内部串行 + 幂等（当前模型版本的有效 done 行不重算，
+  /// 模型未就绪落 `unavailable` 供手动入口）。
+  ///
+  /// [clearExisting]：先清旧行再入队——手动重转用（enqueue 对 done 幂等跳过，
+  /// failed/stale 行也要重算）；自动路径不用（service 自己判幂等）。
+  Future<void> _enqueueLocalVoiceTranscript(HistoryMessage m,
+      {bool clearExisting = false}) async {
+    if (clearExisting) {
+      await (_voiceDb.delete(_voiceDb.localVoiceTranscripts)
+            ..where((tbl) => tbl.messageId.equals(m.env.messageId)))
+          .go();
+    }
     final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
     final ext = _voiceExtOf(m);
     // 明文缓存：stored 模式长期目录已由 _autoStore 落盘；否则确保缓存存在
@@ -9304,7 +9339,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             return Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Clickable(
-                onTap: () => _retryVoiceTranscript(m),
+                onTap: () => _transcribeVoiceMessage(m),
                 child: Text(
                   t.status == 'failed'
                       ? l10n.voiceTranscriptRetry
@@ -9407,11 +9442,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return ok ?? false;
   }
 
-  /// 手动/重转入口（§10）：按授权模式分流（方案 D'，§15.1 ③）——
-  /// local = 本地模型（原路径）；server/ask = 服务端转写（ask 先弹授权确认）。
-  /// 旧 m4a 明确提示不支持转写（别"点了没反应"）；失败静默——转写是纯增强
-  /// 功能，行留在原状态下次还能点。
-  Future<void> _retryVoiceTranscript(HistoryMessage m) async {
+  /// 转写一条消息的总入口（长按菜单「转写」卡 + 行内 failed/stale/unavailable
+  /// 提示共用；2026-10-23 老板重构「每条询问」后，它还是**自动转写关闭时
+  /// 的唯一入口**——没有行就没有行内提示，必须从菜单进）：
+  /// - 自动转写**开启**时不问（选自动 = 已授权自动执行）；
+  /// - 自动转写**关闭**时（默认）先弹询问框——不论方式是本机还是服务端
+  ///   （老板定：每条询问；文案随方式变，见 [_confirmVoiceTranscript]）；
+  /// - 旧 m4a 明确提示不支持转写（别"点了没反应"）。
+  Future<void> _transcribeVoiceMessage(HistoryMessage m) async {
     if (m.attachment == null) return;
     // 旧格式（m4a）：本地 sherpa 与服务端 whisper 都按 wav 口径——直接说明，不打哑炮
     if (_voiceExtOf(m) != 'wav') {
@@ -9421,57 +9459,53 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return;
     }
     final l10n = AppLocalizations.of(context)!;
-    final mode = _voiceTranscriptAuth;
-    if (mode == 'server' || mode == 'ask') {
-      // ask：每条先弹授权确认（老板定：不能无条件把录音送服务器）
-      if (mode == 'ask') {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(l10n.voiceTranscriptAskTitle),
-            content: Text(l10n.voiceTranscriptAskBody),
-            actions: [
-              CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: Text(l10n.confirm),
-              ),
-            ],
-          ),
-        );
-        if (ok != true || !mounted) return;
-      }
-      // 服务端未启用（_serverVoiceTranscribe 已出说明 notice）→ 落穿到下面的
-      // 本地路径（§15.1 ③既定回落语义）；done/failed 都已收尾，直接返回。
+    if (!_voiceTranscriptAuto && !await _confirmVoiceTranscript(l10n)) return;
+    if (_voiceTranscriptEngine == 'server') {
+      // 服务端未启用（_serverVoiceTranscribe 已出说明 notice）→ 落穿到本地
+      // 路径（§15.1 ③既定回落语义）；done/failed 都已收尾，直接返回。
       if (await _serverVoiceTranscribe(m) !=
           _ServerTranscriptOutcome.disabled) {
         return;
       }
     }
+    await _transcribeVoiceLocally(m);
+  }
+
+  /// 询问框（文案随转写方式变）：服务端 = 上传隐私说明（明文上送、即转即删）；
+  /// 本机 = 首次需下载模型的说明。返回 true = 用户确认执行。
+  Future<bool> _confirmVoiceTranscript(AppLocalizations l10n) async {
+    final server = _voiceTranscriptEngine == 'server';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(server
+            ? l10n.voiceTranscriptAskTitle
+            : l10n.voiceTranscriptAskLocalTitle),
+        content: Text(server
+            ? l10n.voiceTranscriptAskBody
+            : l10n.voiceTranscriptAskLocalBody),
+        actions: [
+          CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    return ok == true && mounted;
+  }
+
+  /// 本机模型转写一条（方式=local 的手动路径；模型未就绪先弹准备对话框，
+  /// 取消即放弃）。重转 = 清掉旧行再入队（enqueue 对 done 幂等跳过，
+  /// failed/stale 行也要重算）。失败静默——转写是纯增强功能，行留在原状态。
+  Future<void> _transcribeVoiceLocally(HistoryMessage m) async {
     try {
       if (!await VoiceTranscriptModel.isReady()) {
         final ok = await _prepareVoiceModel();
         if (!ok || !mounted) return;
       }
-      final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
-      final ext = _voiceExtOf(m);
-      final file = (_storeAttachments
-              ? await AttachmentStore.ensure(
-                  widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m))
-              : null) ??
-          await MediaCache.ensure(
-              widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m));
-      // 重转 = 清掉旧行再入队（enqueue 对 done 幂等跳过，failed/stale 行也要重算）
-      await (_voiceDb.delete(
-        _voiceDb.localVoiceTranscripts,
-      )
-            ..where((tbl) => tbl.messageId.equals(m.env.messageId)))
-          .go();
-      t.enqueue(
-        messageId: m.env.messageId,
-        plainPath: file.path,
-        cipherSha256: (m.attachment!['sha256'] as String?) ?? '',
-      );
+      await _enqueueLocalVoiceTranscript(m, clearExisting: true);
       _updateAudioPlayback(() {});
     } catch (_) {
       // 纯增强功能：失败静默（行留在原状态，下次还能点）
@@ -11997,6 +12031,265 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
           child: Text(l10n.chatPageChangePassphraseSubmit),
         ),
       ],
+    );
+  }
+}
+
+/// 语音转写设置弹层（方案 D'，voiceTranscript.zhcn.md §15.1 ③；2026-10-23
+/// 老板重构：原「本地/服务端/每条询问」三选一拆成两组——「每条询问」不再是
+/// 并列的第三个选项，而是**自动转写关闭时**的行为）。
+///
+/// 结构（仿 PIN 更改弹窗的分组卡片）：
+/// - 第一组「转写方式」：本机 / 服务端 二选一（选中项 tint + 对勾）；
+/// - 第二组「自动转写」：勾选框（默认**不勾** = 每条询问——不论方式是本机
+///   还是服务端，执行前都会询问；省流量/上传。勾上 = 按上面的方式自动转写）；
+/// - 底部：「应用于本机所有秘境」勾选框 + 提交按钮（单选+提交模式，与附件
+///   存储/墓碑弹层同构——两项都是本设备持久设置，提交前统一确认）。
+class _VoiceTranscriptSheet extends StatefulWidget {
+  const _VoiceTranscriptSheet({
+    required this.engine,
+    required this.auto,
+    required this.onApply,
+    this.scopeAllLabel,
+  });
+
+  /// 当前转写方式（'local' / 'server'）。
+  final String engine;
+
+  /// 当前自动转写开关。
+  final bool auto;
+
+  /// 「应用于本机所有秘境」标签（null = 单空间，不渲染勾选框）。
+  final String? scopeAllLabel;
+
+  /// 提交回调（弹层自行关闭）。
+  final Future<void> Function(String engine, bool auto,
+      {required bool scopeAll}) onApply;
+
+  @override
+  State<_VoiceTranscriptSheet> createState() => _VoiceTranscriptSheetState();
+}
+
+class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
+  late String _engine;
+  late bool _auto;
+  late bool _scopeAll;
+
+  @override
+  void initState() {
+    super.initState();
+    _engine = widget.engine;
+    _auto = widget.auto;
+    _scopeAll = false; // 每次开弹层都是 false：默认只作用于当前空间（同款弹层惯例）
+  }
+
+  /// 有没有可提交的改动。**勾选态也算改动**——只勾"所有秘境"不改设置同样
+  /// 是有效操作（把当前设置推广到所有空间），必须能提交（同 OptionPickerSheet）。
+  bool get _changed =>
+      _engine != widget.engine || _auto != widget.auto || _scopeAll;
+
+  Future<void> _submit() async {
+    await widget.onApply(_engine, _auto, scopeAll: _scopeAll);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 标题**居中**（与其它选项弹层同款：靠左会与下面的选项行分不清层次）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+            child: Center(
+              child: Text(l10n.chatPageMenuVoiceTranscriptAuth,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 16)),
+            ),
+          ),
+          // 标题下的小备注（outline 淡色，归标题那一组）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+            child: Center(
+              child: Text(
+                l10n.voiceTranscriptAuthNote,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 12, height: 1.4, color: scheme.outline),
+              ),
+            ),
+          ),
+          // 选项区可滚（两组卡片 + 桌面矮窗时不溢出；标题/勾选框/提交按钮固定）
+          Flexible(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _vtGroup(
+                      title: l10n.voiceTranscriptGroupEngine,
+                      children: [
+                        _vtEngineRow(
+                          value: 'local',
+                          label: l10n.voiceTranscriptAuthLocal,
+                          desc: l10n.voiceTranscriptAuthLocalDesc,
+                        ),
+                        _vtEngineRow(
+                          value: 'server',
+                          label: l10n.voiceTranscriptAuthServer,
+                          desc: l10n.voiceTranscriptAuthServerDesc,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _vtGroup(
+                      title: l10n.voiceTranscriptAutoLabel,
+                      children: [
+                        // 整行可点切换（不止小勾框——老板一贯的整块可点偏好）。
+                        // 嵌套 InkWell+Checkbox 与 LabeledCheckbox 同款：手势
+                        // 竞技场只会命中内层，不会双触发。
+                        InkWell(
+                          mouseCursor: SystemMouseCursors.click,
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => setState(() => _auto = !_auto),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    l10n.voiceTranscriptAutoDesc,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Checkbox(
+                                  value: _auto,
+                                  onChanged: (v) =>
+                                      setState(() => _auto = v ?? false),
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (widget.scopeAllLabel != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: LabeledCheckbox(
+                label: widget.scopeAllLabel!,
+                value: _scopeAll,
+                onChanged: (v) => setState(() => _scopeAll = v),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _changed ? _submit : null,
+                child: Text(l10n.chatPageTombstoneSubmit),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 分组卡片（白卡 + 淡边，与 PIN 弹窗 _setLockGroup 同款分层）。
+  Widget _vtGroup({String? title, required List<Widget> children}) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(14, title == null ? 14 : 12, 14, 14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// 方式单选行：选中项 tint 背景 + 对勾（与 OptionPickerSheet 的选项行同款）。
+  Widget _vtEngineRow({
+    required String value,
+    required String label,
+    required String desc,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final active = value == _engine;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: active
+            ? scheme.secondaryContainer.withValues(alpha: 0.55)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _engine = value),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 3),
+                      Text(desc,
+                          style: TextStyle(
+                              fontSize: 12, color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                if (active) Icon(Icons.check, size: 20, color: scheme.primary),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

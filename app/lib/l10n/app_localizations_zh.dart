@@ -1114,12 +1114,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '解密后的录音发到服务器，由 Whisper 转写后立即删除——服务器会短暂处理这条录音。';
 
   @override
-  String get voiceTranscriptAuthAsk => '每条询问';
-
-  @override
-  String get voiceTranscriptAuthAskDesc => '每次转写前先询问（走服务端；本机模型已就绪时也可选本机转写）。';
-
-  @override
   String get voiceTranscriptAskTitle => '用服务端转写这条？';
 
   @override
@@ -1132,6 +1126,38 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get voiceTranscriptServerDisabled => '服务器未启用转写，已改用本机模型';
+
+  @override
+  String get voiceTranscriptGroupEngine => '转写方式';
+
+  @override
+  String get voiceTranscriptAutoLabel => '自动转写';
+
+  @override
+  String get voiceTranscriptAutoDesc =>
+      '关闭时，每条语音转写前都会询问（默认，更省流量）；开启后按上面的方式自动转写。';
+
+  @override
+  String get voiceTranscriptEngineLocalShort => '本机';
+
+  @override
+  String get voiceTranscriptEngineServerShort => '服务端';
+
+  @override
+  String get voiceTranscriptAutoOn => '自动';
+
+  @override
+  String get voiceTranscriptAutoOff => '询问';
+
+  @override
+  String get voiceTranscriptAskLocalTitle => '转写这条语音？';
+
+  @override
+  String get voiceTranscriptAskLocalBody =>
+      '将用本机模型转写。首次使用需下载约 230MB 模型，之后完全不联网、服务器也接触不到音频。';
+
+  @override
+  String get voiceTranscriptMenuTranscribe => '转写';
 
   @override
   String get voiceTranscriptPreparing => '正在准备转写模型…';
