@@ -188,8 +188,9 @@ server/
 │                         #   docker/Caddyfile 后改域名；裸 node 部署照它改系统级 Caddyfile
 ├── config/               # 可选：serverConfig.json（服务端参数，见下；gitignore，不入库）
 ├── data/                 # 运行数据：einz.sqlite.db + files/ + avatars/ + backups/（gitignore）
-├── models/whisper/       # whisper 模型文件（466MB+ 固定资产，gitignore；不入镜像，走卷）
-└── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models/whisper——
+├── models/whisper.cpp/  # whisper.cpp 源码 + 构建 + 模型（models/ 子目录放 ggml；
+│                         #   整个目录 gitignore；Docker 部署只需把模型放进 models/ 子目录走卷）
+└── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models/whisper.cpp/models——
     ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server（部署时拷贝为 docker-compose.yml）
     ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000
     ├── docker-compose.nocaddy.cftunnel.yml  # 模板：中国 origin + CF 隧道双入口

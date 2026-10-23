@@ -36,8 +36,9 @@ COPY src ./src
 RUN npx tsc
 
 # ── whisper.cpp 编译阶段（方案 D'，2026-10-22）────────────────────────────────
-# 二进制烤进镜像、模型走卷（compose 挂 ../models/whisper；models/ 是通用模型目录，
-# 与用户数据 ../data 分开——将来换/加其他模型放它下面同级）。模型不进镜像：
+# 二进制烤进镜像、模型走卷（compose 挂 ../models/whisper.cpp/models——模型放在
+# whisper.cpp 源码树的 models/ 子目录，即其官方下载脚本的落点；与用户数据 ../data
+# 分开）。模型不进镜像：
 # 换模型档位不必重新 build，镜像体积也不被 466MB 模型撑爆。whisper 是 CLI 子进程
 # （server 每次 spawn 用完即退），不是 daemon，无需 entrypoint 改动。
 # GF_WHISPER_CPP_REV 可锁版本（默认 main）；大陆构建机拉 GitHub 慢时可加 --build-arg 代理。

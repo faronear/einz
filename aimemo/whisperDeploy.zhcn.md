@@ -49,6 +49,11 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)   # macOS: -j$(sysctl -n hw.ncpu)
 ```
 
+> 仓库内的位置对应：开发机上这棵树就在 `server/models/whisper.cpp/`（两机同步目录，
+> 整个 `server/models/` gitignore），`.env` 的 `EINZ_WHISPER_BIN` 直接指它的
+> `build/bin/whisper-cli`；上文 `/opt/whisper/` 是 VPS 裸 node 部署的独立位置，两者
+> 结构一致（源码 + build/ + models/ 同级）。
+
 产物：`build/bin/whisper-cli`（还有 bench/server 等兄弟二进制，我们只用 cli）。
 编译耗时约 2-5 分钟。**新机器迁移时可跳过编译**：直接 scp 老机器的
 `whisper-cli` + 模型文件过去（同架构 x86_64 Linux 二进制可直接运行）。
@@ -104,12 +109,13 @@ EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
 
 - **内置镜像（推荐，2026-10-22 已落地）**：`server/Dockerfile` 新增 whisper 编译阶段
   ——二进制 + libggml 动态库烤进镜像（`/opt/whisper/`），模型**不进镜像**，走卷
-  `../models/whisper:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
+  `../models/whisper.cpp/models:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
   `EINZ_WHISPER_BIN=/opt/whisper/whisper-cli` + `EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin`。
-  首次部署只剩一步：往 `server/models/whisper/` 放一份模型文件
+  首次部署只剩一步：往 `server/models/whisper.cpp/models/` 放一份模型文件
   （**老板 2026-10-22 定**：模型是固定二进制资产，不进 `data/` 用户数据目录；
-  `models/` 是**通用模型目录**（gitignore 整个目录），将来换/加其他模型放它下面
-  同级子目录即可；466MB+ 绝不可入库）
+  2026-10-23 整合为 whisper.cpp 源码树的 `models/` 子目录（其官方下载脚本
+  download-ggml-model.sh 的落点，§3 即下到这里）；整个 `server/models/` 目录
+  gitignore，466MB+ 绝不可入库）
   优点：换服务器 = 搬镜像 + 搬模型目录，零宿主机依赖；换模型档位不用重新 build。
 - **裸 Node + 宿主机 whisper**：§2-§5 的原方案，whisper 装宿主机、server 用绝对路径
   spawn（容器隔离问题不存在）。适合不想给镜像加编译时间的场景。
