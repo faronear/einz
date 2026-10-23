@@ -1236,6 +1236,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get lockPageForgotPinHint => '真的忘了锁屏码？您可以卸载重装，然后通过邀请码和共享口令重新加入您的秘境。';
+
+  @override
   String get chatPageMenuAbout => '关于秘境';
 
   @override

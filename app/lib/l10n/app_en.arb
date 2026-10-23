@@ -389,7 +389,7 @@
   "chatPageMenuMoreSettings": "More settings",
   "chatPageMoreSettingsTitle": "More settings",
   "chatPageMoreSettingsStorage": "Attachment storage",
-  "chatPageMoreSettingsTombstone": "Tombstone messages",
+  "chatPageMoreSettingsTombstone": "Vanished messages",
   "chatPageAttachmentStorageNote": "Where are attachments — images, videos, audio, files — stored?",
   "chatPageAttachmentStorageSecured": "Remote only",
   "chatPageAttachmentStorageSecuredDesc": "Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.",
@@ -543,7 +543,7 @@
   },
   "chatPageBurnHeading": "Burn-after-read",
   "chatPageBurnNote": "Delete new messages automatically once read on a countdown",
-  "chatPageTombstoneHeading": "Tombstone messages",
+  "chatPageTombstoneHeading": "Vanished messages",
   "chatPageTombstoneNote": "How deleted/burned/recalled messages appear?",
   "chatPageTombstoneKeep": "Keep message status",
   "chatPageTombstoneKeepDesc": "Show a time and status bar without content, message flow unbroken",
@@ -802,6 +802,10 @@
         "type": "String"
       }
     }
+  },
+  "lockPageForgotPinHint": "Forgot your PIN? You can uninstall and reinstall the app, then rejoin your spaces with an invite code and the shared passphrase.",
+  "@lockPageForgotPinHint": {
+    "description": "Hint shown on the lock screen only while frozen after repeated wrong attempts: the recovery path when the PIN is forgotten (reinstall + rejoin with an invite code and the shared passphrase)"
   },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",

@@ -1480,6 +1480,11 @@ Future<void> main(List<String> args) async {
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/myeinz.json）
+  // 启动即亮出 store 路径（老板 2026-10-23）：npm 包装脚本虽也 echo 过，但 TUI 首帧
+  // 清屏（2J/3J）后不可见；直跑 dart run 时压根没有。走 _guidanceNotes——
+  // loadHistory 开头会 clear messages，启动类系统消息必须排在其后才落得下来
+  // （与 DNS 污染警报/未识别警告同一机制，见下方 flush 循环）。
+  _guidanceNotes.add('📁 Store: $storePath');
 
   // 启动自检：**只有服务端明确撤销本通道**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该通道的 sessions）→ 清 token 走挑战重认证；挑战返回
@@ -1788,6 +1793,7 @@ Future<void> _resetToFreshStart(
   final name = store.entranceName;
   if (name != null && name.isNotEmpty) welcome.add('✅ 新通道名称: $name');
   welcome.add('✅ 新通道公钥: ${store.publicKey}');
+  welcome.add('📁 Store: $storePath'); // /reset 的"重新开始"同样亮出 store 位置
   welcome.add('----------------');
   session.messages.add(_systemMessage(session, welcome.join('\n')));
   _startPeerPolling();

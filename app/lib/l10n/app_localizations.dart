@@ -1229,7 +1229,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMoreSettingsTombstone.
   ///
   /// In en, this message translates to:
-  /// **'Tombstone messages'**
+  /// **'Vanished messages'**
   String get chatPageMoreSettingsTombstone;
 
   /// No description provided for @chatPageAttachmentStorageNote.
@@ -1595,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHeading.
   ///
   /// In en, this message translates to:
-  /// **'Tombstone messages'**
+  /// **'Vanished messages'**
   String get chatPageTombstoneHeading;
 
   /// No description provided for @chatPageTombstoneNote.
@@ -2227,6 +2227,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock failed: {error}'**
   String lockPageUnlockFailed(String error);
+
+  /// Hint shown on the lock screen only while frozen after repeated wrong attempts: the recovery path when the PIN is forgotten (reinstall + rejoin with an invite code and the shared passphrase)
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot your PIN? You can uninstall and reinstall the app, then rejoin your spaces with an invite code and the shared passphrase.'**
+  String get lockPageForgotPinHint;
 
   /// No description provided for @chatPageMenuAbout.
   ///

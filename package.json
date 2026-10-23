@@ -39,8 +39,8 @@
     "app-mac-update": "node scripts/updateMacosApp.js",
     "app-mac-update-check": "node scripts/updateMacosApp.js --check",
     "app-all-reload": "LEVEL=${LEVEL:-1}; npm run app-ios-reload; npm run app-apk-reload; npm run app-mac-reload;",
-    "app-screenshots": "bash app/integration_test/screenshots_drive.sh &; cd app && flutter test integration_test/screenshots_test.dart -d <模拟器ID> --dart-define=SHOT_DIR=/tmp/einz_shots",
-    "tui-cli": "STORE=${STORE:-default}; STORE_FILE=~/.einz/store_$STORE.json; echo CLEAN=$CLEAN; if [ \"$CLEAN\" = \"true\" ]; then echo Removing old store $STORE_FILE ...; rm -f $STORE_FILE; else echo Resume old store $STORE_FILE; fi; SERVERMODE=${SERVERMODE:-local}; DEFINE_SERVER=''; if [ \"$SERVERMODE\" = 'local' ]; then DEFINE_SERVER=\"--server http://localhost:3000\"; cd cli && dart run bin/einz_tui.dart --store ~/.einz/store_$STORE.json $DEFINE_SERVER",
+    "app-create-screenshots": "bash app/integration_test/screenshots_drive.sh & cd app && flutter test integration_test/screenshots_test.dart -d <模拟器ID> --dart-define=SHOT_DIR=/tmp/einz_shots",
+    "tui-cli": "STORE=${STORE:-default}; STORE_FILE=~/.einz/store_$STORE.json; echo CLEAN=$CLEAN; if [ \"$CLEAN\" = \"true\" ]; then echo Removing old store $STORE_FILE ...; rm -f $STORE_FILE; else echo Resuming old store $STORE_FILE; fi; SERVERMODE=${SERVERMODE:-local}; DEFINE_SERVER=''; if [ \"$SERVERMODE\" = 'local' ]; then DEFINE_SERVER=\"--server http://localhost:3000\"; fi; cd cli && dart run bin/einz_tui.dart --store ~/.einz/store_$STORE.json $DEFINE_SERVER",
     "tui-docker": "bash ./cli/dart-docker.sh tui",
     "syncAgentRule": "node -e \"fetch('https://git.tic.cc/opx/sysconfig/raw/branch/main/agents/syncAgentRule.mjs').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(async t=>{await import('data:text/javascript;base64,'+Buffer.from(t).toString('base64'))})\""
   },

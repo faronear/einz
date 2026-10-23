@@ -2441,16 +2441,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 取不到时（如测试直接构造 ChatPage）按单空间处理——最保守，入口仍在菜单里。
   Widget _buildPeerStatus(AppLocalizations l10n) {
     // 左/上/下都 0：这一格以**头像**打头，头像要**三面贴住胶囊内壁**（老板
-    // 2026-09-26）；右 10 给箭头/右缘留白。行高由头像决定，头像即贴边。
+    // 2026-09-26）。行高由头像决定，头像即贴边。右侧距按尾块分流，见下面 pad。
     //
     // **群空间例外**（老板 2026-10-05；2026-10-09 改两行）：左侧摆**成员头像条**
     // + 右侧两行（群组名字 / 在线·总数），整块**竖直居中**（头像比胶囊矮）。
     // 左边距与 duo 同为 0（头像条左缘贴边）——2026-10-09 曾改成 left:10 再用
     // Transform 左移 10 补偿，胶囊收窄到只包头像条后那 10px 会灌进"头像↔群名"
     // 的视觉间距（比右侧"我的头像↔我的名字"明显宽），已一并收回。
-    final pad = _isGroup
+    //
+    // 右距 = 胶囊 → 尾块的引导间距（「邀请加入」链接与呼叫按钮**互斥**，按
+    // _peerJoined 分流）：
+    // - invite 链接：10，加上链接自带的 horizontal 12 = 视觉 22px（老板
+    //   2026-09-26「两侧一样宽」口径，保持不动）；
+    // - 呼叫按钮：6，与我方「通道按钮 ↔ 我的胶囊」**严格同距**（老板 2026-10-23
+    //   实测两侧不一致）：我方是 SizedBox(6) + 图标在 [kStatusAvatarSize](40)
+    //   容器里的居中余量 (40−20)/2 = 10，视觉 16px；这里原先 10 + 10 = 视觉
+    //   20px，比右侧宽一截。取 6 后两侧容器间距（6=6）与视觉间距（16=16）都对齐。
+    // 加入状态未知（null）时尾块是 shrink，取值不影响视觉。
+    final pad = _peerJoined == false
         ? const EdgeInsets.fromLTRB(0, 0, 10, 0)
-        : const EdgeInsets.fromLTRB(0, 0, 10, 0);
+        : const EdgeInsets.fromLTRB(0, 0, 6, 0);
     // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
     final content = _isGroup
@@ -2637,7 +2647,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 与头像的性别底色打架，也不会让人误以为点名字/头像能切换空间。
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Flexible(child: Padding(padding: pad, child: content)),
-      // 与「名字/状态」的间距：靠 pad.right(10) + Invite 自带的内边距(12) = 22px。
+      // 与「名字/状态」的间距由 pad.right 给：invite 链接 10 + 链接自带内边距
+      // 12 = 22px；呼叫按钮 6 + 图标在 40 容器里的居中余量 10 = 16px，与我方
+      // 「通道按钮 ↔ 我的胶囊」同距（老板 2026-10-23：原先呼叫按钮侧是
+      // 10 + 10 = 20px，比右侧宽、两侧不一致）。
       // **两侧要一样宽**（老板 2026-09-26）——此前这里额外加了 12px，导致对方一侧
       // 的间距（34）明显比我方（22）宽，看着不匀。
       trailing,
