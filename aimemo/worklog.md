@@ -15508,3 +15508,12 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 附带发现（未改，待老板定）：root package.json `server-update-remote` 还在调 a7f62f8e 起已合并掉的 `server-run-docker-mirror`（应改 `MIRROR=true npm run server-run-docker` 或类似）；且文档里 VPS 路径 /opt/einz 与 /faronear/einz 混用。
 - 并行改动注意：server/models 是指向 /Users/Shared/productX/einz/server/models 的符号链接（老板 15:53 建，两机同步位；gitignore `server/models` 覆盖，无需处理）。
 
+**（2026-10-23T09:05:00Z / 2026-10-23 17:05）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：顺手修 server-update-remote + VPS 路径统一 /faronear/einz + .dockerignore 迁进 cli/
+- 老板三项指示：① 顺手改掉上轮 flag 的两处；② VPS 实际路径 /faronear/einz；③ 老板注意到 cli/Dockerfile.dart-sodium 也不依赖 shared/，问 .dockerignore 能否迁到 cli/ 与 Dockerfile 并列。
+- server-update-remote：`npm run server-run-docker-mirror`（a7f62f8e 合并后已不存在）→ `MIRROR=true npm run server-run-docker`——与合并前 mirror 脚本语义一致（三个 --build-arg 镜像源 + coturn + 重建 server）。
+- 路径统一：DEPLOYMENT §9.1 与 updateServer §1 的 `EINZ_ROOT=/opt/einz` → `/faronear/einz`；ONBOARDING 阶段 0 的 `/faronear/only` → `/faronear/einz`。/opt/whisper（whisper 安装位）与 /opt/homebrew（macOS libsodium）未动。
+- .dockerignore 迁移（比老板预想的更彻底）：查证 cli/Dockerfile.dart-sodium **没有任何 COPY**——纯基座镜像（dart:stable + libsodium），连 cli/ 源码都不需要。于是 build context 从仓库根直接收窄为 cli/（dart-docker.sh build_image：`"$ROOT"` → `"$DIR"`），.dockerignore 随之 git mv 到 cli/ 与 Dockerfile 并列，内容只剩 .dart_tool/（43MB 大头：pub 缓存 + TUI dill；运行时挂 /app 用宿主那份）和 build/ 两条。全仓库仅 dart-docker.sh 一处构建该镜像（CI 不建），server 用 server/.dockerignore，互不干扰。
+- 验证：`docker build --check -f cli/Dockerfile.dart-sodium cli/` 通过（context 传输 569B，无警告）；真构建在本机后台跑（doomship 无 dart-sodium 镜像缓存，正在拉 241MB dart:stable，网络 ~40KB/s 较慢；Dockerfile 无 COPY，基座层与本次改动无关）。
+- 遗留未动（无依据不改）：DEPLOYMENT §9.1 的 git remote 写 `git.tic.cc/fon/only`、updateServer 写 `fon/einz`，哪个是真 remote 待老板确认。
+
+

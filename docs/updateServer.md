@@ -33,7 +33,7 @@ cd einz
 
 ```bash
 # VPS 上执行
-export EINZ_ROOT=/opt/einz
+export EINZ_ROOT=/faronear/einz
 cd $EINZ_ROOT
 git init
 git remote add origin https://git.tic.cc/fon/einz

@@ -52,7 +52,7 @@ run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
 
 build_image() {
   echo "==> 构建开发镜像 ${IMG}（dart:stable + libsodium）…"
-  docker build -f "$DIR/Dockerfile.dart-sodium" -t "$IMG" "$ROOT"
+  docker build -f "$DIR/Dockerfile.dart-sodium" -t "$IMG" "$DIR"
   echo "✅ 镜像构建完成"
 }
 

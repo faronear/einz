@@ -551,7 +551,7 @@ docker compose up -d
 ```bash
 # VPS 一次性（把现有部署目录转换为 git 工作树；server/ 等
 # 会被仓库版本对齐覆盖，data/ .env 等本地数据不受影响）
-export EINZ_ROOT=/opt/einz
+export EINZ_ROOT=/faronear/einz
 cd $EINZ_ROOT
 git init
 git remote add origin https://git.tic.cc/fon/only
