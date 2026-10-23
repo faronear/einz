@@ -2015,25 +2015,25 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocal.
   ///
   /// In en, this message translates to:
-  /// **'On-device'**
+  /// **'Local'**
   String get voiceTranscriptAuthLocal;
 
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'Run the model locally. No network, the server never sees audio (requires a ~230MB model download).'**
+  /// **'The audio is transcribed locally (requires a ~230MB model download for the first use). No data leaves your device.'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
   ///
   /// In en, this message translates to:
-  /// **'Server'**
+  /// **'Remote'**
   String get voiceTranscriptAuthServer;
 
   /// No description provided for @voiceTranscriptAuthServerDesc.
   ///
   /// In en, this message translates to:
-  /// **'The decrypted audio is sent to our server, transcribed by Whisper, and deleted immediately. The server briefly processes this recording.'**
+  /// **'The audio is sent to a cloud server for transcription, and deleted immediately after processing.'**
   String get voiceTranscriptAuthServerDesc;
 
   /// No description provided for @voiceTranscriptAuthAsk.
@@ -2045,7 +2045,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthAskDesc.
   ///
   /// In en, this message translates to:
-  /// **'Ask before each transcription (server path, or local if the model is ready).'**
+  /// **'Ask before each transcription.'**
   String get voiceTranscriptAuthAskDesc;
 
   /// No description provided for @voiceTranscriptAskTitle.
@@ -2057,7 +2057,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAskBody.
   ///
   /// In en, this message translates to:
-  /// **'The decrypted audio of this message will be sent to the server, transcribed by Whisper, and deleted immediately.'**
+  /// **'The audio will be sent to a cloud server, and deleted immediately after transcription.'**
   String get voiceTranscriptAskBody;
 
   /// No description provided for @voiceTranscriptServerFailed.
@@ -2069,7 +2069,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptServerDisabled.
   ///
   /// In en, this message translates to:
-  /// **'Server transcription isn\'t enabled — used the on-device model instead'**
+  /// **'Server transcription isn\'t enabled — used the local model instead'**
   String get voiceTranscriptServerDisabled;
 
   /// No description provided for @voiceTranscriptPreparing.

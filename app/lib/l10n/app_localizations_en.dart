@@ -1163,32 +1163,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose how voice messages are transcribed on this device.';
 
   @override
-  String get voiceTranscriptAuthLocal => 'On-device';
+  String get voiceTranscriptAuthLocal => 'Local';
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'Run the model locally. No network, the server never sees audio (requires a ~230MB model download).';
+      'The audio is transcribed locally (requires a ~230MB model download for the first use). No data leaves your device.';
 
   @override
-  String get voiceTranscriptAuthServer => 'Server';
+  String get voiceTranscriptAuthServer => 'Remote';
 
   @override
   String get voiceTranscriptAuthServerDesc =>
-      'The decrypted audio is sent to our server, transcribed by Whisper, and deleted immediately. The server briefly processes this recording.';
+      'The audio is sent to a cloud server for transcription, and deleted immediately after processing.';
 
   @override
   String get voiceTranscriptAuthAsk => 'Ask per message';
 
   @override
-  String get voiceTranscriptAuthAskDesc =>
-      'Ask before each transcription (server path, or local if the model is ready).';
+  String get voiceTranscriptAuthAskDesc => 'Ask before each transcription.';
 
   @override
   String get voiceTranscriptAskTitle => 'Transcribe on server?';
 
   @override
   String get voiceTranscriptAskBody =>
-      'The decrypted audio of this message will be sent to the server, transcribed by Whisper, and deleted immediately.';
+      'The audio will be sent to a cloud server, and deleted immediately after transcription.';
 
   @override
   String voiceTranscriptServerFailed(String error) {
@@ -1197,7 +1196,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptServerDisabled =>
-      'Server transcription isn\'t enabled — used the on-device model instead';
+      'Server transcription isn\'t enabled — used the local model instead';
 
   @override
   String get voiceTranscriptPreparing => 'Preparing transcription model…';
