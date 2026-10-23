@@ -15566,6 +15566,17 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 生效方式：只需重启服务端（tsx 吃新 src），App 不用重建。
 - 备注：whisper 对 zh 输出繁体（本地 sherpa 输出简体）——模型行为差异，内容一致，未处理（待老板定是否要简体）。
 
+**（2026-10-24T02:30:00Z / 2026-10-24 10:30）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：服务端转写双引擎——sensevoice 落地 + 通用改名（老板批准）
+- 背景：老板实测 whisper-small 中文不如前端 sherpa；cn1 是 4 核 Celeron N3150（无 AVX）8GB——whisper medium 不可行（5-10 分钟/条），large 更别提。定案：服务端增加 SenseVoice-Small int8 引擎（与 App 本机同模型），默认优先，whisper 保留可切。
+- 改名（老板点出 realWhisperRunner 名不副实）：`WhisperRunner`→`AsrRunner`、`realWhisperRunner`→`whisperAsrRunner`、`whisperConfig`→`whisperEngineConfig`、`parseWhisperStdout`→`parseAsrText`（纯文本行兜底保留，双形态都吃）；runner 与 `defaultAsrRunner`（按 resolveAsrEngine 分发）导出供测试/工具。
+- 引擎选择：`EINZ_ASR_ENGINE` 显式优先；缺省 sensevoice 配了就用（模型目录 model.int8.onnx+tokens.txt 齐全才算），否则 whisper；/health 增 `asr_engine` 字段便于确认切换生效。whisper 侧环境变量不动（零迁移）。
+- sensevoice 实现：sherpa-onnx-node（npm，optionalDependencies 按平台装，linux-x64/darwin-arm64）进程内识别——recognizer 懒初始化+复用、decodeAsync（不卡事件循环）+ 串行队列（recognizer 非并发安全）；音频全程内存（wavPcmSamples 提取 16k/mono/int16→Float32Array），隐私承诺不破。ESM 动态 import CJS 的 default 互译坑已处理（mod.default）。新增 src/sherpa-onnx-node.d.ts 最小类型声明。
+- 本机 e2e 实证（真模型+真语音）：resolveAsrEngine→sensevoice；输出「哎，现在服务端怎么样？」与前端 sherper 一字不差，1.5s（含模型加载）。
+- 测试：新增 resolveAsrEngine 选择逻辑（7 组 env 排列）+ wavPcmSamples（归一化/extensible 兼容/float 拒/非 16k 拒）；tsc 零错误；服务端全量 186 例全过。
+- 文档：whisperDeploy 双引擎化（标题/心智模型/§5 env 示例）+ 新增 §6 引擎选择对比表与 cn1 结论、sensevoice 模型两种获取方式、health 验证法。
+- 待办（VPS）：cn1 上 `npm ci`（装 sherpa-onnx-linux-x64）→ 放模型到 server/models/sensevoice/（或 /opt/whisper/sensevoice）→ .env 配 EINZ_SENSEVOICE_MODEL → 重启；curl /health 确认 asr_engine。
+
+
 
 
 

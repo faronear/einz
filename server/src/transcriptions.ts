@@ -1,20 +1,29 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { ApiError, touchLastSeen } from "./auth.js";
 import { requireSession } from "./guard.js";
+import type { OfflineRecognizer } from "sherpa-onnx-node";
 
 /**
- * 方案 D'：服务端自建 Whisper 转写（voiceTranscript.zhcn.md §15.2）。
+ * 服务端转写（方案 D' 演进，voiceTranscript.zhcn.md §15.2）：双引擎。
  *
  * 隐私承诺（设计文档定稿，部署文档 aimemo/whisperDeploy.zhcn.md §0）：
- * - 明文音频**全程只在内存**——通过 stdin 管道（whisper-cli `-f -`）喂给子进程，
- *   不写临时文件、不落盘、不进日志；
+ * - 明文音频**全程只在内存**——whisper 引擎经 stdin 管道（whisper-cli `-f -`）喂
+ *   子进程；sensevoice 引擎进程内识别（sherpa-onnx node addon）。都不写临时文件、
+ *   不落盘、不进日志；
  * - 审计/事件日志只记「事件发生 + 耗时 + 音频时长」，**绝不记音频内容与转写文本**；
  * - 暴露面 = 运营者本人（server 已能看到密文元数据），不引入第三方。
  *
- * 配置（server/docker/.env，两个都配才启用；缺任一 → 端点报 TRANSCRIBE_DISABLED）：
- *   EINZ_WHISPER_BIN    whisper-cli 可执行文件绝对路径
- *   EINZ_WHISPER_MODEL  ggml 模型文件绝对路径
- *   EINZ_WHISPER_THREADS  推理线程数（默认 1，防止小 VPS 被单次转写打满）
+ * 配置（server/docker/.env；两个引擎任一可用即启用转写）：
+ *   EINZ_ASR_ENGINE      引擎选择：whisper / sensevoice（缺省=sensevoice 配了就用，
+ *                        否则 whisper）——与 App 本机同模型的 sensevoice 优先
+ *   EINZ_WHISPER_BIN     whisper 引擎：whisper-cli 可执行绝对路径
+ *   EINZ_WHISPER_MODEL   whisper 引擎：ggml 模型文件绝对路径
+ *   EINZ_WHISPER_THREADS whisper 引擎：推理线程数（默认 1）
+ *   EINZ_SENSEVOICE_MODEL  sensevoice 引擎：模型目录（含 model.int8.onnx +
+ *                        tokens.txt，与 App 本机模型同文件，可整目录拷来）
+ *   EINZ_SENSEVOICE_THREADS  sensevoice 引擎：线程数（默认 1）
  *   EINZ_TRANSCRIBE_MAX_BYTES  音频上限（默认 10 MiB ≈ 16kHz/16bit/mono 约 5 分钟）
  */
 
@@ -22,17 +31,49 @@ export const MAX_TRANSCRIBE_AUDIO_BYTES = Number(
   process.env.EINZ_TRANSCRIBE_MAX_BYTES ?? 10 * 1024 * 1024
 );
 
-/** whisper-cli 可执行与模型路径（都配了才启用转写）。 */
-function whisperConfig(): { bin: string; model: string; threads: number } | null {
+/** ASR 引擎标识。 */
+export type AsrEngine = "whisper" | "sensevoice";
+
+/** ASR runner：wav 缓冲 → 转写文本（生产按引擎分发；测试可注入假实现）。 */
+export type AsrRunner = (wav: Buffer, lang: string) => Promise<string>;
+
+/** whisper 引擎配置（bin 与 model 都配了才算）。 */
+function whisperEngineConfig(): { bin: string; model: string; threads: number } | null {
   const bin = process.env.EINZ_WHISPER_BIN;
   const model = process.env.EINZ_WHISPER_MODEL;
   if (bin == null || bin.length === 0 || model == null || model.length === 0) return null;
   return { bin, model, threads: Number(process.env.EINZ_WHISPER_THREADS ?? 1) };
 }
 
-/** 服务端转写是否已启用（/health capabilities 用，客户端据此隐藏/显示入口）。 */
-export function transcribeEnabled(): boolean {
-  return whisperConfig() != null;
+/** sensevoice 引擎配置：目录下 model.int8.onnx + tokens.txt 齐全才算配了。
+ *  目录形态与 App 本机模型一致（voiceTranscript_model.dart 的 kModelVersion 目录），
+ *  整目录拷给服务端即可复用。 */
+function senseVoiceEngineConfig(): { model: string; tokens: string; threads: number } | null {
+  const dir = process.env.EINZ_SENSEVOICE_MODEL;
+  if (dir == null || dir.length === 0) return null;
+  const model = join(dir, "model.int8.onnx");
+  const tokens = join(dir, "tokens.txt");
+  if (!existsSync(model) || !existsSync(tokens)) return null;
+  return { model, tokens, threads: Number(process.env.EINZ_SENSEVOICE_THREADS ?? 1) };
+}
+
+/** 选择引擎：EINZ_ASR_ENGINE 显式优先（大小写不敏感）；未设 → sensevoice 配了
+ *  就用（与 App 本机同模型：中文质量、简体、ITN 全对齐），否则 whisper；都没有
+ *  返回 null（未启用，端点报 TRANSCRIBE_DISABLED）。 */
+export function resolveAsrEngine(): AsrEngine | null {
+  const want = (process.env.EINZ_ASR_ENGINE ?? "").trim().toLowerCase();
+  const whisperOk = whisperEngineConfig() != null;
+  const senseOk = senseVoiceEngineConfig() != null;
+  if (want === "whisper") return whisperOk ? "whisper" : null;
+  if (want === "sensevoice") return senseOk ? "sensevoice" : null;
+  if (senseOk) return "sensevoice";
+  if (whisperOk) return "whisper";
+  return null;
+}
+
+/** 当前引擎名（/health 透出 asr_engine，便于部署后确认切换是否生效）。 */
+export function activeAsrEngine(): AsrEngine | null {
+  return resolveAsrEngine();
 }
 
 export interface TranscribeResult {
@@ -42,7 +83,7 @@ export interface TranscribeResult {
 }
 
 /** 16kHz/16bit/单声道 PCM wav 的时长（毫秒）。仅认 PCM16（客户端录音就是这个规格），
- *  其他格式拒绝而非猜测——转写质量与 whisper 的 ffmpeg 分支无关，喂错格式只会出垃圾。
+ *  其他格式拒绝而非猜测——转写质量与引擎的格式兜底无关，喂错格式只会出垃圾。
  *
  *  接受两种 PCM 容器：标准 tag=1，以及 WAVE_FORMAT_EXTENSIBLE（0xFFFE，子格式 GUID
  *  头两位为 1）——macOS 的 AVCaptureAudioFileOutput 把标准 PCM16 录音写成 extensible
@@ -86,21 +127,74 @@ export function wavDurationMs(wav: Buffer): number {
   return Math.round((dataLen / byteRate) * 1000);
 }
 
-/** 解析 whisper-cli stdout：取每行时间戳之后的部分并拼接。
- *  不依赖 -nt 等新版 flag（旧版 whisper.cpp 也能跑），只按输出形态解析。 */
-export function parseWhisperStdout(out: string): string {
+/** 从 wav 缓冲提取 16kHz/mono PCM16 采样（归一化 Float32Array）——sensevoice 引擎
+ *  的输入。容器解析与 [wavDurationMs] 同口径；多声道取第 0 声道（防御，客户端上传前
+ *  已归一化为 mono）；非 16kHz 直接拒（sensevoice 模型只吃 16k，客户端契约保证，
+ *  见 voiceTranscript.zhcn.md §8）。 */
+export function wavPcmSamples(wav: Buffer): { samples: Float32Array; sampleRate: number } {
+  if (wav.length < 44 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") {
+    throw new ApiError("INVALID_REQUEST", "not a wav file", 400);
+  }
+  let offset = 12;
+  let channels = 0;
+  let sampleRate = 0;
+  let bits = 0;
+  let dataStart = -1;
+  let dataLen = 0;
+  while (offset + 8 <= wav.length) {
+    const id = wav.toString("ascii", offset, offset + 4);
+    const size = wav.readUInt32LE(offset + 4);
+    if (id === "fmt ") {
+      const audioFormat = wav.readUInt16LE(offset + 8);
+      const isExtensiblePcm =
+        audioFormat === 0xfffe &&
+        offset + 34 <= wav.length &&
+        wav.readUInt16LE(offset + 32) === 1;
+      if (audioFormat !== 1 && !isExtensiblePcm) {
+        throw new ApiError("INVALID_REQUEST", "only PCM wav supported", 400);
+      }
+      channels = wav.readUInt16LE(offset + 10);
+      sampleRate = wav.readUInt32LE(offset + 12);
+      bits = wav.readUInt16LE(offset + 22);
+    } else if (id === "data") {
+      dataStart = offset + 8;
+      dataLen = Math.min(size, wav.length - dataStart);
+    }
+    offset += 8 + size + (size % 2);
+    if (size === 0 && id !== "data") break;
+  }
+  if (dataStart < 0 || channels === 0 || sampleRate === 0) {
+    throw new ApiError("INVALID_REQUEST", "wav missing fmt/data chunk", 400);
+  }
+  if (bits !== 16) {
+    throw new ApiError("INVALID_REQUEST", "only 16-bit PCM wav supported", 400);
+  }
+  if (sampleRate !== 16000) {
+    throw new ApiError("INVALID_REQUEST", "sensevoice engine expects 16kHz wav", 400);
+  }
+  const frameBytes = channels * 2;
+  const frames = Math.floor(dataLen / frameBytes);
+  const samples = new Float32Array(frames);
+  for (let i = 0; i < frames; i++) {
+    samples[i] = wav.readInt16LE(dataStart + i * frameBytes) / 32768;
+  }
+  return { samples, sampleRate };
+}
+
+/** 解析 ASR runner 的原始输出为文本：兼容两种形态——whisper 旧版时间戳行
+ *  （`[00:00:00.000 --> ...] 文本`，取 `]` 后部分）与 `-otxt -of -` 的纯文本行
+ *  （无 `]` 也无 `-->` → 原行收取）；空行跳过。 */
+export function parseAsrText(out: string): string {
   const lines: string[] = [];
   for (const line of out.split("\n")) {
-    const m = line.match(/\]\s*(.*)$/); // [00:00:00.000 --> 00:00:03.200]  文本
+    const m = line.match(/\]\s*(.*)$/);
     const text = (m?.[1] ?? (line.includes("-->") ? "" : line)).trim();
     if (text.length > 0) lines.push(text);
   }
   return lines.join(" ").trim();
 }
 
-type WhisperRunner = (wav: Buffer, lang: string) => Promise<string>;
-
-/** 默认 runner：spawn whisper-cli，音频经 stdin 管道进子进程（不落盘）。
+/** whisper 引擎：spawn whisper-cli，音频经 stdin 管道进子进程（不落盘）。
  *  ⚠ 两个必须传的旗标（2026-10-23 macOS 实测踩到）：
  *  ① `-f -`（短横）而不是 `-f /dev/stdin`：whisper.cpp 的 read_audio_data 对 `-`
  *     是把 stdin 全量读进内存再解析（管道安全）；对 `/dev/stdin` 会当普通文件走
@@ -109,9 +203,10 @@ type WhisperRunner = (wav: Buffer, lang: string) => Promise<string>;
  *  ② `-otxt -of -`：新版 whisper.cpp 的文本只经由输出格式函数（-otxt/-ovtt/-osrt…）
  *     落盘，**不再默认往 stdout 打时间戳行**——不传就是解码成功但 stdout 全空
  *     （exit 0，只余一条 warning），转写结果恒为空串。`-of -` 把 txt 输出写到
- *     stdout（仍不落盘，守隐私承诺）；[parseWhisperStdout] 对纯文本行有兜底。 */
-const realWhisperRunner: WhisperRunner = (wav, lang) => {
-  const cfg = whisperConfig();
+ *     stdout（仍不落盘，守隐私承诺）；[parseAsrText] 对纯文本行有兜底。 */
+/** whisper 引擎 runner（导出供测试与工具复用；生产经 [defaultAsrRunner] 分发）。 */
+export const whisperAsrRunner: AsrRunner = (wav, lang) => {
+  const cfg = whisperEngineConfig();
   if (cfg == null) throw new ApiError("TRANSCRIBE_DISABLED", "server transcription not configured", 503);
   return new Promise((resolvePromise, reject) => {
     const child = spawn(
@@ -147,13 +242,104 @@ const realWhisperRunner: WhisperRunner = (wav, lang) => {
   });
 };
 
+// ---- sensevoice 引擎（sherpa-onnx node addon，进程内识别） ----
+
+type SenseVoiceAddon = typeof import("sherpa-onnx-node");
+
+let senseVoiceAddon: SenseVoiceAddon | null | undefined;
+let senseVoiceAddonError = "";
+
+/** 懒加载 sherpa-onnx-node（原生 addon，npm 的 optionalDependencies 按平台装）。
+ *  没装/平台不支持时记一次错误、每次请求报清晰失败——而不是让整个 server 起不来
+ *  （whisper 单引擎部署不受影响）。 */
+async function loadSenseVoiceAddon(): Promise<SenseVoiceAddon | null> {
+  if (senseVoiceAddon === undefined) {
+    try {
+      const mod = await import("sherpa-onnx-node");
+      // CJS 互操作：ESM import() 下包的导出整体落在 default 上（cjs-module-lexer
+      // 只识别到部分命名导出），真正的东西在 mod.default。
+      const candidate = mod as unknown as {
+        OfflineRecognizer?: unknown;
+        default?: SenseVoiceAddon;
+      };
+      senseVoiceAddon =
+        candidate.OfflineRecognizer != null
+          ? (candidate as SenseVoiceAddon)
+          : candidate.default ?? null;
+      if (senseVoiceAddon == null) {
+        senseVoiceAddonError = "OfflineRecognizer export not found";
+      }
+    } catch (e) {
+      senseVoiceAddon = null;
+      senseVoiceAddonError = e instanceof Error ? e.message : String(e);
+    }
+  }
+  return senseVoiceAddon;
+}
+
+let senseVoiceRecognizer: OfflineRecognizer | null = null;
+/** 解码串行队列：sherpa 的 recognizer 非并发安全；本端点已有 per-IP 频率限制，
+ *  量小，排队可接受。decodeAsync 不卡事件循环（其余请求照常服务）。 */
+let senseVoiceTail: Promise<unknown> = Promise.resolve();
+
+/** sensevoice 引擎：与 App 本机同模型（sense-voice-small int8，中/粤/英/日/韩
+ *  自动识别 + ITN）。recognizer 懒初始化 + 复用（加载 239MB 模型是大头）；
+ *  音频全程内存（acceptWaveform 吃 Float32Array），不落盘。 */
+/** sensevoice 引擎 runner（导出供测试与工具复用；生产经 [defaultAsrRunner] 分发）。 */
+export const senseVoiceAsrRunner: AsrRunner = async (wav, _lang) => {
+  const cfg = senseVoiceEngineConfig();
+  if (cfg == null) {
+    throw new ApiError("TRANSCRIBE_DISABLED", "sensevoice engine not configured", 503);
+  }
+  const addon = await loadSenseVoiceAddon();
+  if (addon == null) {
+    throw new ApiError(
+      "TRANSCRIBE_FAILED",
+      `sherpa-onnx-node unavailable: ${senseVoiceAddonError} (did npm ci install the platform package?)`,
+      503
+    );
+  }
+  const { samples, sampleRate } = wavPcmSamples(wav);
+  if (senseVoiceRecognizer == null) {
+    senseVoiceRecognizer = new addon.OfflineRecognizer({
+      modelConfig: {
+        senseVoice: {
+          model: cfg.model,
+          language: "", // 自动识别（中/粤/英/日/韩），与 App 本机口径一致
+          useInverseTextNormalization: 1, // 数字规整（"三个"→"3 个"），同 App
+        },
+        tokens: cfg.tokens,
+        numThreads: cfg.threads,
+        debug: 0,
+      },
+    });
+  }
+  const recognizer = senseVoiceRecognizer;
+  const run = senseVoiceTail.then(async () => {
+    const stream = recognizer.createStream();
+    stream.acceptWaveform({ samples, sampleRate });
+    const result = await recognizer.decodeAsync(stream);
+    return String(result.text ?? "").trim();
+  });
+  senseVoiceTail = run.catch(() => {});
+  return run;
+};
+
+/** 默认 runner：按 [resolveAsrEngine] 分发到对应引擎（测试可注入假 runner）。 */
+const defaultAsrRunner: AsrRunner = (wav, lang) => {
+  const engine = resolveAsrEngine();
+  if (engine === "sensevoice") return senseVoiceAsrRunner(wav, lang);
+  if (engine === "whisper") return whisperAsrRunner(wav, lang);
+  throw new ApiError("TRANSCRIBE_DISABLED", "server transcription not configured", 503);
+};
+
 /** 转写一条语音（POST /transcriptions 主体逻辑）。
- *  `runner` 供测试注入假引擎；生产恒用 realWhisperRunner。 */
+ *  `runner` 供测试注入假引擎；生产恒用 [defaultAsrRunner]（按配置选引擎）。 */
 export async function transcribeWav(
   token: string,
   wav: Buffer,
   lang: string,
-  runner: WhisperRunner = realWhisperRunner
+  runner: AsrRunner = defaultAsrRunner
 ): Promise<TranscribeResult> {
   const startedAt = Date.now();
   const { entrance_id } = requireSession(token);
@@ -162,8 +348,8 @@ export async function transcribeWav(
   const audioMs = wavDurationMs(wav);
   // 频率上限约束在 ratelimit（transcribe 桶）；这里只按音频时长兜底——
   // 10MiB 上限已是约 5 分钟，短于此的都放行
-  const stdout = await runner(wav, lang);
-  const text = parseWhisperStdout(stdout);
+  const output = await runner(wav, lang);
+  const text = parseAsrText(output);
   // 事件日志：只有事件与耗时。不记音频字节、不记文本、不记来源 IP 之外的内容
   // （隐私承诺见文件头）；IP 由路由层的全站审计另行覆盖，这里不重复。
   console.log(`[transcribe] entrance=${entrance_id} audio_ms=${audioMs} cost_ms=${Date.now() - startedAt} chars=${text.length}`);

@@ -1,23 +1,22 @@
-# whisper.cpp 服务器部署指南（方案 D'）
+# 服务端转写部署指南（方案 D'；双引擎 whisper.cpp / SenseVoice）
 
 > 目的：让老板**亲自理解**部署原理，任何一台新 VPS（含未来海外搬迁）都能照着从零复原。
-> 原则：转写能力 = **可执行文件 + 模型文件 + 两个环境变量**，无数据库、无后台服务、无开机自启——server 进程 spawn 它，用完即走。
+> 原则：转写能力 = **引擎（二进制或 addon）+ 模型文件 + 少量环境变量**，无数据库、无后台服务、无开机自启。
 
 ## 0. 心智模型（先懂再装）
 
 ```
-Einz server (Node)                    whisper.cpp（不是常驻服务！）
-  POST /transcriptions                  whisper-cli 二进制
-    ↓ 收到明文 wav（内存里）              + ggml 模型文件（只读）
-    ↓ spawn 子进程                        就这两个文件，放哪都行
-    stdin/stdout 传音频与文本 ────────→  CPU 推理，输出文本后子进程退出
-    ↓ 音频即丢（不落盘），文本返回客户端
+Einz server (Node)                    引擎二选一（EINZ_ASR_ENGINE，缺省 sensevoice）
+  POST /transcriptions                  whisper：whisper-cli 二进制 + ggml 模型
+    ↓ 收到明文 wav（内存里）              sensevoice：sherpa-onnx node addon + 模型目录
+    ↓ 管道喂子进程 / 进程内识别           音频全程内存，不落盘
+    文本返回客户端（whisper 子进程用完即退）
 ```
 
 要点：
 
-1. **whisper 不是服务**：没有端口、没有 daemon，就是个命令行程序。server 每次转写 fork 一个子进程，转完退出。所以「部署」= 把文件放好，没有任何 systemd/supervisor 要配。
-2. **两个环境变量**是 server 与 whisper 的唯一耦合点：`EINZ_WHISPER_BIN`（二进制路径）+ `EINZ_WHISPER_MODEL`（模型路径）。没配 = 转写端点报告未启用，server 其余功能完全不受影响。搬迁 = 新机器装好后改这两行再重启 server。
+1. **whisper 不是服务**：没有端口、没有 daemon，就是个命令行程序。server 每次转写 fork 一个子进程，转完退出。sensevoice 则是 node addon 进程内识别（recognizer 常驻复用）。两者都不需要 systemd/supervisor 之类的外挂服务。
+2. **环境变量**是 server 与引擎的唯一耦合点（whisper 引擎：`EINZ_WHISPER_BIN` + `EINZ_WHISPER_MODEL`；sensevoice 引擎：`EINZ_SENSEVOICE_MODEL` 目录）。没配 = 转写端点报告未启用，server 其余功能完全不受影响。搬迁 = 新机器装好后改这几行再重启 server。引擎选择见 §6。
 3. **模型文件是只读资产**，可打包随迁移带走（scp 拷走即可），新机器不必重新下载。
 4. **音频明文全程只在内存**：不写磁盘、不进日志——这是隐私承诺的技术基础，部署时不要为了排障把音频落盘。
 
@@ -95,12 +94,16 @@ ffmpeg 转换参数别漏 `-ar 16000 -ac 1`。
 
 ## 5. 接入 Einz server
 
-server 侧只认两个环境变量：
+server 侧的环境变量（按引擎二选一，亦可同时配——选择逻辑见 §6）：
 
 ```bash
 # server/docker/.env（或 pm2 ecosystem 的 env 块，与现有 EINZ_* 变量同处）
 EINZ_WHISPER_BIN=/opt/whisper/whisper.cpp/build/bin/whisper-cli
 EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
+# sensevoice 引擎（与 App 本机同模型，中文质量/简体/ITN 对齐前端）：
+EINZ_SENSEVOICE_MODEL=/opt/whisper/sensevoice   # 目录含 model.int8.onnx + tokens.txt
+# 引擎选择：sensevoice（缺省，配了就用）/ whisper
+EINZ_ASR_ENGINE=sensevoice
 ```
 
 重启 server 生效：pm2 `pm2 restart einz` / docker `docker compose up -d`。
@@ -120,7 +123,44 @@ EINZ_WHISPER_MODEL=/opt/whisper/whisper.cpp/models/ggml-small.bin
 - **裸 Node + 宿主机 whisper**：§2-§5 的原方案，whisper 装宿主机、server 用绝对路径
   spawn（容器隔离问题不存在）。适合不想给镜像加编译时间的场景。
 
-## 6. 验证与运维
+## 6. 引擎选择：whisper vs sensevoice（2026-10-24）
+
+两个引擎可同时配置，选择逻辑（server/src/transcriptions.ts 的 resolveAsrEngine）：
+
+1. `EINZ_ASR_ENGINE` 显式指定（`whisper` / `sensevoice`，大小写不敏感）——最高优先；
+2. 缺省：**sensevoice 配了就用**，否则 whisper；都没有则转写未启用。
+
+| | whisper.cpp（ggml-small） | SenseVoice-Small int8（推荐） |
+|---|---|---|
+| 中文质量 | 英文中心模型，small 档中文一般，输出繁体 | 与 App 本机同模型，中文强、简体、带 ITN |
+| 语种 | 90+（small 档多数不佳） | 中/粤/英/日/韩自动识别 |
+| 体积/内存 | 466MB / ~1GB | 239MB / ~500MB |
+| 部署形态 | 宿主机二进制 + 子进程（stdin 管道） | sherpa-onnx node addon，进程内识别（npm 依赖自带平台二进制） |
+| 小 VPS 适应性 | 4 核 Celeron N3150（无 AVX）上 medium 不可行（5-10 分钟/条） | 同硬件约 20-60s/条 |
+
+**cn1（Debian，4 核 Celeron N3150 @1.6GHz，8GB）结论**：whisper medium 不可行
+（Braswell 无 AVX，whisper.cpp 的 SIMD 优化全废；且吃 2-3GB 内存）；sensevoice 是唯一
+现实选择——非自回归单次前向，60s 语音约 20-60s，质量还与前端一致。
+
+**sensevoice 模型文件获取**（与 App 本机同款，二选一）：
+
+```bash
+# ① 从 App 已安装目录整目录拷走（macOS 开发机）：
+#    ~/Library/Containers/cc.tic.einz/Data/Library/Application Support/cc.tic.einz/
+#      voice_transcript/2024-07-17-int8/{model.int8.onnx,tokens.txt}
+# ② 或从 HF 下（csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17）：
+mkdir -p /opt/whisper/sensevoice && cd /opt/whisper/sensevoice
+wget https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx
+wget https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt
+```
+
+放到 `server/models/sensevoice/`（整个 `server/models/` 已 gitignore）亦可，
+`EINZ_SENSEVOICE_MODEL` 指过去即可。node 依赖随 `npm ci` 自动装平台二进制
+（linux-x64 / darwin-arm64），无需额外编译。
+
+**验证切换生效**：`curl -s http://127.0.0.1:3000/health` 应含
+`"asr_engine":"sensevoice"`（未配时不出现 transcribe/asr_engine 键）。
+## 7. 验证与运维
 
 1. App 设置里选「服务端转写」→ 对一条语音点转写 → 出文本 = 全链路通。
 2. server 日志应出现转写事件行（**只有事件与耗时，没有内容**）——部署后务必看一眼

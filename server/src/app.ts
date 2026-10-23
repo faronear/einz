@@ -62,7 +62,7 @@ import {
 } from './guard.js'
 import { MAX_ATTACHMENT_BYTES, readBody, readJsonBody } from './body.js'
 import { limitByIp } from './ratelimit.js'
-import { MAX_TRANSCRIBE_AUDIO_BYTES, transcribeEnabled, transcribeWav } from './transcriptions.js'
+import { MAX_TRANSCRIBE_AUDIO_BYTES, activeAsrEngine, transcribeWav } from './transcriptions.js'
 import {
   createJoinToken,
   createSpace,
@@ -197,9 +197,10 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
       capabilities: cfg.capabilities,
-      // 服务端转写（方案 D'）是否已配置启用：客户端据此显示/隐藏「服务端转写」选项
-      // 与入口（未配时不出现该键，老客户端无感）。纯配置布尔，非密。
-      ...(transcribeEnabled() ? { transcribe: true } : {}),
+      // 服务端转写（方案 D'）是否已配置启用 + 当前引擎：客户端据此显示/隐藏
+      // 「服务端转写」选项与入口（未配时不出现该键，老客户端无感）。asr_engine 供
+      // 部署后确认引擎切换是否生效（whisper/sensevoice）。纯配置值，非密。
+      ...(activeAsrEngine() ? { transcribe: true, asr_engine: activeAsrEngine() } : {}),
       // 附件 blob 大小上限（字节）：客户端据此在**读取/加密之前**预检——拖入超大文件
       // （如 1GB 视频）时即时给一句人话，而不是把内存读满再吃 413（2026-10-08）。
       // 纯静态配置值，非密、无元数据风险（与 capabilities 同级）。
