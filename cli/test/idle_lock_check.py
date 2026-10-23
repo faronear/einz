@@ -189,6 +189,14 @@ def main():
         print('[8] 自动锁后解锁恢复:', restored2)
         ok = ok and restored2
 
+        # 8.5) 阈值持久化（老板 2026-10-23，对齐 App）：/lock 45 写入 store，
+        #     重启后 /status 应显示 45（下一步重启流程里验证）
+        send(master, '/lock 45\r')
+        out = wait_for(master, out, '✅ 无操作 45 秒后自动锁屏', 15)
+        persist_set = '✅ 无操作 45 秒后自动锁屏' in out
+        print('[8.5] /lock 45 已记住:', persist_set)
+        ok = ok and persist_set
+
         # 9) 重启走启动解锁（_promptUnlock exitOnEmpty=true 路径，重构重点覆盖）：
         #    提示语不同（直接回车退出）、错码挡住、空回车 = 退出整个 TUI、对码进聊天。
         send(master, '/exit\r')
@@ -239,6 +247,14 @@ def main():
         startup_ok = '机密线路激活失败' in out
         print('[9] 启动解锁对码进聊天:', startup_ok)
         ok = ok and startup_ok
+
+        # 9.5) 持久化验证：重启后 /status 显示重启前设的 45s 阈值
+        time.sleep(2)
+        send(master, '/status\r')
+        out = wait_for(master, out, '自动锁屏: 无操作 45s', 15)
+        persisted = '自动锁屏: 无操作 45s' in out
+        print('[9.5] 重启后阈值持久化(45s):', persisted)
+        ok = ok and persisted
 
         print('✅ 自动锁屏全场景通过' if ok else '❌ 存在失败场景')
         if not ok and _ERR_BUF[0].strip():

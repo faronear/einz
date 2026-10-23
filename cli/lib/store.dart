@@ -30,6 +30,7 @@ class EntranceStore {
     this.sessionToken,
     this.pinHash,
     this.escrowUpdatedAt,
+    this.lockSeconds,
     this.installUid,
     this.lastServerSequence = 0,
     this.lastReportedDeliveredSeq = 0,
@@ -69,6 +70,11 @@ class EntranceStore {
   String? sessionToken;
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
+
+  /// 无操作自动锁屏阈值（秒；null = 从未设置过，用默认值）——`/lock <秒>` 写入，
+  /// 与 App 的锁屏时长持久化对齐（App 存 app_state；TUI 的粒度是"一个 store
+  /// = 一条通道"，故随通道存）。读取时夹到合法范围（见 einz_tui 的 kTuiLock* ）。
+  int? lockSeconds;
 
   /// 安装级标识（服务端 `entrances.install_uid` 的来源）：服务端据此把同一台物理设备
   /// 在各空间的 entrance_id 认成一台。**TUI 的粒度是"一个 store = 一条通道"**（见
@@ -150,6 +156,7 @@ class EntranceStore {
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
+        'lock_seconds': lockSeconds,
         'install_uid': installUid,
         'member_names': memberNames,
         'member_genders': memberGenders,
@@ -179,6 +186,7 @@ class EntranceStore {
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
+        lockSeconds: json['lock_seconds'] as int?,
         installUid: json['install_uid'] as String?,
         memberNames: (json['member_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
         memberGenders: (json['member_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},

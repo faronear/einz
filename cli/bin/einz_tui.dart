@@ -1635,6 +1635,10 @@ Future<void> main(List<String> args) async {
     _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
     // 无操作自动锁看门狗（老板 2026-10-23）：仅在已设 PIN 时才会真锁
     // （_checkIdleLock 内部判 pinHash）——/pin 后补设的码也立即生效，无需重启。
+    // 阈值从 store 持久化读（/lock <秒> 写入；与 App 锁屏时长持久化对齐），
+    // 夹到合法范围防手改 store 文件塞进越界值。
+    _idleLockSeconds = (store.lockSeconds ?? kTuiLockSeconds)
+        .clamp(kTuiLockMinSeconds, kTuiLockMaxSeconds);
     _lastActivityAt = DateTime.now();
     _idleWatchdog?.cancel();
     _idleWatchdog =
@@ -4337,6 +4341,7 @@ Future<void> _execCommand(String line) async {
               '   通道编号: $slot\n'
               '   通道公钥: ${st.publicKey}\n'
               '   消息同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
+              '   自动锁屏: 无操作 ${_idleLockSeconds}s 后锁定（/lock <秒> 调整，20~1200）\n'
               '   数据文件: ${s.storePath}'));
       s.status = '';
       break;
@@ -4451,8 +4456,10 @@ Future<void> _execCommand(String line) async {
         break;
       }
       _idleLockSeconds = lockSecs;
+      s.session.store.lockSeconds = lockSecs; // 持久化：重启后仍生效（对齐 App）
+      s.session.store.save(s.storePath);
       s.session.messages.add(_systemMessage(s.session,
-          '✅ 无操作 $lockSecs 秒后自动锁屏（本次会话有效，重启恢复默认 ${kTuiLockSeconds}s）'));
+          '✅ 无操作 $lockSecs 秒后自动锁屏（已记住，重启后仍生效）'));
       break;
     case '/devices': // 别名（老板 2026-09-23：/device(s) 留着当肌肉记忆）
     case '/entrances':
