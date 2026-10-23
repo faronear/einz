@@ -545,7 +545,7 @@
   "chatPageBurnNote": "Delete new messages automatically once read on a countdown",
   "chatPageTombstoneHeading": "Vanished messages",
   "chatPageTombstoneNote": "How deleted/burned/recalled messages appear?",
-  "chatPageTombstoneKeep": "Show status",
+  "chatPageTombstoneKeep": "Show metadata",
   "chatPageTombstoneKeepDesc": "Show a time and status bar without content, message flow unbroken",
   "chatPageTombstoneHide": "Hide completely",
   "chatPageTombstoneHideDesc": "Disappear from the message flow entirely, leave no trace",

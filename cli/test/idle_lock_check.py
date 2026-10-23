@@ -12,8 +12,9 @@ ANSI = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
 PIN = '123456'
 WRONG = '000000'
 MARKER = '✅ 锁屏码已设置'      # 锁定前加入的消息：锁定后应被遮蔽
-LOCK_PROMPT = '❓ 输入锁屏码（Ctrl+C 退出）'
+LOCK_PROMPT = '❓ 验证锁屏码（Ctrl+C 退出）'
 RESTORED = '✅ 锁屏码验证成功，已恢复'
+STARTUP_PROMPT = '❓ 验证锁屏码（直接回车退出）'
 
 
 # stderr 独立管道（调试/错误输出不与 TUI 的 ANSI 流交错）；start_tui 时赋值
@@ -199,8 +200,8 @@ def main():
         out = ''
         out += drain(master, 8)
         send(master, '\r')  # 服务器地址：回车沿用
-        out = wait_for(master, out, '❓ 输入锁屏码（直接回车退出）', 20)
-        startup_prompt = '❓ 输入锁屏码（直接回车退出）' in out
+        out = wait_for(master, out, STARTUP_PROMPT, 20)
+        startup_prompt = STARTUP_PROMPT in out
         print('[9] 重启后启动解锁提示:', startup_prompt)
         ok = ok and startup_prompt
         send(master, WRONG + '\r')
@@ -223,7 +224,7 @@ def main():
         out = ''
         out += drain(master, 8)
         send(master, '\r')
-        out = wait_for(master, out, '❓ 输入锁屏码（直接回车退出）', 20)
+        out = wait_for(master, out, STARTUP_PROMPT, 20)
         send(master, PIN + '\r')
         out = wait_for(master, out, '机密线路激活失败', 25)
         startup_ok = '机密线路激活失败' in out

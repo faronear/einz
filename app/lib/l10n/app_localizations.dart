@@ -1607,7 +1607,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneKeep.
   ///
   /// In en, this message translates to:
-  /// **'Keep message status'**
+  /// **'Show metadata'**
   String get chatPageTombstoneKeep;
 
   /// No description provided for @chatPageTombstoneKeepDesc.
@@ -1625,7 +1625,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHideDesc.
   ///
   /// In en, this message translates to:
-  /// **'Disappear from the message flow entirely'**
+  /// **'Disappear from the message flow entirely, leave no trace'**
   String get chatPageTombstoneHideDesc;
 
   /// No description provided for @chatPageTombstoneSubmit.

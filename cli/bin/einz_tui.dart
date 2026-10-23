@@ -637,8 +637,8 @@ Future<bool> _promptUnlock(ChatSession session,
   // 字节都不该出现）。提示语只在消息流里（下面的 _prompt），不占状态栏。
   _identityHidden = true;
   final promptText = exitOnEmpty
-      ? '❓ 输入锁屏码（直接回车退出）:'
-      : '❓ 输入锁屏码（Ctrl+C 退出）:'; // 空闲锁：空回车不退出，只重问
+      ? '❓ 验证锁屏码（直接回车退出）:'
+      : '❓ 验证锁屏码（Ctrl+C 退出）:'; // 空闲锁：空回车不退出，只重问
   while (_state!.running) {
     _state!.pendingExitOnEmpty = exitOnEmpty;
     final pin =
@@ -649,7 +649,7 @@ Future<bool> _promptUnlock(ChatSession session,
       if (exitOnEmpty) return false; // 启动解锁：空回车 = 退出整个 TUI
       // 空闲锁：空回车原地重问（补一句轻提示，避免"按了没反应"的困惑）
       session.messages.add(
-          _systemMessage(session, '⚠️ 请输入锁屏码（Ctrl+C 退出）'));
+          _systemMessage(session, '⚠️ 请输入锁屏码（Ctrl+C 彻底退出）'));
       _scheduleRender();
       continue;
     }
@@ -850,7 +850,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.escrowUploaded = true;
       store.save(storePath);
     } else if (hasBox == false && _state!.running) {
-      session.messages.add(_systemMessage(session, '检测到尚未设置共享口令，现在设置: '));
+      session.messages.add(_systemMessage(session, '检测到没有共享口令，现在设置: '));
       _scheduleRender();
       await _setupEscrowPassphrase(store, storePath, session);
     }
@@ -1237,7 +1237,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
     store.memberId = created.creatorMemberId;
     store.slot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 memberA 判据）
     // 密保箱已随本次 POST /spaces 上传（sealed/escrowPassphrase 成对提交，口令非空才走到这）
-    // → 标记托管就绪。漏了这行的话，下次启动会被判成"尚未设置共享口令"再问一遍
+    // → 标记托管就绪。漏了这行的话，下次启动会被判成"没有共享口令"再问一遍
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = displayName;
@@ -1445,7 +1445,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     store.slot = join.slot; // v2 身份槽位（0=第一人，1=第二人）
     // 密保箱本来就存在（刚才正是靠口令从它取回 Space Key）→ 标记托管就绪。
     // 漏了这行：若加入者选的是 slot=0（同一人的另一条通道），重启后会被判成
-    // "尚未设置共享口令"再问一遍（老板 2026-09-15 反馈）。
+    // "没有共享口令"再问一遍（老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = myName ?? '成员';
     // 群聊一期（2026-10-03）：不再从"另一个 slot 的预置名"推对方名字——
@@ -4398,15 +4398,15 @@ Future<void> _execCommand(String line) async {
             s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '【🔧 用法】\n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 重置为空（取消锁屏码）'));
+            '【🔧 用法】\n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 清除锁屏码（重置为空）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
-        s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码已重置为空（未设置）'));
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码已被清除，不再自动锁屏。'));
       } else {
         final err = _pinError(arg);
         if (err != null) {
-          s.session.messages.add(_systemMessage(s.session, '⚠️ $err（/pin \'\' 可取消锁屏码）'));
+          s.session.messages.add(_systemMessage(s.session, '⚠️ $err（/pin \'\' 可清除锁屏码）'));
           break;
         }
         s.session.store.pinHash = await _hashPin(arg);
@@ -4420,7 +4420,7 @@ Future<void> _execCommand(String line) async {
       // App 同范围；本次会话有效，重启恢复默认 30s）。未设 PIN 时锁屏无意义。
       if (s.session.store.pinHash == null) {
         s.session.messages.add(_systemMessage(s.session,
-            '⚠️ 尚未设置锁屏码（/pin <PIN>）——自动锁屏需要锁屏码才能验证'));
+            '⚠️ 没有锁屏码（/pin <PIN>）——自动锁屏需要锁屏码才能验证'));
         break;
       }
       final lockArg = arg.trim();
