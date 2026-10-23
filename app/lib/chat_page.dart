@@ -9321,6 +9321,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (t == null) {
           // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
           // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
+          // 文案用「点按转写文字」（voiceTranscriptManual，老板 2026-10-23）——
+          // 比「转写」多一步动作提示；长按菜单卡片仍用短文案 voiceTranscriptMenuTranscribe。
+          // 不加下划线（老板 2026-10-23）：这不是 URL 链接，实质是按钮，点击反馈
+          // 由 Clickable 自带。
           if (!manualEntry) return const SizedBox.shrink();
           final l10n = AppLocalizations.of(context)!;
           const style = TextStyle(fontSize: 13, color: transcriptColor);
@@ -9339,9 +9343,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 Flexible(
                   child: Clickable(
                     onTap: () => _transcribeVoiceMessage(m),
-                    child: Text(l10n.voiceTranscriptMenuTranscribe,
+                    child: Text(l10n.voiceTranscriptManual,
                         style: style.copyWith(
-                            decoration: TextDecoration.underline,
                             color: transcriptColor.withValues(alpha: 0.7))),
                   ),
                 ),
@@ -9407,8 +9410,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             : t.status == 'stale'
                                 ? l10n.voiceTranscriptStale
                                 : l10n.voiceTranscriptManual,
+                        // 同上：按钮不是链接，不加下划线
                         style: style.copyWith(
-                            decoration: TextDecoration.underline,
                             color: transcriptColor.withValues(alpha: 0.7)),
                       ),
                     ),

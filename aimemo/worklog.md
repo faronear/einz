@@ -15647,3 +15647,7 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **实现：** 去掉 panel() 容器（恢复 Padding top 4）；转写区文字/图标改定色 `#3A3A3A`（黑灰），重试/入口的下划线链接用 70% 透明度同色。渐变深气泡彩色底上靠明度反差区分（白=播放区、深灰=转写区），素雅浅气泡上自然可读；app 无 darkTheme（main.dart 只注册浅色），无需分主题。`_buildVoiceTranscriptLine` 的 foreground 参数不再使用，已删除。
 
 **验证：** flutter analyze 干净。
+
+**（2026-10-23T23:54:31Z / 2026-10-24 07:54）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+转写区两个微调（老板）：① 尚未转写的行内入口文案「转写」→「点按转写文字」（voiceTranscriptManual；长按菜单卡片仍用短文案 voiceTranscriptMenuTranscribe）；② 「转写/重试」可点文字去下划线——不是 URL 链接、实质是按钮，点击反馈由 Clickable 自带。
+⚠️ 教训：本文件**不要跑 `dart format` 全文件重排**——Dart 3.13 的 tall style 与 chat_page.dart 既有紧凑风格冲突，一次 +3354/-2259 行噪音 diff（已 git restore 恢复，两处小改动用 edit_file 重做）。flutter analyze 干净，diff 仅 ±9 行。
