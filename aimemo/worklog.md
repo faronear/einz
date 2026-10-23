@@ -15492,3 +15492,8 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **（2026-10-23T07:55:00Z / 2026-10-23 15:55）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：修正 compose 的 Dockerfile 路径
 - 老板指出 Dockerfile 仍在 `server/Dockerfile`（未搬进 docker/），compose 里误写 `docker/Dockerfile`。
 - 修正为 `dockerfile: server/Dockerfile`（context 仍是仓库根），3 个 compose 变体同步，config 验证全过。
+
+**（2026-10-23T08:20:00Z / 2026-10-23 16:20）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：Docker 构建方案定为 B（server/.dockerignore + context=..）
+- 勘误两连：①「server 构建需要 shared/」经查为错误推断（src 无 shared import，tsconfig 仅 include src，Dockerfile 只 COPY package/tsconfig/src）；② compose 相对路径以文件所在目录为基准，server/docker/ 下的 `..` 就是 server/，此前写的 `../server` 实指不存在的 server/server。
+- 定案（老板选 B）：compose 3 变体 `context: ..`（=server/）+ `dockerfile: Dockerfile`；新建 `server/.dockerignore`（排除 node_modules/dist/data/models/config/docker/.env）；根 `.dockerignore` 回退为 cli 构建原内容。
+- 验证：4 个 compose config 全过；server/ 下 `docker build --call check` 确认 ignore 加载无警告。
