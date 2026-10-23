@@ -15488,3 +15488,7 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 文档同步：DEPLOYMENT/ONBOARDING/TURN/updateServer/E2EE/README/whisperDeploy + server 内注释，全部 serverDocker → server/docker；修正 mailProbe 与回滚 checkout 的相对路径。
 - 验证：4 个 compose `docker compose config` 全过；`node --env-file-if-exists=./docker/.env` 能读到密钥变量（未打印值）；env.sh 幂等通过。
 - 注意：VPS 上 /opt/... 旧目录结构需在下次部署时同步 mv；同一时刻只能跑一个实例（共享 SQLite）。
+
+**（2026-10-23T07:55:00Z / 2026-10-23 15:55）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：修正 compose 的 Dockerfile 路径
+- 老板指出 Dockerfile 仍在 `server/Dockerfile`（未搬进 docker/），compose 里误写 `docker/Dockerfile`。
+- 修正为 `dockerfile: server/Dockerfile`（context 仍是仓库根），3 个 compose 变体同步，config 验证全过。

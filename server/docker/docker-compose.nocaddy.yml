@@ -24,7 +24,7 @@ services:
   server:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: server/Dockerfile
     restart: unless-stopped
     environment:
       - PORT=3000
