@@ -206,17 +206,28 @@ class VoiceTranscriptService {
     }
   }
 
-  /// 把 wav 容器规范化成**标准 16bit PCM**（tag=1、44 字节头）——仅当 fmt 是
-  /// WAVE_FORMAT_EXTENSIBLE（0xFFFE）且子格式 GUID 为 PCM 时重写；已是标准
-  /// tag=1 的原样返回（同一实例，调用方可靠 [identical] 判断是否变过）。
+  /// 转写链路的采样率约定（ sherpa sense-voice 与 whisper 都按 16kHz 口径，
+  /// voiceTranscript.zhcn.md §8）：规范化输出恒定 16kHz/16bit/mono PCM。
+  static const int kTranscriptSampleRate = 16000;
+
+  /// 把 wav 容器规范化成**标准 16kHz/16bit/mono PCM**（tag=1、44 字节头）；
+  /// 无需改动的原样返回（同一实例，调用方可靠 [identical] 判断是否变过）。
   ///
   /// 为什么必须转：sherpa-onnx 的 wave-reader 明确不支持 extensible
   /// （"We don't support WAVE_FORMAT_EXTENSIBLE files."，上游源码可查），而
-  /// macOS 录音器（record 插件的 AVCaptureAudioFileOutput）2026-10-23 实测把
-  /// 标准 PCM16 录音写成 extensible 容器（JUNK + 40 字节 fmt + FLLR + data，
-  /// 数据本身是标准 16bit 交错 PCM）——直接喂本地转写必失败。数据一个采样点
-  /// 都不动，只重建头。服务端也已改成接受 extensible（server transcriptions.ts），
-  /// 这里是本地路径的对口修复 + 双保险。
+  /// macOS 录音器（record 插件的 AVCaptureAudioFileOutput）2026-10-23 实测会
+  /// 把录音写成 extensible 容器（JUNK + 40 字节 fmt + FLLR + data）——直接喂
+  /// 本地转写必失败；服务端旧代码同样只认 tag=1。
+  ///
+  /// 录音器实测会产出三种形态，分别处理：
+  /// ① **16kHz/16bit PCM**（GUID=1，绝大多数）：只重写 44 字节标准头，数据
+  ///    一个采样点不动（快路径）；
+  /// ② **44.1kHz/32bit IEEE float**（GUID=3，录音器没拿到 16kHz 时的回落形态
+  ///    ——2026-10-23 实测命中：拾音设备原生格式被 AVCaptureAudioFileOutput 原样
+  ///    写出）：线性重采样到 16kHz + float→int16 量化；
+  /// ③ **16bit PCM 但非 16kHz**：同样重采样。
+  /// 其余形态（非 extensible 的 float、多声道、8/24bit 等）不猜——原样返回，
+  /// 交给 validateWavHeader / 服务端拒绝，不静默"修"成别的东西。
   static Uint8List normalizeWavBytes(Uint8List bytes) {
     if (bytes.length < 44) return bytes;
     // RIFF/WAVE 快检（与 [validateWavHeader] 同口径）
@@ -251,37 +262,87 @@ class VoiceTranscriptService {
     }
     if (fmtStart < 0 || dataStart < 0 || fmtSize < 16) return bytes;
     final tag = bd.getUint16(fmtStart + 8, Endian.little);
-    if (tag == 1) return bytes; // 已是标准容器：零成本
-    // 只认 extensible（fmt 40 字节，子格式 GUID 头两位=1 才是 PCM；float=3 不碰，
-    // 交给 validateWavHeader / 服务端拒绝，不静默"修"成别的东西）
-    if (tag != 0xfffe || fmtSize < 40 || fmtStart + 48 > bytes.length) return bytes;
-    if (bd.getUint16(fmtStart + 32, Endian.little) != 1) return bytes;
     final channels = bd.getUint16(fmtStart + 10, Endian.little);
     final rate = bd.getUint32(fmtStart + 12, Endian.little);
     final bits = bd.getUint16(fmtStart + 22, Endian.little);
-    final avail = bytes.length - dataStart;
-    final dataLen = dataSize < avail ? dataSize : avail;
-    final out = Uint8List(44 + dataLen);
-    final od = ByteData.sublistView(out);
-    void ascii(int at, String s) {
-      for (var i = 0; i < 4; i++) {
-        out[at + i] = s.codeUnitAt(i);
-      }
+    // extensible 才有子格式 GUID（fmt 40 字节）：头两位 1=PCM / 3=IEEE float
+    var subFormat = 0;
+    if (tag == 0xfffe) {
+      if (fmtSize < 40 || fmtStart + 48 > bytes.length) return bytes;
+      subFormat = bd.getUint16(fmtStart + 32, Endian.little);
     }
-    ascii(0, 'RIFF');
-    od.setUint32(4, 36 + dataLen, Endian.little);
-    ascii(8, 'WAVE');
-    ascii(12, 'fmt ');
-    od.setUint32(16, 16, Endian.little);
-    od.setUint16(20, 1, Endian.little); // PCM
-    od.setUint16(22, channels, Endian.little);
-    od.setUint32(24, rate, Endian.little);
-    od.setUint32(28, rate * channels * (bits ~/ 8), Endian.little);
-    od.setUint16(32, channels * (bits ~/ 8), Endian.little);
-    od.setUint16(34, bits, Endian.little);
-    ascii(36, 'data');
-    od.setUint32(40, dataLen, Endian.little);
-    out.setRange(44, 44 + dataLen, bytes, dataStart); // 数据原样，一个字节不改
+    final isInt16 = bits == 16 && (tag == 1 || subFormat == 1);
+    final isFloat32 = bits == 32 && tag == 0xfffe && subFormat == 3;
+    if (channels != 1 || rate == 0 || (!isInt16 && !isFloat32)) return bytes;
+    final avail = bytes.length - dataStart;
+    final srcLen = dataSize < avail ? dataSize : avail;
+
+    // 写标准 44 字节头（tag=1 / mono / [rate] / 16bit）；两条路径共用
+    void writeHeader(Uint8List out, int dataLen, int outRate) {
+      final od = ByteData.sublistView(out);
+      void ascii(int at, String s) {
+        for (var i = 0; i < 4; i++) {
+          out[at + i] = s.codeUnitAt(i);
+        }
+      }
+      ascii(0, 'RIFF');
+      od.setUint32(4, 36 + dataLen, Endian.little);
+      ascii(8, 'WAVE');
+      ascii(12, 'fmt ');
+      od.setUint32(16, 16, Endian.little);
+      od.setUint16(20, 1, Endian.little); // PCM
+      od.setUint16(22, 1, Endian.little); // mono
+      od.setUint32(24, outRate, Endian.little);
+      od.setUint32(28, outRate * 2, Endian.little); // byte rate
+      od.setUint16(32, 2, Endian.little); // block align
+      od.setUint16(34, 16, Endian.little); // 16bit
+      ascii(36, 'data');
+      od.setUint32(40, dataLen, Endian.little);
+    }
+
+    // 快路径：16kHz/16bit——tag=1 零成本原样返回；extensible 只换头、数据不动
+    if (isInt16 && rate == kTranscriptSampleRate) {
+      if (tag == 1) return bytes;
+      final out = Uint8List(44 + srcLen);
+      writeHeader(out, srcLen, rate);
+      out.setRange(44, 44 + srcLen, bytes, dataStart); // 数据原样，一个字节不改
+      return out;
+    }
+
+    // 转换路径：float32（或非 16k 的 int16）→ 线性重采样到 16kHz + 量化 int16。
+    // 线性插值对语音足够（whisper/sherpa 前端还会再处理），换来的好处是零依赖、
+    // 无第三方重采样器的许可与体积风险。
+    final bytesPerSample = isFloat32 ? 4 : 2;
+    final srcCount = srcLen ~/ bytesPerSample;
+    if (srcCount == 0) return bytes;
+    final step = rate / kTranscriptSampleRate; // 源采样点 / 目标采样点
+    final outCount = srcCount ~/ step;
+    if (outCount == 0) return bytes;
+    final out = Uint8List(44 + outCount * 2);
+    writeHeader(out, outCount * 2, kTranscriptSampleRate);
+    final od = ByteData.sublistView(out);
+    for (var i = 0; i < outCount; i++) {
+      final pos = i * step;
+      final i0 = pos.floor();
+      final i1 = i0 + 1 < srcCount ? i0 + 1 : i0;
+      final frac = pos - i0;
+      final double s0;
+      final double s1;
+      if (isFloat32) {
+        s0 = bd.getFloat32(dataStart + i0 * 4, Endian.little);
+        s1 = bd.getFloat32(dataStart + i1 * 4, Endian.little);
+      } else {
+        s0 = bd.getInt16(dataStart + i0 * 2, Endian.little) / 32768;
+        s1 = bd.getInt16(dataStart + i1 * 2, Endian.little) / 32768;
+      }
+      final v = s0 + (s1 - s0) * frac; // 线性插值（i1==i0 时 frac 无关）
+      // float 采集的故障帧会产出 NaN/Inf（实测命中：真实录音直接让 round() 抛
+      // "Infinity or NaN toInt"）——按静音处理；先 clamp double 再 round，
+      // 顺带防超大有限值溢出。
+      final q =
+          v.isFinite ? (v * 32767).clamp(-32768.0, 32767.0).round() : 0;
+      od.setInt16(44 + i * 2, q, Endian.little);
+    }
     return out;
   }
 

@@ -80,6 +80,65 @@ Uint8List makePlainWav(List<int> payload) {
   return b;
 }
 
+
+/// 通用 extensible wav 构造（JUNK + 40 字节 fmt + FLLR + data）：[subFormat] 为
+/// 子格式 GUID 头两位（1=PCM / 3=IEEE float），[bits] 16=int16 / 32=float32。
+Uint8List makeExtensibleWav2({
+  required int subFormat,
+  required int bits,
+  required int rate,
+  required List<double> samples,
+}) {
+  const junk = 28;
+  const fllr = 4;
+  const fmtSize = 40;
+  final isFloat = bits == 32;
+  final data = Uint8List(samples.length * (isFloat ? 4 : 2));
+  final dd = ByteData.sublistView(data);
+  for (var i = 0; i < samples.length; i++) {
+    if (isFloat) {
+      dd.setFloat32(i * 4, samples[i], Endian.little);
+    } else {
+      dd.setInt16(i * 2, samples[i].round().clamp(-32768, 32767), Endian.little);
+    }
+  }
+  final total = 12 + 8 + junk + 8 + fmtSize + 8 + fllr + 8 + data.length;
+  final b = Uint8List(total);
+  final bd = ByteData.sublistView(b);
+  void ascii(int at, String s) {
+    for (var i = 0; i < 4; i++) {
+      b[at + i] = s.codeUnitAt(i);
+    }
+  }
+  ascii(0, 'RIFF');
+  bd.setUint32(4, total - 8, Endian.little);
+  ascii(8, 'WAVE');
+  var o = 12;
+  ascii(o, 'JUNK');
+  bd.setUint32(o + 4, junk, Endian.little);
+  o += 8 + junk;
+  ascii(o, 'fmt ');
+  bd.setUint32(o + 4, fmtSize, Endian.little);
+  bd.setUint16(o + 8, 0xfffe, Endian.little);
+  bd.setUint16(o + 10, 1, Endian.little); // mono
+  bd.setUint32(o + 12, rate, Endian.little);
+  bd.setUint32(o + 16, rate * (bits ~/ 8), Endian.little);
+  bd.setUint16(o + 20, bits ~/ 8, Endian.little);
+  bd.setUint16(o + 22, bits, Endian.little);
+  bd.setUint16(o + 24, 22, Endian.little);
+  bd.setUint16(o + 26, bits, Endian.little);
+  bd.setUint32(o + 28, 0, Endian.little);
+  bd.setUint16(o + 32, subFormat, Endian.little);
+  o += 8 + fmtSize;
+  ascii(o, 'FLLR');
+  bd.setUint32(o + 4, fllr, Endian.little);
+  o += 8 + fllr;
+  ascii(o, 'data');
+  bd.setUint32(o + 4, data.length, Endian.little);
+  b.setRange(o + 8, o + 8 + data.length, data);
+  return b;
+}
+
 void main() {
   final payload = List<int>.generate(320, (i) => i % 251); // 320 字节"采样数据"
 
@@ -121,6 +180,92 @@ void main() {
     expect(identical(VoiceTranscriptService.normalizeWavBytes(junk), junk), isTrue);
     final short = Uint8List(10);
     expect(identical(VoiceTranscriptService.normalizeWavBytes(short), short), isTrue);
+  });
+
+
+  test('extensible float32 @44.1kHz → 重采样 + 转 int16 标准 PCM（录音器回落形态）', () {
+    // 复刻 2026-10-23 实测形态：录音器没拿到 16kHz 时 AVCaptureAudioFileOutput
+    // 写设备原生格式——44.1kHz/32bit float 的 extensible。常数 0.5 信号重采样后
+    // 每个目标点仍应是 0.5 → int16 16384。
+    final samples = List<double>.filled(4410, 0.5); // 0.1s @44.1k
+    final ext = makeExtensibleWav2(
+        subFormat: 3, bits: 32, rate: 44100, samples: samples);
+    final out = VoiceTranscriptService.normalizeWavBytes(ext);
+    final od = ByteData.sublistView(out);
+    expect(od.getUint16(20, Endian.little), 1, reason: 'tag 应为 1');
+    expect(od.getUint32(24, Endian.little), 16000, reason: '重采样到 16kHz');
+    expect(od.getUint16(34, Endian.little), 16, reason: '16bit');
+    final outCount = od.getUint32(40, Endian.little) ~/ 2;
+    expect(outCount, 1600, reason: '0.1s 音频 → 1600 个 16k 采样点');
+    for (var i = 0; i < outCount; i++) {
+      expect(od.getInt16(44 + i * 2, Endian.little), 16384,
+          reason: '0.5 × 32767 四舍五入');
+    }
+  });
+
+  test('extensible float32 @16kHz → 1:1 转 int16（不重采样，值精确）', () {
+    final ext = makeExtensibleWav2(
+        subFormat: 3, bits: 32, rate: 16000,
+        samples: [0.0, 1.0, -1.0, 0.5]);
+    final out = VoiceTranscriptService.normalizeWavBytes(ext);
+    expect(out.length, 44 + 8);
+    final od = ByteData.sublistView(out);
+    expect([
+      od.getInt16(44, Endian.little),
+      od.getInt16(46, Endian.little),
+      od.getInt16(48, Endian.little),
+      od.getInt16(50, Endian.little),
+    ], [0, 32767, -32767, 16384]);
+  });
+
+  test('extensible float32 @44.1kHz 斜坡信号：线性插值保形（端点与中段）', () {
+    // 0→1 斜坡：线性插值对斜坡是精确的——out[i] ≈ (i×step)/N
+    const n = 4410;
+    final samples = List<double>.generate(n, (i) => i / (n - 1));
+    final ext = makeExtensibleWav2(
+        subFormat: 3, bits: 32, rate: 44100, samples: samples);
+    final out = VoiceTranscriptService.normalizeWavBytes(ext);
+    final od = ByteData.sublistView(out);
+    final outCount = od.getUint32(40, Endian.little) ~/ 2;
+    expect(od.getInt16(44, Endian.little), 0, reason: '起点 0');
+    // 末点：pos=(outCount-1)×2.75625 → 值 ≈ 该位置/4409
+    final lastPos = (outCount - 1) * (44100 / 16000);
+    expect(od.getInt16(44 + (outCount - 1) * 2, Endian.little),
+        closeTo((lastPos / (n - 1)) * 32767, 2));
+    // 全程单调不减（插值不制造回绕）
+    var prev = -32769;
+    for (var i = 0; i < outCount; i++) {
+      final v = od.getInt16(44 + i * 2, Endian.little);
+      expect(v, greaterThanOrEqualTo(prev));
+      prev = v;
+    }
+  });
+
+  test('extensible PCM16 @44.1kHz → 重采样到 16k（常数信号保幅）', () {
+    final ext = makeExtensibleWav2(
+        subFormat: 1, bits: 16, rate: 44100,
+        samples: List<double>.filled(4410, 1000));
+    final out = VoiceTranscriptService.normalizeWavBytes(ext);
+    final od = ByteData.sublistView(out);
+    final outCount = od.getUint32(40, Endian.little) ~/ 2;
+    expect(outCount, 1600);
+    for (var i = 0; i < outCount; i++) {
+      expect(od.getInt16(44 + i * 2, Endian.little), 1000);
+    }
+  });
+
+  test('不支持的形态仍原样返回（多声道 float / 24bit）', () {
+    // 多声道：makeExtensibleWav2 只写 mono，这里手工把 channels 改成 2 验证拒绝
+    final ext = makeExtensibleWav2(
+        subFormat: 3, bits: 32, rate: 16000, samples: [0.5, 0.5]);
+    ByteData.sublistView(ext).setUint16(12 + 8 + 28 + 10, 2, Endian.little);
+    expect(identical(VoiceTranscriptService.normalizeWavBytes(ext), ext), isTrue);
+    // 24bit（既非 16 也非 32）：不猜
+    final ext24 = makeExtensibleWav2(
+        subFormat: 1, bits: 16, rate: 16000, samples: [1, 1]);
+    ByteData.sublistView(ext24).setUint16(12 + 8 + 28 + 22, 24, Endian.little);
+    expect(
+        identical(VoiceTranscriptService.normalizeWavBytes(ext24), ext24), isTrue);
   });
 
   test('文件版：就地规范化 + 幂等', () {
