@@ -8,7 +8,7 @@
 #   ./cli/dart-docker.sh build      # 容器内编译 Linux TUI 产物 → _release.gitomit/einz-tui-linux-<架构>-<yymmddhhmm>
 #
 # 说明：
-#   - 镜像 dart-sodium = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dev 构建；
+#   - 镜像 dart-sodium = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dart-sodium 构建；
 #   - 代码改动无需重建镜像（仓库整体挂载 /app，dart run 即最新代码）；
 #     只有升级 dart SDK 或换镜像才需要重新 setup；
 #   - 身份/密钥持久化：宿主 ~/.einz ↔ 容器 /tmp/.einz；pub 缓存 ~/.pub-cache 同挂；
@@ -52,7 +52,7 @@ run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
 
 build_image() {
   echo "==> 构建开发镜像 ${IMG}（dart:stable + libsodium）…"
-  docker build -f "$DIR/Dockerfile.dev" -t "$IMG" "$ROOT"
+  docker build -f "$DIR/Dockerfile.dart-sodium" -t "$IMG" "$ROOT"
   echo "✅ 镜像构建完成"
 }
 
