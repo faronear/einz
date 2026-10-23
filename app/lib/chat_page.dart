@@ -9558,7 +9558,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
     _updateAudioPlayback(() {});
     try {
-      final wav = await _attachmentBytes(m);
+      // 上送前归一化（2026-10-23 补，此前漏了此调用点）：老消息（macOS 录的）
+      // 可能是 WAVE_FORMAT_EXTENSIBLE 容器，服务端旧代码只认 tag=1——转成标准
+      // PCM16 再上传，新旧服务端都无差异（服务端也已改宽，双保险）。
+      final wav = VoiceTranscriptService.normalizeWavBytes(await _attachmentBytes(m));
       final r = await _withAuth(
           (t) => (widget.api ?? ApiClient(effectiveServer)).transcribeWav(wav: wav, token: t));
       await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
