@@ -9198,13 +9198,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(t.transcript.trim(),
-                  maxLines: 3, overflow: TextOverflow.ellipsis, style: style),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _voiceTranscriptSourceIcon(t.modelId, foreground),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(t.transcript.trim(),
+                        maxLines: 3, overflow: TextOverflow.ellipsis, style: style),
+                  ),
+                ],
+              ),
             );
           case 'pending':
             return Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(l10n.voiceTranscribing, style: style),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _voiceTranscriptSourceIcon(t.modelId, foreground),
+                  const SizedBox(width: 4),
+                  Text(l10n.voiceTranscribing, style: style),
+                ],
+              ),
             );
           case 'failed':
           case 'stale':
@@ -9230,6 +9246,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       },
     );
   }
+
+  /// 转写来源图标（老板 2026-10-23）：转写文字前标明是谁转的——云=服务端
+  /// whisper 转写（modelId='whisper-server'，明文音频出过本机），芯片=本地
+  /// sense-voice 模型转写。本地刻意不用齿轮：设置入口已是齿轮
+  /// （Icons.settings_outlined，见本文件更多设置行），会撞语义；芯片取
+  /// 「本机算力」的意境，与云成一对手。
+  Widget _voiceTranscriptSourceIcon(String modelId, Color foreground) => Icon(
+        modelId == 'whisper-server' ? Icons.cloud_outlined : Icons.memory,
+        size: 14,
+        color: foreground.withValues(alpha: 0.85),
+      );
 
   /// 模型准备（§11，模型 ~228MB 随包分发）：进度对话框（百分比+MB），可取消。
   /// 正常发布构建 = 从包内资产拷进应用目录；dev 构建没跑 fetchVoiceModel.sh
