@@ -165,6 +165,40 @@ void main() {
     expect(find.text('下层页'), findsOneWidget);
   });
 
+  testWidgets('连续输错冻结期间：倒计时下方出现「忘记锁屏码」恢复路径，解冻前不出现',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await AppLockService(db).setPin('123456',
+        payload: const AppLockPayload(
+          spaceKeyB64: 'dGhlLXNwYWNlLWtleQ==',
+          spaceId: 'space-test',
+          entranceId: 'dev-a',
+          keyVersion: 1,
+          token: 'tok-123',
+        ));
+
+    const forgotHint = '真的忘了锁屏码？您可以卸载重装，通过邀请码和共享口令重新加入您的秘境。';
+
+    await _pushLockPage(tester, db, canDismiss: false);
+    await tester.pumpAndSettle();
+
+    // 未冻结：不出现忘 PIN 提示——平时挂着会暗示"忘 PIN 有捷径"，削弱 PIN 威慑
+    expect(find.text(forgotHint), findsNothing);
+
+    // 模拟连错 5 次后的冻结：直接置位 locked_until（等价防爆破锁定的落库效果）
+    await db.into(db.appState).insertOnConflictUpdate(AppStateCompanion.insert(
+        key: 'app_lock.locked_until',
+        value: '${DateTime.now().millisecondsSinceEpoch + 30000}'));
+    await tester.pump(const Duration(seconds: 1)); // 等 1 秒 ticker 刷新锁定态
+    await tester.pumpAndSettle();
+
+    // 冻结期间：倒计时 + 恢复路径提示同时出现，输入框禁用
+    expect(find.textContaining('已锁定'), findsOneWidget);
+    expect(find.text(forgotHint), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, false);
+  });
+
   testWidgets('顶栏左上角 Logo 可点 → 打开「关于秘境」弹层（未设 PIN 的兜底页同样有效）',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());

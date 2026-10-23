@@ -771,6 +771,10 @@
       }
     }
   },
+  "lockPageForgotPinHint": "Forgot your PIN? You can uninstall and reinstall the app, then rejoin your spaces with an invite code and the shared passphrase.",
+  "@lockPageForgotPinHint": {
+    "description": "Hint shown on the lock screen only while frozen after repeated wrong attempts: the recovery path when the PIN is forgotten (reinstall + rejoin with an invite code and the shared passphrase)"
+  },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",
   "aboutIntro": "Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.",

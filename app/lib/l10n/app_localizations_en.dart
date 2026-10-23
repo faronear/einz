@@ -1241,6 +1241,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get lockPageForgotPinHint =>
+      'Forgot your PIN? You can uninstall and reinstall the app, then rejoin your spaces with an invite code and the shared passphrase.';
+
+  @override
   String get chatPageMenuAbout => 'About Einz';
 
   @override

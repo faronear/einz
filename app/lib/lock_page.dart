@@ -350,13 +350,28 @@ class _LockPageState extends State<LockPage> {
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
               const SizedBox(height: 24),
               // 连续错误锁定：倒计时提示（原来挂在输入框的 labelText 上，现已移除 label）
-              if (locked)
+              if (locked) ...[
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(l10n.lockPageLockedSeconds(_lockSeconds),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.red, fontSize: 13)),
                 ),
+                // 冻结期间才提示「忘记锁屏码」的恢复路径（老板 2026-10-23）：
+                // 忘 PIN = 本设备密钥包密码学上报废（无恢复副本），唯一路径是
+                // 卸载重装 + 邀请码 + 共享口令重新加入（服务端判重按 install_uid，
+                // 卸载重装换新 uid 才不再撞 ENTRANCE_ALREADY_EXISTS）。
+                // 只在冻结时出现：连续输错正说明用户可能真忘了，此刻告知不打断、
+                // 不误导；平时挂着反而会暗示"忘 PIN 有捷径"，削弱 PIN 威慑。
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(l10n.lockPageForgotPinHint,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ),
+              ],
               TextField(
                 controller: _pin,
                 // 进入锁屏页即聚焦输入框 → 直接弹键盘等待输入（老板要求 2026-09-14：

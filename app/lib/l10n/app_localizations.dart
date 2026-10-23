@@ -2120,6 +2120,12 @@ abstract class AppLocalizations {
   /// **'Unlock failed: {error}'**
   String lockPageUnlockFailed(String error);
 
+  /// Hint shown on the lock screen only while frozen after repeated wrong attempts: the recovery path when the PIN is forgotten (reinstall + rejoin with an invite code and the shared passphrase)
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot your PIN? You can uninstall and reinstall the app, then rejoin your spaces with an invite code and the shared passphrase.'**
+  String get lockPageForgotPinHint;
+
   /// No description provided for @chatPageMenuAbout.
   ///
   /// In en, this message translates to:
