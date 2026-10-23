@@ -101,19 +101,22 @@ export function parseWhisperStdout(out: string): string {
 type WhisperRunner = (wav: Buffer, lang: string) => Promise<string>;
 
 /** 默认 runner：spawn whisper-cli，音频经 stdin 管道进子进程（不落盘）。
- *  ⚠ 必须传 `-f -`（短横）而不是 `-f /dev/stdin`：whisper.cpp 的 read_audio_data
- *  对 `-` 是把 stdin 全量读进内存再解析（管道安全）；对 `/dev/stdin` 会当普通
- *  文件走 ma_decoder_init_file——stdin 是管道、不可 seek，miniaudio 打开即失败，
- *  再回落 ffmpeg（多数机器没装）→ exit 11「read_audio_data from /dev/stdin」。
- *  2026-10-23 macOS 实测踩到（此前各次测试都在到达 whisper 前就失败，从未真正
- *  跑通过这条管道）。 */
+ *  ⚠ 两个必须传的旗标（2026-10-23 macOS 实测踩到）：
+ *  ① `-f -`（短横）而不是 `-f /dev/stdin`：whisper.cpp 的 read_audio_data 对 `-`
+ *     是把 stdin 全量读进内存再解析（管道安全）；对 `/dev/stdin` 会当普通文件走
+ *     ma_decoder_init_file——stdin 是管道、不可 seek，miniaudio 打开即失败，再回落
+ *     ffmpeg（多数机器没装）→ exit 11「read_audio_data from /dev/stdin」。
+ *  ② `-otxt -of -`：新版 whisper.cpp 的文本只经由输出格式函数（-otxt/-ovtt/-osrt…）
+ *     落盘，**不再默认往 stdout 打时间戳行**——不传就是解码成功但 stdout 全空
+ *     （exit 0，只余一条 warning），转写结果恒为空串。`-of -` 把 txt 输出写到
+ *     stdout（仍不落盘，守隐私承诺）；[parseWhisperStdout] 对纯文本行有兜底。 */
 const realWhisperRunner: WhisperRunner = (wav, lang) => {
   const cfg = whisperConfig();
   if (cfg == null) throw new ApiError("TRANSCRIBE_DISABLED", "server transcription not configured", 503);
   return new Promise((resolvePromise, reject) => {
     const child = spawn(
       cfg.bin,
-      ["-m", cfg.model, "-f", "-", "-l", lang, "-np", "-t", String(cfg.threads)],
+      ["-m", cfg.model, "-f", "-", "-l", lang, "-np", "-otxt", "-of", "-", "-t", String(cfg.threads)],
       { stdio: ["pipe", "pipe", "pipe"] }
     );
     let stdout = "";

@@ -143,6 +143,16 @@ test('parseWhisperStdout：时间戳行取正文、无时间戳行直取、空�
   assert.equal(parseWhisperStdout('\n\n'), '')
 })
 
+test('parseWhisperStdout：-otxt 纯文本行格式（新版 whisper 默认不再打时间戳行）', () => {
+  // 真实 -otxt -of - 输出形态：一段一行纯文本、无时间戳（2026-10-23 实测：
+  // 不传 -otxt 时 whisper 解码成功但 stdout 全空——见 realWhisperRunner 注释）
+  assert.equal(
+    parseWhisperStdout('現在服務端怎麼樣\n第二行文字\n'),
+    '現在服務端怎麼樣 第二行文字')
+  // 空行/纯空白行不产生空段
+  assert.equal(parseWhisperStdout('\n  \n文字\n'), '文字')
+})
+
 test('transcribeWav：假 runner 走通主体，返回 text + audio_ms', async () => {
   await withDb(async () => {
     const r = await transcribeWav('tok-me', makeWav(2000), 'zh', async () =>

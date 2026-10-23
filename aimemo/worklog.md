@@ -15559,6 +15559,14 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 验证：compose config ×4 全过；全仓无残留旧路径引用（git grep models/whisper/ 除 whisper.cpp 外为零）。
 - 并行注意：本轮又撞一次老板并行保存冲掉我的 worklog 编辑——重写后只 add worklog 单独提交，老板在改的 compose 改动与其 .env（gitignore）一并纳入本提交（老板明确要求"然后提交"）。
 
+**（2026-10-24T01:00:00Z / 2026-10-24 09:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：whisper-cli 新版输出行为——必须显式 -otxt -of -，否则 stdout 恒空（老板复测）
+- 老板复测：服务端转写后气泡无任何文字。DB 实证：近 4 条 whisper-server 行全 done 但 transcript 长度 0；同一份音频本地 sense-voice 能转出「哎，现在服务器怎么样？」——问题在服务端链路。
+- 根因（查本机 whisper.cpp 10-19 master 源码 + 真二进制对比实测）：新版 cli.cpp 的文本**只经由输出格式函数**（-otxt/-ovtt/-osrt…）落盘，内联时间戳打印已移除——不传格式旗标时解码成功、exit 0、stdout 全空（只余 warning）。真实语音实测：旧参数 stdout 空；加 `-otxt -of -` 后输出「現在服務端怎麼樣」。`-of -` 写 stdout 不落盘，守隐私承诺。
+- 修复：transcriptions.ts spawn 参数加 `-otxt -of -`（9d571f7c 的 `-f -` 之外第二个必须旗标），注释记录两个坑；parseWhisperStdout 对纯文本行原有兜底，无需改解析；单测补 -otxt 纯文本格式用例，7/7 过。
+- 生效方式：只需重启服务端（tsx 吃新 src），App 不用重建。
+- 备注：whisper 对 zh 输出繁体（本地 sherpa 输出简体）——模型行为差异，内容一致，未处理（待老板定是否要简体）。
+
+
 
 
 
