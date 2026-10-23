@@ -15577,3 +15577,15 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **验证：** 重建镜像后容器内 `DynamicLibrary.open('/usr/lib/libsodium.so')` → `sodium_init: true`；`./cli/dart-docker.sh dartc compile kernel bin/einz_tui.dart` 编译通过。`tui` 的交互运行留给老板真实终端里自测。
 
 顺手：升级 dart/重建镜像时用 `docker build --pull`（本次已 pull 最新 dart:stable + Debian 13 trixie）。
+
+## 2026-10-23 修语音气泡被转写行撑满全宽
+
+**（2026-10-23T16:09:52Z / 2026-10-24 00:09）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板报：不论转写多短（截图里 2s「远程测试。」也全宽），语音消息气泡都被拉到几乎全屏宽。
+
+**根因：** `_buildVoiceTranscriptLine`（chat_page.dart）三个状态分支（done/pending/failed|stale|unavailable）的 `Row` 都没写 `mainAxisSize: MainAxisSize.min`。Row 默认 max → 无条件占满气泡允许的最大宽度约束，把整条气泡撑满；与转写文字长短无关。对照：同一音频条里波形行（waveformRow）写了 min，所以加转写行之前气泡是紧凑的。转写行是本分支（feat/voice-transcript）新加的，故现在才暴露。
+
+**修法：** 三处 Row 补 `mainAxisSize: MainAxisSize.min`（Flexible 保留，长转写仍限 3 行 ellipsis）。
+
+**验证：** flutter analyze lib/chat_page.dart 干净；热重启信号没发成——/tmp/einz_flutter.pid 不存在（本机 flutter run 可能没带 pid-file），待老板真机查看效果。

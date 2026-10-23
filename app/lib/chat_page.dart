@@ -9315,7 +9315,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.only(top: 4),
+              // mainAxisSize.min：Row 默认 max 会占满气泡最大宽，把整条语音气泡
+              // 拉到全宽（转写再短也一样，2026-10-23 实测），必须收缩到内容宽。
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _voiceTranscriptSourceIcon(t.modelId, foreground),
@@ -9331,6 +9334,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             return Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _voiceTranscriptSourceIcon(t.modelId, foreground),
@@ -9348,6 +9352,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             return Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _voiceTranscriptSourceIcon(t.modelId, foreground),
