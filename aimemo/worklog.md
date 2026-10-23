@@ -15518,3 +15518,12 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 清理 5 处：DEPLOYMENT §9.1 `git remote add origin .../fon/only` → `fon/einz`；§9.2 本机 push 路径 `/Users/Shared/productX/only` → `/Users/Shared/productX/einz`；ONBOARDING 阶段 0② 与阶段 1、阶段 3 的 `/Users/Shared/productX/only[/cli]` → `einz`（该目录实际存在，server/models 符号链接就指向它）。aimemo 历史记录不改。
 - 老板指示：不要在本机构建 dart-sodium（不拉 dart:stable）——这台 MacBook always 直接跑原生 dart，dart-docker.sh 容器路线是给没装 dart 的机器用的。上轮为验证拉起的后台 docker build 本想停，但环境分类器持续拦截 kill 类命令（试 5 次约 10 分钟），进程仍在（仅是 241MB dart:stable 慢速拉取，~40KB/s，无其他副作用；已请老板一键 pkill 或等它自行拉完——拉完也只是本地多一个 dart-sodium 镜像，dart-docker.sh 首次使用本来也会建）。
 - 发现分叉（重要，已向老板 flag）：~/einz（本 session 工作区，line A：2f1ac41e→a555893f→61009e26→5cc1c706，已推 origin）与 /Users/Shared/productX/einz（老板工作区，line B：2f1ac41e→fcda12cc「refactor(voice): 转写设置拆两组」17:19）已分叉——B 线不含 serverDocker 融合四件套，需要合并（voice 设置重构 vs server docker/文档，预估无冲突，待老板定谁来合）。
+
+**（2026-10-23T09:50:00Z / 2026-10-23 17:50）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：转写失败行补来源图标（老板 2026-10-23 要求）
+- 老板要求：「转写失败，点按重试」前面也要有代表本地/远程转写的图标——此前只有 done/pending 两态带图标（云=服务端 whisper，芯片=本地 sense-voice），failed/stale/unavailable 三个可重试态只有下划线文字。
+- 改动：chat_page.dart `_buildVoiceTranscriptLine` 的 failed/stale/unavailable 分支包一层 Row（`_voiceTranscriptSourceIcon` + 4px + Flexible(Clickable(Text))），与 done/pending 同构；点按重试语义不变。
+- 正确性依据：三条失败写入路径都已落定 modelId——本地 service `_upsert` 恒写 `sense-voice-small`（unavailable/failed/stale 皆走它）；服务端 `_serverVoiceTranscribe` 的 failed 行写 `whisper-server`；TRANSCRIBE_DISABLED 不落 failed 行（交还本地回落），所以图标判断在失败态不会误判。
+- 测试：新增 app/test/voice_transcript_line_test.dart 4 例（服务端 failed=云、本地 failed=芯片、stale=芯片+「可重新转写」、unavailable=芯片+「点按转写文字」，均断言图标与文字同 Row、失败行最近 Clickable 祖先挂 onTap）；聊天页回归 78 例全过；flutter analyze lib+test 零问题。
+- 文档：aimemo/voiceTranscript.zhcn.md §10 补「所有状态行首都带来源图标」及失败行 modelId 落定说明。
+- 踩坑记录：drift 的 `isNull`/`isNotNull` 与 matcher 撞名，测试 import 要 `hide isNull, isNotNull`；record 类型注解不能把 named 字段写成 positional（override 不匹配）。
+

@@ -9289,6 +9289,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// - pending → 「转写中…」占位；
   /// - failed / stale → 可点的「重新转写」入口（不露错误堆栈）；
   /// - unavailable → 可点的「手动转写」入口（模型未就绪，点了也不报错）；
+  /// - 所有状态行首都带来源图标（云=服务端 whisper / 芯片=本地 sense-voice）；
   /// - 无行（非语音/还没入队）→ 不占位。
   Widget _buildVoiceTranscriptLine(HistoryMessage m, Color foreground) {
     if (m.attachment == null) return const SizedBox.shrink();
@@ -9336,20 +9337,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           case 'failed':
           case 'stale':
           case 'unavailable':
+            // 行首同样带来源图标（老板 2026-10-23）：失败行的 modelId 在写入时
+            // 就已落定（本地失败=sense-voice-small，服务端失败=whisper-server），
+            // 与 done/pending 同一判断，点按重试不改变来源语义。
             return Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Clickable(
-                onTap: () => _transcribeVoiceMessage(m),
-                child: Text(
-                  t.status == 'failed'
-                      ? l10n.voiceTranscriptRetry
-                      : t.status == 'stale'
-                          ? l10n.voiceTranscriptStale
-                          : l10n.voiceTranscriptManual,
-                  style: style.copyWith(
-                      decoration: TextDecoration.underline,
-                      color: foreground.withValues(alpha: 0.7)),
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _voiceTranscriptSourceIcon(t.modelId, foreground),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Clickable(
+                      onTap: () => _transcribeVoiceMessage(m),
+                      child: Text(
+                        t.status == 'failed'
+                            ? l10n.voiceTranscriptRetry
+                            : t.status == 'stale'
+                                ? l10n.voiceTranscriptStale
+                                : l10n.voiceTranscriptManual,
+                        style: style.copyWith(
+                            decoration: TextDecoration.underline,
+                            color: foreground.withValues(alpha: 0.7)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
         }
@@ -9362,7 +9375,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// whisper 转写（modelId='whisper-server'，明文音频出过本机），芯片=本地
   /// sense-voice 模型转写。本地刻意不用齿轮：设置入口已是齿轮
   /// （Icons.settings_outlined，见本文件更多设置行），会撞语义；芯片取
-  /// 「本机算力」的意境，与云成一对手。
+  /// 「本机算力」的意境，与云成一对手。所有行状态都用它（done/pending/
+  /// failed/stale/unavailable）——失败行的 modelId 写入时已落定，见
+  /// [_buildVoiceTranscriptLine]。
   Widget _voiceTranscriptSourceIcon(String modelId, Color foreground) => Icon(
         modelId == 'whisper-server' ? Icons.cloud_outlined : Icons.memory,
         size: 14,
