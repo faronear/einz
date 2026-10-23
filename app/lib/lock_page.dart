@@ -19,8 +19,10 @@ import 'widgets/top_notice.dart';
 /// 锁屏页：输入 PIN 解密 Space Key 包 → 进入聊天页。
 /// 连续错误锁定倒计时（恢复码功能已按老板决策删除）。
 ///
-/// [asOverlay]：true = 聊天中切后台超时返回的覆盖锁屏（解锁成功 pop 回聊天页，
-/// 保留消息状态）；false = 冷启动锁屏（解锁成功 pushReplacement 进聊天页）。
+/// [asOverlay]：true = 覆盖锁屏（手动锁 / 后台切回超时 / 前台 idle 超时，
+/// 三个入口共用 chat_page 的 _pushLockOverlay；验证通过 pop 回聊天页，保留消息
+/// 状态）；false = 冷启动锁屏（验证通过 pushReplacement 进聊天页）。
+/// **两个入口都真验 PIN**（2026-10-23 修：覆盖锁屏曾因早退先于验证而任意码可进）。
 ///
 /// [canDismiss]：false = 严格锁屏——返回手势/返回键都被 PopScope 挡掉，必须输对
 /// PIN 才回聊天。**三个入口全传 false**（冷启动锁屏、顶栏手动锁屏、切后台超时
@@ -91,15 +93,20 @@ class _LockPageState extends State<LockPage> {
   }
 
   Future<void> _enterChat(String pin) async {
+    // **先验证、后导航**——两个入口都必须真验 PIN（2026-10-23 修严重回归：
+    // 多空间重构 213bc8c4 把 unlockVault 挪进本方法时，asOverlay 的早退留在了
+    // 验证之前 → 覆盖锁屏（手动锁/后台锁/idle 锁共用 _pushLockOverlay）输任意
+    // 码都能进，5 次错误锁定也一并绕过；冷启动那条一直是真验的，bug 只藏在
+    // 覆盖锁屏里）。错码走 unlockVault 的 FormatException → 防爆破计数 + 红字。
+    final vault = await _lock.unlockVault(pin);
+    if (!mounted) return;
     if (widget.asOverlay) {
-      // 覆盖锁屏（聊天中切后台超时返回）：解锁成功 pop 回聊天页，保留消息状态
+      // 覆盖锁屏（手动锁/后台超时/idle 锁）：验证通过 pop 回聊天页，保留消息状态
       Navigator.of(context).pop();
       return;
     }
     // 冷启动锁屏：解锁拿到的是**整个 Vault**（旧单空间包已归一）。
     // 单空间 → 直接进聊天（与旧行为一致）；多空间 → 先给空间列表。
-    final vault = await _lock.unlockVault(pin);
-    if (!mounted) return;
     final active = vault.active;
     if (active == null) {
       // 所有空间都已销毁（含"销毁本通道"挂的 pending 在解锁时被摘掉）→ 回向导。

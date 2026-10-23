@@ -165,6 +165,39 @@ void main() {
     expect(find.text('下层页'), findsOneWidget);
   });
 
+  testWidgets('覆盖锁屏（asOverlay）也必须真验 PIN：错码留下 + 红字，对码才回上一层',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await AppLockService(db).setPin('123456',
+        payload: const AppLockPayload(
+          spaceKeyB64: 'dGhlLXNwYWNlLWtleQ==',
+          spaceId: 'space-test',
+          entranceId: 'dev-a',
+          keyVersion: 1,
+          token: 'tok-123',
+        ));
+
+    await _pushLockPage(tester, db, canDismiss: false); // asOverlay: true
+
+    // 错码：留在锁屏页 + 红字错误（回归 2026-10-23：覆盖锁屏曾因 _enterChat 的
+    // asOverlay 早退先于 unlockVault，输任意码都能 pop 回聊天）
+    await tester.enterText(find.byType(TextField), '000000');
+    await tester.tap(find.text('解锁'));
+    await settleRealAsync(tester);
+
+    expect(find.byType(LockPage), findsOneWidget, reason: '错码进不去，必须留在锁屏页');
+    expect(find.text('锁屏码 错误'), findsOneWidget);
+
+    // 对码：pop 回上一层（覆盖锁屏的正常出路）
+    await tester.enterText(find.byType(TextField), '123456');
+    await tester.tap(find.text('解锁'));
+    await settleRealAsync(tester);
+
+    expect(find.byType(LockPage), findsNothing);
+    expect(find.text('下层页'), findsOneWidget);
+  });
+
   testWidgets('连续输错冻结期间：倒计时下方出现「忘记锁屏码」恢复路径，解冻前不出现',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
