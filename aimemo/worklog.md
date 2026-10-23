@@ -15597,3 +15597,19 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **修法：** 三处 Row 补 `mainAxisSize: MainAxisSize.min`（Flexible 保留，长转写仍限 3 行 ellipsis）。
 
 **验证：** flutter analyze lib/chat_page.dart 干净；热重启信号没发成——/tmp/einz_flutter.pid 不存在（本机 flutter run 可能没带 pid-file），待老板真机查看效果。
+
+## 2026-10-23 手动模式：语音气泡行内「转写」入口
+
+**（2026-10-23T16:35:00Z / 2026-10-24 00:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板需求：手动模式（自动转写关）下，气泡里尚未转写的语音下方显示「云/芯片图标 + 转写」，点击直接发起转写。
+
+**实现（全在 chat_page.dart）：**
+- `_buildAudioBar`/`_buildAudioBarBody` 加 `inlineTranscribeEntry` 参数（默认 false，四个共用场景只有消息流气泡开）；
+- 消息流调用点传 `inlineTranscribeEntry: !_voiceTranscriptAuto`（仅手动模式）；
+- `_buildVoiceTranscriptLine` 加 `manualEntry` 参数：`t == null`（还没有任何转写行）时不再返回空占位，而是显示「来源图标 + 下划线"转写"」可点入口——图标按当前方式映射（server→whisper-server 云 / local→sense-voice-small 芯片），点按复用 `_transcribeVoiceMessage`，文案复用 `voiceTranscriptMenuTranscribe`（转写/Transcribe）。入队后 StreamBuilder 自动把入口顶替成 pending/done 行；
+- 引用块（tappable:false）与长按菜单预览不传 inlineTranscribeEntry → 不显示入口（它们的点击语义是跳原消息/预览）。
+
+**口径：** 入口只挂语音消息气泡（isVoice 分支）；wav 音频文件气泡不加（转写入口仍在长按菜单，与自动入队口径一致——音频文件是低频场景）。
+
+**验证：** flutter analyze 干净；真机效果待老板确认。

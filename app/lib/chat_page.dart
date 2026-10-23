@@ -9072,7 +9072,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
-        return _buildAudioBar(m, foreground: _mediaForegroundOnBubble);
+        // inlineTranscribeEntry：手动模式（自动转写关）下，气泡里还没有转写行时
+        // 显示行内「转写」入口（老板 2026-10-23）；自动模式下转写无感发生，不需要。
+        return _buildAudioBar(m,
+            foreground: _mediaForegroundOnBubble,
+            inlineTranscribeEntry: !_voiceTranscriptAuto);
       case 'image':
         return _buildImage(m);
       case 'video':
@@ -9152,13 +9156,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       HistoryMessage m,
       {double waveformWidth = 120,
       required Color foreground,
-      bool tappable = true}) {
+      bool tappable = true,
+      bool inlineTranscribeEntry = false}) {
     return ValueListenableBuilder<int>(
       valueListenable: _audioPlaybackVersion,
       builder: (context, _, child) => _buildAudioBarBody(m,
           waveformWidth: waveformWidth,
           foreground: foreground,
-          tappable: tappable),
+          tappable: tappable,
+          inlineTranscribeEntry: inlineTranscribeEntry),
     );
   }
 
@@ -9166,7 +9172,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       HistoryMessage m,
       {required double waveformWidth,
       required Color foreground,
-      required bool tappable}) {
+      required bool tappable,
+      bool inlineTranscribeEntry = false}) {
     // 附件元数据缺失（sync 竞态漏拉）：波形条是"假"的（按 messageId 画的装饰），
     // 会误导成可播放——改显示统一的「不可用·重试」行（2026-10-09）
     if (m.attachment == null) return _attachmentUnusable(m);
@@ -9212,6 +9219,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (isVoice) {
       // 语音消息：波形行下方挂本地转写行（aimemo/voiceTranscript.zhcn.md §10——
       // 仅消息流气泡有；无转写数据/纯音频文件消息不加这一行）
+      // 手动模式（自动转写关）且还没有任何转写行时，转写行位置显示「图标+转写」
+      // 的行内入口（老板 2026-10-23）：点击直接按当前方式发起转写，入队后被
+      // pending/done 行顶替。转写行只在消息流气泡挂（inlineTranscribeEntry
+      // 由调用点控制），引用块/菜单预览的点击语义不同，不给。
       body = Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -9220,7 +9231,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [playButton, waveformRow],
           ),
-          _buildVoiceTranscriptLine(m, foreground),
+          _buildVoiceTranscriptLine(m, foreground, manualEntry: inlineTranscribeEntry),
         ],
       );
     } else {
@@ -9294,9 +9305,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// - pending → 「转写中…」占位；
   /// - failed / stale → 可点的「重新转写」入口（不露错误堆栈）；
   /// - unavailable → 可点的「手动转写」入口（模型未就绪，点了也不报错）；
+  /// - **无行（还没入队/手动模式下尚未转写）**→ [manualEntry] 为 true 时显示
+  ///   「图标+转写」行内入口（老板 2026-10-23）：手动模式下没有行就没有任何
+  ///   可点的东西，用户得长按进菜单才能转写，太深；行内入口点击直接按当前
+  ///   方式发起转写，入队后被 pending/done 行顶替。图标跟随当前转写方式
+  ///   （云=服务端 / 芯片=本机），与各行首图标同一语义；
+  /// - 无行且 [manualEntry] 为 false（引用块/菜单预览/自动模式）→ 不占位。
   /// - 所有状态行首都带来源图标（云=服务端 whisper / 芯片=本地 sense-voice）；
-  /// - 无行（非语音/还没入队）→ 不占位。
-  Widget _buildVoiceTranscriptLine(HistoryMessage m, Color foreground) {
+  Widget _buildVoiceTranscriptLine(HistoryMessage m, Color foreground,
+      {bool manualEntry = false}) {
     if (m.attachment == null) return const SizedBox.shrink();
     // watch 单行：转写完成/状态变化时此行自动重建（细粒度刷新，不牵动整个消息列表）
     return StreamBuilder<LocalVoiceTranscript?>(
@@ -9307,7 +9324,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               .watchSingleOrNull(),
       builder: (context, snap) {
         final t = snap.data;
-        if (t == null) return const SizedBox.shrink();
+        if (t == null) {
+          // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
+          // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
+          if (!manualEntry) return const SizedBox.shrink();
+          final l10n = AppLocalizations.of(context)!;
+          final TextStyle style =
+              TextStyle(fontSize: 13, color: foreground.withValues(alpha: 0.85));
+          return Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _voiceTranscriptSourceIcon(
+                    _voiceTranscriptEngine == 'server'
+                        ? 'whisper-server'
+                        : 'sense-voice-small',
+                    foreground),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Clickable(
+                    onTap: () => _transcribeVoiceMessage(m),
+                    child: Text(l10n.voiceTranscriptMenuTranscribe,
+                        style: style.copyWith(
+                            decoration: TextDecoration.underline,
+                            color: foreground.withValues(alpha: 0.7))),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
         final l10n = AppLocalizations.of(context)!;
         final TextStyle style = TextStyle(fontSize: 13, color: foreground.withValues(alpha: 0.85));
         switch (t.status) {
