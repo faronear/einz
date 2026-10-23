@@ -1104,20 +1104,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      '在本机跑模型转写，不联网、服务器完全接触不到音频（需下载约 230MB 模型）。';
+      '在本机上直接转写（第一次使用会下载约 230MB 转写模型），原始消息不离开本机。';
 
   @override
-  String get voiceTranscriptAuthServer => '服务端转写';
+  String get voiceTranscriptAuthServer => '远程转写';
 
   @override
-  String get voiceTranscriptAuthServerDesc =>
-      '解密后的录音发到服务器，由 Whisper 转写后立即删除——服务器会短暂处理这条录音。';
+  String get voiceTranscriptAuthServerDesc => '把原始录音发送给远程服务器，完成转写后立即删除。';
 
   @override
   String get voiceTranscriptAskTitle => '用服务端转写这条？';
 
   @override
-  String get voiceTranscriptAskBody => '这条消息解密后的录音将发送到服务器，由 Whisper 转写后立即删除。';
+  String get voiceTranscriptAskBody => '这条消息将发送到远程服务器，完成转写后立即删除。';
 
   @override
   String voiceTranscriptServerFailed(String error) {

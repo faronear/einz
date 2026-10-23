@@ -2009,7 +2009,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthNote.
   ///
   /// In en, this message translates to:
-  /// **'Choose how voice messages are transcribed on this device.'**
+  /// **'Choose how voice messages are transcribed.'**
   String get voiceTranscriptAuthNote;
 
   /// No description provided for @voiceTranscriptAuthLocal.
@@ -2021,7 +2021,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'The audio is transcribed locally (requires a ~230MB model download for the first use). No data leaves your device.'**
+  /// **'Transcription happens on this device (requires a ~230MB model download at the first use).'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
@@ -2033,7 +2033,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthServerDesc.
   ///
   /// In en, this message translates to:
-  /// **'The audio is sent to a cloud server for transcription, and deleted immediately after processing.'**
+  /// **'Voice messages are sent to a cloud server, and deleted immediately after transcribing.'**
   String get voiceTranscriptAuthServerDesc;
 
   /// No description provided for @voiceTranscriptAskTitle.
@@ -2045,7 +2045,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAskBody.
   ///
   /// In en, this message translates to:
-  /// **'The audio will be sent to a cloud server, and deleted immediately after transcription.'**
+  /// **'This voice message will be sent to a cloud server, and deleted immediately after transcription.'**
   String get voiceTranscriptAskBody;
 
   /// No description provided for @voiceTranscriptServerFailed.

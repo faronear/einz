@@ -1160,28 +1160,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthNote =>
-      'Choose how voice messages are transcribed on this device.';
+      'Choose how voice messages are transcribed.';
 
   @override
   String get voiceTranscriptAuthLocal => 'Local';
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'The audio is transcribed locally (requires a ~230MB model download for the first use). No data leaves your device.';
+      'Transcription happens on this device (requires a ~230MB model download at the first use).';
 
   @override
   String get voiceTranscriptAuthServer => 'Remote';
 
   @override
   String get voiceTranscriptAuthServerDesc =>
-      'The audio is sent to a cloud server for transcription, and deleted immediately after processing.';
+      'Voice messages are sent to a cloud server, and deleted immediately after transcribing.';
 
   @override
   String get voiceTranscriptAskTitle => 'Transcribe on server?';
 
   @override
   String get voiceTranscriptAskBody =>
-      'The audio will be sent to a cloud server, and deleted immediately after transcription.';
+      'This voice message will be sent to a cloud server, and deleted immediately after transcription.';
 
   @override
   String voiceTranscriptServerFailed(String error) {
