@@ -66,7 +66,7 @@ curl -s https://einz.tic.cc/health
 docker compose logs -f server   # 查看日志（启动/建空间/通道登记等事件；Ctrl+C 停止跟踪）
 
 # ② 本机（Mac）：拉最新代码
-cd /Users/Shared/productX/only && git pull
+cd /Users/Shared/productX/einz && git pull
 
 # ③ 可选：清掉旧通道凭证（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
 rm -f ~/.einz/*.json
@@ -88,7 +88,7 @@ TUI 引导会一次完成：生成通道身份 → `POST /spaces` 建空间（�
 本地生成 Space Key → 用口令加密上传密保箱 → 打印邀请链接。
 
 ```bash
-cd /Users/Shared/productX/only/cli
+cd /Users/Shared/productX/einz/cli
 dart run bin/einz_tui.dart --server https://einz.tic.cc \
   --store ~/.einz/a.json
 # 引导流程：
@@ -132,7 +132,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 ## 阶段 3：日常使用（两端）
 
 ```bash
-cd /Users/Shared/productX/only/cli
+cd /Users/Shared/productX/einz/cli
 dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ 下的通道后列出选择
 # 启动探测 /health → 能连 → 直接进 TUI（不询问服务器）；状态栏 ● 在线
 # 输入消息回车即发送（无需子命令）

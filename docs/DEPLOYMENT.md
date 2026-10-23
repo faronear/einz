@@ -554,7 +554,7 @@ docker compose up -d
 export EINZ_ROOT=/faronear/einz
 cd $EINZ_ROOT
 git init
-git remote add origin https://git.tic.cc/fon/only
+git remote add origin https://git.tic.cc/fon/einz
 git fetch origin
 git checkout -b main origin/main
 git update-index --assume-unchanged server/docker/Caddyfile   # Caddyfile 保留 VPS 域名，pull 不覆盖
@@ -568,7 +568,7 @@ git status --short                                          # 应只显示本地
 
 ```bash
 # 本机（macOS/Linux）：新代码提交并推送到远程仓库
-cd /Users/Shared/productX/only
+cd /Users/Shared/productX/einz
 git push origin main
 ```
 
