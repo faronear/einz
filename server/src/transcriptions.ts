@@ -42,7 +42,12 @@ export interface TranscribeResult {
 }
 
 /** 16kHz/16bit/单声道 PCM wav 的时长（毫秒）。仅认 PCM16（客户端录音就是这个规格），
- *  其他格式拒绝而非猜测——转写质量与 whisper 的 ffmpeg 分支无关，喂错格式只会出垃圾。 */
+ *  其他格式拒绝而非猜测——转写质量与 whisper 的 ffmpeg 分支无关，喂错格式只会出垃圾。
+ *
+ *  接受两种 PCM 容器：标准 tag=1，以及 WAVE_FORMAT_EXTENSIBLE（0xFFFE，子格式 GUID
+ *  头两位为 1）——macOS 的 AVCaptureAudioFileOutput 把标准 PCM16 录音写成 extensible
+ *  （2026-10-23 实测：JUNK + 40 字节 fmt + FLLR + data，数据本身是 16bit 交错 PCM），
+ *  App 上传前虽已规范化，服务端也不能因此把合法音频 400 掉。 */
 export function wavDurationMs(wav: Buffer): number {
   // RIFF 头：12 字节文件头 + 逐 chunk 找 fmt 与 data（容忍非标准 chunk 顺序）
   if (wav.length < 44 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") {
@@ -57,7 +62,16 @@ export function wavDurationMs(wav: Buffer): number {
     const size = wav.readUInt32LE(offset + 4);
     if (id === "fmt ") {
       const audioFormat = wav.readUInt16LE(offset + 8);
-      if (audioFormat !== 1) throw new ApiError("INVALID_REQUEST", "only PCM wav supported", 400);
+      // 0xFFFE 的 fmt 是 40 字节：标准 16 字节 + cbSize(2)/validBits(2)/
+      // channelMask(4) + 子格式 GUID(16)；GUID 起点 = 块头 + 8 + 24 = +32，
+      // 其头两位（LE）为 1 = PCM（float 是 3，仍拒）。
+      const isExtensiblePcm =
+        audioFormat === 0xfffe &&
+        offset + 34 <= wav.length &&
+        wav.readUInt16LE(offset + 32) === 1;
+      if (audioFormat !== 1 && !isExtensiblePcm) {
+        throw new ApiError("INVALID_REQUEST", "only PCM wav supported", 400);
+      }
       byteRate = wav.readUInt32LE(offset + 16);
     } else if (id === "data") {
       dataStart = offset + 8;

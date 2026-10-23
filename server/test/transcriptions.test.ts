@@ -45,6 +45,40 @@ function makeWav (ms: number): Buffer {
   return buf
 }
 
+/** WAVE_FORMAT_EXTENSIBLE（0xFFFE）PCM wav：复刻 macOS AVCaptureAudioFileOutput
+ *  2026-10-23 实测产出形态——JUNK 填充 + 40 字节 fmt（PCM 子格式 GUID）+ FLLR + data，
+ *  数据本身是标准 16bit 交错 PCM。[subFormat] 覆盖 GUID 头两位（1=PCM，3=float）。 */
+function makeExtensibleWav (ms: number, subFormat = 1): Buffer {
+  const sampleRate = 16000
+  const samples = Math.floor((sampleRate * ms) / 1000)
+  const dataLen = samples * 2
+  const junk = 28, fllr = 4
+  const fmtSize = 40
+  const total = 12 + 8 + junk + 8 + fmtSize + 8 + fllr + 8 + dataLen
+  const buf = Buffer.alloc(total)
+  buf.write('RIFF', 0, 'ascii')
+  buf.writeUInt32LE(total - 8, 4)
+  buf.write('WAVE', 8, 'ascii')
+  let o = 12
+  buf.write('JUNK', o, 'ascii'); buf.writeUInt32LE(junk, o + 4); o += 8 + junk
+  buf.write('fmt ', o, 'ascii'); buf.writeUInt32LE(fmtSize, o + 4)
+  buf.writeUInt16LE(0xfffe, o + 8) // WAVE_FORMAT_EXTENSIBLE
+  buf.writeUInt16LE(1, o + 10) // mono
+  buf.writeUInt32LE(sampleRate, o + 12)
+  buf.writeUInt32LE(sampleRate * 2, o + 16) // byte rate
+  buf.writeUInt16LE(2, o + 20) // block align
+  buf.writeUInt16LE(16, o + 22) // bits
+  buf.writeUInt16LE(22, o + 24) // cbSize
+  buf.writeUInt16LE(16, o + 26) // valid bits
+  buf.writeUInt32LE(0, o + 28) // channel mask
+  // 子格式 GUID：KSDATAFORMAT_SUBTYPE_PCM 头两位（LE）= 1
+  buf.writeUInt16LE(subFormat, o + 32)
+  o += 8 + fmtSize
+  buf.write('FLLR', o, 'ascii'); buf.writeUInt32LE(fllr, o + 4); o += 8 + fllr
+  buf.write('data', o, 'ascii'); buf.writeUInt32LE(dataLen, o + 4)
+  return buf
+}
+
 function withDb (fn: () => void | Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'einz-transcribe-'))
   const run = async (): Promise<void> => {
@@ -89,6 +123,14 @@ test('wavDurationMs：标准 16kHz PCM wav 算时长；非 wav / 非 PCM 拒绝'
   assert.throws(() => wavDurationMs(Buffer.from('not a wav at all........')), ApiError)
   const nonPcm = makeWav(100); nonPcm.writeUInt16LE(85, 20) // IEEE float
   assert.throws(() => wavDurationMs(nonPcm), /only PCM/)
+})
+
+test('wavDurationMs：接受 macOS 的 WAVE_FORMAT_EXTENSIBLE PCM 容器', () => {
+  // 实测形态（2026-10-23 macOS 录音）：tag=0xFFFE + PCM 子格式 GUID，
+  // 数据是标准 16bit 交错 PCM——必须算得出时长，不能 400 掉
+  assert.equal(wavDurationMs(makeExtensibleWav(1500)), 1500)
+  // 子格式是 float（GUID 头两位=3）→ 仍拒
+  assert.throws(() => wavDurationMs(makeExtensibleWav(100, 3)), /only PCM/)
 })
 
 test('parseWhisperStdout：时间戳行取正文、无时间戳行直取、空输出得空串', () => {

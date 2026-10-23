@@ -81,6 +81,9 @@ class VoiceTranscriptService {
       await _upsert(messageId, status: 'unavailable', cipherSha256: cipherSha256);
       return;
     }
+    // 规范化上线前录的老消息可能是 extensible 容器（macOS 录音器形态）：
+    // sherpa wave-reader 明确不支持 0xFFFE——喂 isolate 前先转标准 PCM16 头
+    normalizeWavFile(plainPath);
     await _upsert(messageId, status: 'pending', cipherSha256: cipherSha256);
     var attempt = 0;
     while (true) {
@@ -201,6 +204,98 @@ class VoiceTranscriptService {
     } finally {
       f.closeSync();
     }
+  }
+
+  /// 把 wav 容器规范化成**标准 16bit PCM**（tag=1、44 字节头）——仅当 fmt 是
+  /// WAVE_FORMAT_EXTENSIBLE（0xFFFE）且子格式 GUID 为 PCM 时重写；已是标准
+  /// tag=1 的原样返回（同一实例，调用方可靠 [identical] 判断是否变过）。
+  ///
+  /// 为什么必须转：sherpa-onnx 的 wave-reader 明确不支持 extensible
+  /// （"We don't support WAVE_FORMAT_EXTENSIBLE files."，上游源码可查），而
+  /// macOS 录音器（record 插件的 AVCaptureAudioFileOutput）2026-10-23 实测把
+  /// 标准 PCM16 录音写成 extensible 容器（JUNK + 40 字节 fmt + FLLR + data，
+  /// 数据本身是标准 16bit 交错 PCM）——直接喂本地转写必失败。数据一个采样点
+  /// 都不动，只重建头。服务端也已改成接受 extensible（server transcriptions.ts），
+  /// 这里是本地路径的对口修复 + 双保险。
+  static Uint8List normalizeWavBytes(Uint8List bytes) {
+    if (bytes.length < 44) return bytes;
+    // RIFF/WAVE 快检（与 [validateWavHeader] 同口径）
+    if (bytes[0] != 0x52 || bytes[1] != 0x49 || bytes[2] != 0x46 || bytes[3] != 0x46 ||
+        bytes[8] != 0x57 || bytes[9] != 0x41 || bytes[10] != 0x56 || bytes[11] != 0x45) {
+      return bytes;
+    }
+    final bd = ByteData.sublistView(bytes);
+    // 逐 chunk 找 fmt 与 data（容忍 JUNK/FLLR 填充块与乱序）
+    var fmtStart = -1;
+    var fmtSize = 0;
+    var dataStart = -1;
+    var dataSize = 0;
+    var pos = 12;
+    while (pos + 8 <= bytes.length) {
+      final isFmt = bytes[pos] == 0x66 && bytes[pos + 1] == 0x6d && // 'fmt '
+          bytes[pos + 2] == 0x74 && bytes[pos + 3] == 0x20;
+      final isData = bytes[pos] == 0x64 && bytes[pos + 1] == 0x61 && // 'data'
+          bytes[pos + 2] == 0x74 && bytes[pos + 3] == 0x61;
+      final size = bd.getUint32(pos + 4, Endian.little);
+      if (isFmt && fmtStart < 0) {
+        fmtStart = pos;
+        fmtSize = size;
+      }
+      if (isData && dataStart < 0) {
+        dataStart = pos + 8;
+        dataSize = size;
+      }
+      if (fmtStart >= 0 && dataStart >= 0) break;
+      if (size == 0 && !isData) break; // 防畸形头死循环（同 validateWavHeader）
+      pos += 8 + size + (size & 1); // 块按 2 字节对齐
+    }
+    if (fmtStart < 0 || dataStart < 0 || fmtSize < 16) return bytes;
+    final tag = bd.getUint16(fmtStart + 8, Endian.little);
+    if (tag == 1) return bytes; // 已是标准容器：零成本
+    // 只认 extensible（fmt 40 字节，子格式 GUID 头两位=1 才是 PCM；float=3 不碰，
+    // 交给 validateWavHeader / 服务端拒绝，不静默"修"成别的东西）
+    if (tag != 0xfffe || fmtSize < 40 || fmtStart + 48 > bytes.length) return bytes;
+    if (bd.getUint16(fmtStart + 32, Endian.little) != 1) return bytes;
+    final channels = bd.getUint16(fmtStart + 10, Endian.little);
+    final rate = bd.getUint32(fmtStart + 12, Endian.little);
+    final bits = bd.getUint16(fmtStart + 22, Endian.little);
+    final avail = bytes.length - dataStart;
+    final dataLen = dataSize < avail ? dataSize : avail;
+    final out = Uint8List(44 + dataLen);
+    final od = ByteData.sublistView(out);
+    void ascii(int at, String s) {
+      for (var i = 0; i < 4; i++) {
+        out[at + i] = s.codeUnitAt(i);
+      }
+    }
+    ascii(0, 'RIFF');
+    od.setUint32(4, 36 + dataLen, Endian.little);
+    ascii(8, 'WAVE');
+    ascii(12, 'fmt ');
+    od.setUint32(16, 16, Endian.little);
+    od.setUint16(20, 1, Endian.little); // PCM
+    od.setUint16(22, channels, Endian.little);
+    od.setUint32(24, rate, Endian.little);
+    od.setUint32(28, rate * channels * (bits ~/ 8), Endian.little);
+    od.setUint16(32, channels * (bits ~/ 8), Endian.little);
+    od.setUint16(34, bits, Endian.little);
+    ascii(36, 'data');
+    od.setUint32(40, dataLen, Endian.little);
+    out.setRange(44, 44 + dataLen, bytes, dataStart); // 数据原样，一个字节不改
+    return out;
+  }
+
+  /// 文件版 [normalizeWavBytes]：就地规范化（临时文件 + rename 原子替换，避免
+  /// 并发读取撞上半个头）。未变（非 extensible / 解析不了）不动文件。
+  static void normalizeWavFile(String path) {
+    final f = File(path);
+    if (!f.existsSync()) return;
+    final bytes = f.readAsBytesSync();
+    final out = normalizeWavBytes(bytes);
+    if (identical(out, bytes)) return;
+    final tmp = File('$path.norm');
+    tmp.writeAsBytesSync(out);
+    tmp.renameSync(path); // POSIX rename 原子替换
   }
 
   /// 文件是否含真实音频数据（录音侧发送/进预览前判定用）。

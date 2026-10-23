@@ -15527,3 +15527,15 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 文档：aimemo/voiceTranscript.zhcn.md §10 补「所有状态行首都带来源图标」及失败行 modelId 落定说明。
 - 踩坑记录：drift 的 `isNull`/`isNotNull` 与 matcher 撞名，测试 import 要 `hide isNull, isNotNull`；record 类型注解不能把 named 字段写成 positional（override 不匹配）。
 
+**（2026-10-23T10:30:00Z / 2026-10-23 18:30）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：修 macOS 录音 extensible wav 容器致转写全链路失败（老板实测报告）
+- 老板报告：macOS 测试服务端转写失败，报「only PCM wav supported」。
+- 根因（实测定位，非猜测）：从沙盒容器翻出老板 18:59 录的真实 wav——`fmt.tag=65534`（0xFFFE，WAVE_FORMAT_EXTENSIBLE），JUNK:28 + fmt:40 + FLLR:3984 + data:67976，其余全对（16000/mono/16bit）。macOS 的 AVCaptureAudioFileOutput（record 插件 2.1.1）把标准 PCM16 录音写成 extensible 容器；数据本身是标准 16bit 交错 PCM，纯粹是容器声明问题。
+- 影响面（查上游源码确认）：sherpa-onnx wave-reader 明确拒 0xFFFE（"We don't support WAVE_FORMAT_EXTENSIBLE files."）——**本地转写同样坏**，只是老板先撞到服务端；服务端 wavDurationMs 只认 tag=1 → 400。
+- 修复（两侧 + 客户端三点归一）：
+  ① 服务端 `wavDurationMs` 接受 0xFFFE 且子格式 GUID 头两位=1（PCM）的容器；float（3）等仍拒。GUID 偏移踩过一次坑（在 fmt 块头 +32，不在 +24——cbSize/validBits/channelMask 占 24~31），测试抓住。
+  ② 客户端新增 `VoiceTranscriptService.normalizeWavBytes/normalizeWavFile`：extensible+PCM → 重写成标准 44 字节头（数据一个采样点不动，temp+rename 原子替换）；三个调用点——录音落库前（_stopVoice，新消息从源头干净）、本地喂 isolate 前（_processOne，覆盖存量老消息）、服务端上送前（_serverVoiceTranscribe，双保险）。
+- 验证（全部实测）：服务端单测 6/6（新增 extensible 复刻用例：JUNK+fmt40+FLLR+data，时长正确；float 子格式仍拒）；客户端新增 wav_normalize_test 6 例（重写/幂等/标准头零成本/float 不碰/垃圾不碰/文件版原子替换）；**拿老板真实录音端到端跑**：72072B→68020B（剥掉 Apple 4052B 填充），tag 65534→1，67976 字节数据逐字节一致，validateWavHeader 通过；聊天页回归 78 例 + 新增转写行测试 4 例全过；flutter analyze 零问题。
+- 文档：aimemo/voiceTranscript.zhcn.md §8 补「macOS 容器坑」小节（三个归一化调用点 + 服务端双保险）。
+- 备注：FLLR 填充 3984B/条被剥掉后单条语音消息体积降 ~6%；老消息（存量 extensible 密文）不动，转写时归一化。
+
+

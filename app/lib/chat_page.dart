@@ -7761,6 +7761,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ok = await f.exists() &&
             await f.length() > 0 &&
             VoiceTranscriptService.hasAudioData(path);
+        // macOS 录音器（AVCaptureAudioFileOutput）把标准 PCM16 录音写成
+        // WAVE_FORMAT_EXTENSIBLE 容器（2026-10-23 实测）：sherpa 本地转写
+        // 明确不支持该容器——落库加密前规范化为标准 PCM16 头，附件、转写、
+        // 播放三路同一形态（数据一个采样点不动）。
+        if (ok) VoiceTranscriptService.normalizeWavFile(path);
       }
       if (!mounted) return;
       // 空录音（权限被系统拒后仍可能走到这里）不再静默回文字态，给明确反馈
