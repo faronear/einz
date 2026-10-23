@@ -15546,5 +15546,12 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 验证：analyze 零问题；wav_normalize 6 例 + 转写行 4 例全过；等老板 npm run app-mac-run 复测（老消息 + 远程 → 预期云图标 + 文字）。
 - 教训：多步编辑后必须验证编辑真的落盘（grep/read 回读），不能只信 analyze/测试通过——测试过得部分不包括没写进去的部分。
 
+**（2026-10-23T15:10:00Z / 2026-10-23 23:10）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：whisper-cli stdin 参数修正 -f /dev/stdin → -f -（管道不可 seek，必 exit 11）
+- 老板复测报：服务端转写失败 ApiException(TRANSCRIBE_FAILED) whisper exit 11 read_audio_data from /dev/stdin——上传归一化已生效（only PCM 报错消失）、whisper 真跑起来了，卡在读 stdin。
+- 根因（查本机 whisper.cpp 10-19 master 源码 + 真二进制复现）：read_audio_data 对 `-` 是全量读 stdin 进内存再解析（管道安全）；对 `/dev/stdin` 走 ma_decoder_init_file 当普通文件——stdin 是管道不可 seek，miniaudio 打开即败，回落 ffmpeg（没装）→ exit 11。**这条管道此前从未在任何机器上跑通过**（以往测试都在到达 whisper 前就挂了：先 only PCM，后 disabled 回落）。
+- 修复：server/src/transcriptions.ts spawn 参数改 `-f -`（9d571f7c）；源码注释留警示。本地实测两种姿势：旧 exit 11（stderr 首行与老板报错逐字一致）、新 exit 0 + read 64044 bytes from stdin。
+- 生效方式：只需重启服务端（tsx 吃新 src），App 不用重建。已通知老板重启 server-run-dev 后复测。
+
+
 
 
