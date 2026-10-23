@@ -15563,3 +15563,17 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 
 
 
+
+## 2026-10-23 修 dart-docker.sh tui 报「无法加载 libsodium」（arm64 镜像悬空链接）
+
+**（2026-10-23T15:14:56Z / 2026-10-23 23:14）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板报 `./cli/dart-docker.sh tui` 在编译 kernel 快照时挂：`无法加载 libsodium（尝试过: [/usr/local/lib/libsodium.so, /usr/lib/libsodium.so, /lib/x86_64-linux-gnu/libsodium.so])`。老板记得以前踩过但忘了解法。
+
+**根因（这次不是"没装"，是"装了但链接悬空"）：** 本机是 Apple Silicon，`dart:stable` 拉的是 arm64 镜像，libsodium 实际在 `/usr/lib/aarch64-linux-gnu/`；而 `cli/Dockerfile.dart-sodium` 里两条 `ln -sf` 硬编码 `x86_64-linux-gnu` → 建出的 `/usr/lib/libsodium.so`、`/usr/local/lib/libsodium.so` 全是悬空符号链接；`shared/lib/src/sodium.dart` 的三个候选路径（其中 `/lib/x86_64-linux-gnu/` 也是硬编码）全落空。之前 docker-docker 的 setup 校验只 `ls /usr/lib/x86_64-linux-gnu/libsodium.so`——在 arm64 上这个文件本来就不存在，校验等于恒失败/无意义（ls 命令本身只测存在性）。
+
+**修法：** Dockerfile 两条 `ln -sf` 改为 `ln -sf /usr/lib/*-linux-gnu/libsodium.so.23 <目标>`（shell 通配符，架构无关）。注意不能用 `dpkg-architecture -qDEB_HOST_MULTIARCH`——精简 dart 镜像里该命令不存在（返回空，同样悬空，本次先踩了这坑再改通配符）。
+
+**验证：** 重建镜像后容器内 `DynamicLibrary.open('/usr/lib/libsodium.so')` → `sodium_init: true`；`./cli/dart-docker.sh dartc compile kernel bin/einz_tui.dart` 编译通过。`tui` 的交互运行留给老板真实终端里自测。
+
+顺手：升级 dart/重建镜像时用 `docker build --pull`（本次已 pull 最新 dart:stable + Debian 13 trixie）。
