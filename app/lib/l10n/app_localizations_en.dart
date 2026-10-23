@@ -678,7 +678,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMoreSettingsStorage => 'Attachment storage';
 
   @override
-  String get chatPageMoreSettingsTombstone => 'Tombstone messages';
+  String get chatPageMoreSettingsTombstone => 'Vanished messages';
 
   @override
   String get chatPageAttachmentStorageNote =>
@@ -903,7 +903,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete new messages automatically once read on a countdown';
 
   @override
-  String get chatPageTombstoneHeading => 'Tombstone messages';
+  String get chatPageTombstoneHeading => 'Vanished messages';
 
   @override
   String get chatPageTombstoneNote =>
