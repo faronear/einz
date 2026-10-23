@@ -24,7 +24,13 @@ Einz server (Node)                    whisper.cpp（不是常驻服务！）
 ## 1. 前置依赖（一次性）
 
 ```bash
+# Linux（裸 node 部署的常规路径；apt 没有 whisper-cli 包，必须源码编译）
 sudo apt update && sudo apt install -y build-essential cmake git ffmpeg
+
+# macOS 等价（2026-10-23 补：同流程，只差包管理器与并行度取法）
+#   make/clang++ 随 Xcode Command Line Tools 已有，只缺 cmake：
+brew install cmake
+#   （后文 -j$(nproc) 在 macOS 用 -j$(sysctl -n hw.ncpu)）
 ```
 
 - `build-essential` + `cmake`：编译 whisper.cpp 用（编译完可卸载，二进制自包含）
@@ -40,7 +46,7 @@ sudo mkdir -p /opt/whisper && cd /opt/whisper
 sudo git clone https://github.com/ggml-org/whisper.cpp
 cd whisper.cpp
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
+cmake --build build -j$(nproc)   # macOS: -j$(sysctl -n hw.ncpu)
 ```
 
 产物：`build/bin/whisper-cli`（还有 bench/server 等兄弟二进制，我们只用 cli）。
