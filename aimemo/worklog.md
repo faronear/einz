@@ -15552,6 +15552,14 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 修复：server/src/transcriptions.ts spawn 参数改 `-f -`（9d571f7c）；源码注释留警示。本地实测两种姿势：旧 exit 11（stderr 首行与老板报错逐字一致）、新 exit 0 + read 64044 bytes from stdin。
 - 生效方式：只需重启服务端（tsx 吃新 src），App 不用重建。已通知老板重启 server-run-dev 后复测。
 
+**（2026-10-23T15:40:00Z / 2026-10-23 23:40）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：whisper 模型整合进 whisper.cpp/models——卷路径与文档全量同步（老板整合，1ceabb57）
+- 老板把 `server/models/whisper/ggml-small.bin` 整合进 `server/models/whisper.cpp/models/`（whisper.cpp 官方下载脚本的落点），并自改 `.env` 与 `docker-compose.*.yml` 卷路径；委托补全其余同步点后提交。
+- 补全清单：compose×3 注释、server/Dockerfile 注释、DEPLOYMENT.md §3.1 目录树、.gitignore 注释、whisperDeploy §2（补「仓库内即 server/models/whisper.cpp/」位置对应）与 §5（卷示例+首次部署说明）。
+- 不变：容器内路径 `/opt/whisper/models/ggml-small.bin` 与 compose 里 EINZ_WHISPER_MODEL 编排值（挂载目标没动）；整个 server/models/ 仍 gitignore。
+- 验证：compose config ×4 全过；全仓无残留旧路径引用（git grep models/whisper/ 除 whisper.cpp 外为零）。
+- 并行注意：本轮又撞一次老板并行保存冲掉我的 worklog 编辑——重写后只 add worklog 单独提交，老板在改的 compose 改动与其 .env（gitignore）一并纳入本提交（老板明确要求"然后提交"）。
+
+
 
 
 
