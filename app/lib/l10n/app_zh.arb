@@ -647,6 +647,7 @@
   "voiceTranscriptAskTitle": "用服务端转写这条？",
   "voiceTranscriptAskBody": "这条消息解密后的录音将发送到服务器，由 Whisper 转写后立即删除。",
   "voiceTranscriptServerFailed": "服务端转写失败：{error}",
+  "voiceTranscriptServerDisabled": "服务器未启用转写，已改用本机模型",
   "@voiceTranscriptServerFailed": {
     "placeholders": {
       "error": {

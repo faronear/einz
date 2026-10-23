@@ -1131,6 +1131,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get voiceTranscriptServerDisabled => '服务器未启用转写，已改用本机模型';
+
+  @override
   String get voiceTranscriptPreparing => '正在准备转写模型…';
 
   @override

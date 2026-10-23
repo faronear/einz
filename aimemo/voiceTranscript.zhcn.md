@@ -341,11 +341,13 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 **与 §15.2 的关系**：§15.2 的「客户端解密后按需上送」（D'）仍然保留，作为
 **单条显性授权**模式的路径；本节是**全部自动转写**模式的优化路径。两模式并存。
 
-### 15.4 待办（[待评审]，未动手）
+### 15.4 落地状态（2026-10-23 更新）
 
-- [ ] 服务端：新增 `POST /transcriptions`（multipart 音频；whisper.cpp/faster-whisper small 或 medium int8；内存处理即转即删）
-- [ ] 客户端：设置页授权三选项 + 转写入口按授权模式分流（本地模型 / 服务端 / 每条询问）
-- [ ] 客户端：服务端转写路径复用 `LocalVoiceTranscripts` 表（`modelId=whisper-*`）
+- [x] 服务端：新增 `POST /transcriptions`（multipart 音频；whisper.cpp；内存处理即转即删）——`server/src/transcriptions.ts`，未配 `EINZ_WHISPER_BIN`/`EINZ_WHISPER_MODEL` 报 503 `TRANSCRIBE_DISABLED`
+- [x] 客户端：设置页授权三选项（local/server/ask，每设备每空间）+ 转写入口按授权模式分流
+- [x] 客户端：服务端转写路径复用 `LocalVoiceTranscripts` 表（`modelId=whisper-server`，与本地 sense-voice 行共用 UI 渲染）
+- [x] **自动路径也按模式路由**（2026-10-23 修）：此前只有手动重转读授权模式、自动恒定本地；现 server 模式自动走上送（幂等：已有 done/pending 行不重送，防首屏历史页全量上传撞限流；旧 m4a 不上送）；ask 模式自动仍走本地（零网络零上传，「上传前先问」只发生在手动点按）
+- [x] 服务端未启用（503 `TRANSCRIBE_DISABLED`）→ 自动与手动两条路都回落本地模型 + 说明 notice（§15.1 ③ 既定回落语义的补全实现）
 - [ ] 双传（§15.3）：发送时按授权模式条件性附带明文（密文 + 明文一次传）；服务端即算、结果 space_key 加密落盘、随各端取走/焚毁清理
-- [ ] PROTOCOL.md 登记新端点与「即转即删」承诺
+- [ ] PROTOCOL.md 登记新端点与「即转即删」承诺（端点已随服务端落地，文档登记待补）
 - [ ] 本地模型链路（§11）保留不动，等老板决定是否退役

@@ -2066,6 +2066,12 @@ abstract class AppLocalizations {
   /// **'Server transcription failed: {error}'**
   String voiceTranscriptServerFailed(String error);
 
+  /// No description provided for @voiceTranscriptServerDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Server transcription isn\'t enabled — used the on-device model instead'**
+  String get voiceTranscriptServerDisabled;
+
   /// No description provided for @voiceTranscriptPreparing.
   ///
   /// In en, this message translates to:

@@ -173,6 +173,13 @@ const double _entranceRefreshSize = 40;
 /// 手机端本就比它窄，不受影响。
 const double kMyProfileSheetMaxWidth = 480;
 
+/// 服务端转写一次尝试的结果（_ChatPageState._serverVoiceTranscribe 返回值）：
+/// - [done]：拿到文本（行已置 done）；
+/// - [failed]：失败（行已置 failed、notice 已出）；
+/// - [disabled]：服务端未启用转写（503 TRANSCRIBE_DISABLED）——按 §15.1 ③
+///   既定回落语义，调用方改走本地模型（说明 notice 已由该方法出）。
+enum _ServerTranscriptOutcome { done, failed, disabled }
+
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -8691,6 +8698,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 语音/音频消息转写入队（§9）：明文音频走解密缓存的确定性路径（stored 模式
   /// 长期目录 / 否则临时缓存），密文 sha256 取附件元数据（音频变化 → stale）。
   /// 服务未就绪（如桌面未配模型）时 lazy 构造，行会落 `unavailable` 供手动入口。
+  ///
+  /// **按授权模式路由（老板 2026-10-23 实测 bug 修复）**：此前只有手动重转读
+  /// [_voiceTranscriptAuth]，本自动路径恒定走本地——server 模式下自动转写也落
+  /// 芯片图标。现在：`server` → 自动走服务端（§15.2「全部语音自动转写仅在用户
+  /// 显式选择后生效」——选 server 即显式选择）；`ask` → 自动仍走本地（本地链路
+  /// 零网络零上传，不违背「上传前先问」——问的是服务端上传、只发生在手动点按；
+  /// 且 ask 下没有行就没有手动入口，不能整条跳过）；`local` → 不变。
   void _enqueueVoiceTranscripts(List<HistoryMessage> msgs) {
     final voices = msgs
         .where((m) =>
@@ -8704,29 +8718,68 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _extOf(m.plaintext).toLowerCase() == 'wav')))
         .toList();
     if (voices.isEmpty) return;
+    final serverAuto = _voiceTranscriptAuth == 'server';
     unawaited(() async {
       try {
-        final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
         for (final m in voices) {
-          final ext = _voiceExtOf(m);
-          // 明文缓存：stored 模式长期目录已由 _autoStore 落盘；否则确保缓存存在
-          final file = (_storeAttachments
-                  ? await AttachmentStore.ensure(widget.spaceId, m.env.messageId,
-                      ext, () => _attachmentBytes(m))
-                  : null) ??
-              await MediaCache.ensure(
-                  widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m));
-          t.enqueue(
-            messageId: m.env.messageId,
-            plainPath: file.path,
-            cipherSha256: (m.attachment!['sha256'] as String?) ?? '',
-          );
+          // 逐条 try：单条失败（网络抖动/文件缺失）不影响其余消息
+          try {
+            if (serverAuto) {
+              await _autoServerVoiceTranscript(m);
+            } else {
+              await _enqueueLocalVoiceTranscript(m);
+            }
+          } catch (_) {
+            // 纯增强功能：单条失败静默
+          }
         }
         _updateAudioPlayback(() {}); // 状态变化 → 气泡下方转写区刷新
       } catch (_) {
-        // 单条失败不影响消息流（转写是纯增强功能）
+        // 兜底（理论不可达）：不影响消息流
       }
     }());
+  }
+
+  /// 本地模型转写入队（自动路径与 server 回落共用）：明文走解密缓存的确定性
+  /// 路径；service 内部串行 + 幂等（当前模型版本的有效 done 行不重算，模型未
+  /// 就绪落 `unavailable` 供手动入口）。
+  Future<void> _enqueueLocalVoiceTranscript(HistoryMessage m) async {
+    final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
+    final ext = _voiceExtOf(m);
+    // 明文缓存：stored 模式长期目录已由 _autoStore 落盘；否则确保缓存存在
+    final file = (_storeAttachments
+            ? await AttachmentStore.ensure(
+                widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m))
+            : null) ??
+        await MediaCache.ensure(
+            widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m));
+    t.enqueue(
+      messageId: m.env.messageId,
+      plainPath: file.path,
+      cipherSha256: (m.attachment!['sha256'] as String?) ?? '',
+    );
+  }
+
+  /// server 模式的**自动**转写（手动重转不走这——它无条件重转）：
+  /// - 旧 m4a 不上送：服务端只吃 PCM16 wav（PROTOCOL.md §6.3），上传必 400；
+  /// - 幂等：已有 done/pending 行不重转——防首屏历史页把旧语音全量上送（撞
+  ///   per-IP 10 次/小时限流桶），也防实时刷新重复触发；failed/stale/
+  ///   unavailable 才转；
+  /// - 服务端未启用（TRANSCRIBE_DISABLED）→ 回落本地模型（§15.1 ③既定回落
+  ///   语义；说明 notice 由 _serverVoiceTranscribe 出）。
+  Future<void> _autoServerVoiceTranscript(HistoryMessage m) async {
+    if (_voiceExtOf(m) != 'wav') return;
+    final existing = await (_voiceDb.select(_voiceDb.localVoiceTranscripts)
+          ..where((t) => t.messageId.equals(m.env.messageId)))
+        .getSingleOrNull();
+    if (existing != null &&
+        (existing.status == 'done' || existing.status == 'pending')) {
+      return;
+    }
+    final outcome = await _serverVoiceTranscribe(m);
+    if (outcome == _ServerTranscriptOutcome.disabled) {
+      await _enqueueLocalVoiceTranscript(m);
+    }
   }
 
   /// 图片明文（发送端本地密文解密 / 接收端服务端拉取）：按 messageId 缓存 future，
@@ -9388,8 +9441,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
         if (ok != true || !mounted) return;
       }
-      await _serverVoiceTranscribe(m);
-      return;
+      // 服务端未启用（_serverVoiceTranscribe 已出说明 notice）→ 落穿到下面的
+      // 本地路径（§15.1 ③既定回落语义）；done/failed 都已收尾，直接返回。
+      if (await _serverVoiceTranscribe(m) !=
+          _ServerTranscriptOutcome.disabled) {
+        return;
+      }
     }
     try {
       if (!await VoiceTranscriptModel.isReady()) {
@@ -9425,7 +9482,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// `POST /transcriptions`，服务端 whisper.cpp 即转即删，文本写本地转写表
   /// （modelId='whisper-server'，与本地 sense-voice 行共用同一 UI 渲染）。
   /// 失败置 failed 行（可再点重试），notice 带服务端错误原话。
-  Future<void> _serverVoiceTranscribe(HistoryMessage m) async {
+  ///
+  /// 返回值见 [_ServerTranscriptOutcome]：手动重转忽略它；自动路径与手动
+  /// 路径在 [disabled]（服务端未启用）时按 §15.1 ③ 既定语义回落本地模型。
+  Future<_ServerTranscriptOutcome> _serverVoiceTranscribe(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
     final messageId = m.env.messageId;
     final cipherSha256 = (m.attachment!['sha256'] as String?) ?? '';
@@ -9458,7 +9518,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
             ),
           );
+      _updateAudioPlayback(() {});
+      return _ServerTranscriptOutcome.done;
     } catch (e) {
+      // 服务端未启用转写（503 TRANSCRIBE_DISABLED）：不算失败——按 §15.1 ③
+      // 既定回落语义交还调用方改走本地模型。pending 行留给随后的本地入队
+      // 覆写（本地 service 见到非 done 行会照常处理），不落 failed。
+      if (e is ApiException && e.code == 'TRANSCRIBE_DISABLED') {
+        if (mounted) {
+          _notice(context, l10n.voiceTranscriptServerDisabled);
+        }
+        return _ServerTranscriptOutcome.disabled;
+      }
       await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
             LocalVoiceTranscriptsCompanion.insert(
               messageId: messageId,
@@ -9471,8 +9542,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (mounted) {
         _notice(context, l10n.voiceTranscriptServerFailed('$e'));
       }
+      _updateAudioPlayback(() {});
+      return _ServerTranscriptOutcome.failed;
     }
-    _updateAudioPlayback(() {});
   }
 
   /// 音频文件时长：h/m/s，为零的部分不显示（如 3s、1m 15s、2h 5s）。

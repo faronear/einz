@@ -1196,6 +1196,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get voiceTranscriptServerDisabled =>
+      'Server transcription isn\'t enabled — used the on-device model instead';
+
+  @override
   String get voiceTranscriptPreparing => 'Preparing transcription model…';
 
   @override
