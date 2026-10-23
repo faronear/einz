@@ -335,6 +335,9 @@ jobs:
           MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
           MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
           MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER: ${{ secrets.ASC_API_ISSUER }}
+          ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
         run: |
           APP=build/macos/Build/Products/Release/einz.app
           # flutter 可能嵌入本机 profile（CI 上通常没有，防御性删除）。Developer ID
@@ -354,11 +357,28 @@ jobs:
             -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
           codesign -f -s "$IDENTITY" --timestamp --options runtime --entitlements "$ENT" "$APP"
           codesign --verify -v --strict "$APP"
-          # 公证凭据存入临时 keychain profile（secrets 不落日志）
-          xcrun notarytool store-credentials notary-ci \
-            --apple-id "$MACOS_NOTARY_APPLE_ID" \
-            --team-id "$MACOS_NOTARY_TEAM_ID" \
-            --password "$MACOS_NOTARY_PASSWORD"
+          # 公证凭据存入临时 keychain profile（secrets 不落日志）。
+          # **优先 ASC API key**（与 iOS 上传同一套 secrets）：2026-10-22/23 连续两次
+          # 用 Apple ID + App 密码公证后，stapler 查询公证记录持续 "CloudKit query
+          # ... Record not found"（run 39729360308 / 39875227075，重试 3 分钟仍查不到
+          # ——不是同步延迟，是 Apple ID 私有 CloudKit 库查询通道不稳）；改用 ASC
+          # key 后 stapler 走 App Store Connect API 查询，社区普遍反馈该问题消失。
+          # 缺 ASC secrets 时回退 Apple ID 方式（旧行为）。
+          mkdir -p ~/private_keys
+          printf '%s' "$ASC_P8_KEY" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          chmod 600 "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          if [[ -n "$ASC_API_KEY_ID" && -n "$ASC_API_ISSUER" ]]; then
+            xcrun notarytool store-credentials notary-ci \
+              --key "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8" \
+              --key-id "$ASC_API_KEY_ID" \
+              --issuer "$ASC_API_ISSUER"
+          else
+            echo "⚠️ 未配 ASC secrets，回退 Apple ID + App 密码公证（staple 可能遇到 Record not found）"
+            xcrun notarytool store-credentials notary-ci \
+              --apple-id "$MACOS_NOTARY_APPLE_ID" \
+              --team-id "$MACOS_NOTARY_TEAM_ID" \
+              --password "$MACOS_NOTARY_PASSWORD"
+          fi
           # zip 必须用 ditto（保留 Frameworks 符号链接，zip 命令会破坏结构导致公证失败）
           ditto -c -k --keepParent --sequesterRsrc "$APP" notary-upload.zip
           xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait
