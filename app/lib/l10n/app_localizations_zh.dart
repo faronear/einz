@@ -1113,12 +1113,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAuthServerDesc => '把原始录音发送给远程服务器，完成转写后立即删除。';
 
   @override
-  String get voiceTranscriptAskTitle => '用服务端转写这条？';
-
-  @override
-  String get voiceTranscriptAskBody => '这条消息将发送到远程服务器，完成转写后立即删除。';
-
-  @override
   String voiceTranscriptServerFailed(String error) {
     return '服务端转写失败：$error';
   }
@@ -1134,7 +1128,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get voiceTranscriptAutoDesc =>
-      '关闭时，每条语音转写前都会询问（默认，更省流量）；开启后按上面的方式自动转写。';
+      '关闭时，语音消息不会自动转写，可长按消息手动转写（默认）；开启后按上面的方式自动转写。';
 
   @override
   String get voiceTranscriptEngineLocalShort => '本机';
@@ -1146,14 +1140,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoOn => '自动';
 
   @override
-  String get voiceTranscriptAutoOff => '询问';
-
-  @override
-  String get voiceTranscriptAskLocalTitle => '转写这条语音？';
-
-  @override
-  String get voiceTranscriptAskLocalBody =>
-      '将用本机模型转写。首次使用需下载约 230MB 模型，之后完全不联网、服务器也接触不到音频。';
+  String get voiceTranscriptAutoOff => '关';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';

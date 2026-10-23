@@ -2036,18 +2036,6 @@ abstract class AppLocalizations {
   /// **'Voice messages are sent to a cloud server, and deleted immediately after transcribing.'**
   String get voiceTranscriptAuthServerDesc;
 
-  /// No description provided for @voiceTranscriptAskTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcribe on server?'**
-  String get voiceTranscriptAskTitle;
-
-  /// No description provided for @voiceTranscriptAskBody.
-  ///
-  /// In en, this message translates to:
-  /// **'This voice message will be sent to a cloud server, and deleted immediately after transcription.'**
-  String get voiceTranscriptAskBody;
-
   /// No description provided for @voiceTranscriptServerFailed.
   ///
   /// In en, this message translates to:
@@ -2075,7 +2063,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoDesc.
   ///
   /// In en, this message translates to:
-  /// **'When off, you\'ll be asked before each transcription (default — saves data). When on, messages are transcribed automatically with the method above.'**
+  /// **'When off, voice messages aren\'t transcribed automatically — long-press a message to transcribe manually (default). When on, messages are transcribed automatically with the method above.'**
   String get voiceTranscriptAutoDesc;
 
   /// No description provided for @voiceTranscriptEngineLocalShort.
@@ -2099,20 +2087,8 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoOff.
   ///
   /// In en, this message translates to:
-  /// **'Ask'**
+  /// **'Off'**
   String get voiceTranscriptAutoOff;
-
-  /// No description provided for @voiceTranscriptAskLocalTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcribe this voice message?'**
-  String get voiceTranscriptAskLocalTitle;
-
-  /// No description provided for @voiceTranscriptAskLocalBody.
-  ///
-  /// In en, this message translates to:
-  /// **'This uses the on-device model. The first transcription downloads a ~230MB model; after that, nothing leaves your device.'**
-  String get voiceTranscriptAskLocalBody;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.
   ///

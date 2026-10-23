@@ -6919,18 +6919,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       label: l10n.chatPageActionSave,
                       onTap: () => Navigator.of(ctx).pop('save'),
                     ),
-                  // 语音转写（2026-10-23 老板重构「每条询问」后，这是**自动转写
-                  // 关闭时的唯一入口**——没有行就没有行内提示，必须从菜单进；
-                  // 自动开启时也可用它手动重转）。显示条件与自动入队同口径：
-                  // 语音消息（任意容器——旧 m4a 点了由 _transcribeVoiceMessage
-                  // 出「不支持」说明，比藏起来更 informative）+ wav 音频文件。
-                  // 放「保存」后面：转写是音频专属动作，挨着音频相关的卡。
-                  if (_voiceTranscriptEligible(m))
-                    _buildActionCard(
-                      icon: Icons.graphic_eq,
-                      label: l10n.voiceTranscriptMenuTranscribe,
-                      onTap: () => Navigator.of(ctx).pop('transcribe'),
-                    ),
                   // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
                   _buildActionCard(
                     icon: Icons.timer_outlined,
@@ -6952,6 +6940,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       icon: Icons.undo_outlined,
                       label: l10n.chatPageActionRecall,
                       onTap: () => Navigator.of(ctx).pop('recall'),
+                    ),
+                  // 语音转写（自动转写关闭时的唯一入口——没有行就没有行内提示，
+                  // 必须从菜单进；自动开启时也可用它手动重转）。显示条件与自动
+                  // 入队同口径：语音消息（任意容器——旧 m4a 点了由
+                  // _transcribeVoiceMessage 出「不支持」说明，比藏起来更
+                  // informative）+ wav 音频文件。放**最后**（老板 2026-10-23：
+                  // 转到撤回后面）——转写是音频专属的低频动作，不挡常用项。
+                  if (_voiceTranscriptEligible(m))
+                    _buildActionCard(
+                      icon: Icons.graphic_eq,
+                      label: l10n.voiceTranscriptMenuTranscribe,
+                      onTap: () => Navigator.of(ctx).pop('transcribe'),
                     ),
                 ]
               ]),
@@ -9463,11 +9463,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 转写一条消息的总入口（长按菜单「转写」卡 + 行内 failed/stale/unavailable
-  /// 提示共用；2026-10-23 老板重构「每条询问」后，它还是**自动转写关闭时
-  /// 的唯一入口**——没有行就没有行内提示，必须从菜单进）：
-  /// - 自动转写**开启**时不问（选自动 = 已授权自动执行）；
-  /// - 自动转写**关闭**时（默认）先弹询问框——不论方式是本机还是服务端
-  ///   （老板定：每条询问；文案随方式变，见 [_confirmVoiceTranscript]）；
+  /// 提示共用；自动转写关闭时没有行就没有行内提示，必须从菜单进）：
+  /// - 点了就直接转，不再弹询问框（老板 2026-10-23 要求：手动点 = 已确认）；
   /// - 旧 m4a 明确提示不支持转写（别"点了没反应"）。
   Future<void> _transcribeVoiceMessage(HistoryMessage m) async {
     if (m.attachment == null) return;
@@ -9478,8 +9475,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           AppLocalizations.of(context)!.voiceTranscriptLegacyAudio);
       return;
     }
-    final l10n = AppLocalizations.of(context)!;
-    if (!_voiceTranscriptAuto && !await _confirmVoiceTranscript(l10n)) return;
     if (_voiceTranscriptEngine == 'server') {
       // 服务端未启用（_serverVoiceTranscribe 已出说明 notice）→ 落穿到本地
       // 路径（§15.1 ③既定回落语义）；done/failed 都已收尾，直接返回。
@@ -9489,31 +9484,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     }
     await _transcribeVoiceLocally(m);
-  }
-
-  /// 询问框（文案随转写方式变）：服务端 = 上传隐私说明（明文上送、即转即删）；
-  /// 本机 = 首次需下载模型的说明。返回 true = 用户确认执行。
-  Future<bool> _confirmVoiceTranscript(AppLocalizations l10n) async {
-    final server = _voiceTranscriptEngine == 'server';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(server
-            ? l10n.voiceTranscriptAskTitle
-            : l10n.voiceTranscriptAskLocalTitle),
-        content: Text(server
-            ? l10n.voiceTranscriptAskBody
-            : l10n.voiceTranscriptAskLocalBody),
-        actions: [
-          CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.confirm),
-          ),
-        ],
-      ),
-    );
-    return ok == true && mounted;
   }
 
   /// 本机模型转写一条（方式=local 的手动路径；模型未就绪先弹准备对话框，

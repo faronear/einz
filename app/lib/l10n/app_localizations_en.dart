@@ -1177,13 +1177,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Voice messages are sent to a cloud server, and deleted immediately after transcribing.';
 
   @override
-  String get voiceTranscriptAskTitle => 'Transcribe on server?';
-
-  @override
-  String get voiceTranscriptAskBody =>
-      'This voice message will be sent to a cloud server, and deleted immediately after transcription.';
-
-  @override
   String voiceTranscriptServerFailed(String error) {
     return 'Server transcription failed: $error';
   }
@@ -1200,7 +1193,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAutoDesc =>
-      'When off, you\'ll be asked before each transcription (default — saves data). When on, messages are transcribed automatically with the method above.';
+      'When off, voice messages aren\'t transcribed automatically — long-press a message to transcribe manually (default). When on, messages are transcribed automatically with the method above.';
 
   @override
   String get voiceTranscriptEngineLocalShort => 'Local';
@@ -1212,14 +1205,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptAutoOn => 'Auto';
 
   @override
-  String get voiceTranscriptAutoOff => 'Ask';
-
-  @override
-  String get voiceTranscriptAskLocalTitle => 'Transcribe this voice message?';
-
-  @override
-  String get voiceTranscriptAskLocalBody =>
-      'This uses the on-device model. The first transcription downloads a ~230MB model; after that, nothing leaves your device.';
+  String get voiceTranscriptAutoOff => 'Off';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';
