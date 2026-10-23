@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
@@ -117,6 +119,9 @@ class VoiceTranscriptService {
     required String path,
     required String modelDir,
   }) {
+    // 喂给 sherpa 前先验 wav 头（见 [validateWavHeader]）——原生层除零
+    // SIGFPE 直接杀进程，Dart catch 拦不住，必须在进原生前拦下。
+    validateWavHeader(path);
     // 包要求**每个**用到 sherpa 的 isolate 先 initBindings 一次：缺了绑定表
     // 全是 null → 建 recognizer 即抛 "Please initialize sherpa-onnx first"
     // → 重试耗尽落 failed（老板 2026-10-22 实测"转写失败"的根因之一）。
@@ -147,6 +152,65 @@ class VoiceTranscriptService {
     } finally {
       stream.free();
       rec.free();
+    }
+  }
+
+  /// 转写前校验 wav 文件头：RIFF/WAVE 标记 + `data` 块存在且非空。
+  ///
+  /// 不合格（录音中断落下的空壳、data=0 等）直接抛异常 → 由
+  /// [_processOne] 的重试耗尽落 `failed`，**绝不进 sherpa 原生层**：
+  /// sherpa-onnx 对 0 采样数据会在原生代码里除零 SIGFPE，杀掉整个
+  /// 进程（Dart catch 拦不住，2026-10-23 模拟器「进聊天页必崩」的根因——
+  /// tmp 里一条断录的 einz_voice_*.wav，data 块 0 字节，每次进页自动
+  /// 补转写即崩即重试成死循环）。
+  ///
+  /// 块头逐个增量读（不开整个文件进内存）；跳过 JUNK/FLLR 等填充块
+  /// （iOS 录音器会插），遍历规则与 sherpa wave-reader 一致——但它不查
+  /// data 是否为空，那正是 SIGFPE 的来源。
+  static void validateWavHeader(String path) {
+    final f = File(path).openSync();
+    try {
+      final len = f.lengthSync();
+      final head = f.readSync(12);
+      // 'RIFF'....'WAVE'
+      if (head.length < 12 ||
+          head[0] != 0x52 || head[1] != 0x49 ||
+          head[2] != 0x46 || head[3] != 0x46 ||
+          head[8] != 0x57 || head[9] != 0x41 ||
+          head[10] != 0x56 || head[11] != 0x45) {
+        throw ArgumentError('not a RIFF/WAVE file: $path (${len}B)');
+      }
+      var pos = 12;
+      final idBuf = List<int>.filled(4, 0);
+      while (pos + 8 <= len) {
+        f.setPositionSync(pos);
+        f.readIntoSync(idBuf, 0, 4);
+        final size = ByteData.sublistView(f.readSync(4))
+            .getUint32(0, Endian.little);
+        if (idBuf[0] == 0x64 && idBuf[1] == 0x61 && // 'data'
+            idBuf[2] == 0x74 && idBuf[3] == 0x61) {
+          if (size == 0 || pos + 8 + size > len) {
+            throw ArgumentError(
+                'empty/truncated data chunk ($size B): $path');
+          }
+          return;
+        }
+        pos += 8 + size + (size & 1); // 块按 2 字节对齐
+      }
+      throw ArgumentError('no data chunk found: $path');
+    } finally {
+      f.closeSync();
+    }
+  }
+
+  /// 文件是否含真实音频数据（录音侧发送/进预览前判定用）。
+  /// 任何读不出来的情况（文件缺失/头损坏）都算无数据。
+  static bool hasAudioData(String path) {
+    try {
+      validateWavHeader(path);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

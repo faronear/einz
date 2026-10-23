@@ -7624,6 +7624,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (_playingMessageId != null) _playingMessageId = null;
       if (_audioStartedMessageId != null) _audioStartedMessageId = null;
       await _player?.stop();
+      // 清扫孤儿临时录音：录音中 app 被杀（热重启/闪退）会留下没人停的
+      // einz_voice_*.wav——上次那条 data=0 的断录文件就是这样泄漏的，之后
+      // 每次进聊天页自动补转写都崩。此刻必然没有录音在跑（上面 inputMode
+      // 守卫），tmp 里所有前缀匹配的文件都是残骸，直接删。
+      try {
+        final tmp = Directory.systemTemp;
+        await for (final e in tmp.list()) {
+          if (e is File &&
+              e.path.contains('einz_voice_') &&
+              e.path.endsWith('.wav') &&
+              e.path != old) {
+            await e.delete().catchError((_) => e);
+          }
+        }
+      } catch (_) {
+        // 清扫失败不影响开录
+      }
       final recorder = (_recorder ??= AudioRecorder());
       // 安卓端 start() 不会自动申请 RECORD_AUDIO 运行时权限（manifest 静态声明
       // 不够，Android 6.0+ 需动态授权），必须先 hasPermission() 显式申请，
@@ -7704,7 +7721,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       var ok = false;
       if (path != null) {
         final f = File(path);
-        ok = await f.exists() && await f.length() > 0;
+        // 只查「文件存在且 >0」不够：iOS 录音器空录/断录也会产出几 KB 的
+        // 头文件（JUNK/FLLR 填充块、data 块 0 字节），发出去对端转写即
+        // 触发 sherpa 原生除零 SIGFPE（2026-10-23「进聊天页必崩」的源头）。
+        // 必须验到 data 块确有音频字节才算有效录音。
+        ok = await f.exists() &&
+            await f.length() > 0 &&
+            VoiceTranscriptService.hasAudioData(path);
       }
       if (!mounted) return;
       // 空录音（权限被系统拒后仍可能走到这里）不再静默回文字态，给明确反馈
