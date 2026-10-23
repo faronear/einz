@@ -15626,3 +15626,13 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 引用块/菜单预览（tappable:false）同样生效：面板区分视觉全场景一致，播放点击范围同步收窄。
 
 **验证：** flutter analyze 干净。
+
+## 2026-10-23 转写区改黑灰字体（弃半透明面板方案）
+
+**（2026-10-23T23:31:16Z / 2026-10-24 07:31）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板反馈：半透明面板与被引用消息块观感太像，改用更简方案——转写文字直接黑灰色。
+
+**实现：** 去掉 panel() 容器（恢复 Padding top 4）；转写区文字/图标改定色 `#3A3A3A`（黑灰），重试/入口的下划线链接用 70% 透明度同色。渐变深气泡彩色底上靠明度反差区分（白=播放区、深灰=转写区），素雅浅气泡上自然可读；app 无 darkTheme（main.dart 只注册浅色），无需分主题。`_buildVoiceTranscriptLine` 的 foreground 参数不再使用，已删除。
+
+**验证：** flutter analyze 干净。

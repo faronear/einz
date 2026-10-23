@@ -9275,7 +9275,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 的行内入口（老板 2026-10-23）：点击直接按当前方式发起转写，入队后被
         // pending/done 行顶替。转写行只在消息流气泡挂（inlineTranscribeEntry
         // 由调用点控制），引用块/菜单预览的点击语义不同，不给。
-        _buildVoiceTranscriptLine(m, foreground,
+        _buildVoiceTranscriptLine(m,
             manualEntry: isVoice && inlineTranscribeEntry),
       ],
     );
@@ -9300,7 +9300,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   （云=服务端 / 芯片=本机），与各行首图标同一语义；
   /// - 无行且 [manualEntry] 为 false（引用块/菜单预览/自动模式）→ 不占位。
   /// - 所有状态行首都带来源图标（云=服务端 whisper / 芯片=本地 sense-voice）；
-  Widget _buildVoiceTranscriptLine(HistoryMessage m, Color foreground,
+  /// - 行样式**不随气泡前景色**（黑灰定色，见 builder 内注释）。
+  Widget _buildVoiceTranscriptLine(HistoryMessage m,
       {bool manualEntry = false}) {
     if (m.attachment == null) return const SizedBox.shrink();
     // watch 单行：转写完成/状态变化时此行自动重建（细粒度刷新，不牵动整个消息列表）
@@ -9312,28 +9313,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               .watchSingleOrNull(),
       builder: (context, snap) {
         final t = snap.data;
-        // 转写区内嵌面板（老板 2026-10-23：转写区原先与播放区同底色、又同在播放
-        // 胶囊里，分不清）：半透明圆角底 + 内边距，与气泡本体/播放区区分开。
-        // 底色取前景色 10%——渐变深气泡前景是白 → 浅白块；素雅浅气泡/引用条
-        // 前景是主题蓝 → 淡蓝块，两种主题下都可见且不刺眼。
-        Widget panel(Widget child) => Container(
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: foreground.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: child,
-            );
+        // 转写区样式（老板 2026-10-23 定稿）：不用面板底色——半透明块与引用块
+        // 观感太像；改为**黑灰字体**（#3A3A3A），在渐变深气泡的彩色底上靠明度
+        // 反差区分（白色系=播放区，深灰=转写区），素雅浅气泡上也自然可读。
+        // app 只有浅色模式（main.dart 无 darkTheme），无需再分主题。
+        const transcriptColor = Color(0xFF3A3A3A);
         if (t == null) {
           // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
           // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
           if (!manualEntry) return const SizedBox.shrink();
           final l10n = AppLocalizations.of(context)!;
-          final TextStyle style =
-              TextStyle(fontSize: 13, color: foreground.withValues(alpha: 0.85));
-          return panel(
-            Row(
+          const style = TextStyle(fontSize: 13, color: transcriptColor);
+          return Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -9341,7 +9334,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _voiceTranscriptEngine == 'server'
                         ? 'whisper-server'
                         : 'sense-voice-small',
-                    foreground),
+                    transcriptColor),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Clickable(
@@ -9349,7 +9342,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     child: Text(l10n.voiceTranscriptMenuTranscribe,
                         style: style.copyWith(
                             decoration: TextDecoration.underline,
-                            color: foreground.withValues(alpha: 0.7))),
+                            color: transcriptColor.withValues(alpha: 0.7))),
                   ),
                 ),
               ],
@@ -9357,18 +9350,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           );
         }
         final l10n = AppLocalizations.of(context)!;
-        final TextStyle style = TextStyle(fontSize: 13, color: foreground.withValues(alpha: 0.85));
+        const style = TextStyle(fontSize: 13, color: transcriptColor);
         switch (t.status) {
           case 'done':
             if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
-            return panel(
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
               // mainAxisSize.min：Row 默认 max 会占满气泡最大宽，把整条语音气泡
               // 拉到全宽（转写再短也一样，2026-10-23 实测），必须收缩到内容宽。
-              Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _voiceTranscriptSourceIcon(t.modelId, foreground),
+                  _voiceTranscriptSourceIcon(t.modelId, transcriptColor),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(t.transcript.trim(),
@@ -9378,12 +9372,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             );
           case 'pending':
-            return panel(
-              Row(
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _voiceTranscriptSourceIcon(t.modelId, foreground),
+                  _voiceTranscriptSourceIcon(t.modelId, transcriptColor),
                   const SizedBox(width: 4),
                   Text(l10n.voiceTranscribing, style: style),
                 ],
@@ -9395,12 +9390,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 行首同样带来源图标（老板 2026-10-23）：失败行的 modelId 在写入时
             // 就已落定（本地失败=sense-voice-small，服务端失败=whisper-server），
             // 与 done/pending 同一判断，点按重试不改变来源语义。
-            return panel(
-              Row(
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _voiceTranscriptSourceIcon(t.modelId, foreground),
+                  _voiceTranscriptSourceIcon(t.modelId, transcriptColor),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Clickable(
@@ -9413,7 +9409,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 : l10n.voiceTranscriptManual,
                         style: style.copyWith(
                             decoration: TextDecoration.underline,
-                            color: foreground.withValues(alpha: 0.7)),
+                            color: transcriptColor.withValues(alpha: 0.7)),
                       ),
                     ),
                   ),
