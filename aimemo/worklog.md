@@ -15538,4 +15538,13 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 文档：aimemo/voiceTranscript.zhcn.md §8 补「macOS 容器坑」小节（三个归一化调用点 + 服务端双保险）。
 - 备注：FLLR 填充 3984B/条被剥掉后单条语音消息体积降 ~6%；老消息（存量 extensible 密文）不动，转写时归一化。
 
+**（2026-10-23T14:20:00Z / 2026-10-23 22:20）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：补 _serverVoiceTranscribe 上传前归一化——上轮静默漏掉的调用点（老板实测复现）
+- 复现路径（老板报告）：远程转写终于走到服务端（失败行正确显示云图标），但仍报 only PCM wav supported；客户端（本地）转写成功。
+- 根因一（我的错）：f25b3331 声称三个归一化点，实际 _serverVoiceTranscribe 里那处 Edit 因 REPL 脚本语法错误**静默跳过**——当时只验了 analyze 通过，没核对编辑落盘，commit message 名不副实。录音前（chat_page:7768）与本地喂 isolate 前（service:86）两处一直在（所以本地转写始终是好的），缺的正是上传前这处：老消息原样 extensible 上送 → 服务端 reject。
+- 根因二（环境）：服务端进程 15:56 启动，早于 20:35 落地的服务端修复——tsx 启动时编译，进程不重启则磁盘新代码不生效，跑的仍是拒 0xFFFE 的旧逻辑。
+- 修复：chat_page.dart:9564 补 `normalizeWavBytes(await _attachmentBytes(m))`，**grep 逐行核实落地**后才提交（09ba758e）；三处调用点齐。客户端修复后上传即 tag=1，旧服务端也收——app 重build 即可测通；服务端重启（吃进 0xFFFE 接受逻辑）作为双保险另行安排。
+- 验证：analyze 零问题；wav_normalize 6 例 + 转写行 4 例全过；等老板 npm run app-mac-run 复测（老消息 + 远程 → 预期云图标 + 文字）。
+- 教训：多步编辑后必须验证编辑真的落盘（grep/read 回读），不能只信 analyze/测试通过——测试过得部分不包括没写进去的部分。
+
+
 
