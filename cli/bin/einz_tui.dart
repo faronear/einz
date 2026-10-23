@@ -526,6 +526,10 @@ Future<(EntranceStore, String, String)> _onboard(String storePath, String server
       welcome.add('✅ 新通道名称: $entranceName');
     }
     welcome.add('✅ 新通道公钥: ${store.publicKey}');
+    // store 路径与身份信息同块（老板 2026-10-23：放在分隔线**前面**，
+    // 不单独占一条系统消息——已有 store 直接进聊天时什么都不刷，随问随答
+    // 走 /store 命令）
+    welcome.add('📁 Store: $storePath');
     welcome.add('----------------');
     for (final line in welcome) {
       stdout.writeln(line);
@@ -937,7 +941,6 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   // processing=true：倒计时期间忽略输入、隐藏光标（复用 busy 机制——此时尚未进入
   // 聊天态，敲字不应被当作消息提交；Ctrl+C 仍可退出）
   _state!.processing = true;
-  session.messages.add(_systemMessage(session, '----------------'));
   // 欢迎辞与读秒拆成两条 system 消息（老板 2026-09-18）：读秒独立成条且逐秒
   // 追加数字不覆盖——"5 4 3 …"式历史可回看，最后 5 4 3 2 1 完整呈现
   session.messages.add(_systemMessage(session, '一切就绪！即将进入秘境与同伴聊天 💞'));
@@ -1175,7 +1178,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
   }
 }
 
-/// Multiverse：/space join <链接或 token> 加入已有空间（preflight 校验 →
+/// Multiverse：/space join <链接或通道码> 加入已有空间（preflight 校验 →
 /// join 通道登记 + 签发绑定 Space 的 session → 口令 escrow 取 Space Key）。
 Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePath, String input) async {
   final server = session.server;
@@ -1480,11 +1483,6 @@ Future<void> main(List<String> args) async {
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/myeinz.json）
-  // 启动即亮出 store 路径（老板 2026-10-23）：npm 包装脚本虽也 echo 过，但 TUI 首帧
-  // 清屏（2J/3J）后不可见；直跑 dart run 时压根没有。走 _guidanceNotes——
-  // loadHistory 开头会 clear messages，启动类系统消息必须排在其后才落得下来
-  // （与 DNS 污染警报/未识别警告同一机制，见下方 flush 循环）。
-  _guidanceNotes.add('📁 Store: $storePath');
 
   // 启动自检：**只有服务端明确撤销本通道**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该通道的 sessions）→ 清 token 走挑战重认证；挑战返回
@@ -4082,6 +4080,7 @@ Future<void> _execCommand(String line) async {
         ('/server <地址>', '查看当前服务端；带地址参数：切换服务端（仅本次生效）'),
         ('/space', '查看当前连接的秘境'),
         ('/status', '查看服务器/连接/绑定/通道状态（排障用，只读）'),
+        ('/store', '查看当前 store 文件路径（多 store 场景确认连的是哪个文件）'),
         ('/switch <store路径>', '切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）'),
         ('/sync', '同步最新消息流'),
       ];
@@ -4232,7 +4231,7 @@ Future<void> _execCommand(String line) async {
       // Multiverse：空间绑定命令——一通道一空间。
       // /space（无参）显示状态与用法；/space address 显示空间地址；
       // /space create 新建空间（生成 Space Key + 口令密封包，打印邀请链接）；
-      // /space join <邀请链接或 token> 加入已有空间（preflight → join → 口令取钥）
+      // /space join <邀请链接或通道码> 加入已有空间（preflight → join → 口令取钥）
       if (arg.trim().isEmpty) {
         final addr = s.session.store.spaceAddress;
         if (s.session.hasSpace) {
@@ -4241,7 +4240,7 @@ Future<void> _execCommand(String line) async {
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前通道尚未绑定秘境'));
         }
-        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
+        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或通道码> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
         break;
       }
       {
@@ -4264,7 +4263,7 @@ Future<void> _execCommand(String line) async {
         if (sub == 'join') {
           final rest = arg.trim().substring('join'.length).trim();
           if (rest.isEmpty) {
-            s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space join <邀请链接或 token>'));
+            s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space join <邀请链接或通道码>'));
             break;
           }
           await _spaceJoin(s.session, s.session.store, s.storePath, rest);
@@ -4448,6 +4447,12 @@ Future<void> _execCommand(String line) async {
       }
     case '/history':
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
+    case '/store':
+      // 当前 store 文件路径（老板 2026-10-23）：启动时**不再自动亮出**——已有
+      // store 直接进聊天不该被这条打扰；新通道走身份横幅（📁 行在分隔线前）。
+      // 多 store 场景（--store / STORE / /switch）随问随答，与 /switch 配套。
+      s.session.messages.add(_systemMessage(s.session, '📁 Store: ${s.storePath}'));
+      break;
     case '/switch':
       // 切换到另一个 store 文件（不退出进程）——多空间日常用法（老板 2026-10-08）。
       // 目标空间有 PIN 才要求解锁（"进来要解锁，离开不设卡"——只验目标，不重验
@@ -4671,7 +4676,7 @@ Future<void> _execCommand(String line) async {
 }
 
 /// /entoken：生成一次性通道码（join token——24h 一次性；v1 通道码已废弃，
-/// 新通道用 /space join <链接或 token> 绑定）。三种签法（老板 2026-10-07 定名）：
+/// 新通道用 /space join <邀请链接或通道码> 绑定）。三种签法（老板 2026-10-07 定名）：
 /// - 无参         → 给我自己的其他设备开通道（attach 进我的已有身份，免口令）
 /// - `invite`     → 给新人生成通道码（开新身份，加入时自填名字；/invite 别名）
 /// - `reinvite`   → 给其他成员生成专属码（进他的已有身份，需共享口令）
