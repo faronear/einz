@@ -381,7 +381,20 @@ jobs:
           fi
           # zip 必须用 ditto（保留 Frameworks 符号链接，zip 命令会破坏结构导致公证失败）
           ditto -c -k --keepParent --sequesterRsrc "$APP" notary-upload.zip
-          xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait
+          # **必须解析 submit 的 JSON status**：公证被判 Invalid 时 notarytool 也
+          # exit 0（electron/notarize 社区同款坑），只看退出码会一路走到 stapler，
+          # 得到的只是不知所云的 "CloudKit query ... Record not found"——Invalid 的
+          # 公证不发布 ticket，重试多久都查不到（run 39729360308/39875227075/39876828935
+          # 三连败的真相）。status 非 Accepted 当场打 notarytool log 拿 Apple 的拒绝原因。
+          SUBMIT_JSON=$(xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait --output-format json)
+          echo "$SUBMIT_JSON"
+          STATUS=$(printf '%s' "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')
+          SUB_ID=$(printf '%s' "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))')
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "❌ 公证未通过（status=$STATUS）——Apple 拒绝原因："
+            xcrun notarytool log "$SUB_ID" --keychain-profile notary-ci || true
+            exit 1
+          fi
           # stapler 要到 Apple CloudKit 查公证记录；submit --wait 成功后记录同步到
           # stapler 侧偶发延迟（"CloudKit query ... Record not found"，2026-10-22
           # CI run 39729360308 实测），加退避重试——通常 1-2 分钟内可查。
