@@ -149,6 +149,10 @@ class _TuiState {
   /// 机密输入模式（口令等）：输入行回显 *（而非原文）。
   bool hiddenInput = false;
 
+  /// 当前问答只收数字（锁屏码验证，老板 2026-10-23）：非数字字符直接忽略
+  /// （与 App 的 digitsOnly 输入过滤器同口径——输错字符无声丢弃，不回显）。
+  bool promptDigitsOnly = false;
+
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
 
@@ -238,6 +242,33 @@ bool _onboardingFinalized = false;
 /// 标题栏两侧一律渲染中性占位「?」——本地缓存的成员名称表（store.memberNames /
 /// peerName / memberName 兜底）此时不得上屏，否则锁屏期间真实名字直接暴露在标题栏。
 bool _identityHidden = false;
+
+/// 无操作自动锁屏（老板 2026-10-23，对齐 App：app/lib/data/lock_timer.dart）：
+/// 默认 30s、可调 20s~20min（App 侧 2026-10-18 定死的范围，TUI 对齐）。
+/// **仅已设锁屏码时生效**——没设 PIN 无从验证，锁了只能干等（与 App 同规则：
+/// 无锁包不锁）。阈值经 /lock <秒> 调整，本次会话有效，重启恢复默认。
+const int kTuiLockSeconds = 30;
+const int kTuiLockMinSeconds = 20;
+const int kTuiLockMaxSeconds = 20 * 60;
+
+/// 当前生效的自动锁阈值（秒）。
+int _idleLockSeconds = kTuiLockSeconds;
+
+/// 空闲自动锁屏中：身份不渲染（_identityHidden）、消息区只显解锁流程的系统
+/// 消息、所有输入按锁屏码处理（隐藏回显）——效果等同 App 的覆盖锁屏。
+bool _idleLocked = false;
+
+/// 锁定时刻的消息条数——消息区遮蔽起点：只渲染其后**且 isSystem** 的消息
+/// （解锁提示/错误提示；锁定后到达的聊天内容一概不上屏），解锁后整条消息流
+/// 原样恢复（历史一直在内存，无需重载）。
+int _lockedFromIndex = 0;
+
+/// 最后一次用户操作时刻：任意按键（含方向键/翻页/滚轮——与 App"滚动算交互"
+/// 同口径）。看门狗据此判断无操作超时。
+DateTime _lastActivityAt = DateTime.now();
+
+/// 自动锁看门狗（1s 粒度；退出前必须取消，否则事件循环不空闲、进程挂起）。
+Timer? _idleWatchdog;
 
 /// 入网向导收尾：向导完成后作为最后一条 system 消息出现，随后自动
 /// 倒计时（屏幕上跳动显示剩余秒数）进入聊天态——倒计时结束清空全部 system
@@ -526,6 +557,10 @@ Future<(EntranceStore, String, String)> _onboard(String storePath, String server
       welcome.add('✅ 新通道名称: $entranceName');
     }
     welcome.add('✅ 新通道公钥: ${store.publicKey}');
+    // store 路径与身份信息同块（老板 2026-10-23：放在分隔线**前面**，
+    // 不单独占一条系统消息——已有 store 直接进聊天时什么都不刷，随问随答
+    // 走 /store 命令）
+    welcome.add('📁 Store: $storePath');
     welcome.add('----------------');
     for (final line in welcome) {
       stdout.writeln(line);
@@ -568,16 +603,24 @@ Future<bool> _verifyPin(String hash, String pin) async {
 }
 
 /// 启动进对话前：store 已设 PIN 则校验解锁（错误重试）；未设直接进。
+/// 薄封装 [_promptUnlock]（exitOnEmpty=true：启动期空回车即退出）。
+/// 返回 true = 验证通过（false = 解锁期退出，running 已为 false）。
+Future<bool> _unlockPin(ChatSession session) =>
+    _promptUnlock(session, exitOnEmpty: true);
+
+/// 解锁问答核心（启动解锁与空闲自动锁共用）：隐藏回显 + argon2id 校验 + 错误重试。
 ///
-/// **这一步只认两种输入**（老板 2026-10-13 定，与 App 锁屏页同口径）：
-/// - 输入内容 → 当锁屏码校验。`/exit` 等命令在此**不识别**（只是错码）；
-/// - 直接回车（空）→ 退出整个 TUI（[_TuiState.pendingExitOnEmpty]：输入循环
-///   落地完整退出序列；启动期没有"取消后回到哪里"，退个干净）。
+/// **只认两种输入**（老板 2026-10-13 定，与 App 锁屏页同口径）：输入内容 → 当
+/// 锁屏码校验（`/exit` 等命令在此**不识别**，只是错码）；空回车 → 语义由
+/// [exitOnEmpty] 定（老板 2026-10-23 补充分流）：
+/// - true（启动解锁）：空回车 = 退出整个 TUI——启动期没有"取消后回到哪里"，
+///   退个干净（[_TuiState.pendingExitOnEmpty]：输入循环落地完整退出序列）；
+/// - false（空闲自动锁）：空回车 = 原地重问——会话还在，误碰回车不该丢会话，
+///   Ctrl+C 才是退出。这也更贴近 App 锁屏（无取消按钮，必须输码）。
 ///
 /// PIN **不明文回显**（hidden：输入行回显 *）——TUI 整体策略（老板 2026-10-13）：
 /// **设置**机密时明文回显、随时可 /exit（/pin、入网口令问答）；
-/// **验证**机密时隐藏回显、不认 /exit、直接回车=取消/退出（相当于 App 弹窗
-/// 里按取消按钮）。
+/// **验证**机密时隐藏回显、空回车按上述分流。
 ///
 /// 为什么走消息流问答（[_prompt]）而不是循环外同步读行：旧实现用同步
 /// readByteSync，"中止"（/exit / EOF）只把 running 置 false 就返回，main 不
@@ -585,24 +628,35 @@ Future<bool> _verifyPin(String hash, String pin) async {
 /// 渲染出来**，随后输入循环因 running=false 吞掉所有按键（含 Ctrl+C）挂死，
 /// 只能强杀进程（老板 2026-10-13 实测的 bug）。现在中止统一走输入循环的退出
 /// 序列，main 见 running=false 直接收尾：历史一行都不加载、一帧都不渲染。
-/// 验证成功的确认消息由 **main 在 loadHistory 之后**补（这里不加）：微任务里的
-/// 渲染不落地，且 loadHistory 开头会 clear messages——加在这里只会被抹掉
-/// （2026-10-13 实测）。
+/// 验证成功的确认消息由调用方在合适的时机补（启动路径由 main 在 loadHistory
+/// 之后加——微任务渲染不落地且会被 loadHistory 的 clear 抹掉，2026-10-13 实测；
+/// 空闲锁路径由 [_idleLock] 加）。
 /// 返回 true = 验证通过（false = 解锁期退出，running 已为 false）。
-Future<bool> _unlockPin(ChatSession session) async {
+Future<bool> _promptUnlock(ChatSession session,
+    {required bool exitOnEmpty}) async {
   final hash = session.store.pinHash;
   if (hash == null) return true; // 未设置：直接进入
   // 身份未揭示：解锁前标题栏两侧、状态栏一律只显示产品名——名字/通道/WS
   // 状态/命令提示一概不上屏（老板 2026-10-13：验证通过前屏幕上一个身份
   // 字节都不该出现）。提示语只在消息流里（下面的 _prompt），不占状态栏。
   _identityHidden = true;
+  final promptText = exitOnEmpty
+      ? '❓ 验证锁屏码（直接回车退出）:'
+      : '❓ 验证锁屏码（Ctrl+C 退出）:'; // 空闲锁：空回车不退出，只重问
   while (_state!.running) {
-    _state!.pendingExitOnEmpty = true;
-    final pin = await _prompt(session, '❓ 输入锁屏码（直接回车退出）:',
-        hidden: true, exitOnEmpty: true);
+    _state!.pendingExitOnEmpty = exitOnEmpty;
+    final pin = await _prompt(session, promptText,
+        hidden: true, exitOnEmpty: exitOnEmpty, digitsOnly: true);
     if (!_state!.running) return false; // 解锁期 Ctrl+C / EOF：退出序列已由输入循环跑完
     final answer = pin.trim();
-    if (answer.isEmpty) return false; // 空回车 = 退出整个 TUI（输入循环已落地退出序列）
+    if (answer.isEmpty) {
+      if (exitOnEmpty) return false; // 启动解锁：空回车 = 退出整个 TUI
+      // 空闲锁：空回车原地重问（补一句轻提示，避免"按了没反应"的困惑）
+      session.messages.add(
+          _systemMessage(session, '⚠️ 请输入锁屏码（Ctrl+C 彻底退出）'));
+      _scheduleRender();
+      continue;
+    }
     // argon2id 校验约几十毫秒：期间置 processing 忽略误按键（防被当命令执行）
     _state!.processing = true;
     bool ok;
@@ -610,21 +664,58 @@ Future<bool> _unlockPin(ChatSession session) async {
       ok = await _verifyPin(hash, answer); // str 哈希自含盐，true = 验证通过
     } catch (e) {
       _state!.processing = false;
-      session.messages.add(
-          _systemMessage(session, '⚠️ 锁屏码校验失败: $e（直接回车退出）'));
+      session.messages.add(_systemMessage(session, '⚠️ 锁屏码校验失败: $e'));
       _scheduleRender();
       continue;
     }
     _state!.processing = false;
     if (ok) {
       _identityHidden = false; // 解锁成功：标题栏/状态栏恢复真实身份显示
-      return true; // 成功消息由 main 在 loadHistory 之后补（见函数文档）
+      return true;
     }
-    session.messages.add(
-        _systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入（直接回车退出）'));
+    session.messages.add(_systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入'));
     _scheduleRender();
   }
   return false;
+}
+
+/// 无操作自动锁看门狗回调（1s 粒度）。满足全部条件才锁：
+/// 运行中、未锁、**已设 PIN**、无进行中的问答（引导/口令/解锁——仿 App"被弹层
+/// 盖着不硬锁"）、不忙（processing）、文件浏览器未开。
+void _checkIdleLock() {
+  final s = _state;
+  if (s == null || !s.running || _idleLocked) return;
+  if (s.session.store.pinHash == null) return; // 无 PIN：不锁（无从验证）
+  if (s.pendingGuideCompleter != null) return; // 问答进行中：不锁
+  if (s.processing) return; // 忙（如口令打包/校验）：不锁
+  if (s.browser != null) return; // 文件浏览器：不锁
+  if (DateTime.now().difference(_lastActivityAt).inSeconds < _idleLockSeconds) {
+    return;
+  }
+  _idleLock();
+}
+
+/// 立即锁屏（/lock 手动 或 看门狗超时）：身份隐藏 + 消息区遮蔽 + 解锁问答。
+/// 解锁成功原样恢复（历史一直在内存，无需重载——等同 App"解锁回来继续聊"）。
+Future<void> _idleLock() async {
+  final s = _state;
+  if (s == null || !s.running || _idleLocked) return;
+  if (s.session.store.pinHash == null) return;
+  _idleLocked = true;
+  _identityHidden = true;
+  _lockedFromIndex = s.session.messages.length; // 遮蔽起点：此前的一概不上屏
+  s.input.clear();
+  s.cursor = 0;
+  s.hiddenInput = false;
+  _scheduleRender(); // 先按锁定态画一帧（身份/消息区遮蔽即时生效）
+  final ok = await _promptUnlock(s.session, exitOnEmpty: false);
+  if (!ok) return; // 解锁期 Ctrl+C / EOF：running 已 false，收尾交给 main
+  _idleLocked = false;
+  _identityHidden = false;
+  _lockedFromIndex = 0;
+  _lastActivityAt = DateTime.now(); // 解锁也是一次操作：计时重新起算
+  s.session.messages.add(_systemMessage(s.session, '✅ 锁屏码验证成功，已恢复'));
+  _scheduleRender();
 }
 
 /// 同步读一行（兼容 \r / \n / \r\n）：部分终端回车只发 \r，readLineSync 在
@@ -763,7 +854,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.escrowUploaded = true;
       store.save(storePath);
     } else if (hasBox == false && _state!.running) {
-      session.messages.add(_systemMessage(session, '检测到尚未设置共享口令，现在设置: '));
+      session.messages.add(_systemMessage(session, '检测到没有共享口令，现在设置: '));
       _scheduleRender();
       await _setupEscrowPassphrase(store, storePath, session);
     }
@@ -937,7 +1028,6 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   // processing=true：倒计时期间忽略输入、隐藏光标（复用 busy 机制——此时尚未进入
   // 聊天态，敲字不应被当作消息提交；Ctrl+C 仍可退出）
   _state!.processing = true;
-  session.messages.add(_systemMessage(session, '----------------'));
   // 欢迎辞与读秒拆成两条 system 消息（老板 2026-09-18）：读秒独立成条且逐秒
   // 追加数字不覆盖——"5 4 3 …"式历史可回看，最后 5 4 3 2 1 完整呈现
   session.messages.add(_systemMessage(session, '一切就绪！即将进入秘境与同伴聊天 💞'));
@@ -1151,7 +1241,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
     store.memberId = created.creatorMemberId;
     store.slot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 memberA 判据）
     // 密保箱已随本次 POST /spaces 上传（sealed/escrowPassphrase 成对提交，口令非空才走到这）
-    // → 标记托管就绪。漏了这行的话，下次启动会被判成"尚未设置共享口令"再问一遍
+    // → 标记托管就绪。漏了这行的话，下次启动会被判成"没有共享口令"再问一遍
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = displayName;
@@ -1175,7 +1265,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
   }
 }
 
-/// Multiverse：/space join <链接或 token> 加入已有空间（preflight 校验 →
+/// Multiverse：/space join <链接或通道码> 加入已有空间（preflight 校验 →
 /// join 通道登记 + 签发绑定 Space 的 session → 口令 escrow 取 Space Key）。
 Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePath, String input) async {
   final server = session.server;
@@ -1359,7 +1449,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     store.slot = join.slot; // v2 身份槽位（0=第一人，1=第二人）
     // 密保箱本来就存在（刚才正是靠口令从它取回 Space Key）→ 标记托管就绪。
     // 漏了这行：若加入者选的是 slot=0（同一人的另一条通道），重启后会被判成
-    // "尚未设置共享口令"再问一遍（老板 2026-09-15 反馈）。
+    // "没有共享口令"再问一遍（老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = myName ?? '成员';
     // 群聊一期（2026-10-03）：不再从"另一个 slot 的预置名"推对方名字——
@@ -1480,11 +1570,6 @@ Future<void> main(List<String> args) async {
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/myeinz.json）
-  // 启动即亮出 store 路径（老板 2026-10-23）：npm 包装脚本虽也 echo 过，但 TUI 首帧
-  // 清屏（2J/3J）后不可见；直跑 dart run 时压根没有。走 _guidanceNotes——
-  // loadHistory 开头会 clear messages，启动类系统消息必须排在其后才落得下来
-  // （与 DNS 污染警报/未识别警告同一机制，见下方 flush 循环）。
-  _guidanceNotes.add('📁 Store: $storePath');
 
   // 启动自检：**只有服务端明确撤销本通道**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该通道的 sessions）→ 清 token 走挑战重认证；挑战返回
@@ -1548,6 +1633,12 @@ Future<void> main(List<String> args) async {
     }
     _guidanceNotes.clear();
     _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
+    // 无操作自动锁看门狗（老板 2026-10-23）：仅在已设 PIN 时才会真锁
+    // （_checkIdleLock 内部判 pinHash）——/pin 后补设的码也立即生效，无需重启。
+    _lastActivityAt = DateTime.now();
+    _idleWatchdog?.cancel();
+    _idleWatchdog =
+        Timer.periodic(const Duration(seconds: 1), (_) => _checkIdleLock());
     _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
     // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
     // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
@@ -1585,6 +1676,7 @@ Future<void> main(List<String> args) async {
   _exitRaw();
   session.stopWs();
   _sigwinchSub?.cancel(); // 取消终端尺寸监听：否则 event loop 不空闲，进程挂起回不到命令行
+  _idleWatchdog?.cancel(); // 取消自动锁看门狗（同理：不取消则进程挂起回不到命令行）
   _wipeScreen(); // 清屏+清回滚缓冲：不留 TUI 画面残骸把 shell 提示符顶出窗口
   _printFarewell(session);
   try {
@@ -2126,7 +2218,15 @@ void _render() {
     s.lastMaxStart = 0; // 状态行不走"历史浏览"分支（浏览器有自己的提示）
     s.lastMsgArea = msgArea;
   } else {
-    final msgs = s.session.messages;
+    // 空闲自动锁屏中（老板 2026-10-23）：消息区只渲染锁定时刻之后的**系统**
+    // 消息（解锁提示/错误提示）——锁定后到达的聊天消息（内容！）与一切非系统
+    // 通知一概不上屏；解锁后整条消息流原样恢复（历史一直在内存）。
+    final msgs = _idleLocked
+        ? s.session.messages
+            .sublist(_lockedFromIndex.clamp(0, s.session.messages.length))
+            .where((m) => m.isSystem)
+            .toList()
+        : s.session.messages;
     // 附件固定序号表每帧预计算一次（formatMessage 逐条复用，避免 O(n²) 扫描）
     final attachmentNos = _attachmentNos(s.session);
     for (var i = 0; i < msgs.length; i++) {
@@ -2984,6 +3084,9 @@ Future<void> _runInputLoop() async {
   // 由解码器缓冲拼合后再逐字符处理（避免中文乱码）。
   sub = stdin.transform(utf8.decoder).listen((chunk) {
     try {
+    // 任意输入 = 活动：自动锁看门狗计时器复位（含方向键/翻页/滚轮——与 App
+    // "滚动算交互"同口径；锁定期的 PIN 输入同样复位，解锁后从头起算）
+    _lastActivityAt = DateTime.now();
     var inputChanged = false;
     for (final ch in chunk.split('')) {
       if (!(_state?.running ?? false)) break;
@@ -3116,6 +3219,7 @@ Future<void> _runInputLoop() async {
           // 引导问答回答：提交（含留空——调用方自行判定回退/跳过/取消）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
+          _state!.promptDigitsOnly = false;
           _state!.pendingExitOnEmpty = false;
           if (!gc.isCompleted) gc.complete(answer);
           try {
@@ -3211,6 +3315,11 @@ Future<void> _runInputLoop() async {
         if (_state!.browser != null) {
           _browserChar(_state!, ch);
           inputChanged = true;
+          continue;
+        }
+        // 锁屏码问答只收数字（老板 2026-10-23）：非数字字符无声丢弃——
+        // 与 App 的 digitsOnly 输入过滤器同口径（回显 * 也看不到输过什么）
+        if (_state!.promptDigitsOnly && (code < 48 || code > 57)) {
           continue;
         }
         _insertAtCursor(_state!, ch);
@@ -4072,6 +4181,8 @@ Future<void> _execCommand(String line) async {
         ('/history', ''),
         ('/help', '查看命令列表（本条）'),
         ('/invite', '/entoken invite 的别名：给尚未加入的新成员生成通道码'),
+        ('/lock', '立即锁屏；/lock <秒> 设无操作自动锁阈值（20~1200s，默认 30s，'
+            '本次会话有效；需先 /pin 设锁屏码）'),
         ('/myname <名字>', '修改我的名字'),
         ('/open <附件序号>', '打开 #序号 的附件消息'),
         ('/passphrase <random>', '修改共享口令；random 生成随机 12 词恢复码'),
@@ -4082,6 +4193,7 @@ Future<void> _execCommand(String line) async {
         ('/server <地址>', '查看当前服务端；带地址参数：切换服务端（仅本次生效）'),
         ('/space', '查看当前连接的秘境'),
         ('/status', '查看服务器/连接/绑定/通道状态（排障用，只读）'),
+        ('/store', '查看当前 store 文件路径（多 store 场景确认连的是哪个文件）'),
         ('/switch <store路径>', '切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）'),
         ('/sync', '同步最新消息流'),
       ];
@@ -4232,7 +4344,7 @@ Future<void> _execCommand(String line) async {
       // Multiverse：空间绑定命令——一通道一空间。
       // /space（无参）显示状态与用法；/space address 显示空间地址；
       // /space create 新建空间（生成 Space Key + 口令密封包，打印邀请链接）；
-      // /space join <邀请链接或 token> 加入已有空间（preflight → join → 口令取钥）
+      // /space join <邀请链接或通道码> 加入已有空间（preflight → join → 口令取钥）
       if (arg.trim().isEmpty) {
         final addr = s.session.store.spaceAddress;
         if (s.session.hasSpace) {
@@ -4241,7 +4353,7 @@ Future<void> _execCommand(String line) async {
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前通道尚未绑定秘境'));
         }
-        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
+        s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或通道码> 👉 加入已有空间（口令在加入流程里问，问什么答什么）'));
         break;
       }
       {
@@ -4264,7 +4376,7 @@ Future<void> _execCommand(String line) async {
         if (sub == 'join') {
           final rest = arg.trim().substring('join'.length).trim();
           if (rest.isEmpty) {
-            s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space join <邀请链接或 token>'));
+            s.session.messages.add(_systemMessage(s.session, '【🔧 用法】\n/space join <邀请链接或通道码>'));
             break;
           }
           await _spaceJoin(s.session, s.session.store, s.storePath, rest);
@@ -4296,21 +4408,51 @@ Future<void> _execCommand(String line) async {
             s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '【🔧 用法】\n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 重置为空（取消锁屏码）'));
+            '【🔧 用法】\n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 清除锁屏码（重置为空）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
-        s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码已重置为空（未设置）'));
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码已被清除，不再自动锁屏。'));
       } else {
         final err = _pinError(arg);
         if (err != null) {
-          s.session.messages.add(_systemMessage(s.session, '⚠️ $err（/pin \'\' 可取消锁屏码）'));
+          s.session.messages.add(_systemMessage(s.session, '⚠️ $err（/pin \'\' 可清除锁屏码）'));
           break;
         }
         s.session.store.pinHash = await _hashPin(arg);
         s.session.store.save(s.storePath);
         s.session.messages.add(_systemMessage(s.session, '✅ 锁屏码已设置'));
       }
+      break;
+    case '/lock':
+      // 锁屏（老板 2026-10-23，对齐 App）：
+      // 无参 = 立即锁（不等无操作超时）；带秒数 = 设自动锁阈值（20s~20min，与
+      // App 同范围；本次会话有效，重启恢复默认 30s）。未设 PIN 时锁屏无意义。
+      if (s.session.store.pinHash == null) {
+        s.session.messages.add(_systemMessage(s.session,
+            '⚠️ 没有锁屏码（/pin <PIN>）——自动锁屏需要锁屏码才能验证'));
+        break;
+      }
+      final lockArg = arg.trim();
+      if (lockArg.isEmpty) {
+        if (_idleLocked) {
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 已在锁屏中'));
+          break;
+        }
+        await _idleLock(); // 解锁问答在消息流中进行（隐藏回显；空回车重问）
+        break;
+      }
+      final lockSecs = int.tryParse(lockArg);
+      if (lockSecs == null ||
+          lockSecs < kTuiLockMinSeconds ||
+          lockSecs > kTuiLockMaxSeconds) {
+        s.session.messages.add(_systemMessage(s.session,
+            '⚠️ 阈值须为 $kTuiLockMinSeconds~$kTuiLockMaxSeconds 秒（当前 $_idleLockSeconds 秒）'));
+        break;
+      }
+      _idleLockSeconds = lockSecs;
+      s.session.messages.add(_systemMessage(s.session,
+          '✅ 无操作 $lockSecs 秒后自动锁屏（本次会话有效，重启恢复默认 ${kTuiLockSeconds}s）'));
       break;
     case '/devices': // 别名（老板 2026-09-23：/device(s) 留着当肌肉记忆）
     case '/entrances':
@@ -4448,6 +4590,12 @@ Future<void> _execCommand(String line) async {
       }
     case '/history':
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
+    case '/store':
+      // 当前 store 文件路径（老板 2026-10-23）：启动时**不再自动亮出**——已有
+      // store 直接进聊天不该被这条打扰；新通道走身份横幅（📁 行在分隔线前）。
+      // 多 store 场景（--store / STORE / /switch）随问随答，与 /switch 配套。
+      s.session.messages.add(_systemMessage(s.session, '📁 Store: ${s.storePath}'));
+      break;
     case '/switch':
       // 切换到另一个 store 文件（不退出进程）——多空间日常用法（老板 2026-10-08）。
       // 目标空间有 PIN 才要求解锁（"进来要解锁，离开不设卡"——只验目标，不重验
@@ -4671,7 +4819,7 @@ Future<void> _execCommand(String line) async {
 }
 
 /// /entoken：生成一次性通道码（join token——24h 一次性；v1 通道码已废弃，
-/// 新通道用 /space join <链接或 token> 绑定）。三种签法（老板 2026-10-07 定名）：
+/// 新通道用 /space join <邀请链接或通道码> 绑定）。三种签法（老板 2026-10-07 定名）：
 /// - 无参         → 给我自己的其他设备开通道（attach 进我的已有身份，免口令）
 /// - `invite`     → 给新人生成通道码（开新身份，加入时自填名字；/invite 别名）
 /// - `reinvite`   → 给其他成员生成专属码（进他的已有身份，需共享口令）
@@ -5356,10 +5504,11 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 ///   → `hidden: true`：不明文回显。设置机密（`/pin`、入网口令）
 ///   不隐藏：那些明文回显（老板 2026-09-14：隐藏时连自己敲了什么都看不见）。
 Future<String> _prompt(ChatSession session, String message,
-    {bool hidden = false, bool exitOnEmpty = false}) {
+    {bool hidden = false, bool exitOnEmpty = false, bool digitsOnly = false}) {
   final s = _state!;
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
+  s.promptDigitsOnly = digitsOnly; // 锁屏码问答：只收数字（与 App 同口径）
   s.pendingExitOnEmpty = exitOnEmpty; // 空回车 = 退出整个 TUI（无上一问可回退的门）
   session.messages.add(_systemMessage(session, message));
   _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
@@ -5391,6 +5540,7 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
+  _state?.promptDigitsOnly = false;
   _state?.pendingExitOnEmpty = false;
 }
 

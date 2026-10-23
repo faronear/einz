@@ -286,17 +286,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupInitRetry => '重试';
 
   @override
-  String get startupInitClearData => '清除本机数据并重来';
+  String get startupInitClearData => '清空本机数据并重来';
 
   @override
-  String get startupInitClearDataTitle => '清除本机数据？';
+  String get startupInitClearDataTitle => '清空本机数据？';
 
   @override
   String get startupInitClearDataMessage =>
-      '这会清除本机全部本地数据（秘境、消息、附件、锁屏码与密钥），并回到入网向导。仅在反复重试仍失败时使用——不可恢复。';
+      '这会清空本机全部本地数据（秘境、消息、附件、锁屏码与密钥），并回到入网向导。仅在反复重试仍失败时使用——不可恢复。';
 
   @override
-  String get startupInitClearedRestart => '本机数据已清除。请完全退出并重新打开 App。';
+  String get startupInitClearedRestart => '本机数据已清空。请完全退出并重新打开 App。';
 
   @override
   String get setupPageScanInvite => '扫码填入通道码';
@@ -1175,7 +1175,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清除，请重新配置';
+  String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清空，请重新配置';
 
   @override
   String get burnOptionOff => '不再自动焚毁';
@@ -1345,7 +1345,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetEntranceServerResidualHint =>
-      '⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
+      '⚠️ 本地数据已清空，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
 
   @override
   String get spaceListHint => '点击卡片切换当前秘境';

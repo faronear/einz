@@ -910,7 +910,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'How deleted/burned/recalled messages appear?';
 
   @override
-  String get chatPageTombstoneKeep => 'Keep message status';
+  String get chatPageTombstoneKeep => 'Show metadata';
 
   @override
   String get chatPageTombstoneKeepDesc =>
@@ -921,7 +921,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageTombstoneHideDesc =>
-      'Disappear from the message flow entirely';
+      'Disappear from the message flow entirely, leave no trace';
 
   @override
   String get chatPageTombstoneSubmit => 'Apply';
