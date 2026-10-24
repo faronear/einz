@@ -1193,7 +1193,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMoreSettingsTombstone.
   ///
   /// In en, this message translates to:
-  /// **'Vanished messages'**
+  /// **'Removed messages'**
   String get chatPageMoreSettingsTombstone;
 
   /// No description provided for @chatPageAttachmentStorageNote.
@@ -1535,7 +1535,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHeading.
   ///
   /// In en, this message translates to:
-  /// **'Vanished messages'**
+  /// **'Removed messages'**
   String get chatPageTombstoneHeading;
 
   /// No description provided for @chatPageTombstoneNote.
