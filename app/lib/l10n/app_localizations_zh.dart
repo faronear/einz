@@ -1070,7 +1070,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptServerDisabled => '服务器未启用转写，已改用本机模型';
 
   @override
-  String get voiceTranscriptGroupEngine => '转写方式';
+  String get voiceTranscriptGroupEngine => '转写位置';
 
   @override
   String get voiceTranscriptTimingLabel => '转写时机';
@@ -1088,10 +1088,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoOff => '手动';
 
   @override
-  String get voiceTranscriptAutoModeDesc => '所有语音消息一旦收到就自动转写。';
+  String get voiceTranscriptAutoModeDesc => '一旦收到就自动转写';
 
   @override
-  String get voiceTranscriptManualModeDesc => '每条语音消息都需要你手动发起转写。';
+  String get voiceTranscriptManualModeDesc => '需要你手动发起转写';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';

@@ -1134,7 +1134,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Server transcription isn\'t enabled — used the local model instead';
 
   @override
-  String get voiceTranscriptGroupEngine => 'Method';
+  String get voiceTranscriptGroupEngine => 'Where to transcribe';
 
   @override
   String get voiceTranscriptTimingLabel => 'When to transcribe';
@@ -1153,11 +1153,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAutoModeDesc =>
-      'Transcribe every voice message as soon as it arrives.';
+      'Transcribe automatically when it arrives';
 
   @override
   String get voiceTranscriptManualModeDesc =>
-      'Transcribe each voice message yourself, on demand.';
+      'Transcribe on-demand when you ask it to';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';

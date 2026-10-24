@@ -2516,6 +2516,18 @@ void main() {
     expect(find.text(_zh.voiceTranscriptAutoOff), findsOneWidget);
     expect(find.text(_zh.voiceTranscriptAutoOn), findsOneWidget);
 
+    // 方式组：标题 + 芯片（本机）/云（远程）前置图标——与语音消息气泡里
+    // 转写来源指示图标同款（_voiceTranscriptSourceIcon）
+    expect(find.text(_zh.voiceTranscriptGroupEngine), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(BottomSheet), matching: find.byIcon(Icons.memory)),
+        findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(BottomSheet), matching: find.byIcon(Icons.cloud_outlined)),
+        findsOneWidget);
+
     // 两块等高（IntrinsicHeight 把无界高度收敛成齐高再拉伸）
     final manualHeight =
         tester.getSize(find.byKey(const ValueKey('vtTimingManual'))).height;

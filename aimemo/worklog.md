@@ -15837,6 +15837,17 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 **（2026-10-24T07:55:00Z / 2026-10-24 15:55）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 消息菜单弹出时聊天页变暗（老板）：_MessageActionsPopupRoute 的 barrierColor 原 20% 黑，比 app 里 36 处 showDialog/showModalBottomSheet 的默认 Colors.black54（54%）浅了快一倍——"没像其他弹层那样变暗"的根因就是它。对齐到 Colors.black54（2327eabb）。barrierDismissible 本就 true，点暗区关闭不变。analyze + 47 个菜单测试绿。提交纪律：本次严格只 add chat_page.dart 一个文件——工作区另有老板/并行的 l10n 改动与 b000310a（转写弹层 IntrinsicHeight，他人工作），均不碰不提交；diff 实证无裹挟。
+**（2026-10-24T08:10:00Z / 2026-10-24 16:10）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+转写弹层「方式组」视觉对齐（老板）：① 组标题「转写方式」→「转写位置」（en Method → Where to transcribe）——与时机组「转写时机」同款四字名词、直指"在哪转写"；② _vtOptionRow 调色对齐 OptionPickerSheet 2026-10-24 定稿口径：选中=品牌粉 #D6529C 25% 实底（原 secondaryContainer 55% 淡粉废弃），**未选中=5% 黑**（原透明——白卡上没有任何"可点"暗示，老板要求补淡灰底），悬浮 10%/点击 14% 显式对齐；③ 两行前置图标与语音消息气泡里的转写来源指示图标同款（_voiceTranscriptSourceIcon）：Local=Icons.memory 芯片、Remote=Icons.cloud_outlined 云，size 20 + onSurfaceVariant（气泡里是 14，设置行按行高放大）。
+
+- l10n：voiceTranscriptGroupEngine zh/en 双改 + gen-l10n；
+- _vtOptionRow 新增 required icon 形参（Row 首位 Icon + 12 间距，其余结构不动）；
+- 回归用例扩展：断言弹层内芯片/云图标各一（scoped 到 BottomSheet）；
+- 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量后台确认。
 
 **（2026-10-24T08:11:12Z / 2026-10-24 16:11）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
 合并 origin 的 7 个提交进本地（老板）：唯一冲突是 worklog.md 尾部（双方各追加条目）→ 双方条目按 UTC 段排序合并，本条置末；合并前工作区未提交的 l10n 改名（voiceTranscriptAutoLabel→voiceTranscriptTimingLabel）经核对与传入内容一致，无丢失。
+
+**（2026-10-24T08:21:00Z / 2026-10-24 16:21）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+补合并 origin 新到的第 8 个提交 966f97ef（转写弹层方式组调色+芯片/云图标，08:10 条目在上）：仍只 worklog.md 冲突（尾部追加），按 UTC 排序解决。至此本地 = origin + 我的 demo 修复，无落后。

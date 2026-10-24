@@ -1949,7 +1949,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptGroupEngine.
   ///
   /// In en, this message translates to:
-  /// **'Method'**
+  /// **'Where to transcribe'**
   String get voiceTranscriptGroupEngine;
 
   /// No description provided for @voiceTranscriptTimingLabel.
@@ -1985,13 +1985,13 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe every voice message as soon as it arrives.'**
+  /// **'Transcribe automatically when it arrives'**
   String get voiceTranscriptAutoModeDesc;
 
   /// No description provided for @voiceTranscriptManualModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe each voice message yourself, on demand.'**
+  /// **'Transcribe on-demand when you ask it to'**
   String get voiceTranscriptManualModeDesc;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.
