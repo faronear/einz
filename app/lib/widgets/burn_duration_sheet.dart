@@ -148,13 +148,24 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
               ),
             ),
           ),
-          // 主体：矮窗时这一块内部滚动
+          // 主体：矮窗时这一块内部滚动。整块套**白色分组卡片**（老板 2026-10-24，
+          // 参照 PIN 弹窗的分组卡 surfaceContainerLowest + outlineVariant 细描边）
+          // ——把"时间轴 + 当前值预览 + 轴下标注"圈成主要设置区，与弹层粉底分层。
           Flexible(
             fit: FlexFit.loose,
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                child: _axisBody(l10n, scheme),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLowest, // 白卡：与弹窗粉底分层
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: scheme.outlineVariant.withValues(alpha: 0.6)),
+                  ),
+                  child: _axisBody(l10n, scheme),
+                ),
               ),
             ),
           ),

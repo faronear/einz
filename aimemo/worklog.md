@@ -15770,3 +15770,10 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 **（2026-10-24T06:00:00Z / 2026-10-24 14:00）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 选中态改深粉（老板实测反馈：5% 灰与 secondaryContainer 55% 淡粉对比不足）：Theme 弹层 + OptionPickerSheet（共用组件，Attachment storage/vanished messages 等全部受益）的选中项底色 secondaryContainer 55% → **品牌粉 #D6529C 25%**（与气泡女性别色同源）；未选中三态（5%/10%/14%）维持不变——"可点"的暗示是对的，问题在选中态不够重。老板另问 Theme 为何独立于 OptionPickerSheet：因带渐变/纯色预览图（_StylePreview）而 OptionPickerItem 无预览槽——待办：给 OptionPickerItem 加可选 preview 槽把 Theme 迁移进来消重复（未做，等老板确认）。analyze 干净 + 全量 385 绿。
+
+**（2026-10-24T06:30:00Z / 2026-10-24 14:30）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+两件事（老板）：
+① **Theme 弹层迁移进 OptionPickerSheet**：OptionPickerItem 加可选 preview 槽（带 preview 的行垂直内边距 10→12）；_showStylePicker 改用 showOptionPickerSheet（点选即生效/立即关闭语义不变，selected 取 uiStyleNotifier 当前值）；_StylePreview 平移为 chat_page 顶层 _UiStylePreview；**删除 ui_style_picker.dart**（原文件）。从此所有选择弹层一套行样式维护。
+② **阅后即焚弹层时间轴区套白色分组卡片**（参照 PIN 弹窗 _setLockGroup 2026-10-18 口径：surfaceContainerLowest 白底 + outlineVariant 60% 细描边 + 圆角 14）：时间轴+当前值预览+轴下标注整块圈成主要设置区，与弹层粉底分层。
+插曲：误删 chat_page 的 _DropHintOverlay.build（与任务无关），同轮发现并完整恢复。
+验证：analyze 干净 + 全量 385 绿（ui_style_switch_test 5 用例全过=迁移后 Theme 弹层交互正确）。

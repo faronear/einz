@@ -80,17 +80,23 @@ class OptionPickerSheet extends StatefulWidget {
   State<OptionPickerSheet> createState() => _OptionPickerSheetState();
 }
 
-/// 一个选项：[value] 为存库值，[label] 主文案，[description] 可选副标题。
+/// 一个选项：[value] 为存库值，[label] 主文案，[description] 可选副标题，
+/// [preview] 可选**前置预览图**（Theme 弹层的渐变/纯色缩略卡；非空时该行改为
+/// 「预览图 + 文字」横向布局，与 ui_style_picker 原卡片同款）。
 class OptionPickerItem {
   const OptionPickerItem({
     required this.value,
     required this.label,
     this.description,
+    this.preview,
   });
 
   final String value;
   final String label;
   final String? description;
+
+  /// 可选预览 widget（如 Theme 选项的配色缩略卡）。非空 = 行布局带前置预览。
+  final Widget? preview;
 }
 
 class _OptionPickerSheetState extends State<OptionPickerSheet> {
@@ -263,9 +269,19 @@ class _OptionRow extends StatelessWidget {
           highlightColor: Colors.black.withValues(alpha: 0.14),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            // 带 preview 的行（Theme 迁移）体量更大：垂直内边距从 10 加到 12，
+            // 预览图 64 高不至于贴边（与原 ui_style_picker 卡片体量一致）。
+            padding: option.preview != null
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+                : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
+                // 前置预览图（Theme 弹层的渐变/纯色缩略卡；有 preview 的选项行
+                // 垂直内边距加大一圈，与原 ui_style_picker 卡片体量一致）。
+                if (option.preview != null) ...[
+                  option.preview!,
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

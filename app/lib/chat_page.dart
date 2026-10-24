@@ -68,7 +68,6 @@ import 'widgets/editable_field.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/labeled_checkbox.dart';
 import 'widgets/top_notice.dart';
-import 'widgets/ui_style_picker.dart';
 import 'widgets/clickable.dart';
 import 'widgets/transcribe_icon.dart';
 
@@ -2663,12 +2662,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 顶栏 🎨：切换界面主题（素雅纯色/渐变粉蓝）。弹窗内点选即生效并立即关闭，
   /// 回到对话消息页（老板要求 2026-09-13；此前是保持打开供边看边试）。
   Future<void> _showStylePicker() async {
-    await showModalBottomSheet<void>(
+    // 2026-10-24 迁移到 OptionPickerSheet（老板：与界面语言等选择弹层统一，
+    // 三态底色/选中深粉一处维护；预览图走 OptionPickerItem.preview 槽）。
+    // 交互保留原语义：点选即生效、立即关闭（无提交按钮）。
+    final l10n = AppLocalizations.of(context)!;
+    await showOptionPickerSheet<void>(
       context: context,
-      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
-      isScrollControlled: true,
-      builder: (_) => UiStylePickerSheet(
-        settings: UiStyleSettings(widget.db ?? LocalDatabase.shared),
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageMenuStyleLabel,
+        selected: uiStyleNotifier.value,
+        options: [
+          for (final option in kUiStyleOptions)
+            OptionPickerItem(
+              value: option,
+              label: option == 'gradient'
+                  ? AppLocalizations.of(context)!.chatPageUiStyleGradient
+                  : AppLocalizations.of(context)!.chatPageUiStylePlain,
+              description: option == 'gradient'
+                  ? AppLocalizations.of(context)!.chatPageUiStyleGradientDesc
+                  : AppLocalizations.of(context)!.chatPageUiStylePlainDesc,
+              preview: _UiStylePreview(option: option),
+            ),
+        ],
+        onApply: (value, {bool scopeAll = false}) async {
+          await UiStyleSettings(widget.db ?? LocalDatabase.shared).save(value);
+        },
       ),
     );
   }
@@ -10868,6 +10886,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         unawaited(_sendDroppedFiles(detail.files));
       },
       child: page,
+    );
+  }
+}
+
+/// 界面风格预览缩略图（程序化绘制，无需图片资源）——自 ui_style_picker.dart
+/// 迁移（该弹层并入 OptionPickerSheet，老板 2026-10-24）：迷你聊天页示意——
+/// 背景按风格（浅粉纯色 / 粉蓝渐变）+ 一左一右两枚迷你气泡（天蓝=对方、粉=我）。
+class _UiStylePreview extends StatelessWidget {
+  const _UiStylePreview({required this.option});
+
+  final String option;
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = option == 'gradient';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 92,
+        height: 64,
+        decoration: BoxDecoration(
+          gradient: gradient ? kBrandGradient : null,
+          color: gradient ? null : const Color(0xFFFFF5FA),
+        ),
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                width: 34,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3BAFFD).withValues(alpha: 0.30),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+            const Spacer(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 34,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6529C).withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
