@@ -69,6 +69,7 @@ import 'widgets/labeled_checkbox.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
 import 'widgets/clickable.dart';
+import 'widgets/transcribe_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
@@ -6948,8 +6949,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // informative）+ wav 音频文件。放**最后**（老板 2026-10-23：
                   // 转到撤回后面）——转写是音频专属的低频动作，不挡常用项。
                   if (_voiceTranscriptEligible(m))
-                    _buildActionCard(
-                      icon: Icons.graphic_eq,
+                    _buildActionCardWidget(
+                      // 麦克风+文档自绘图标（老板 2026-10-24）：纯波形只有"语音"
+                      // 半边，加上文档线条才是完整的"语音→文字"。颜色跟卡片
+                      // 前景一致（近黑；非 destructive 固定深灰黑）。
+                      iconWidget: const TranscribeIcon(color: Color(0xFF1A1A1A)),
                       label: l10n.voiceTranscriptMenuTranscribe,
                       onTap: () => Navigator.of(ctx).pop('transcribe'),
                     ),
@@ -7072,6 +7076,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     bool destructive = false,
     double iconSize = 26,
   }) {
+    return _buildActionCardWidget(
+      iconWidget: Icon(icon, size: iconSize),
+      label: label,
+      onTap: onTap,
+      destructive: destructive,
+    );
+  }
+
+  /// 自定义 widget 图标版操作卡片（[_buildActionCard] 的泛化）：给自绘图标用
+  /// （如「语音转写」的麦克风+文档 [TranscribeIcon]，IconData 表达不了）。
+  Widget _buildActionCardWidget({
+    required Widget iconWidget,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+  }) {
     final foreground = destructive ? Colors.red.shade400 : null;
     return Material(
       color: Colors.black.withValues(alpha: 0.05),
@@ -7084,7 +7104,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: iconSize, color: foreground),
+              IconTheme.merge(
+                data: IconThemeData(color: foreground),
+                child: iconWidget,
+              ),
               const SizedBox(height: 8),
               Text(
                 label,
