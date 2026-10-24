@@ -15872,3 +15872,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 **（2026-10-24T12:35:35Z / 2026-10-24 20:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
 「应用于本机所有秘境」勾选框样式优化（07437f29）。共享组件 LabeledCheckbox 卡片化：圆角 12 不再横贯弹层；老板后续拍板**默认无底色**（勾选框本身暗示可点，悬浮 10%/点按 14% 黑才显色）；上方间距 4→8。新增 horizontalInset 参数处理对齐分裂：底部选项弹层默认 12（与选项行同缩进）；AlertDialog（Email alerts/通道名称/My name）传 0——dialog content 左右 24 + 卡片内边距 12 正好对齐输入框。老板指出 burn 弹层勾选框超出上下元素宽度，根因是 burn 主体/按钮用 16 边距而非选项弹层的 12，方案=把 burn 主体白卡与提交按钮 16→12 与 OptionPickerSheet 统一口径（而非给勾选框传 16 特调）。analyze 通过；老板自查视觉，未跑 golden（政策：UI 改动 golden 失配保持红）。
+
+**（2026-10-24T16:30:15Z / 2026-10-25 00:30）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
+时长轴范围调整（42b64c25）。PIN 锁屏轴 20 秒~20 分钟 → 10 秒~30 分钟（lock_timer.dart 常量 + 轴标注）；阅后即焚轴 1 分钟~60 天 → 10 秒~50 天，轴下增加「1 分钟」标注。老板反馈 10 秒~1 分钟在单一对数轴上太挤（仅占 ~8%），改**分段对数**：10 秒~1 分钟占前 25%、1 分钟~50 天占后 75%，段内对数 + 吸附规则不变，标注由 _tFromSeconds 反推自动对位。过程坑：math.pow 返回 num 不能赋给 int/double 声明，需 .toDouble()。中途试过把英文 burnUnit* 键改成 sec/min 风格（老板要求预览与 PIN 轴同款写法），老板看后说改坏了，已 git checkout 撤回 l10n 三个文件——**结论：burn 单位简写 s/m/h/d 保持原样，不再改**。测试：全量 392 过（chat_page_menu_test 锁屏轴断言随新范围更新）。
