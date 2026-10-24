@@ -15818,3 +15818,12 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - 7219f791 style(app)：转写弹层时机组改方块二选一（app/lib + l10n + 本人 worklog 条目）
 - 64daa1c3 refactor(server)：coturn compose 迁入子目录（纯 rename + 对方 worklog 条目，原消息与 Co-Authored-By 保留）
 备份 ref backup-pre-split-20261024；git diff backup-pre-split-20261024 HEAD 为空=重组前后文件树完全一致，零丢失。对方 coturn 的后续工作区改动（package.json/docs/voiceCall/compose 内容）未动，仍在其工作区待其自行提交。教训：并行环境下提交务必 git commit -- 显式路径，且提交前一刻要重新 git status（本轮两次状态检查之间对方又落了一轮改动）。
+**（2026-10-24T07:45:00Z / 2026-10-24 15:45）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+修复「语音转写弹层打不开」（老板实测上报）：时机组 Row 用了 CrossAxisAlignment.stretch，而它位于弹层的竖直 SingleChildScrollView 里（高度无上界）→ stretch 把无限高约束传给子块，performLayout 抛 BoxConstraints forces an infinite height，整个弹层渲染失败。先用最小复现测试确认根因（stretch Row + 竖直滚动区必抛），再按标准写法修：Row 外包 IntrinsicHeight（先按两块内容量出齐高、再拉伸），恢复等高大方块且不再崩。
+
+- _vtTimingBlock 增加 keyName 形参（两块分别 vtTimingManual / vtTimingAuto），供测试按块定位；
+- chat_page_menu_test 新增回归用例「语音转写弹层：转写时机为左右方块，点选可提交」：菜单→更多设置→语音转写打开弹层、标题/两块在场、两块等高、默认无改动提交灰/点「自动」后亮起并落盘 auto=true。**已验证该用例能抓到旧 bug**（临时拆掉 IntrinsicHeight 即复现 infinite height 红测，随后恢复）；
+- 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量套件后台跑完后确认。
+
+教训：**在可竖直滚动容器里，Row/Column 用 stretch 前必须想清楚 cross 轴是否有界**——stretch 会把「传入约束的上界」直接当紧约束发给子节点，滚动区的无界高就是在这里炸的；等宽等高双卡的标准解是 IntrinsicHeight 包裹。

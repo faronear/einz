@@ -12131,27 +12131,35 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
                     _vtGroup(
                       title: l10n.voiceTranscriptTimingLabel,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: _vtTimingBlock(
-                                active: !_auto,
-                                onTap: () => setState(() => _auto = false),
-                                label: l10n.voiceTranscriptAutoOff,
-                                desc: l10n.voiceTranscriptManualModeDesc,
+                        // IntrinsicHeight：Row 在竖直滚动区里（高度无上界），
+                        // stretch 会拿到无限高约束直接抛「BoxConstraints forces
+                        // an infinite height」——先按两块内容量出齐高再拉伸
+                        // （等大方块的标准写法，2026-10-24 踩坑修复）。
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: _vtTimingBlock(
+                                  active: !_auto,
+                                  onTap: () => setState(() => _auto = false),
+                                  label: l10n.voiceTranscriptAutoOff,
+                                  desc: l10n.voiceTranscriptManualModeDesc,
+                                  keyName: 'vtTimingManual',
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _vtTimingBlock(
-                                active: _auto,
-                                onTap: () => setState(() => _auto = true),
-                                label: l10n.voiceTranscriptAutoOn,
-                                desc: l10n.voiceTranscriptAutoModeDesc,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _vtTimingBlock(
+                                  active: _auto,
+                                  onTap: () => setState(() => _auto = true),
+                                  label: l10n.voiceTranscriptAutoOn,
+                                  desc: l10n.voiceTranscriptAutoModeDesc,
+                                  keyName: 'vtTimingAuto',
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -12268,14 +12276,18 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
   ///
   /// 配色与 OptionPickerSheet 的选项行同款（2026-10-24 定稿口径）：选中 =
   /// 品牌粉 #D6529C 25% 实底；未选中 = 5% 黑；悬浮 10% / 点击 14%。
+  ///
+  /// [keyName] 供测试按块定位（等高/点选断言）；不传即无 key。
   Widget _vtTimingBlock({
     required bool active,
     required VoidCallback onTap,
     required String label,
     required String desc,
+    String? keyName,
   }) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
+      key: keyName == null ? null : ValueKey(keyName),
       color: active
           ? const Color(0xFFD6529C).withValues(alpha: 0.25)
           : Colors.black.withValues(alpha: 0.05),

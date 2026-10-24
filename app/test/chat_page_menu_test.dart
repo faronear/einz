@@ -17,6 +17,7 @@ import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/space_session.dart';
 import 'package:einz/data/vault_session.dart';
+import 'package:einz/data/voice_transcript_settings.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/widgets/burn_duration_sheet.dart';
 import 'package:einz/lock_page.dart';
@@ -2477,6 +2478,63 @@ void main() {
       expect(await BurnAfterSettings(db, spaceId: 'space-demo').load(), 86400);
       expect(await BurnAfterSettings(db, spaceId: 'space-b').load(), 0,
           reason: '不勾选不应扇出到其它空间');
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('语音转写弹层：转写时机为左右方块，点选可提交（stretch 无限高回归）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 顶栏菜单 → 更多设置 → 语音转写（两级 deferred：每级关窗 300ms 后再开下一层）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMoreSettings));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuVoiceTranscriptAuth));
+
+    // 弹层打开：标题「转写时机」+ 两块（手动/自动）都在——Row 用 stretch 等高，
+    // 曾在竖直滚动区里抛「BoxConstraints forces an infinite height」整个弹层打不开
+    expect(find.text(_zh.voiceTranscriptTimingLabel), findsOneWidget);
+    expect(find.text(_zh.voiceTranscriptAutoOff), findsOneWidget);
+    expect(find.text(_zh.voiceTranscriptAutoOn), findsOneWidget);
+
+    // 两块等高（IntrinsicHeight 把无界高度收敛成齐高再拉伸）
+    final manualHeight =
+        tester.getSize(find.byKey(const ValueKey('vtTimingManual'))).height;
+    final autoHeight =
+        tester.getSize(find.byKey(const ValueKey('vtTimingAuto'))).height;
+    expect(manualHeight, autoHeight, reason: '左右两块应等高');
+
+    // 默认手动、无改动 → 提交按钮灰；点「自动」块 → 亮起 → 提交落盘
+    final submit = find.widgetWithText(FilledButton, _zh.chatPageTombstoneSubmit);
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+    await tester.tap(find.text(_zh.voiceTranscriptAutoOn));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(submit).onPressed, isNotNull);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      expect(
+          await VoiceTranscriptSettings(db, spaceId: 'space-demo').loadAuto(),
+          isTrue);
     });
     expect(tester.takeException(), isNull);
   });
