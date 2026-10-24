@@ -15812,3 +15812,9 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - 文档同步：DEPLOYMENT.md 树状图、TURN.md 部署步骤、voiceCall.zhcn.md 部署文件路径
 - .gitignore `turnserver.*.conf` 规则依旧覆盖新位置的机密 conf（只有 .example 入库）
 验证：docker compose config 通过。aimemo/worklog.md 里旧路径引用是历史日志，保留原样。
+**（2026-10-24T07:25:00Z / 2026-10-24 15:25）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+提交拆分（老板拍板「拆成两个提交」）：本轮转写弹层改动提交时撞上并行会话提交——对方的 coturn 提交（原 a1805cda）把暂存区里我的 app/lib + l10n 改动一并打包，我的提交只剩 worklog 后半。两提交均未推送，本地 soft reset 到 d9de5a0c 后重组为：
+- 7219f791 style(app)：转写弹层时机组改方块二选一（app/lib + l10n + 本人 worklog 条目）
+- 64daa1c3 refactor(server)：coturn compose 迁入子目录（纯 rename + 对方 worklog 条目，原消息与 Co-Authored-By 保留）
+备份 ref backup-pre-split-20261024；git diff backup-pre-split-20261024 HEAD 为空=重组前后文件树完全一致，零丢失。对方 coturn 的后续工作区改动（package.json/docs/voiceCall/compose 内容）未动，仍在其工作区待其自行提交。教训：并行环境下提交务必 git commit -- 显式路径，且提交前一刻要重新 git status（本轮两次状态检查之间对方又落了一轮改动）。
