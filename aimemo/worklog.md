@@ -15764,3 +15764,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 **（2026-10-24T05:05:00Z / 2026-10-24 13:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 ⚠️ 提交 9fd487a8 实际包含两块内容：① 我的名义改动（顶栏长按放开+Tooltip 删除+测试适配）；② 另一 agent（CodeBuddy）的 compose 合并成品（三变体合并为单文件+COMPOSE_PROFILES，删 nocaddy/withcaddy，docs/SECURITY/DEPLOYMENT/Caddyfile.example 同步）——该 agent 的改动在暂存区残留，git add app 路径时被一起打包。内容均完整验证过（全量测试绿），不再改写历史；worklog 如实记录。老板在另一台机器 pull 时注意此提交是混合主题。
+
+**（2026-10-24T05:35:00Z / 2026-10-24 13:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+可点击条目三态统一（老板）：**默认 5% 黑 → 悬浮 10% → 点击/长按 14%**（锚定「我的秘境」弹层「添加秘境」按钮 2026-09-24 的既有口径）。改动两处未选中项底色：Theme 弹层（ui_style_picker）3%→5%；OptionPickerSheet（Attachment storage/vanished messages/语言/阅后即焚等共用）透明→5%；两处 InkWell hoverColor/highlightColor 显式对齐 10%/14%（不再用默认浅值）。选中项高亮（secondaryContainer 55%）不变。老板纠偏记录：最初我理解成"往 Theme 的 3% 看齐"，实际 3% 才是太浅的一方，基准是 spaces/entrances 按钮的 5%。analyze 干净 + 全量 385 测试绿。
