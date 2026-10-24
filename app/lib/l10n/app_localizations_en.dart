@@ -1167,14 +1167,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'Transcription happens on this device (requires a ~230MB model download at the first use).';
+      'Transcription happens on this device (requires a model download at the first use).';
 
   @override
   String get voiceTranscriptAuthServer => 'Remote';
 
   @override
   String get voiceTranscriptAuthServerDesc =>
-      'Voice messages are sent to a cloud server, and deleted immediately after transcribing.';
+      'Voice messages are sent to our cloud server, and deleted immediately after transcribing.';
 
   @override
   String voiceTranscriptServerFailed(String error) {
@@ -1192,20 +1192,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptAutoLabel => 'Auto-transcribe';
 
   @override
-  String get voiceTranscriptAutoDesc =>
-      'When off, voice messages aren\'t transcribed automatically — long-press a message to transcribe manually (default). When on, messages are transcribed automatically with the method above.';
-
-  @override
   String get voiceTranscriptEngineLocalShort => 'Local';
 
   @override
-  String get voiceTranscriptEngineServerShort => 'Server';
+  String get voiceTranscriptEngineServerShort => 'Remote';
 
   @override
   String get voiceTranscriptAutoOn => 'Auto';
 
   @override
-  String get voiceTranscriptAutoOff => 'Off';
+  String get voiceTranscriptAutoOff => 'Manual';
+
+  @override
+  String get voiceTranscriptTimingLabel => 'When to transcribe';
+
+  @override
+  String get voiceTranscriptAutoModeDesc =>
+      'Transcribe every voice message as soon as it arrives.';
+
+  @override
+  String get voiceTranscriptModeManual => 'Manual';
+
+  @override
+  String get voiceTranscriptManualModeDesc =>
+      'Transcribe each voice message yourself, on demand.';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';

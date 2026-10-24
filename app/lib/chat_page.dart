@@ -13,6 +13,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/services.dart';
 
 import 'widgets/linkified_text.dart';
@@ -474,6 +475,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 气泡尺寸变化已弃用，老板要求 2026-09-10）
   String? _highlightMessageId;
   Timer? _highlightTimer;
+  // 操作菜单选中的消息：菜单打开期间持续橘黄（#FF9800，同跳转高亮色，老板
+  // 2026-10-24：微信同款「选中的消息着色」），菜单关闭即恢复。与跳转高亮共用
+  // 气泡底色的判定口（见 itemBuilder 里 AnimatedContainer 的 color 分支）。
+  String? _menuTargetMessageId;
   late String _uiStyle; // 当前界面主题（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
 
   /// 当前附件存储模式：'secured'=不留存明文（默认）/ 'stored'=明文留在本机、直接打开。
@@ -1833,21 +1838,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 语音转写菜单行当前值：「方式 · 自动/询问」（如「服务端 · 询问」）。
-  /// 方式与开关都用短标签——与附件存储等行的当前值同款长度风格。
+  /// 语音转写菜单行当前值：「方式 · 自动/手动」（如「服务端 · 手动」）。
+  /// 方式与时机都用短标签——与附件存储等行的当前值同款长度风格。
   String _voiceTranscriptLabel(AppLocalizations l10n) {
     final engine = _voiceTranscriptEngine == 'server'
         ? l10n.voiceTranscriptEngineServerShort
         : l10n.voiceTranscriptEngineLocalShort;
-    final auto =
+    final timing =
         _voiceTranscriptAuto ? l10n.voiceTranscriptAutoOn : l10n.voiceTranscriptAutoOff;
-    return '$engine · $auto';
+    return '$engine · $timing';
   }
 
-  /// 语音转写设置弹层（方案 D'，§15.1 ③；2026-10-23 老板重构为两组）：
-  /// 第一组「转写方式」本机/服务端二选一；第二组「自动转写」开关（默认关=
-  /// 每条询问，省流量/上传）。单选 + 提交（有副作用数据写入，与附件存储/墓碑
-  /// 同构）；「应用于本机所有秘境」勾选框同款。
+  /// 语音转写设置弹层（方案 D'，§15.1 ③；2026-10-23 老板重构为两组，
+  /// 2026-10-24 第二组由勾选改单选）：第一组「转写方式」本机/服务端二选一；
+  /// 第二组「转写时机」自动/手动二选一（默认手动=长按逐条转写，省流量/上传）。
+  /// 单选 + 提交（有副作用数据写入，与附件存储/墓碑同构）；「应用于本机所有
+  /// 秘境」勾选框同款。
   Future<void> _showVoiceTranscriptPicker() async {
     final l10n = AppLocalizations.of(context)!;
     await showOptionPickerSheet<void>(
@@ -6868,104 +6874,40 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         0;
   }
 
-  Future<void> _showMessageActions(HistoryMessage m) async {
+  /// 消息操作菜单（老板 2026-10-24 改版）：**锚定气泡的浮层**——在气泡上方或下方
+  /// 打开（按气泡在屏幕中的位置自动选），不再从底部弹出。微信同款交互：菜单出现在
+  /// 原消息旁，用户视线不用跳，也不再需要顶部的消息预览行。
+  ///
+  /// - [bubbleCtx] 必须是**气泡子树内**的 context（长按回调传消息气泡的 context），
+  ///   用它拿 RenderBox 全局坐标：垂直方向按上/下方剩余空间选边，都放得下时选
+  ///   上方（微信习惯）；水平方向跟随气泡侧（我的靠右、对方靠左），与消息流对齐。
+  /// - 走 [PopupRoute] 而非 showModalBottomSheet：barrier 点击关闭、缩放淡入
+  ///   动画从锚点方向进入；route 仍要守 _waitRouteHandoff 衔接规则（点「引用」
+  ///   等动作后 menuAction 错峰）。
+  Future<void> _showMessageActions(
+    HistoryMessage m, {
+    required Offset anchorGlobal,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
-            // 老板要求 2026-09-10）；底色与被引消息的引用块同款浅灰，代替原来
-            // 的分隔横线（老板要求 2026-09-13）。
-            // 墓碑消息不展示内容（已删/已焚毁）：改一条灰字占位（老板 2026-10-10
-            // 起墓碑也可开菜单——只剩撤回一项）
-            m.deleted ? _tombstoneMenuPlaceholder() : _buildMessagePreviewRow(m, ctx),
-            // 操作项改为圆角方形卡片（图标 + 文字），不再是列表式 ListTile
-            // （老板要求 2026-09-13）
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: _buildActionCardGrid([
-                // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除
-                // 均无意义；删除本来也是打本地墓碑，已做了）
-                if (m.deleted) ...[
-                  _buildActionCard(
-                    icon: Icons.undo_outlined,
-                    label: l10n.chatPageActionRecall,
-                    onTap: () => Navigator.of(ctx).pop('recall'),
-                  ),
-                ] else ...[
-                  _buildActionCard(
-                    icon: Icons.format_quote,
-                    label: l10n.chatPageActionQuote,
-                    onTap: () => Navigator.of(ctx).pop('quote'),
-                  ),
-                  // 文字消息才有「拷贝」（媒体消息无文本可拷）
-                  if (m.env.type == 'text')
-                    _buildActionCard(
-                      // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
-                      // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
-                      // 与邻居光学对齐
-                      icon: Icons.copy_outlined,
-                      iconSize: 24,
-                      label: l10n.chatPageCopy,
-                      onTap: () => Navigator.of(ctx).pop('copy'),
-                    ),
-                  // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
-                  // 存到本机（系统保存对话框选位置）；放「引用」后面
-                  if (m.attachment != null)
-                    _buildActionCard(
-                      icon: Icons.save_alt,
-                      label: l10n.chatPageActionSave,
-                      onTap: () => Navigator.of(ctx).pop('save'),
-                    ),
-                  // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-                  _buildActionCard(
-                    icon: Icons.timer_outlined,
-                    label: l10n.chatPageActionBurn,
-                    onTap: () => Navigator.of(ctx).pop('burn'),
-                  ),
-                  // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——
-                  // 服务端按 delivered 高水位原子判定，客户端只做**粗筛**减少
-                  // 无效入口（最终判定的权威在服务端 409）。放「删除」之后：
-                  // 撤回实质上比删除更重（删自己的还让别人收不到；2026-10-11）。
-                  // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
-                  _buildActionCard(
-                    icon: Icons.delete_outline,
-                    label: l10n.chatPageActionDelete,
-                    onTap: () => Navigator.of(ctx).pop('delete'),
-                  ),
-                  if (_messageRecallable(m))
-                    _buildActionCard(
-                      icon: Icons.undo_outlined,
-                      label: l10n.chatPageActionRecall,
-                      onTap: () => Navigator.of(ctx).pop('recall'),
-                    ),
-                  // 语音转写（自动转写关闭时的唯一入口——没有行就没有行内提示，
-                  // 必须从菜单进；自动开启时也可用它手动重转）。显示条件与自动
-                  // 入队同口径：语音消息（任意容器——旧 m4a 点了由
-                  // _transcribeVoiceMessage 出「不支持」说明，比藏起来更
-                  // informative）+ wav 音频文件。放**最后**（老板 2026-10-23：
-                  // 转到撤回后面）——转写是音频专属的低频动作，不挡常用项。
-                  if (_voiceTranscriptEligible(m))
-                    _buildActionCardWidget(
-                      // 麦克风+文档自绘图标（老板 2026-10-24）：纯波形只有"语音"
-                      // 半边，加上文档线条才是完整的"语音→文字"。颜色跟卡片
-                      // 前景一致（近黑；非 destructive 固定深灰黑）。
-                      iconWidget: const TranscribeIcon(color: Color(0xFF1A1A1A)),
-                      label: l10n.voiceTranscriptMenuTranscribe,
-                      onTap: () => Navigator.of(ctx).pop('transcribe'),
-                    ),
-                ]
-              ]),
-            ),
-          ],
-        ),
-      ),
-    );
+    // 锚点 = **按点的全局坐标**（老板 2026-10-24 定稿）：按点必在气泡内，菜单
+    // 边缘贴按点弹出 → 必然压住气泡一部分，其余部分露出橘黄选中高亮——微信同款
+    // "菜单长在消息上"。不再爬 RenderBox 祖先链：itemBuilder 的 context 挂在
+    // SliverList 层（RenderObject 是 RenderSliver），爬上去全是 viewport 级
+    // 容器、摸不到气泡（macOS 日志确诊 2026-10-24）。
+    final screen = MediaQuery.sizeOf(context);
+    final Rect anchor = Rect.fromPoints(anchorGlobal, anchorGlobal);
+    // 选中高亮（老板 2026-10-24，微信同款）：菜单打开期间该消息橘黄（#FF9800，
+    // 与跳转高亮同色同一判定口），菜单关闭即恢复。
+    setState(() => _menuTargetMessageId = m.env.messageId);
+    final action = await Navigator.of(context).push<String>(_MessageActionsPopupRoute(
+      anchor: anchor,
+      screen: screen,
+      menuBuilder: (ctx) =>
+          _buildActionCardGrid(_buildMessageActionCards(m, ctx, l10n)),
+    ));
+    if (mounted) {
+      setState(() => _menuTargetMessageId = null);
+    }
     if (!mounted) return;
     if (action == 'delete') {
       await _deleteMessage(m);
@@ -6989,6 +6931,80 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (action == 'burn') {
       await _setMessageBurn(m);
     }
+  }
+
+  /// 消息操作菜单的**动作卡片列表**（锚定浮层与底部弹层兜底共用；从
+  /// [_showMessageActions] 抽出——菜单内容与承载方式解耦）。
+  List<Widget> _buildMessageActionCards(
+      HistoryMessage m, BuildContext ctx, AppLocalizations l10n) {
+    return [
+      // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除均无意义；
+      // 删除本来也是打本地墓碑，已做了）
+      if (m.deleted) ...[
+        _buildActionCard(
+          icon: Icons.undo_outlined,
+          label: l10n.chatPageActionRecall,
+          onTap: () => Navigator.of(ctx).pop('recall'),
+        ),
+      ] else ...[
+        _buildActionCard(
+          icon: Icons.format_quote,
+          label: l10n.chatPageActionQuote,
+          onTap: () => Navigator.of(ctx).pop('quote'),
+        ),
+        // 文字消息才有「拷贝」（媒体消息无文本可拷）
+        if (m.env.type == 'text')
+          _buildActionCard(
+            // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote 高一档
+            // （2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24 与邻居光学对齐
+            icon: Icons.copy_outlined,
+            iconSize: 24,
+            label: l10n.chatPageCopy,
+            onTap: () => Navigator.of(ctx).pop('copy'),
+          ),
+        // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件存到本机
+        // （系统保存对话框选位置）；放「引用」后面
+        if (m.attachment != null)
+          _buildActionCard(
+            icon: Icons.save_alt,
+            label: l10n.chatPageActionSave,
+            onTap: () => Navigator.of(ctx).pop('save'),
+          ),
+        // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
+        _buildActionCard(
+          icon: Icons.timer_outlined,
+          label: l10n.chatPageActionBurn,
+          onTap: () => Navigator.of(ctx).pop('burn'),
+        ),
+        // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——服务端按
+        // delivered 高水位原子判定，客户端只做**粗筛**减少无效入口（最终判定
+        // 的权威在服务端 409）。放「删除」之后：撤回实质上比删除更重（2026-10-11）。
+        // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
+        _buildActionCard(
+          icon: Icons.delete_outline,
+          label: l10n.chatPageActionDelete,
+          onTap: () => Navigator.of(ctx).pop('delete'),
+        ),
+        if (_messageRecallable(m))
+          _buildActionCard(
+            icon: Icons.undo_outlined,
+            label: l10n.chatPageActionRecall,
+            onTap: () => Navigator.of(ctx).pop('recall'),
+          ),
+        // 语音转写（自动转写关闭时的唯一入口——没有行就没有行内提示，必须从
+        // 菜单进；自动开启时也可用它手动重转）。显示条件与自动入队同口径：语音
+        // 消息（任意容器）+ wav 音频文件。放**最后**（老板 2026-10-23）——
+        // 转写是音频专属的低频动作，不挡常用项。
+        if (_voiceTranscriptEligible(m))
+          _buildActionCardWidget(
+            // 麦克风+文档自绘图标（老板 2026-10-24）：纯波形只有"语音"半边，
+            // 加上文档线条才是完整的"语音→文字"。
+            iconWidget: const TranscribeIcon(color: Color(0xFF1A1A1A)),
+            label: l10n.voiceTranscriptMenuTranscribe,
+            onTap: () => Navigator.of(ctx).pop('transcribe'),
+          ),
+      ],
+    ];
   }
 
   /// 底部菜单操作项布局：圆角方形卡片，一行最多 4 个。总数不超过 4 个时等距
@@ -7125,153 +7141,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 长按菜单顶部的消息预览行：发言人头像 + 按性别气泡风格的正文。
-  /// 正文单行截断不溢出（老板要求 2026-09-10）；头像左右位置与消息流一致
-  /// （我的在右、对方在左）；附件消息无正文时显示消息类型作占位。语音/音频文件
-  /// 消息直接复用消息流的音频条（播放键 + 波形 + 时长，可点按播放/停止，
-  /// 老板要求 2026-09-13）。
-  /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
-  /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
-  /// 2026-09-10 修复）。
-  ///
-  /// [sheetCtx] = 菜单弹层自己的 BuildContext：点头像开个人资料页时要先把它
-  /// 收起（见下方 openProfile 的 route 交接注释）。
-  /// 长按菜单顶部占位行（墓碑消息专用，2026-10-10）：消息已删/已焚毁，
-  /// 不展示内容，只留一条淡灰说明——菜单里只剩「撤回」一项
-  Widget _tombstoneMenuPlaceholder() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        AppLocalizations.of(context)!.chatPageQuotedTombMessage,
-        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-
-  Widget _buildMessagePreviewRow(HistoryMessage m, BuildContext sheetCtx) {
-    final mine = m.sender == 'me';
-    final avatarMemberId =
-        m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
-    // 头像点击（老板 2026-10-20）：开个人资料页——与消息气泡旁头像、群成员卡
-    // 同一批入口。我的 → 「我的资料」弹层；别人的 → 对方资料页；memberId
-    // 解析不出（旧消息 + 通道映射也没兜到）时不猜：头像不可点。
-    // 先收菜单、错峰 300ms 再开弹层——紧接着 showModalBottomSheet 会让两条
-    // route 在 Overlay 里交叉卸载（见 _waitRouteHandoff，与成员弹层同款）。
-    final VoidCallback? openProfile;
-    if (mine) {
-      openProfile = () {
-        Navigator.of(sheetCtx).pop();
-        _menuAction(_showMyProfileSheet);
-      };
-    } else if (avatarMemberId != null) {
-      openProfile = () {
-        Navigator.of(sheetCtx).pop();
-        _menuAction(() => _showMemberProfileSheet(avatarMemberId));
-      };
-    } else {
-      openProfile = null;
-    }
-    final preview = m.plaintext.trim();
-    // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长（+ 音频文件的
-    // 文件名一行），可点按播放（老板要求 2026-09-13）；文件消息**复用消息流那张
-    // 文件名片**（图标 + 文件名 + 尺寸，老板 2026-09-27），整块可点打开。
-    // 其余类型沿用单行文本（空正文显示类型占位）。
-    final Widget bubbleContent;
-    switch (m.env.type) {
-      case 'voice':
-      case 'audio':
-        bubbleContent =
-            _buildAudioBar(m, waveformWidth: 88, foreground: _mediaForegroundOnBubble);
-        break;
-      case 'image':
-        bubbleContent = _buildImageThumb(m, size: 48);
-        break;
-      case 'video':
-        bubbleContent = _buildVideoThumb(m, size: 48);
-        break;
-      case 'system':
-        // 通话记录：明文为空，内容在 meta 里——复用消息流那条的渲染
-        bubbleContent = _buildSystemHint(m);
-        break;
-      case 'file':
-        // 与音频条同一套：直接用消息流那张**文件名片**（图标 + 文件名 + 尺寸），
-        // 整块可点 = 用系统应用打开（老板 2026-09-27）。不再自己拼一个"图标 + 文件名"
-        // 的只读行——那样既跟气泡长得不一样，点了也没反应。
-        bubbleContent = _buildFileCard(m, foreground: _mediaForegroundOnBubble);
-        break;
-      default:
-        bubbleContent = Text(
-          preview.isEmpty ? m.env.type : preview,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          // 预览条背景色已清空（老板 2026-09-15 试用效果：去掉浅灰底，只留气泡本身）。
-          // 弹窗始终跟随浅色主题，不随 gradient 气泡风格变白。
-          color: Colors.transparent,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            key: const ValueKey('messagePreviewRow'), // 测试断言对齐用（项目惯例）
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment:
-                mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-            children: [
-              if (!mine) ...[
-                _MessageAvatar(
-                    memberId: avatarMemberId,
-                    server: effectiveServer,
-                    api: widget.api,
-                    // 点别人的头像 = 开他的资料页（老板 2026-10-20）
-                    openFullscreenOnTap: false,
-                    onTap: openProfile),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    // 与消息流一致：按发言人性别配色（男天蓝 / 女品牌粉）
-                    color: _bubbleColor(mine: mine),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DefaultTextStyle.merge(
-                    style: TextStyle(
-                      color: _uiStyle == 'gradient' ? Colors.white : null,
-                      fontSize: 14,
-                    ),
-                    child: bubbleContent,
-                  ),
-                ),
-              ),
-              if (mine) ...[
-                const SizedBox(width: 8),
-                // 点我的头像 = 开「我的资料」弹层（老板 2026-10-20）
-                _MessageAvatar(
-                    memberId: avatarMemberId,
-                    server: effectiveServer,
-                    api: widget.api,
-                    openFullscreenOnTap: false,
-                    onTap: openProfile),
-              ],
-            ],
-          ),
-        ),
-        // 预览条底部的淡灰分隔线（老板 2026-09-15：底色清空后用线与菜单项分层）
-        const Divider(height: 1, thickness: 0.5, color: Color(0x14000000)),
-      ],
-    );
-  }
 
   /// 记录副本：标记为已删除/已焚毁（墓碑，内容隐藏、时间+焚毁记录保留）。
   /// [kind] 传墓碑来路（'delete'=本机删除、'recall'=撤回、缺省=焚毁到期）。
@@ -10513,8 +10382,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // **吸收**掉长按，见下面那处 GestureDetector。
                         // 墓碑消息仅当可撤回时开菜单（老板 2026-10-10：本地墓碑不
                         // 影响服务端行，未送达的仍可撤）
-                        onLongPress: _messageHasActions(m)
-                            ? () => _showMessageActions(m)
+                        // 用 onLongPressStart（而非 onLongPress）：回调带
+                        // details.globalPosition——**长按点全局坐标**直接当菜单
+                        // 锚点（按点必在气泡内，菜单贴按点弹出即压住气泡，
+                        // 老板 2026-10-24 定稿）。不爬 RenderBox：itemBuilder
+                        // 的 context 挂在 SliverList 层，摸不到气泡（实测）。
+                        onLongPressStart: _messageHasActions(m)
+                            ? (d) => _showMessageActions(m,
+                                anchorGlobal: d.globalPosition)
                             : null,
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
@@ -10532,7 +10407,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 跳转目标短暂高亮背景改为显眼橘黄 #FF9800（老板要求
                             // 2026-09-10：不撞任何性别气泡色系；只换背景色、尺寸
                             // 不变——边框方案实测闪烁期间气泡尺寸变化，已弃用）
-                            color: m.env.messageId == _highlightMessageId
+                            color: m.env.messageId == _highlightMessageId ||
+                                    m.env.messageId == _menuTargetMessageId
                                 ? const Color(0xFFFF9800)
                                 // 群聊一期：group 空间按发送者 member 取哈希色板
                                 // （duo 走原来的性别/槽位规则，一字未改）
@@ -10753,14 +10629,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           //（_messageHasActions：墓碑仅可撤回时给）。
                                           if (_messageHasActions(m)) ...[
                                             const SizedBox(width: 2),
-                                            _bubbleQuickAction(
-                                              m,
-                                              icon: Icons.more_horiz,
-                                              // 「更多操作」：区别于汉堡菜单的
-                                              // chatPageMenuMore（"菜单"），这个
-                                              // 指消息操作菜单（老板 2026-10-12）
-                                              label: l10n.chatPageMsgMoreActions,
-                                              onTap: () => _showMessageActions(m),
+                                            Builder(
+                                              // Builder：锚点要「…」按钮自己的
+                                              // 中心坐标——item 层 context 的
+                                              // RenderBox 不是这个小按钮（同上）。
+                                              builder: (btnCtx) =>
+                                                  _bubbleQuickAction(
+                                                m,
+                                                icon: Icons.more_horiz,
+                                                // 「更多操作」：区别于汉堡菜单的
+                                                // chatPageMenuMore（"菜单"），这个
+                                                // 指消息操作菜单（老板 2026-10-12）
+                                                label: l10n.chatPageMsgMoreActions,
+                                                onTap: () {
+                                                  final btnBox = btnCtx
+                                                      .findRenderObject()
+                                                      as RenderBox?;
+                                                  if (btnBox == null ||
+                                                      !btnBox.attached) {
+                                                    return;
+                                                  }
+                                                  _showMessageActions(m,
+                                                      anchorGlobal: btnBox
+                                                          .localToGlobal(btnBox
+                                                              .size
+                                                              .center(Offset
+                                                                  .zero)));
+                                                },
+                                              ),
                                             ),
                                           ],
                                         ],
@@ -12207,55 +12103,39 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
                     _vtGroup(
                       title: l10n.voiceTranscriptGroupEngine,
                       children: [
-                        _vtEngineRow(
-                          value: 'local',
+                        _vtOptionRow(
+                          active: _engine == 'local',
+                          onTap: () => setState(() => _engine = 'local'),
                           label: l10n.voiceTranscriptAuthLocal,
                           desc: l10n.voiceTranscriptAuthLocalDesc,
                         ),
-                        _vtEngineRow(
-                          value: 'server',
+                        _vtOptionRow(
+                          active: _engine == 'server',
+                          onTap: () => setState(() => _engine = 'server'),
                           label: l10n.voiceTranscriptAuthServer,
                           desc: l10n.voiceTranscriptAuthServerDesc,
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
+                    // 转写时机：自动/手动二选一（老板 2026-10-24：把原「自动转写」
+                    // 勾选改成单选）——与方式组同款单选行，存储层仍是同一个 bool
+                    // （_voiceTranscriptAuto），无迁移。标签用 AutoOn/AutoOff
+                    // （“自动”/“手动”），描述是 AutoDesc 原句的两半。
                     _vtGroup(
                       title: l10n.voiceTranscriptAutoLabel,
                       children: [
-                        // 整行可点切换（不止小勾框——老板一贯的整块可点偏好）。
-                        // 嵌套 InkWell+Checkbox 与 LabeledCheckbox 同款：手势
-                        // 竞技场只会命中内层，不会双触发。
-                        InkWell(
-                          mouseCursor: SystemMouseCursors.click,
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () => setState(() => _auto = !_auto),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    l10n.voiceTranscriptAutoDesc,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.4,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Checkbox(
-                                  value: _auto,
-                                  onChanged: (v) =>
-                                      setState(() => _auto = v ?? false),
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ],
-                            ),
-                          ),
+                        _vtOptionRow(
+                          active: _auto,
+                          onTap: () => setState(() => _auto = true),
+                          label: l10n.voiceTranscriptAutoOn,
+                          desc: l10n.voiceTranscriptAutoModeDesc,
+                        ),
+                        _vtOptionRow(
+                          active: !_auto,
+                          onTap: () => setState(() => _auto = false),
+                          label: l10n.voiceTranscriptAutoOff,
+                          desc: l10n.voiceTranscriptManualModeDesc,
                         ),
                       ],
                     ),
@@ -12320,14 +12200,15 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
     );
   }
 
-  /// 方式单选行：选中项 tint 背景 + 对勾（与 OptionPickerSheet 的选项行同款）。
-  Widget _vtEngineRow({
-    required String value,
+  /// 通用单选行（方式组与时机组共用）：选中项 tint 背景 + 对勾（与
+  /// OptionPickerSheet 的选项行同款）。
+  Widget _vtOptionRow({
+    required bool active,
+    required VoidCallback onTap,
     required String label,
     required String desc,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    final active = value == _engine;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
@@ -12338,7 +12219,7 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(12),
-          onTap: () => setState(() => _engine = value),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
@@ -12872,6 +12753,253 @@ Future<void> showMyAvatarFullscreen(
           ),
         ),
       ));
+}
+
+/// 消息操作菜单的**锚定浮层 route**（老板 2026-10-24）：内容是一个白底圆角卡片，
+/// **紧贴**锚点气泡（[anchor]，全局坐标）：上方放得下放上方、否则下方、**都不够放
+/// 时直接悬浮覆盖在气泡上**（老板指定，微信长链接同款）。水平跟随气泡侧
+/// （[mine] 靠右 / 对方靠左），越界钳回屏内。
+///
+/// 高度不用估算值选边——用 [_MenuPlacement] 两阶段布局：先让菜单按给定宽度做
+/// intrinsic 测量（_buildActionCardGrid 由固定尺寸卡片组成，intrinsic 安全），
+/// 拿到真实高度后精确放置。
+class _MessageActionsPopupRoute extends PopupRoute<String> {
+  _MessageActionsPopupRoute({
+    required this.anchor,
+    required this.screen,
+    required this.menuBuilder,
+  });
+
+  final Rect anchor;
+  final Size screen;
+  final WidgetBuilder menuBuilder;
+
+  @override
+  Color? get barrierColor => Colors.black.withValues(alpha: 0.20);
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  String? get barrierLabel => '关闭消息菜单';
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 180);
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    final curved =
+        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    // PopupRoute 的 buildTransitions 结果直接进 Overlay（不是 Stack）——
+    // 自己包一层 Stack，Positioned 才有合法宿主（实测：直接 Positioned 抛
+    // ParentData 断言）。
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FadeTransition(
+            opacity: curved,
+            child: _MenuPlacement(
+              anchor: anchor,
+              screen: screen,
+              curved: curved,
+              menuBuilder: menuBuilder,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 菜单的两阶段放置：先在 `Offstage` 里按目标宽度把菜单**真实测高**
+/// （setState 记录），下一帧再按测得高度精确选位（上/下/悬浮）。
+/// 为什么不用 intrinsic 高度一步算：_buildActionCardGrid 内部有 LayoutBuilder
+/// （按可用宽算每行卡数），对它调 getMaxIntrinsicHeight 会抛断言——离屏布局
+/// （Offstage）是最省事的真实测量。
+class _MenuPlacement extends StatefulWidget {
+  const _MenuPlacement({
+    required this.anchor,
+    required this.screen,
+    required this.curved,
+    required this.menuBuilder,
+  });
+
+  final Rect anchor;
+  final Size screen;
+  final Animation<double> curved;
+  final WidgetBuilder menuBuilder;
+
+  @override
+  State<_MenuPlacement> createState() => _MenuPlacementState();
+}
+
+class _MenuPlacementState extends State<_MenuPlacement> {
+  double? _menuHeight;
+
+  static const double _gap = 8.0; // 菜单与气泡的间距
+  static const double _edgeMargin = 12.0; // 卡片距屏幕边缘
+  static const double _gridMaxWidth = 96.0 * 4 + 12.0 * 3; // 一行四卡
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = widget.screen;
+    final menuWidth =
+        _gridMaxWidth.clamp(0.0, screen.width - _edgeMargin * 2);
+    final anchor = widget.anchor;
+    final curved = widget.curved;
+    final menu = Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      elevation: 6,
+      shadowColor: Colors.black38,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: widget.menuBuilder(context),
+      ),
+    );
+
+    // 阶段一：菜单还没量过高 → 离屏测高（同宽度），下一帧回来放置。
+    // 注意：本 widget 处于 buildTransitions 包的 Positioned.fill 的 Stack 里，
+    // 这里**不能再套 Positioned**（ParentData 冲突）——直接返回非定位子节点，
+    // 由 Align 顶到左上角，Offstage 不参与布局占位。
+    final measured = _menuHeight;
+    if (measured == null) {
+      return Align(
+        alignment: Alignment.topLeft,
+        child: Offstage(
+          child: SizedBox(
+            width: menuWidth,
+            child: _MeasureSize(
+              onChange: (size) {
+                // performLayout 里回调 → 不能同步 setState（"Build scheduled
+                // during frame" 断言），推到帧尾。
+                if (!mounted || _menuHeight == size.height) return;
+                scheduleMicrotask(() {
+                  if (mounted && _menuHeight != size.height) {
+                    setState(() => _menuHeight = size.height);
+                  }
+                });
+              },
+              child: menu,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 阶段二：按真实高度选位（老板 2026-10-24 定稿）：以**按点**为锚——锚是
+    // 长按点/按钮中心（必在气泡内），菜单**下边缘（上方开）/上边缘（下方开）
+    // 贴住按点** → 菜单必然压住气泡一部分，其余部分露出橘黄选中高亮（微信同款
+    // "菜单长在消息上"）。上下都放不下时选空间大的一侧，菜单允许被屏幕缘裁掉
+    // 一部分（按点在屏内，露出的部分够用）。
+    final insets = MediaQuery.paddingOf(context);
+    final spaceAbove = anchor.top - insets.top;
+    final spaceBelow = screen.height - insets.bottom - anchor.bottom;
+    // 上方放得下优先上方（微信习惯）；否则下方；都不够选空间大的一侧。
+    final bool above;
+    if (spaceAbove >= measured + _gap) {
+      above = true;
+    } else if (spaceBelow >= measured + _gap) {
+      above = false;
+    } else {
+      above = spaceAbove >= spaceBelow;
+    }
+    // 水平：菜单中心对准按点 x；太靠边时钳回屏内。
+    double left = anchor.center.dx - menuWidth / 2;
+    left = left.clamp(_edgeMargin, math.max(_edgeMargin,
+        screen.width - _edgeMargin - menuWidth));
+    // 垂直：菜单边缘贴按点（_gap 缝里出箭头）。钳回屏内（贴边裁切可接受）。
+    final double top = above
+        ? (anchor.top - _gap - measured)
+            .clamp(_edgeMargin + insets.top, double.infinity)
+        : (anchor.bottom + _gap).clamp(0.0, double.infinity);
+    // 小箭头（老板 2026-10-24，微信同款）：旋转 45° 的正方形，指回按点——
+    // 上方开时贴菜单下边（箭头尖朝下）、下方开时贴上边。水平 = 按点 x 在菜单
+    // 坐标系里的偏移，钳在菜单宽度内（留出箭头半径与 8px 边距）。
+    const arrowSize = 12.0;
+    final double? arrowTop = above ? null : -arrowSize / 2;
+    final double? arrowBottom = above ? -arrowSize / 2 : null;
+    final double arrowLeft = ((anchor.center.dx - left) - arrowSize / 2)
+        .clamp(8.0, math.max(8.0, menuWidth - arrowSize - 8.0));
+    return Stack(
+      children: [
+        Positioned(
+          left: left,
+          top: top,
+          width: menuWidth,
+          child: ScaleTransition(
+            alignment:
+                above ? Alignment.bottomCenter : Alignment.topCenter,
+            scale: Tween<double>(begin: 0.85, end: 1.0).animate(curved),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                menu,
+                Positioned(
+                  left: arrowLeft,
+                  top: arrowTop,
+                  bottom: arrowBottom,
+                  child: Transform.rotate(
+                    angle: math.pi / 4,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const RoundedRectangleBorder(),
+                      elevation: 0,
+                      child: SizedBox.square(
+                          dimension: arrowSize,
+                          child: const SizedBox.expand()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 子组件尺寸变化回调（离屏测高用）：包一层 RenderProxyBox，layout 后上报
+/// 子组件真实大小。（全私有，仅本文件 [_MenuPlacementState] 用。）
+class _MeasureSize extends SingleChildRenderObjectWidget {
+  const _MeasureSize({required this.onChange, super.child});
+
+  final ValueChanged<Size> onChange;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _MeasureSizeRenderObject(onChange);
+
+  @override
+  void updateRenderObject(
+      BuildContext context, covariant _MeasureSizeRenderObject renderObject) {
+    renderObject.onChange = onChange;
+  }
+}
+
+class _MeasureSizeRenderObject extends RenderProxyBox {
+  _MeasureSizeRenderObject(this.onChange);
+
+  ValueChanged<Size> onChange;
+  Size? _lastSize;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (child != null && size != _lastSize) {
+      _lastSize = size;
+      onChange(size);
+    }
+  }
 }
 
 class _MessageAvatar extends StatefulWidget {

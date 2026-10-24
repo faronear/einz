@@ -170,17 +170,10 @@ void main() {
     await tester.longPress(videoBubble());
     await settleRealAsync(tester);
     await tester.pumpAndSettle();
-    final previewRow = find.byKey(const ValueKey('messagePreviewRow'));
-    expect(
-      find.descendant(of: previewRow, matching: _thumbOf(48)),
-      findsOneWidget,
-      reason: '菜单顶部简略气泡应显示视频首帧缩略图',
-    );
-    expect(
-      find.descendant(of: previewRow, matching: find.byType(Text)),
-      findsNothing,
-      reason: '预览行不应再显示「📎 video.mp4」这类文件名文本',
-    );
+    // 2026-10-24 老板：菜单改锚定气泡的浮层，预览行删除——消息本体就在菜单旁
+    expect(find.text('引用'), findsOneWidget, reason: '菜单应已弹出');
+    expect(find.byKey(const ValueKey('messagePreviewRow')), findsNothing,
+        reason: '锚定浮层不再需要消息预览行');
 
     await tester.tapAt(const Offset(20, 20)); // 关闭弹窗
     await tester.pumpAndSettle();

@@ -2021,7 +2021,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcription happens on this device (requires a ~230MB model download at the first use).'**
+  /// **'Transcription happens on this device (requires a model download at the first use).'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
@@ -2033,7 +2033,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthServerDesc.
   ///
   /// In en, this message translates to:
-  /// **'Voice messages are sent to a cloud server, and deleted immediately after transcribing.'**
+  /// **'Voice messages are sent to our cloud server, and deleted immediately after transcribing.'**
   String get voiceTranscriptAuthServerDesc;
 
   /// No description provided for @voiceTranscriptServerFailed.
@@ -2060,12 +2060,6 @@ abstract class AppLocalizations {
   /// **'Auto-transcribe'**
   String get voiceTranscriptAutoLabel;
 
-  /// No description provided for @voiceTranscriptAutoDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'When off, voice messages aren\'t transcribed automatically — long-press a message to transcribe manually (default). When on, messages are transcribed automatically with the method above.'**
-  String get voiceTranscriptAutoDesc;
-
   /// No description provided for @voiceTranscriptEngineLocalShort.
   ///
   /// In en, this message translates to:
@@ -2075,7 +2069,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptEngineServerShort.
   ///
   /// In en, this message translates to:
-  /// **'Server'**
+  /// **'Remote'**
   String get voiceTranscriptEngineServerShort;
 
   /// No description provided for @voiceTranscriptAutoOn.
@@ -2087,8 +2081,32 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoOff.
   ///
   /// In en, this message translates to:
-  /// **'Off'**
+  /// **'Manual'**
   String get voiceTranscriptAutoOff;
+
+  /// No description provided for @voiceTranscriptTimingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'When to transcribe'**
+  String get voiceTranscriptTimingLabel;
+
+  /// No description provided for @voiceTranscriptAutoModeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe every voice message as soon as it arrives.'**
+  String get voiceTranscriptAutoModeDesc;
+
+  /// No description provided for @voiceTranscriptModeManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get voiceTranscriptModeManual;
+
+  /// No description provided for @voiceTranscriptManualModeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe each voice message yourself, on demand.'**
+  String get voiceTranscriptManualModeDesc;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.
   ///

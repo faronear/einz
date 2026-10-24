@@ -111,23 +111,16 @@ void main() {
     return tester;
   }
 
-  testWidgets('长按图片消息：菜单预览行显示缩略图（不是文件名）', (WidgetTester tester) async {
+  testWidgets('长按图片消息：锚定浮层菜单弹出（无预览行，消息本体就在旁边）', (WidgetTester tester) async {
     await pumpWithImage(tester);
     expect(_imageOf(180), findsOneWidget, reason: '消息流应显示图片本体');
 
     await tester.longPress(_imageOf(180));
     await tester.pumpAndSettle();
-    final previewRow = find.byKey(const ValueKey('messagePreviewRow'));
-    expect(
-      find.descendant(of: previewRow, matching: _imageOf(48)),
-      findsOneWidget,
-      reason: '菜单顶部简略气泡应显示图片缩略图',
-    );
-    expect(
-      find.descendant(of: previewRow, matching: find.byType(Text)),
-      findsNothing,
-      reason: '预览行不应再显示文件名文本',
-    );
+    // 2026-10-24 老板：菜单改锚定气泡的浮层，预览行删除——消息本体就在菜单旁
+    expect(find.text('引用'), findsOneWidget, reason: '菜单应已弹出');
+    expect(find.byKey(const ValueKey('messagePreviewRow')), findsNothing,
+        reason: '锚定浮层不再需要消息预览行');
 
     await tester.tapAt(const Offset(20, 20)); // 关闭弹窗
     await tester.pumpAndSettle();

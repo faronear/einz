@@ -1104,7 +1104,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      '在本机上直接转写（第一次使用会下载约 230MB 转写模型），原始消息不离开本机。';
+      '在本机上直接转写，原始消息不离开本机（第一次使用会下载一个语音模型）';
 
   @override
   String get voiceTranscriptAuthServer => '远程转写';
@@ -1127,20 +1127,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoLabel => '自动转写';
 
   @override
-  String get voiceTranscriptAutoDesc =>
-      '关闭时，语音消息不会自动转写，可长按消息手动转写（默认）；开启后按上面的方式自动转写。';
-
-  @override
   String get voiceTranscriptEngineLocalShort => '本机';
 
   @override
-  String get voiceTranscriptEngineServerShort => '服务端';
+  String get voiceTranscriptEngineServerShort => '远程';
 
   @override
   String get voiceTranscriptAutoOn => '自动';
 
   @override
-  String get voiceTranscriptAutoOff => '关';
+  String get voiceTranscriptAutoOff => '手动';
+
+  @override
+  String get voiceTranscriptTimingLabel => '转写时机';
+
+  @override
+  String get voiceTranscriptAutoModeDesc => '所有语音消息一旦收到就自动转写。';
+
+  @override
+  String get voiceTranscriptModeManual => '手动';
+
+  @override
+  String get voiceTranscriptManualModeDesc => '每条语音消息都需要你手动发起转写。';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';
