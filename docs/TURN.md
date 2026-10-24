@@ -18,14 +18,18 @@ TURN 只是把 **UDP 包原样转发**，媒体是 DTLS-SRTP 端到端加密，T
 ## 1. 部署（国内机 `einz.yuanjinx.com`）
 
 ```bash
-cd <仓库>/server/docker
-cp coturn/turnserver.conf.example coturn/turnserver.conf
+cd <仓库>/server/docker/coturn
+cp turnserver.conf.example turnserver.conf
 # 改三处：user= 的密码、realm、external-ip（云主机有公网网卡就不用填）
 #   生成密码：openssl rand -hex 16
 
-docker compose -f docker-compose.coturn.yml up -d
-docker compose -f docker-compose.coturn.yml logs -f
+docker compose up -d          # 或仓库根 `npm run coturn-run-docker`
+docker compose logs -f
 ```
+
+> compose 文件在 `server/docker/coturn/docker-compose.yml`（2026-10-24 从
+> `server/docker/docker-compose.coturn.yml` 迁入子目录，与 turnserver.conf 同目录，
+> 独立项目名 `einz-turn` 不变）。
 
 用 **host 网络**：TURN 要用 49152–65535 这一大段 UDP 端口，且需要真实公网 IP；
 走 docker 桥接 + 端口映射既麻烦又容易在 `external-ip` 上踩坑。

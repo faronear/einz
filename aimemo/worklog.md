@@ -15799,3 +15799,16 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - chat_page.dart：时机组 children 改 Row(stretch)+两个 Expanded _vtTimingBlock（新增，Material+InkWell 方块，label 15/w600 + desc 12/onSurfaceVariant，选中行尾对勾）；类文档注释同步更新（原「勾选框」描述早已过时）。
 - 存储层不变：仍是同一个 bool _voiceTranscriptAuto，无迁移；_changed 判定与提交语义不变。
 - 验证：flutter analyze 干净；voice_transcript_line 12 + option_picker_sheet 6 全绿；golden 不覆盖此弹层。UI 待老板真机自测（更多设置→语音转写）。
+
+## 2026-10-24 coturn compose 迁入 server/docker/coturn/ 子目录
+
+**（2026-10-24T07:15:00Z / 2026-10-24 15:15）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板决定把 `server/docker/docker-compose.coturn.yml` 迁到 `server/docker/coturn/docker-compose.yml`（compose 与 turnserver.conf 同目录），老板已改好 package.json（新增 `coturn-run-docker`、`server-run-docker` 拆掉内联 coturn 启动、`server-update-remote` 改调用它）。我负责其余：
+- **git mv** 旧 compose → coturn/docker-compose.yml（保留历史）
+- volume 挂载 `./coturn/turnserver.conf` → `./turnserver.conf`（同目录相对路径）
+- 头部用法注释更新（cd coturn/、去 -f、加 npm run coturn-run-docker 入口）
+- 补 2026-10-24 位置迁移说明：项目名 einz-turn + 容器名不变，VPS 运行中容器被新路径命令直接采纳、无需 docker rm 重建
+- 文档同步：DEPLOYMENT.md 树状图、TURN.md 部署步骤、voiceCall.zhcn.md 部署文件路径
+- .gitignore `turnserver.*.conf` 规则依旧覆盖新位置的机密 conf（只有 .example 入库）
+验证：docker compose config 通过。aimemo/worklog.md 里旧路径引用是历史日志，保留原样。
