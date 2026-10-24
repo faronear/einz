@@ -2553,6 +2553,17 @@ void main() {
       expect(
           await VoiceTranscriptSettings(db, spaceId: 'space-demo').loadAuto(),
           isTrue);
+      // 没勾「所有秘境」→ 只写本空间 per-space 键；全局键一个都不许落
+      // （2026-10-24 回归：_ScopedKey.write 曾误写全局裸键，所有空间都生效）
+      for (final globalKey in const [
+        'voice_transcript_engine',
+        'voice_transcript_auto',
+      ]) {
+        final global = await (db.select(db.appState)
+              ..where((s) => s.key.equals(globalKey)))
+            .getSingleOrNull();
+        expect(global, isNull, reason: '不勾范围不许写全局键 $globalKey');
+      }
     });
     expect(tester.takeException(), isNull);
   });

@@ -185,7 +185,7 @@ class LocalDatabase extends _$LocalDatabase {
       : super(DatabaseConnection(executor, closeStreamsSynchronously: true));
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -290,6 +290,46 @@ class LocalDatabase extends _$LocalDatabase {
             // 时 from==10，整段迁移根本不会跑，local_voice_transcripts 不存在，
             // 语音气泡下方的转写行（drift watch 流）直接报 "no such table"。
             await m.createTable(localVoiceTranscripts); // CREATE TABLE IF NOT EXISTS
+          }
+          if (from < 12) {
+            // v12（2026-10-24）：转写设置 per-space 化的**存量数据善后**。
+            //
+            // 背景：2026-10-23 重构后 VoiceTranscriptSettings._ScopedKey.write 误写
+            // 裸键（全局 voice_transcript_engine / voice_transcript_auto）而非
+            // scopedKey——不勾「应用于本机所有秘境」的保存也污染了这两个全局键，
+            // 所有空间读到时（per-space 缺失 → 回退全局）都生效（老板 2026-10-24
+            // 实测）。代码已修（写 scopedKey）；本迁移处理已被写脏的存量库：
+            // ① 把全局现值**认领**进每个空间的 per-space 键（INSERT OR IGNORE——
+            //    已有 per-space 值的空间不动，那是 saveAll 清覆盖前的合法状态）；
+            // ② 删除这两个全局键——不删的话此后新建/未配置空间仍会读到污染值。
+            // 删后语义：每个空间各自独立（未配置走默认 local/手动），「所有秘境」
+            // 仍可随时用勾选框重新铺（saveAll 写全局 + 清覆盖，与迁移前同款）。
+            // 旧版单键 voice_transcript_auth（迁移派生源）不属这两键，不受影响。
+            // 键名全是代码内常量（无注入面），与 v7 回填一样直接内联拼 SQL。
+            //
+            // app_state 表可能压根不存在（sqlite3 手工造的落后库：user_version=6
+            // 却只有四张表——迁移测试第一个用例实测，2026-10-24）。没有设置表
+            // 就没有污染可善后，整段跳过；不跳过的话 INSERT 抛 no such table,
+            // 整个迁移失败、库再也打不开。
+            final appStateExists =
+                (await customSelect('PRAGMA table_info(app_state)').get())
+                    .isNotEmpty;
+            if (appStateExists) {
+              for (final settingKey in const [
+                'voice_transcript_engine',
+                'voice_transcript_auto',
+              ]) {
+                await customStatement(
+                  'INSERT OR IGNORE INTO app_state (key, value) '
+                  "SELECT 'space.' || s.space_id || '.$settingKey', a.value "
+                  "FROM spaces s, app_state a WHERE a.key = '$settingKey'",
+                );
+              }
+              await customStatement(
+                "DELETE FROM app_state WHERE key IN "
+                "('voice_transcript_engine', 'voice_transcript_auto')",
+              );
+            }
           }
         },
       );

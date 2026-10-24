@@ -49,8 +49,8 @@ PRAGMA user_version = 6;
     // 触发打开 → 迁移（原先就在这里抛 "duplicate column name: space_id"）。
     await db.select(db.spaces).get();
 
-    expect(await _userVersion(db), 11,
-        reason: '迁移后版本戳应升到当前 schema 版本（v11：+voice_transcripts）');
+    expect(await _userVersion(db), 12,
+        reason: '迁移后版本戳应升到当前 schema 版本（v12：转写设置 per-space 善后）');
 
     // v11 新表已建（语音转写派生缓存）。
     expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue);
@@ -89,10 +89,59 @@ PRAGMA user_version = 6;
     // 触发打开 → 迁移（回归：新表曾塞进 from<10 块，v10 存量库打不开它）。
     await db.select(db.localVoiceTranscripts).get();
 
-    expect(await _userVersion(db), 11, reason: 'v10 存量库应升到 v11');
+    expect(await _userVersion(db), 12, reason: 'v10 存量库应升到当前版本');
     expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue,
         reason: 'v10 存量库必须补建语音转写表，否则转写行报 no such table');
     // v10 已引入的列不受影响。
     expect(await _has(db, 'local_messages', 'deleted_kind'), isTrue);
+  });
+
+  test('v11 存量库（被 bug 写脏的转写全局键）打开 → 认领 per-space 后清全局，升到 v12',
+      () async {
+    final dir = Directory.systemTemp.createTempSync('einz-mig-v12-');
+    final path = '${dir.path}/einz.sqlite';
+    // 造 v11 形状的库：当前 schema 建全表 → 灌入 2026-10-24 修复前的"脏数据"
+    // （两个全局键被不勾"所有秘境"的保存污染 + space-b 有自己的 per-space 覆盖）
+    // → 版本戳改回 11。
+    final seed = LocalDatabase.forTesting(NativeDatabase(File(path)));
+    await seed.select(seed.localMessages).get(); // 触发建表
+    await seed.customStatement("INSERT INTO spaces (space_id) VALUES ('space-a')");
+    await seed.customStatement("INSERT INTO spaces (space_id) VALUES ('space-b')");
+    await seed.customStatement(
+        "INSERT INTO app_state (key, value) VALUES ('voice_transcript_engine', 'server')");
+    await seed.customStatement(
+        "INSERT INTO app_state (key, value) VALUES ('voice_transcript_auto', '1')");
+    // space-b 已按新语义正确写过 per-space 键（local）——迁移不许 clobber 它
+    await seed.customStatement(
+        "INSERT INTO app_state (key, value) VALUES "
+        "('space.space-b.voice_transcript_engine', 'local')");
+    await seed.customStatement('PRAGMA user_version = 11');
+    await seed.close();
+
+    final db = LocalDatabase.forTesting(NativeDatabase(File(path)));
+    addTearDown(() async {
+      await db.close();
+      dir.deleteSync(recursive: true);
+    });
+
+    // 触发打开 → v12 迁移。
+    await db.select(db.appState).get();
+
+    expect(await _userVersion(db), 12);
+    Future<String?> valueOf(String key) async =>
+        (await (db.select(db.appState)..where((s) => s.key.equals(key)))
+                .getSingleOrNull())
+            ?.value;
+    // 认领：无覆盖的空间拿到全局现值（a 收下 server/1）
+    expect(await valueOf('space.space-a.voice_transcript_engine'), 'server');
+    expect(await valueOf('space.space-a.voice_transcript_auto'), '1');
+    // b 的 engine 覆盖不被 clobber（INSERT OR IGNORE）；没覆盖的 auto 照认领
+    expect(await valueOf('space.space-b.voice_transcript_engine'), 'local');
+    expect(await valueOf('space.space-b.voice_transcript_auto'), '1');
+    // 全局键已删——不删此后新建/未配置空间仍读到污染值
+    expect(await valueOf('voice_transcript_engine'), isNull);
+    expect(await valueOf('voice_transcript_auto'), isNull);
+    // 旧版迁移派生键不属这两键，不动
+    expect(await valueOf('voice_transcript_auth'), isNull);
   });
 }

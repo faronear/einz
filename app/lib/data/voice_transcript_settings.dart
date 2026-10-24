@@ -125,6 +125,12 @@ class _ScopedKey with SpaceScopedSetting {
   @override
   String get settingKey => key;
 
-  /// 写本键的值（mixin 的 writeSetting 要显式传 key，包一层少一个出错点）。
-  Future<void> write(String value) => writeSetting(key, value);
+  /// 写本键的值（mixin 的 writeSetting 要显式传键名，包一层少一个出错点）。
+  ///
+  /// **必须传 [scopedKey]**（`space.<spaceId>.<key>` 形式）：2026-10-23 重构时误传
+  /// 裸 [key]（全局键）——不勾「应用于本机所有秘境」的保存也写进了全局，所有
+  /// 空间读到时（per-space 缺失回退全局）都生效，老板实测发现（2026-10-24）。
+  /// 与 tombstone/attachment 两个设置类的写法拉齐（它们都写 scopedKey）。
+  /// 无 spaceId 的上下文（单空间）scopedKey 即全局键，行为不变。
+  Future<void> write(String value) => writeSetting(scopedKey, value);
 }
