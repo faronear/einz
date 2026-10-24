@@ -11042,7 +11042,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   bool get _hasPin => widget.hasPin;
   bool _busy = false; // 当前锁屏码校验中（Argon2id）：防连点重复提交
   // 锁屏时长（前台闲置锁与后台锁共用，老板 2026-10-18 定）：对数刻度轴
-  // （30 秒~30 分钟，仿阅后即焚 burn_duration_sheet）。initState 异步读持久化值
+  // （10 秒~30 分钟，仿阅后即焚 burn_duration_sheet；2026-10-24 由 20 秒~20
+  // 分钟改来）。initState 异步读持久化值
   // 换成轴位置；读回前按默认 30 秒渲染（同 _loadUiStyle 套路）。
   // _initialSeconds = 打开弹窗时的档位，提交时判"是否真改过"。
   double _axisT = 0.0; // 轴位置 t∈[0,1]（对数刻度）
@@ -11292,9 +11293,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     return l10n.lockDurationSecs(seconds);
   }
 
-  /// 轴下的阶段性可点标注（老板 2026-10-18，仿阅后即焚轴）：20 秒（最左）/
-  /// 1 分钟 / 5 分钟 / 20 分钟（最右），点了立刻把轴跳到该点。默认就带一层
-  /// 淡背景色提示可点（与焚毁轴的标注同款：primary 6% 淡底 + InkWell 反馈）。
+  /// 轴下的阶段性可点标注（老板 2026-10-18，仿阅后即焚轴；2026-10-24 范围改
+  /// 10 秒~30 分钟）：10 秒（最左）/ 1 分钟 / 5 分钟 / 30 分钟（最右），点了
+  /// 立刻把轴跳到该点。默认就带一层淡背景色提示可点（与焚毁轴的标注同款：
+  /// primary 6% 淡底 + InkWell 反馈）。
   ///
   /// 标签 x 用与 Slider thumb 完全相同的几何（`trackLeft + t × trackWidth`，
   /// 见 burn_duration_sheet._axisLabels 同款算法），保证对准刻度。

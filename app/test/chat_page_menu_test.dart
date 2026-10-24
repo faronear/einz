@@ -724,17 +724,18 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
-    // 时长轴（对数刻度 20 秒~20 分钟，仿阅后即焚）。初始停在默认档 30 秒
-    // （kLockSeconds，持久化里没存过值）；轴下最左标注是「20 秒」
+    // 时长轴（对数刻度 10 秒~30 分钟，仿阅后即焚；2026-10-24 由 20 秒~20 分钟
+    // 改来）。初始停在默认档 30 秒（kLockSeconds，持久化里没存过值）；
+    // 轴下最左标注是「10 秒」
     expect(find.byType(Slider), findsOneWidget);
     expect(find.text('30 秒'), findsOneWidget, reason: '标题行当前值=默认档 30 秒');
-    expect(find.text('20 秒'), findsOneWidget, reason: '轴下最左可点标注');
-    // 点轴中点 → t=0.5 → 20×√60≈155s → 吸附到整分钟 180s（3 分钟）
+    expect(find.text('10 秒'), findsOneWidget, reason: '轴下最左可点标注');
+    // 点轴中点 → t=0.5 → 10×√180≈134s → 吸附到整分钟 120s（2 分钟）
     await tester.tap(find.byType(Slider));
     await tester.pumpAndSettle();
     final slider = tester.widget<Slider>(find.byType(Slider));
     expect(slider.value, 0.5, reason: '对数轴中点是 t=0.5');
-    expect(find.text('3 分钟'), findsOneWidget, reason: '标题行当前值应跟随更新');
+    expect(find.text('2 分钟'), findsOneWidget, reason: '标题行当前值应跟随更新');
     // 两空提交：只调时长 → 需验老 PIN（2026-10-19 新规），通过后弹窗关闭、PIN 不动
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
@@ -743,7 +744,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing);
     expect(await AppLockService(db).isSetup, true, reason: '只调时长不清锁');
-    expect(await AppLockService(db).loadLockSeconds(), 180);
+    expect(await AppLockService(db).loadLockSeconds(), 120);
   });
 
   testWidgets('更改弹窗：PIN 和时长都没动就点「更改」→ 红字报没有做任何修改', (WidgetTester tester) async {

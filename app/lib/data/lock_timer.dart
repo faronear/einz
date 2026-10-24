@@ -6,11 +6,11 @@
 /// loadLockSeconds / saveLockSeconds），chat_page 加载后回填这两处。
 const int kLockSeconds = 30;
 
-/// 可调锁屏时长范围（秒）：20 秒 ~ 20 分钟（老板 2026-10-18 定，由 30 秒~30 分钟
-/// 收窄而来）。弹窗里的时长轴仿阅后即焚（burn_duration_sheet）：对数刻度、
+/// 可调锁屏时长范围（秒）：10 秒 ~ 30 分钟（老板 2026-10-24 定，由 20 秒~20 分钟
+/// 改来）。弹窗里的时长轴仿阅后即焚（burn_duration_sheet）：对数刻度、
 /// 档位吸附（≤1 分钟吸附 10 秒、>1 分钟吸附整分钟）、轴下可点阶段标注。
-const int kLockMinSeconds = 20;
-const int kLockMaxSeconds = 20 * 60;
+const int kLockMinSeconds = 10;
+const int kLockMaxSeconds = 30 * 60;
 
 /// 后台锁定计时（纯逻辑，可单测）。
 ///

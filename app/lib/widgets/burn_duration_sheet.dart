@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import 'labeled_checkbox.dart';
 
-/// 阅后即焚时长的下限/上限（老板 2026-10-16：1 分钟 ~ 60 天；60 由 30 调来
-/// ——对数轴上最右的时长刻度离「关闭」顶点太近，拖/点稍偏就互相误触）。
-const int kBurnMinSeconds = 60; // 1 分钟
-const int kBurnMaxSeconds = 60 * 86400; // 60 天
+/// 阅后即焚时长的下限/上限（老板 2026-10-24：10 秒 ~ 50 天；此前为 1 分钟~
+/// 60 天）。对数轴上最右的时长刻度要离「关闭」顶点足够远，拖/点稍偏不至于
+/// 互相误触。
+const int kBurnMinSeconds = 10; // 10 秒
+const int kBurnMaxSeconds = 50 * 86400; // 50 天
 
 /// 任意秒数 → 人类可读（天/时/分，零单位省略；不足 1 分钟才落到秒）。
 /// 0/负数 → 「关闭（不再自动焚毁）」。
@@ -93,15 +94,35 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
 
   int get _axisSeconds => _secondsFromT(_t);
 
-  // ---- 轴刻度映射（对数：1 分钟 ~ 60 天）----
+  // ---- 轴刻度映射（**分段对数**：10 秒~1 分钟一段占前 1/4，1 分钟~50 天
+  // 一段占后 3/4。单一对数轴上 10 秒~1 分钟只占整轴 ~8%，太挤；分段把这段
+  // 拉长到 25%，同时保持段内对数刻度与档位吸附不变，老板 2026-10-24）----
 
-  /// 轴位置 → 秒数：对数刻度 + **粒度随时长升档**（见类文档）。
+  /// 分段点（秒）：短时长段与长时长段的分界，轴位置 [kBurnSplitT]。
+  static const int _splitSeconds = 60;
+
+  /// 分段点在轴上的位置（0~1）。
+  static const double _splitT = 0.25;
+
+  /// 轴位置 → 秒数：段内对数 + **粒度随时长升档**（见类文档）。
   static int _secondsFromT(double t) {
-    final raw = kBurnMinSeconds *
-        math.pow(kBurnMaxSeconds / kBurnMinSeconds, t.clamp(0.0, 1.0));
+    final c = t.clamp(0.0, 1.0);
+    final double raw;
+    if (c <= _splitT) {
+      // 短段：10 秒 → 1 分钟，段内线性映射到对数值
+      final local = c / _splitT;
+      raw = kBurnMinSeconds *
+          math.pow(_splitSeconds / kBurnMinSeconds, local).toDouble();
+    } else {
+      // 长段：1 分钟 → 50 天
+      final local = (c - _splitT) / (1 - _splitT);
+      raw = _splitSeconds *
+          math.pow(kBurnMaxSeconds / _splitSeconds, local).toDouble();
+    }
     final int snapped;
     if (raw <= 3600) {
-      snapped = (raw / 60).round() * 60; // ≤1 小时：分钟
+      // ≤1 小时：分钟吸附（10 秒~60 秒区段吸附到 10 秒，与锁屏轴同口径）
+      snapped = raw <= 60 ? (raw / 10).round() * 10 : (raw / 60).round() * 60;
     } else if (raw <= 86400) {
       snapped = (raw / 3600).round() * 3600; // ≤1 天：小时
     } else {
@@ -112,8 +133,17 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
 
   static double _tFromSeconds(int seconds) {
     final clamped = seconds.clamp(kBurnMinSeconds, kBurnMaxSeconds);
-    return math.log(clamped / kBurnMinSeconds) /
-        math.log(kBurnMaxSeconds / kBurnMinSeconds);
+    if (clamped <= _splitSeconds) {
+      // 短段：10 秒 → 1 分钟
+      return _splitT *
+          math.log(clamped / kBurnMinSeconds) /
+          math.log(_splitSeconds / kBurnMinSeconds);
+    }
+    // 长段：1 分钟 → 50 天
+    return _splitT +
+        (1 - _splitT) *
+            math.log(clamped / _splitSeconds) /
+            math.log(kBurnMaxSeconds / _splitSeconds);
   }
 
   void _submit() => Navigator.of(context)
@@ -243,9 +273,11 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
     final trackInset = math.max(thumbWidth, overlayWidth);
     return LayoutBuilder(builder: (ctx, constraints) {
       final width = constraints.maxWidth;
-      // 标注点（t 为轴位置；最后一个是右端顶点，右对齐避免伸出屏幕）
+      // 标注点（t 为轴位置；最后一个是右端顶点，右对齐避免伸出屏幕）。
+      // 老板 2026-10-24：范围改 10 秒~50 天，左端标 10 秒，增加 1 分钟锚点。
       final marks = <({double t, String label, bool isOff, bool rightAligned})>[
-        (t: 0, label: l10n.burnUnitMinutes(1), isOff: false, rightAligned: false),
+        (t: 0, label: l10n.burnUnitSeconds(kBurnMinSeconds), isOff: false, rightAligned: false),
+        (t: _tFromSeconds(60), label: l10n.burnUnitMinutes(1), isOff: false, rightAligned: false),
         (t: _tFromSeconds(3600), label: l10n.burnUnitHours(1), isOff: false, rightAligned: false),
         (t: _tFromSeconds(86400), label: l10n.burnUnitDays(1), isOff: false, rightAligned: false),
         (t: 1, label: l10n.burnAxisOffLabel, isOff: true, rightAligned: true),
