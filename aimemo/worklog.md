@@ -15654,3 +15654,6 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 
 **（2026-10-24T00:49:43Z / 2026-10-24 08:49）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 转写行图标对齐（老板）：云/芯片图标与文字排列不齐 → 改用 Text.rich + WidgetSpan(PlaceholderAlignment.middle)：单行时图标与文字上下居中；多行（转写最多 3 行）图标钉在第一行、与首行中线对齐——正是老板要的两种效果统一解。四个状态行（入口/done/pending/failed）共用 line() helper，Clickable 包整行（点击区更大）。flutter analyze 干净。
+
+**（2026-10-24T01:00:00Z / 2026-10-24 09:00）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+转写行左对齐（老板）：云/芯片图标原先向左突出于播放键 → line() helper 统一加左缩进 8px，与播放键 IconButton（compact 40px 盒、24px 图标居中）的图标左缘对齐。flutter analyze 干净。

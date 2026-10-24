@@ -9325,25 +9325,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 单行即上下居中；多行（转写最多 3 行）图标钉在第一行、与首行文字居中。
         // 之前是 Row + crossAxisAlignment.start，图标顶到行框顶部，对 13px 文字
         // 视觉偏上（「排列不整齐」的来源）。
+        // 左缩进 8px（老板 2026-10-24）：与播放键图标左缘对齐——播放键是
+        // IconButton（compact 40px 盒、24px 图标居中 → 图标左缘距内容左边 8px），
+        // 转写行原先从 0 起排，向左突出 8px。
         Widget line(String iconModelId, String text, {TextStyle? textStyle}) =>
-            Text.rich(
-              TextSpan(
-                children: [
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child:
-                        _voiceTranscriptSourceIcon(iconModelId, transcriptColor),
-                  ),
-                  const WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: SizedBox(width: 4),
-                  ),
-                  TextSpan(text: text, style: textStyle ?? style),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: _voiceTranscriptSourceIcon(
+                          iconModelId, transcriptColor),
+                    ),
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: SizedBox(width: 4),
+                    ),
+                    TextSpan(text: text, style: textStyle ?? style),
+                  ],
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: style,
               ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: style,
             );
         if (t == null) {
           // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
