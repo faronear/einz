@@ -15761,3 +15761,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 过程险情：① 当时撞见另一 agent 保存中的瞬时坏文件状态误判"并行编辑冲突"（老板澄清无人工作后复analyze=干净，实为写盘非原子瞬间）；② stash pop 带出大量"陌生"改动，实为该 agent 的 compose 合并重构落盘（git status 全景核对后确认无裹挟）；③ 删 GestureDetector 的括号手术两次失败，改用"删 onLongPress 行"的最小改动法一次成功——**结构级 widget 替换应优先做减法（删参数）而非重排括号**。
 最终：flutter analyze lib/ test/ 全绿；全量 385 用例 +1 skip 全过。
+
+**（2026-10-24T05:05:00Z / 2026-10-24 13:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+⚠️ 提交 9fd487a8 实际包含两块内容：① 我的名义改动（顶栏长按放开+Tooltip 删除+测试适配）；② 另一 agent（CodeBuddy）的 compose 合并成品（三变体合并为单文件+COMPOSE_PROFILES，删 nocaddy/withcaddy，docs/SECURITY/DEPLOYMENT/Caddyfile.example 同步）——该 agent 的改动在暂存区残留，git add app 路径时被一起打包。内容均完整验证过（全量测试绿），不再改写历史；worklog 如实记录。老板在另一台机器 pull 时注意此提交是混合主题。
