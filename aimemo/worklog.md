@@ -15827,3 +15827,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量套件后台跑完后确认。
 
 教训：**在可竖直滚动容器里，Row/Column 用 stretch 前必须想清楚 cross 轴是否有界**——stretch 会把「传入约束的上界」直接当紧约束发给子节点，滚动区的无界高就是在这里炸的；等宽等高双卡的标准解是 IntrinsicHeight 包裹。
+
+**（2026-10-24T07:55:00Z / 2026-10-24 15:55）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+消息菜单弹出时聊天页变暗（老板）：_MessageActionsPopupRoute 的 barrierColor 原 20% 黑，比 app 里 36 处 showDialog/showModalBottomSheet 的默认 Colors.black54（54%）浅了快一倍——"没像其他弹层那样变暗"的根因就是它。对齐到 Colors.black54（2327eabb）。barrierDismissible 本就 true，点暗区关闭不变。analyze + 47 个菜单测试绿。提交纪律：本次严格只 add chat_page.dart 一个文件——工作区另有老板/并行的 l10n 改动与 b000310a（转写弹层 IntrinsicHeight，他人工作），均不碰不提交；diff 实证无裹挟。
