@@ -1,6 +1,11 @@
 // 回归测试：转写行来源图标全覆盖（老板 2026-10-23）——done/pending 之外，
 // failed/stale/unavailable 三个可重试状态行首也要带来源图标（云=服务端
-// whisper，modelId='whisper-server'；芯片=本地 sense-voice），且行保持可点。
+// whisper，芯片=本地 sense-voice），且行保持可点。
+//
+// ⚠ 查找方式：转写行自 2026-10-23/24 起改为 Text.rich + WidgetSpan（图标嵌进
+// 文本 span，左缩进 8px 与播放键对齐）——find.text 找不到 TextSpan 里的文字，
+// 要用 RichText 的 toPlainText() 匹配；图标是 WidgetSpan 的真实子 widget，
+// find.byIcon 仍可用（作为所在 Clickable 的后代断言“同行”）。
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -55,6 +60,7 @@ Future<void> _pumpVoiceWithTranscript(
   WidgetTester tester, {
   required String status,
   required String modelId,
+  String transcript = '',
 }) async {
   final db = LocalDatabase.forTesting(NativeDatabase.memory());
   addTearDown(db.close);
@@ -102,6 +108,7 @@ Future<void> _pumpVoiceWithTranscript(
         LocalVoiceTranscriptsCompanion.insert(
           messageId: 'msg-voice-1',
           modelId: Value(modelId),
+          transcript: Value(transcript),
           status: Value(status),
           audioSha256: const Value('fake-sha256'),
           updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
@@ -111,28 +118,30 @@ Future<void> _pumpVoiceWithTranscript(
   await tester.pumpAndSettle();
 }
 
+/// 含指定文字（TextSpan 内）的 RichText finder——转写行是 Text.rich 结构。
+Finder richTextContaining(String text) => find.byWidgetPredicate(
+    (w) => w is RichText && w.text.toPlainText().contains(text));
+
 void main() {
   testWidgets('服务端转写失败：行首带云图标 + 「转写失败，点按重试」可点',
       (WidgetTester tester) async {
     await _pumpVoiceWithTranscript(tester,
         status: 'failed', modelId: 'whisper-server');
 
-    final retry = find.text('转写失败，点按重试');
+    final retry = richTextContaining('转写失败，点按重试');
     expect(retry, findsOneWidget, reason: '失败行应显示重试入口');
-    // 来源图标与文字在同一行（最近的 Row 祖先）
-    final row = find.ancestor(of: retry, matching: find.byType(Row));
+    // 图标是同一 Text.rich 里的 WidgetSpan 子 widget——后代断言即“同行”
     expect(
-      find.descendant(
-          of: row.first, matching: find.byIcon(Icons.cloud_outlined)),
+      find.descendant(of: retry, matching: find.byIcon(Icons.cloud_outlined)),
       findsOneWidget,
       reason: '服务端失败行行首应是云图标（whisper-server）',
     );
-    // 行仍可点（重试入口）：最近的 Clickable 祖先挂着 onTap
-    // （外层还有气泡等 Clickable，取 .first 最近的）
-    final nearestClickable = tester.widget<Clickable>(
-        find.ancestor(of: retry, matching: find.byType(Clickable)).first);
-    expect(nearestClickable.onTap, isNotNull,
-        reason: '失败行应保持可点按重试');
+    // 失败行可点：Clickable 祖先存在且最近的一个挂着回调
+    // （外层还有气泡长按等的 Clickable，故用 findsWidgets + .first）
+    final clickables = find.ancestor(of: retry, matching: find.byType(Clickable));
+    expect(clickables, findsWidgets, reason: '失败行应可点按重试');
+    expect(tester.widget<Clickable>(clickables.first).onTap, isNotNull,
+        reason: '失败行应挂着重试回调');
     expect(tester.takeException(), isNull);
   });
 
@@ -140,46 +149,62 @@ void main() {
     await _pumpVoiceWithTranscript(tester,
         status: 'failed', modelId: 'sense-voice-small');
 
-    final retry = find.text('转写失败，点按重试');
+    final retry = richTextContaining('转写失败，点按重试');
     expect(retry, findsOneWidget);
-    final row = find.ancestor(of: retry, matching: find.byType(Row));
     expect(
-      find.descendant(of: row.first, matching: find.byIcon(Icons.memory)),
+      find.descendant(of: retry, matching: find.byIcon(Icons.memory)),
       findsOneWidget,
       reason: '本地失败行行首应是芯片图标（sense-voice）',
     );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stale / unavailable 行同样带芯片图标且文案各自正确',
-      (WidgetTester tester) async {
+  testWidgets('stale 行带芯片图标 + 「可重新转写」文案', (WidgetTester tester) async {
     await _pumpVoiceWithTranscript(tester,
         status: 'stale', modelId: 'sense-voice-small');
-    final stale = find.text('可重新转写');
+    final stale = richTextContaining('可重新转写');
     expect(stale, findsOneWidget);
     expect(
-      find.descendant(
-          of: find.ancestor(of: stale, matching: find.byType(Row)).first,
-          matching: find.byIcon(Icons.memory)),
+      find.descendant(of: stale, matching: find.byIcon(Icons.memory)),
       findsOneWidget,
       reason: 'stale 行行首应带芯片图标',
     );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('unavailable 行带芯片图标 + 手动入口文案',
-      (WidgetTester tester) async {
+  testWidgets('unavailable 行带芯片图标 + 手动入口文案', (WidgetTester tester) async {
     await _pumpVoiceWithTranscript(tester,
         status: 'unavailable', modelId: 'sense-voice-small');
-    final manual = find.text('点按转写文字');
+    final manual = richTextContaining('点按转写文字');
     expect(manual, findsOneWidget);
     expect(
-      find.descendant(
-          of: find.ancestor(of: manual, matching: find.byType(Row)).first,
-          matching: find.byIcon(Icons.memory)),
+      find.descendant(of: manual, matching: find.byIcon(Icons.memory)),
       findsOneWidget,
       reason: 'unavailable 行行首应带芯片图标',
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('done 行：文本前带芯片图标（本地结果）', (WidgetTester tester) async {
+    await _pumpVoiceWithTranscript(tester,
+        status: 'done', modelId: 'sense-voice-small', transcript: '转写出的文字');
+    final done = richTextContaining('转写出的文字');
+    expect(done, findsOneWidget);
+    // done 行不包 Clickable（纯展示）——图标与文字同在 Text.rich 里
+    expect(
+      find.descendant(of: done, matching: find.byIcon(Icons.memory)),
+      findsOneWidget,
+      reason: 'done 行行首应带芯片图标',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('done 行文本为空 → 整行隐藏（不显示空行）', (WidgetTester tester) async {
+    await _pumpVoiceWithTranscript(tester,
+        status: 'done', modelId: 'sense-voice-small');
+    expect(richTextContaining('转写中'), findsNothing);
+    expect(find.byIcon(Icons.memory), findsNothing,
+        reason: '空文本 done 行应整行隐藏');
     expect(tester.takeException(), isNull);
   });
 }

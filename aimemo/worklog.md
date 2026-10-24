@@ -15576,6 +15576,13 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 文档：whisperDeploy 双引擎化（标题/心智模型/§5 env 示例）+ 新增 §6 引擎选择对比表与 cn1 结论、sensevoice 模型两种获取方式、health 验证法。
 - 待办（VPS）：cn1 上 `npm ci`（装 sherpa-onnx-linux-x64）→ 放模型到 server/models/sensevoice/（或 /opt/whisper/sensevoice）→ .env 配 EINZ_SENSEVOICE_MODEL → 重启；curl /health 确认 asr_engine。
 
+**（2026-10-24T03:10:00Z / 2026-10-24 11:10）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：修模型下载中点 Cancel 黑屏（双重 pop）+ 转写行测试适配 Text.rich 新结构
+- 老板报告：用户下载模型时点 Cancel 进黑屏。根因：Cancel 的 onPressed 里 pop(false) 关窗，但 route 退场动画期间仍在导航栈（ctx.mounted 仍 true），随后 ensureInstalled 抛 _Cancelled，catch 里又 pop 一次——**双重 pop 把底下聊天页一起弹掉**。代码注释里提过同类“重入 pop”坑（2026-10-12 并发那次是红屏，这次是取消竞态黑屏）。
+- 修复：_prepareVoiceModel 加 `dismissed` 旗标，三路出口（下载完成/失败取消/用户 Cancel）共用，谁先到谁关窗后者止步。该改动已随老板的 style commit 进入 HEAD（我改到工作区时被其 git add -A 顺手带上，dismissed 8 处齐全，无需再提交）。
+- 测试适配（非代码回归）：老板并行把转写行从 Row+Text 重构为 Text.rich+WidgetSpan（图标嵌文本 span、左缩进 8px），find.text 找不到 TextSpan 内文字致 4 例挂——重写 voice_transcript_line_test 为 RichText.toPlainText 匹配 + 图标作为同 RichText 后代断言（最紧的“同行”判据），补 done 有文字/空文本隐藏两例，共 6 例全过；聊天页回归 74 例全过；analyze 零问题。
+- 手测步骤（待老板在 TestFlow 包上验）：删 App 重装（确保无模型）→ 转写一条语音 → 下载进度框弹出后点 Cancel → 预期：框关闭、留在聊天页、无黑屏无红屏、无错误 snackbar；再点转写可重新开始（.part 续传）。
+
+
 
 
 
