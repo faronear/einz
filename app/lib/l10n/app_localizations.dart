@@ -1952,11 +1952,11 @@ abstract class AppLocalizations {
   /// **'Method'**
   String get voiceTranscriptGroupEngine;
 
-  /// No description provided for @voiceTranscriptAutoLabel.
+  /// No description provided for @voiceTranscriptTimingLabel.
   ///
   /// In en, this message translates to:
-  /// **'Auto-transcribe'**
-  String get voiceTranscriptAutoLabel;
+  /// **'When to transcribe'**
+  String get voiceTranscriptTimingLabel;
 
   /// No description provided for @voiceTranscriptEngineLocalShort.
   ///

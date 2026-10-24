@@ -628,7 +628,7 @@
   "voiceTranscriptServerFailed": "服务端转写失败：{error}",
   "voiceTranscriptServerDisabled": "服务器未启用转写，已改用本机模型",
   "voiceTranscriptGroupEngine": "转写方式",
-  "voiceTranscriptAutoLabel": "自动转写",
+  "voiceTranscriptTimingLabel": "转写时机",
   "voiceTranscriptEngineLocalShort": "本机",
   "voiceTranscriptEngineServerShort": "远程",
   "voiceTranscriptAutoOn": "自动",

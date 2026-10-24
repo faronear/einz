@@ -12015,8 +12015,9 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 ///
 /// 结构（仿 PIN 更改弹窗的分组卡片）：
 /// - 第一组「转写方式」：本机 / 服务端 二选一（选中项 tint + 对勾）；
-/// - 第二组「自动转写」：勾选框（默认**不勾** = 每条询问——不论方式是本机
-///   还是服务端，执行前都会询问；省流量/上传。勾上 = 按上面的方式自动转写）；
+/// - 第二组「转写时机」：手动 / 自动 两个方块二选一（选中打勾，老板
+///   2026-10-24；手动 = 每条询问——不论方式是本机还是服务端，执行前都会
+///   询问；省流量/上传。自动 = 按上面的方式自动转写）；
 /// - 底部：「应用于本机所有秘境」勾选框 + 提交按钮（单选+提交模式，与附件
 ///   存储/墓碑弹层同构——两项都是本设备持久设置，提交前统一确认）。
 class _VoiceTranscriptSheet extends StatefulWidget {
@@ -12123,24 +12124,42 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // 转写时机：自动/手动二选一（老板 2026-10-24：把原「自动转写」
-                    // 勾选改成单选）——与方式组同款单选行，存储层仍是同一个 bool
-                    // （_voiceTranscriptAuto），无迁移。标签用 AutoOn/AutoOff
-                    // （“自动”/“手动”），描述是 AutoDesc 原句的两半。
+                    // 转写时机：左「手动」右「自动」两个方块二选一（老板 2026-10-24：
+                    // 参考空间向导里性别选择的方块按钮）——选中打勾，配色与
+                    // OptionPickerSheet 选项行同款（见 _vtTimingBlock）。存储层
+                    // 仍是同一个 bool（_voiceTranscriptAuto），无迁移。
                     _vtGroup(
-                      title: l10n.voiceTranscriptAutoLabel,
+                      title: l10n.voiceTranscriptTimingLabel,
                       children: [
-                        _vtOptionRow(
-                          active: _auto,
-                          onTap: () => setState(() => _auto = true),
-                          label: l10n.voiceTranscriptAutoOn,
-                          desc: l10n.voiceTranscriptAutoModeDesc,
-                        ),
-                        _vtOptionRow(
-                          active: !_auto,
-                          onTap: () => setState(() => _auto = false),
-                          label: l10n.voiceTranscriptAutoOff,
-                          desc: l10n.voiceTranscriptManualModeDesc,
+                        // IntrinsicHeight：Row 在竖直滚动区里（高度无上界），
+                        // stretch 会拿到无限高约束直接抛「BoxConstraints forces
+                        // an infinite height」——先按两块内容量出齐高再拉伸
+                        // （等大方块的标准写法，2026-10-24 踩坑修复）。
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: _vtTimingBlock(
+                                  active: !_auto,
+                                  onTap: () => setState(() => _auto = false),
+                                  label: l10n.voiceTranscriptAutoOff,
+                                  desc: l10n.voiceTranscriptManualModeDesc,
+                                  keyName: 'vtTimingManual',
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _vtTimingBlock(
+                                  active: _auto,
+                                  onTap: () => setState(() => _auto = true),
+                                  label: l10n.voiceTranscriptAutoOn,
+                                  desc: l10n.voiceTranscriptAutoModeDesc,
+                                  keyName: 'vtTimingAuto',
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -12246,6 +12265,61 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
                 if (active) Icon(Icons.check, size: 20, color: scheme.primary),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 转写时机方块（老板 2026-10-24）：左右并排两个方块二选一（布局参考空间
+  /// 向导里性别选择的卡片），左「手动」右「自动」；选中者打勾。
+  ///
+  /// 配色与 OptionPickerSheet 的选项行同款（2026-10-24 定稿口径）：选中 =
+  /// 品牌粉 #D6529C 25% 实底；未选中 = 5% 黑；悬浮 10% / 点击 14%。
+  ///
+  /// [keyName] 供测试按块定位（等高/点选断言）；不传即无 key。
+  Widget _vtTimingBlock({
+    required bool active,
+    required VoidCallback onTap,
+    required String label,
+    required String desc,
+    String? keyName,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      key: keyName == null ? null : ValueKey(keyName),
+      color: active
+          ? const Color(0xFFD6529C).withValues(alpha: 0.25)
+          : Colors.black.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: Colors.black.withValues(alpha: 0.10),
+        highlightColor: Colors.black.withValues(alpha: 0.14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(label,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                  if (active)
+                    Icon(Icons.check, size: 20, color: scheme.primary),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(desc,
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            ],
           ),
         ),
       ),
@@ -12776,7 +12850,10 @@ class _MessageActionsPopupRoute extends PopupRoute<String> {
   final WidgetBuilder menuBuilder;
 
   @override
-  Color? get barrierColor => Colors.black.withValues(alpha: 0.20);
+  // 与 app 里所有 showDialog / showModalBottomSheet 的默认 barrier 同款
+  // （Colors.black54，54% 黑）——菜单弹出时聊天页同样变暗，视觉一致
+  // （老板 2026-10-24：原先 20% 太浅，比别的弹层暗得明显不够）。
+  Color? get barrierColor => Colors.black54;
 
   @override
   bool get barrierDismissible => true;

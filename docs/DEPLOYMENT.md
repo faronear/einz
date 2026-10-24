@@ -197,9 +197,10 @@ server/
     │                                #   COMPOSE_PROFILES=caddy 则同起内置 Caddy 容器（80/443）；
     │                                #   COMPOSE_PROFILES=cftunnel 则同起 cloudflared
     │                                #   （中国双入口：系统级 Caddy 服备案域名 + 隧道服境外域名）
-    ├── docker-compose.coturn.yml     # TURN（独立 compose，项目名 einz-turn，可单独启停）
     ├── env.sh              # 生成 .env（EINZ_DB_BACKUP_KEY 等；.env gitignore，pull 不覆盖）
-    ├── coturn/             # turnserver.conf.example
+    ├── coturn/             # TURN 独立 compose + 配置（项目名 einz-turn，可单独启停）
+    │   ├── docker-compose.yml        #   host 网络；`npm run coturn-run-docker` 在此启动
+    │   └── turnserver.conf.example   #   cp 成 turnserver.conf 填密码/realm/external-ip
     └── .env                # 本地化密钥/配置（gitignore）
 ```
 

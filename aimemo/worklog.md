@@ -15791,10 +15791,52 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - 12 个 tooltip 删除遗留：chatPageMsgSent/SendingTap/Failed/Delivered、voiceCallMenuCall、chatPagePassphraseShow/Hide、chatPageLockNow、chatPageInviteCopyLink/CodeTooltip、chatPageEntranceListRefresh、chatPageEmojiKeyboard
 - 9 个历史遗留（转写功能改名后的旧键 voiceTranscriptTimingLabel/ModeManual、PIN 弹窗重构遗留 setPinDialog*、setupCreateCopy、chatPagePlaying/QuotedTombMessage/StatusOthersOnline/GroupNameEditTooltip 等）
 教训：**macOS grep 的 \b 不可靠**（GNU grep 语义的单词边界在 BSD grep 下失效），两次用 grep 判定孤儿都误报/漏报，最终用 Python 的 (?<![A-Za-z0-9_]) 前后断言才可信；l10n 孤儿判定必须排除 app_localizations{,_zh,_en}.dart 三个生成文件。gen-l10n 重新生成（纯删 257 行）+ analyze + 全量 385 绿。
+**（2026-10-24T07:10:00Z / 2026-10-24 15:10）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
 
+语音转写弹层「转写时机」改方块二选一（老板）：第二组标题「自动转写」→「转写时机」，下面两个整行单选改成**左右两个方块按钮**（布局参考空间向导里性别选择的双卡片），左「手动」+备注、右「自动」+备注，选中打勾；配色参考 OptionPickerSheet 选项行（2026-10-24 定稿口径）：选中=品牌粉 #D6529C 25% 实底、未选中=5% 黑、悬浮 10%/点击 14%，对勾 scheme.primary。第一组「转写方式」仍是整行单选（_vtOptionRow）不动。
+
+- l10n：voiceTranscriptAutoLabel 更名 voiceTranscriptTimingLabel（zh「转写时机」/ en「When to transcribe」），gen-l10n 重生成；标签/描述沿用 AutoOn/AutoOff/AutoModeDesc/ManualModeDesc。
+- chat_page.dart：时机组 children 改 Row(stretch)+两个 Expanded _vtTimingBlock（新增，Material+InkWell 方块，label 15/w600 + desc 12/onSurfaceVariant，选中行尾对勾）；类文档注释同步更新（原「勾选框」描述早已过时）。
+- 存储层不变：仍是同一个 bool _voiceTranscriptAuto，无迁移；_changed 判定与提交语义不变。
+- 验证：flutter analyze 干净；voice_transcript_line 12 + option_picker_sheet 6 全绿；golden 不覆盖此弹层。UI 待老板真机自测（更多设置→语音转写）。
+
+## 2026-10-24 coturn compose 迁入 server/docker/coturn/ 子目录
+
+**（2026-10-24T07:15:00Z / 2026-10-24 15:15）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板决定把 `server/docker/docker-compose.coturn.yml` 迁到 `server/docker/coturn/docker-compose.yml`（compose 与 turnserver.conf 同目录），老板已改好 package.json（新增 `coturn-run-docker`、`server-run-docker` 拆掉内联 coturn 启动、`server-update-remote` 改调用它）。我负责其余：
+- **git mv** 旧 compose → coturn/docker-compose.yml（保留历史）
+- volume 挂载 `./coturn/turnserver.conf` → `./turnserver.conf`（同目录相对路径）
+- 头部用法注释更新（cd coturn/、去 -f、加 npm run coturn-run-docker 入口）
+- 补 2026-10-24 位置迁移说明：项目名 einz-turn + 容器名不变，VPS 运行中容器被新路径命令直接采纳、无需 docker rm 重建
+- 文档同步：DEPLOYMENT.md 树状图、TURN.md 部署步骤、voiceCall.zhcn.md 部署文件路径
+- .gitignore `turnserver.*.conf` 规则依旧覆盖新位置的机密 conf（只有 .example 入库）
+验证：docker compose config 通过。aimemo/worklog.md 里旧路径引用是历史日志，保留原样。
+**（2026-10-24T07:25:00Z / 2026-10-24 15:25）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+提交拆分（老板拍板「拆成两个提交」）：本轮转写弹层改动提交时撞上并行会话提交——对方的 coturn 提交（原 a1805cda）把暂存区里我的 app/lib + l10n 改动一并打包，我的提交只剩 worklog 后半。两提交均未推送，本地 soft reset 到 d9de5a0c 后重组为：
+- 7219f791 style(app)：转写弹层时机组改方块二选一（app/lib + l10n + 本人 worklog 条目）
+- 64daa1c3 refactor(server)：coturn compose 迁入子目录（纯 rename + 对方 worklog 条目，原消息与 Co-Authored-By 保留）
+备份 ref backup-pre-split-20261024；git diff backup-pre-split-20261024 HEAD 为空=重组前后文件树完全一致，零丢失。对方 coturn 的后续工作区改动（package.json/docs/voiceCall/compose 内容）未动，仍在其工作区待其自行提交。教训：并行环境下提交务必 git commit -- 显式路径，且提交前一刻要重新 git status（本轮两次状态检查之间对方又落了一轮改动）。
 **（2026-10-24T07:30:26Z / 2026-10-24 15:30）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
 演示秘境头像空白根因 + 修复（老板：imac 上演示空间对方和我的头像都空白，macbook/iOS/Android 正常）：
 - **根因**：这台 iMac（iMac19,1，Intel，macOS 15.8.1）跑 x86_64 Flutter 3.47.2 引擎 + Impeller-Metal 后端，`Picture.toImage()` 离屏栅格化产出**全透明空图**。实证：演示空间当天 14:49 种入的照片从 dev 库解密密文后是 1024×768 全透明 PNG（转 BMP 3.1MB 仅 22 个非零字节）。头像与照片同一套运行时绘制 → 同因空白。上游为 Flutter x86_64+Impeller 已知 bug 类（flutter/flutter#134399 等）；Apple 在收缩 x86_64 支持。全 app 仅 demo_space.dart 用 toImage，**影响限于演示秘境**，真实空间不受影响。
 - **修复（老板定夺：预生成 PNG 资产）**：绘制代码抽到 `lib/data/demo_art.dart`（画法唯一来源，原样保留）；`DemoSpace` 头像/照片改 `rootBundle.load('assets/demoSpace/*.png')`；3 张 PNG（avatarMe/avatarPeer/photoSunrise，共 ~65KB）已生成提交——在 iMac 上用 flutter test（测试 shell 栅格化没坏）跑出，像素核验 + 亲眼核验画面；种子版本 v2→v3（iMac 上 v2 实例存着空白照片，升版自动重种，演示消息随之重置）。
 - **生成器**：`test/demo_space_art_gen_test.dart` 双模式——默认当回归测试（3 张资产存在且不空白，防误删/空白资产进库），`GEN_DEMO_ASSETS=1`（或 `npm run demo-assets`）重画资产；Intel iMac 上引擎栅格化坏了会出空图，生成器自带覆盖率校验直接 test 失败挡住。另加 `test/demo_space_seed_test.dart`：ensureSeeded 后照片密文解密非空白 + 10 条消息 + 幂等。
 - 验证：analyze 干净 + 3 个新测试绿 + 全量 388 用例 +1 skip 全过。
+
+**（2026-10-24T07:45:00Z / 2026-10-24 15:45）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+修复「语音转写弹层打不开」（老板实测上报）：时机组 Row 用了 CrossAxisAlignment.stretch，而它位于弹层的竖直 SingleChildScrollView 里（高度无上界）→ stretch 把无限高约束传给子块，performLayout 抛 BoxConstraints forces an infinite height，整个弹层渲染失败。先用最小复现测试确认根因（stretch Row + 竖直滚动区必抛），再按标准写法修：Row 外包 IntrinsicHeight（先按两块内容量出齐高、再拉伸），恢复等高大方块且不再崩。
+
+- _vtTimingBlock 增加 keyName 形参（两块分别 vtTimingManual / vtTimingAuto），供测试按块定位；
+- chat_page_menu_test 新增回归用例「语音转写弹层：转写时机为左右方块，点选可提交」：菜单→更多设置→语音转写打开弹层、标题/两块在场、两块等高、默认无改动提交灰/点「自动」后亮起并落盘 auto=true。**已验证该用例能抓到旧 bug**（临时拆掉 IntrinsicHeight 即复现 infinite height 红测，随后恢复）；
+- 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量套件后台跑完后确认。
+
+教训：**在可竖直滚动容器里，Row/Column 用 stretch 前必须想清楚 cross 轴是否有界**——stretch 会把「传入约束的上界」直接当紧约束发给子节点，滚动区的无界高就是在这里炸的；等宽等高双卡的标准解是 IntrinsicHeight 包裹。
+
+**（2026-10-24T07:55:00Z / 2026-10-24 15:55）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+消息菜单弹出时聊天页变暗（老板）：_MessageActionsPopupRoute 的 barrierColor 原 20% 黑，比 app 里 36 处 showDialog/showModalBottomSheet 的默认 Colors.black54（54%）浅了快一倍——"没像其他弹层那样变暗"的根因就是它。对齐到 Colors.black54（2327eabb）。barrierDismissible 本就 true，点暗区关闭不变。analyze + 47 个菜单测试绿。提交纪律：本次严格只 add chat_page.dart 一个文件——工作区另有老板/并行的 l10n 改动与 b000310a（转写弹层 IntrinsicHeight，他人工作），均不碰不提交；diff 实证无裹挟。
+
+**（2026-10-24T08:11:12Z / 2026-10-24 16:11）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+合并 origin 的 7 个提交进本地（老板）：唯一冲突是 worklog.md 尾部（双方各追加条目）→ 双方条目按 UTC 段排序合并，本条置末；合并前工作区未提交的 l10n 改名（voiceTranscriptAutoLabel→voiceTranscriptTimingLabel）经核对与传入内容一致，无丢失。

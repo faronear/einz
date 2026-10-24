@@ -1137,7 +1137,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptGroupEngine => 'Method';
 
   @override
-  String get voiceTranscriptAutoLabel => 'Auto-transcribe';
+  String get voiceTranscriptTimingLabel => 'When to transcribe';
 
   @override
   String get voiceTranscriptEngineLocalShort => 'Local';
