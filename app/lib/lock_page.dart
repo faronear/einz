@@ -157,7 +157,6 @@ class _LockPageState extends State<LockPage> {
         cursor: SystemMouseCursors.click,
         child: const Icon(Icons.menu),
       ),
-      tooltip: l10n.chatPageMenuMore,
       onSelected: (value) {
         // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言崩溃）
         Future<void>.delayed(const Duration(milliseconds: 300), () {
@@ -253,9 +252,7 @@ class _LockPageState extends State<LockPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Tooltip(
-          message: l10n.chatPageMenuAbout,
-          child: InkWell(
+        InkWell(
             mouseCursor: SystemMouseCursors.click,
             borderRadius: BorderRadius.circular(10),
             onTap: _openAboutPage,
@@ -265,7 +262,6 @@ class _LockPageState extends State<LockPage> {
               child: BrandLogo(),
             ),
           ),
-        ),
         const SizedBox(width: 10),
         Flexible(
           child: Text(l10n.lockPageTitle,

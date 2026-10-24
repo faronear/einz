@@ -246,8 +246,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AboutSheet), findsNothing);
-    await tester.tap(find.descendant(
-        of: find.byType(Tooltip), matching: find.byType(BrandLogo)));
+    // Tooltip 已按老板 2026-10-24 决策删除（仅状态条成员头像保留）——直接点 Logo
+    await tester.tap(find.byType(BrandLogo));
     await tester.pumpAndSettle();
 
     expect(find.byType(AboutSheet), findsOneWidget,
@@ -270,8 +270,8 @@ void main() {
     await _pushLockPage(tester, db, canDismiss: false);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.descendant(
-        of: find.byType(Tooltip), matching: find.byType(BrandLogo)));
+    // Tooltip 已按老板 2026-10-24 决策删除（仅状态条成员头像保留）——直接点 Logo
+    await tester.tap(find.byType(BrandLogo));
     await tester.pumpAndSettle();
 
     expect(find.byType(AboutSheet), findsOneWidget);

@@ -15749,3 +15749,15 @@ flutter analyze 干净。
 
 **（2026-10-24T04:25:00Z / 2026-10-24 12:25）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮层+删预览行 / e5869b72 两阶段放置+箭头+高亮 / 4eb50393 跳全宽翻车稿 / 3d9c79c9 按点定稿）soft reset 压成单提交 887663b4「菜单改微信式锚定浮层（按点方案定稿）」，force-with-lease 覆盖远程（仅老板两台 Mac 在用，已确认可改写已推送历史）；5076b9df（server compose）与 aimemo/server 未提交改动不受影响。废稿过程详见上方 2026-10-24 各条目与 worklog。
+
+## 2026-10-24 顶栏长按放开 + 全 app Tooltip 删除（状态条成员头像除外）
+
+**（2026-10-24T04:54:56Z / 2026-10-24 12:54）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板三个决策：
+1. **反转 2026-10-08 的"顶栏吸收长按"**：气泡整体（含时间戳顶栏、含圆按钮）都能长按出菜单。实现=删吸收层 GestureDetector 的 `onLongPress: () {}`（保留 opaque 命中、不注册 recognizer → 竞技场无内层长按手势，外层气泡唯一赢）。当初防的"误开"正是现在要的一致行为（菜单锚定按点）。
+2. **删除全 app 一切 Tooltip**（手机无 hover 无价值、长按抢手势）：Tooltip widget 20 处（chat_page 19 + lock_page 1）+ IconButton(tooltip:) 参数 12 处全部移除；**唯一例外=状态条群成员头像 hover 出完整名字**（`_stripAvatar`，老板特别要求保留——头像下方名字格是 clip 截断，hover 是唯一看全名的途径；触屏无 hover 不抢手势）。
+3. 测试适配：lock_page_test 2 处 `find.descendant(of: Tooltip, ...)` → 直接 byType(BrandLogo)；chat_send_status_test 6 处 `byTooltip('发送中…')` → byKey(ValueKey('sendingPlane'))（小飞机加 key）；member_profile_test 1 个过期用例（还在找已删除的 messagePreviewRow）改写为点消息流头像。
+
+过程险情：① 当时撞见另一 agent 保存中的瞬时坏文件状态误判"并行编辑冲突"（老板澄清无人工作后复analyze=干净，实为写盘非原子瞬间）；② stash pop 带出大量"陌生"改动，实为该 agent 的 compose 合并重构落盘（git status 全景核对后确认无裹挟）；③ 删 GestureDetector 的括号手术两次失败，改用"删 onLongPress 行"的最小改动法一次成功——**结构级 widget 替换应优先做减法（删参数）而非重排括号**。
+最终：flutter analyze lib/ test/ 全绿；全量 385 用例 +1 skip 全过。

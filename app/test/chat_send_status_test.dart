@@ -277,7 +277,7 @@ void main() {
     expect(find.text('旧设备发的'), findsOneWidget);
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '服务端已收下（seq 有值）→ 单勾');
-    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
+    expect(find.byKey(const ValueKey('sendingPlane')), findsNothing,
         reason: '不该显示成「发送中」——那会诱导用户点重发，进而撞 403 变永久失败');
     expect(find.byIcon(Icons.done_all), findsNothing,
         reason: '还没有对方回执 → 不该显示双勾');
@@ -321,7 +321,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('待确认的一条'), findsOneWidget);
-    final plane = find.byTooltip('发送中，点击验证是否已送达并重发');
+    final plane = find.byKey(const ValueKey('sendingPlane'));
     expect(plane, findsOneWidget, reason: 'pending 应显示可点按的小飞机');
     expect(api.posted, isEmpty, reason: '尚未点按前不该上传');
 
@@ -332,7 +332,7 @@ void main() {
     expect(api.posted.length, 1, reason: '点按应触发一次重发');
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '重发成功后应显示单勾（已发送）');
-    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
+    expect(find.byKey(const ValueKey('sendingPlane')), findsNothing,
         reason: '不应再停留在发送中');
   });
 
@@ -531,13 +531,13 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsOneWidget,
+    expect(find.byKey(const ValueKey('sendingPlane')), findsOneWidget,
         reason: '网络异常后应停在待确认的小飞机');
 
     // 网络恢复且响应变慢 → 点按后能观察到「加速中…」
     api.failPostMessage = false;
     api.postMessageDelay = const Duration(milliseconds: 60);
-    await tester.tap(find.byTooltip('发送中，点击验证是否已送达并重发'));
+    await tester.tap(find.byKey(const ValueKey('sendingPlane')));
     await tester.pump(const Duration(milliseconds: 10));
     expect(find.text('加速中…'), findsOneWidget, reason: '重发期间应显示进行中文案');
 

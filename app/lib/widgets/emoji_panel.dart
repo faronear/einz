@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../l10n/app_localizations.dart';
 
 /// emoji 分类：tab 图标直接用该分类的代表 emoji（不引图片资源、不为分类名新增
 /// l10n 文案）。
@@ -176,7 +175,6 @@ class _EmojiPanelState extends State<EmojiPanel> {
 
   /// 底部分类条：分类 tab（可横向滚动，窄屏不挤）+ 右侧退格/回键盘。
   Widget _buildTabBar(ThemeData theme) {
-    final l10n = AppLocalizations.of(context)!;
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -197,12 +195,10 @@ class _EmojiPanelState extends State<EmojiPanel> {
           ),
           IconButton(
             icon: const Icon(Icons.backspace_outlined, size: 20),
-            tooltip: l10n.delete,
             onPressed: widget.onBackspace,
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_alt_outlined, size: 20),
-            tooltip: l10n.chatPageEmojiKeyboard,
             onPressed: widget.onDismiss,
           ),
         ],

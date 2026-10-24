@@ -510,33 +510,29 @@ void main() {
 
     await _pumpChat(tester, db, spaceKey, [fromPeer, fromMe]);
 
-    // 预览行里的头像（菜单弹层内只有一枚）
-    Finder previewAvatar() => find.descendant(
-        of: find.byKey(const ValueKey('messagePreviewRow')),
-        matching: find.byType(CircleAvatar));
-
-    // ① 长按对方的消息 → 菜单；点头像 → 他的资料页
-    await tester.longPress(find.text('hello'));
-    await tester.pumpAndSettle();
-    expect(previewAvatar(), findsOneWidget, reason: '菜单顶部应有预览行头像');
-    await tester.tap(previewAvatar());
-    await tester.pump(const Duration(milliseconds: 400)); // 收菜单 + route 交接
+    // 2026-10-24 菜单改锚定浮层、预览行删除——头像点按语义改为直接点**消息流里
+    // 的头像**（与原口径同源：别人的开他的资料页、我的开「我的资料」）。
+    // ① 点对方消息旁的头像 → 他的资料页
+    await tester.tap(find.descendant(
+        of: find.widgetWithText(Align, 'hello'),
+        matching: find.byType(CircleAvatar)));
+    await tester.pump(const Duration(milliseconds: 400)); // route 交接
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageMemberProfileTitle), findsOneWidget,
-        reason: '点预览行里别人的头像应开他的资料页');
+        reason: '点消息旁别人的头像应开他的资料页');
     expect(find.descendant(of: _profileSheet, matching: find.text('Alice')),
         findsOneWidget);
     await tester.tapAt(const Offset(20, 20)); // 关掉资料页
     await tester.pumpAndSettle();
 
-    // ② 长按我的消息 → 菜单；点我的头像 → 「我的资料」弹层
-    await tester.longPress(find.text('hi'));
-    await tester.pumpAndSettle();
-    await tester.tap(previewAvatar());
+    // ② 点我的消息旁的头像 → 「我的资料」弹层
+    await tester.tap(find.descendant(
+        of: find.widgetWithText(Align, 'hi'),
+        matching: find.byType(CircleAvatar)));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
-        reason: '点预览行里我的头像应开「我的资料」弹层');
+        reason: '点消息旁我的头像应开「我的资料」弹层');
     expect(tester.takeException(), isNull);
   });
 }

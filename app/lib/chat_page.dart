@@ -633,9 +633,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// `burned: false` 恒真——顶栏标记只在焚毁**生效前**显示。
   /// 配色不单独指定：跟锁屏等顶栏图标同色。
   Widget _buildBurnBadge(AppLocalizations l10n) {
-    return Tooltip(
-      message: l10n.chatPageBurnHeading,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
+    return InkWell(mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(16),
         onTap: _showBurnPicker,
         child: Padding(
@@ -650,8 +648,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 消息发送时间标注：当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM。
@@ -733,9 +730,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       color: Colors.transparent,
       shape: const CircleBorder(), // 圆形背景（老板 2026-10-02：同状态栏电话图标）
       clipBehavior: Clip.antiAlias,
-      child: Tooltip(
-        message: label,
-        child: InkWell(
+      child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           // 悬浮/点击背景（老板 2026-10-02）：与状态栏电话/设备图标同档
           // hover/highlight 色，浅灰淡染——gradient 深色气泡下黑 alpha 同样可见
@@ -749,7 +744,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Center(child: Icon(icon, size: iconSize, color: subtle)),
           ),
         ),
-      ),
     );
   }
 
@@ -785,9 +779,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）。
       // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
       // 引用/拷贝/保存快捷动作同款风格，别像裸文字）
-      return Tooltip(
-        message: l10n.chatPageMsgFailed,
-        child: Material(
+      return Material(
           color: Colors.transparent,
           shape: const CircleBorder(),
           clipBehavior: Clip.antiAlias,
@@ -811,8 +803,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-        ),
-      );
+        );
     }
 
     // 撤回墓碑永远显示单勾（2026-10-11 老板）：服务端消息行已真删（对方永远
@@ -820,10 +811,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 任何更大 seq 的消息都会越过它的 seq，按常规判定会误显双勾。撤回=没送达，
     // 固定单勾才符合事实。
     if (m.deletedKind == 'recall') {
-      return Tooltip(
-        message: l10n.chatPageMsgSent,
-        child: Icon(Icons.check, size: 12, color: subtle),
-      );
+      return Icon(Icons.check, size: 12, color: subtle);
     }
 
     // 送达进度（老板 2026-10-12 定稿）：k=0 → 单勾；k≥1 → 「k 双勾」（数字在
@@ -838,11 +826,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final allReceived = MessageRepository.receiptOf(
               m.env.serverSequence, _peerReceipts) !=
           null;
-      return Tooltip(
-        message: allReceived
-            ? l10n.chatPageMsgDelivered
-            : l10n.chatPageMsgSent,
-        child: Row(
+      return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             // duo（peers=1）全员送达 → 裸双勾；群 → 永远带人数（含全员时），
@@ -854,14 +838,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
             Icon(Icons.done_all, size: 12, color: subtle),
           ],
-        ),
-      );
+        );
     }
     if (m.status == 'sent' || m.status == 'delivered' || m.status == 'read') {
-      return Tooltip(
-        message: l10n.chatPageMsgSent,
-        child: Icon(Icons.check, size: 12, color: subtle),
-      );
+      return Icon(Icons.check, size: 12, color: subtle);
     }
 
     // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）。
@@ -869,9 +849,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 小飞机用超链接蓝提示可点——但渐变主题深蓝气泡上蓝飞机几乎看不见
     // （2026-10-11 老板），改白系（同快捷动作的 white70）；「加速中」期间
     // 仍用中性色，避免"点了还提示可点"的矛盾。
-    return Tooltip(
-      message: l10n.chatPageMsgSendingTap,
-      child: Material(
+    return Material(
         color: Colors.transparent,
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
@@ -891,7 +869,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
                   const SizedBox(width: 2),
                 ],
+                // key：测试定位锚点（Tooltip 删除后 byTooltip 不可用，老板
+                // 2026-10-24 删 tooltip 决策的配套）
                 _SendingPlane(
+                  key: const ValueKey('sendingPlane'),
                   size: 16,
                   color: busyLabel != null
                       ? subtle
@@ -903,8 +884,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 点按状态小标 → 幂等重发（服务端按 message_id 去重），期间显示进行中文案。
@@ -1994,14 +1974,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ),
     );
-    return Tooltip(
-      message: l10n.spaceListSwitch,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
+    return InkWell(mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(10),
         onTap: _openSpacePicker,
         child: titleRow,
-      ),
-    );
+      );
   }
 
   /// 性别底色：淡粉（女）/ 淡蓝（男）/ 淡灰（未登记）。
@@ -2209,11 +2186,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 空群占位头像自带 tooltip「我的同伴」；已有成员时头像条里每个头像自带
     // 人名 tooltip（`_stripAvatar`）。
     final Widget avatarSlot = others.isEmpty
-        ? Tooltip(
-            // 三个「我的群组/同伴」文案（菜单项/弹层标题/本 tooltip）共享
-            // 同一键（老板 2026-10-11）
-            message: l10n.chatPageMembersTitle('group'),
-            child: SizedBox(
+        ? SizedBox(
               width: kStatusMemberAvatarSize,
               height: kStatusMemberAvatarSize,
               // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
@@ -2226,17 +2199,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 child: const Icon(Icons.groups_outlined, size: 22),
               ),
-            ),
-          )
+            )
         : _avatarStrip(others, avatarBudget);
 
     // **一个大胶囊**（2026-10-11 老板）：多人头像条 + 群名/编辑图标 + 在线
     // 人数整体包进同一个 StadiumBorder 胶囊，悬浮/按住显色，点击打开
     // 「我的群组」弹层（改名走弹层里的群名行）。tooltip 与菜单项/弹层标题
     // 共享同一文案键（2026-10-11 老板）。
-    return Tooltip(
-      message: l10n.chatPageMembersTitle('group'),
-      child: Material(
+    return Material(
         color: Colors.transparent,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
@@ -2274,8 +2244,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 除我之外的成员：**在线的在前**，同在线内按"上线时刻"**新近优先**；离线的
@@ -2352,6 +2321,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           )
         : avatar;
     final name = _senderNameOf(memberId);
+    // Tooltip **仅这一处保留**（老板 2026-10-24）：状态条群成员头像 hover 出
+    // 完整名字——头像下方那格名字是截断的（clip），hover 是唯一能看全名的途径；
+    // 其余全 app 的 Tooltip 已按老板决策删除（手机无 hover 无价值、长按抢手势）。
+    // 触屏天然无 hover，不会与气泡长按菜单抢手势。
     return Tooltip(
       message: name.isEmpty
           ? AppLocalizations.of(context)!.chatPageMembersUnnamed
@@ -2492,11 +2465,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             alignment: Alignment.centerLeft,
             widthFactor: 1.0,
             child: _othersSummary(l10n))
-        : Tooltip(
-            // 大胶囊 tooltip 与「My companion」弹层标题、菜单项共享同一文案键
-            // chatPageMembersTitle('duo')（老板 2026-10-11，与 group 空间同款）。
-            message: l10n.chatPageMembersTitle('duo'),
-            child: Material(
+        : Material(
               color: Colors.transparent,
               shape: const StadiumBorder(),
               clipBehavior: Clip.antiAlias,
@@ -2585,8 +2554,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-            ),
-          );
+            );
 
     final Widget inviteLink = _peerJoined != false
         ? const SizedBox.shrink()
@@ -2632,9 +2600,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 群聊一期（2026-10-03）：**群空间不挂**——群内通话一期不做，服务端也会
     // 静默丢弃 call.* 信令（挂出来点了没人接，只能干等超时）。
     final Widget callButton = _peerJoined == true && !_isGroup
-        ? Tooltip(
-            message: l10n.voiceCallMenuCall,
-            child: Material(
+        ? Material(
               color: Colors.transparent,
               shape: const CircleBorder(), // 真圆：状态条加高后 24 圆角成了圆角矩形
               clipBehavior: Clip.antiAlias,
@@ -2649,8 +2615,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       size: 20, color: Color(0xFF2271F7)),
                 ),
               ),
-            ),
-          )
+            )
         : const SizedBox.shrink();
 
     // 芯片右侧挂一块：**未加入=邀请加入 / 已加入=语音通话**（老板 2026-09-26）。
@@ -2853,7 +2818,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 16),
                                 color: scheme.onSurfaceVariant,
-                                tooltip: l10n.chatPageInviteCopyCodeTooltip,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 visualDensity: VisualDensity.compact,
@@ -2879,7 +2843,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 16),
                                 color: const Color(0xFF2271F7),
-                                tooltip: l10n.chatPageInviteCopyLinkTooltip,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 visualDensity: VisualDensity.compact,
@@ -3580,9 +3543,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       hintText: l10n.chatPagePassphraseFieldHint,
                       suffixIcon: IconButton(
                         icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                        tooltip: obscure
-                            ? l10n.chatPagePassphraseShow
-                            : l10n.chatPagePassphraseHide,
                         onPressed: () => setLocal(() => obscure = !obscure),
                       ),
                     ),
@@ -4384,7 +4344,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 )
                               : IconButton(
                                   icon: const Icon(Icons.refresh, size: 20),
-                                  tooltip: l10n.chatPageEntranceListRefresh,
                                   visualDensity: VisualDensity.compact,
                                   onPressed: () async {
                                     setSheetState(() => refreshing = true);
@@ -4501,10 +4460,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                           ? 18
                                                           : 0),
                                                   child: isLocal
-                                                      ? Tooltip(
-                                                          message:
-                                                              l10n.chatPageEdit,
-                                                          child: Material(
+                                                      ? Material(
                                                             // 胶囊底：淡灰圆角
                                                             // （同卡片蒙版/占位那一档
                                                             // 灰），悬浮/点击有反馈
@@ -4581,8 +4537,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                                 ),
                                                               ),
                                                             ),
-                                                          ),
-                                                        )
+                                                          )
                                                       : Padding(
                                                           // 纯名字卡补上与本机
                                                           // 胶囊相同的纵向
@@ -5282,7 +5237,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     suffixIcon: isEditing
                         ? null
                         : IconButton(
-                            tooltip: l10n.chatPageEdit,
                             icon: const Icon(Icons.edit, size: 18),
                             visualDensity: VisualDensity.compact,
                             onPressed: () => editing.value = true,
@@ -5739,7 +5693,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     suffixIcon: isEditing
                         ? null
                         : IconButton(
-                            tooltip: l10n.chatPageEdit,
                             icon: const Icon(Icons.edit, size: 18),
                             visualDensity: VisualDensity.compact,
                             onPressed: () => editing.value = true,
@@ -9703,9 +9656,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Tooltip(
-              message: l10n.aboutPageTitle,
-              child: InkWell(mouseCursor: SystemMouseCursors.click,
+            InkWell(mouseCursor: SystemMouseCursors.click,
                 borderRadius: BorderRadius.circular(10),
                 onTap: _openAboutPage,
                 child: const Padding(
@@ -9714,7 +9665,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: BrandLogo(),
                 ),
               ),
-            ),
             Flexible(child: _brandTitle()),
             // 其它秘境有未读 → 汇总角标（老板 2026-09-26）：不打开「选择秘境」
             // 也能一眼看到"别的秘境来消息了"。
@@ -9734,7 +9684,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (_hasPin)
             IconButton(
               icon: const Icon(Icons.lock_outline),
-              tooltip: l10n.chatPageLockNow,
               onPressed: _lockNow,
             ),
           // 顶栏统一入口：语言/阅后即焚/本机 PIN（显示各功能当前值）
@@ -9745,7 +9694,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               cursor: SystemMouseCursors.click,
               child: const Icon(Icons.menu),
             ),
-            tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               switch (value) {
                 case 'locale':
@@ -10149,10 +10097,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 onTap: _showEntranceListSheet,
                                 hoverColor: Colors.black.withValues(alpha: 0.05),
                                 highlightColor: Colors.black.withValues(alpha: 0.08),
-                                child: Tooltip(
-                                  // 桌面端悬停提示：光看图标不一定看得出是"多设备"
-                                  message: l10n.chatPageMenuEntranceList,
-                                  child: SizedBox(
+                                child: SizedBox(
                                     // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
                                     // 状态条上下边缘（与 invite 同源的问题）。
                                     // 边长与呼叫图标同源（kStatusAvatarSize=40）：
@@ -10167,7 +10112,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             .colorScheme
                                             .onSurfaceVariant),
                                   ),
-                                ),
                               ),
                             ),
                             // 与「名字/时间」的间距 6px：加上图标在 32 宽容器里的
@@ -10189,11 +10133,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 与左侧对方大胶囊同款：透明底 + Material/InkWell 水波；
                             // 头像三面贴住胶囊右缘（左侧对方头像贴左缘，镜像对称）。
                             Flexible(
-                              child: Tooltip(
-                                // 桌面端悬停提示（状态条 tooltip 全量补齐，
-                                // 老板 2026-10-10）：整块胶囊一个提示
-                                message: l10n.chatPageMenuMyProfile,
-                                child: Material(
+                              child: Material(
                                   color: Colors.transparent,
                                   shape: const StadiumBorder(),
                                   clipBehavior: Clip.antiAlias,
@@ -10282,7 +10222,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     ),
                                   ),
                                 ),
-                              ),
                             ),
                           ],
                         ),
@@ -10438,15 +10377,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   // 搬到气泡左侧、头像下方（见上面那处 SizedBox）。
                                   // 气泡内只留内容本身，读起来更像"对话"。
                                   //
-                                  // 顶栏**吸收长按**：不让它冒泡到外层气泡的长按菜单
-                                  // （老板 2026-10-08：长按气泡任意位置都该开菜单，
-                                  // 唯独顶栏不行——桌面长按顶栏按钮会误开菜单；手机
-                                  // 长按顶栏该出 tooltip，Tooltip 在更内层，手势竞技场
-                                  // 里本来就赢，这里只挡"没有 tooltip 的空白"）。
-                                  // opaque = 整条顶栏矩形都挡，连图标之间的间隙也不漏。
+                                  // 顶栏长按**放开**（老板 2026-10-24 反转 2026-10-08
+                                  // 的决策）：气泡整体（含时间戳顶栏、含引用/拷贝
+                                  // 圆按钮）都能长按出菜单——当初吸收层防的"误开"
+                                  // 正是现在要的一致行为（菜单锚定按点，从顶栏长按
+                                  // 就在时间戳旁打开）。GestureDetector 保留 opaque
+                                  // 命中（Tooltip hover 不受影响）但**不注册任何长按
+                                  // 手势**：竞技场里没有内层 recognizer，长按唯一
+                                  // 由外层气泡赢得 → 全气泡一处语义。
                                   GestureDetector(
                                     behavior: HitTestBehavior.opaque,
-                                    onLongPress: () {},
                                     child: Padding(
                                       padding: const EdgeInsets.only(bottom: 2),
                                       child: Row(
@@ -10578,11 +10518,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               // 不跟快捷图标走圆形（老板 2026-10-02）
                                               borderRadius: BorderRadius.circular(12),
                                               clipBehavior: Clip.antiAlias,
-                                              child: Tooltip(
-                                                // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
-                                                // （老板 2026-10-08；此前只有这处没有）
-                                                message: l10n.chatPageActionBurn,
-                                                child: InkWell(
+                                              child: InkWell(
                                                   mouseCursor: SystemMouseCursors.click,
                                                   // 悬浮/点击背景同快捷动作/状态栏图标
                                                   hoverColor:
@@ -10620,7 +10556,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                     ),
                                                   ),
                                                 ),
-                                              ),
                                             ),
                                           ],
                                           // 菜单「...」（老板 2026-10-12）：时间行
@@ -11468,7 +11403,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                     icon: Icon(_newPinRevealed
                         ? Icons.visibility
                         : Icons.visibility_off),
-                    tooltip: l10n.chatPagePassphraseRevealTip,
                     onPressed: () {
                       setState(() => _newPinRevealed = !_newPinRevealed);
                       _newPinRevealTimer?.cancel();
@@ -12705,17 +12639,13 @@ Future<void> showMyAvatarFullscreen(
                           children: [
                             if (onSave != null && onApplyAllSpaces != null) ...[
                               // 我的头像：图标圆钮版
-                              Tooltip(
-                                message:
-                                    AppLocalizations.of(ctx)!.chatPageActionSave,
-                                child: IconButton.filled(
+                              IconButton.filled(
                                   onPressed: () {
                                     Navigator.of(ctx).pop();
                                     unawaited(onSave(bytes));
                                   },
                                   icon: const Icon(Icons.save_alt),
                                 ),
-                              ),
                               const SizedBox(width: 8),
                             ],
                             if (onApplyAllSpaces != null)
@@ -13440,7 +13370,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
 /// 既尊重"减少动态效果"的系统偏好，也让 widget 测试里的 `pumpAndSettle` 不会
 /// 被这个常驻动画卡住（常驻动画会让 pumpAndSettle 一直等到超时）。
 class _SendingPlane extends StatefulWidget {
-  const _SendingPlane({this.color, this.size = 11});
+  const _SendingPlane({super.key, this.color, this.size = 11});
 
   final Color? color;
 

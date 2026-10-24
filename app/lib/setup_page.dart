@@ -403,7 +403,6 @@ class _SetupPageState extends State<SetupPage> {
               cursor: SystemMouseCursors.click,
               child: const Icon(Icons.menu),
             ),
-            tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {
@@ -1587,7 +1586,6 @@ class _SetupPageState extends State<SetupPage> {
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.qr_code_scanner),
-                    tooltip: l10n.setupPageScanInvite,
                     onPressed: _joinTokenVerified ? null : _scanInviteQr,
                   ),
           ),
@@ -2354,7 +2352,6 @@ class _InviteScannerPageState extends State<_InviteScannerPage> {
         title: Text(l10n.setupPageScanInvite),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: l10n.cancel,
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
