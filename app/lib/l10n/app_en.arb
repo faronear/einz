@@ -666,7 +666,7 @@
   "voiceTranscriptServerFailed": "Server transcription failed: {error}",
   "voiceTranscriptServerDisabled": "Server transcription isn't enabled — used the local model instead",
   "voiceTranscriptGroupEngine": "Method",
-  "voiceTranscriptAutoLabel": "Auto-transcribe",
+  "voiceTranscriptTimingLabel": "When to transcribe",
   "voiceTranscriptEngineLocalShort": "Local",
   "voiceTranscriptEngineServerShort": "Remote",
   "voiceTranscriptAutoOn": "Auto",

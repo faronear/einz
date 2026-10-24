@@ -1073,7 +1073,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptGroupEngine => '转写方式';
 
   @override
-  String get voiceTranscriptAutoLabel => '自动转写';
+  String get voiceTranscriptTimingLabel => '转写时机';
 
   @override
   String get voiceTranscriptEngineLocalShort => '本机';

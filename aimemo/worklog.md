@@ -15791,3 +15791,11 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - 12 个 tooltip 删除遗留：chatPageMsgSent/SendingTap/Failed/Delivered、voiceCallMenuCall、chatPagePassphraseShow/Hide、chatPageLockNow、chatPageInviteCopyLink/CodeTooltip、chatPageEntranceListRefresh、chatPageEmojiKeyboard
 - 9 个历史遗留（转写功能改名后的旧键 voiceTranscriptTimingLabel/ModeManual、PIN 弹窗重构遗留 setPinDialog*、setupCreateCopy、chatPagePlaying/QuotedTombMessage/StatusOthersOnline/GroupNameEditTooltip 等）
 教训：**macOS grep 的 \b 不可靠**（GNU grep 语义的单词边界在 BSD grep 下失效），两次用 grep 判定孤儿都误报/漏报，最终用 Python 的 (?<![A-Za-z0-9_]) 前后断言才可信；l10n 孤儿判定必须排除 app_localizations{,_zh,_en}.dart 三个生成文件。gen-l10n 重新生成（纯删 257 行）+ analyze + 全量 385 绿。
+**（2026-10-24T07:10:00Z / 2026-10-24 15:10）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+语音转写弹层「转写时机」改方块二选一（老板）：第二组标题「自动转写」→「转写时机」，下面两个整行单选改成**左右两个方块按钮**（布局参考空间向导里性别选择的双卡片），左「手动」+备注、右「自动」+备注，选中打勾；配色参考 OptionPickerSheet 选项行（2026-10-24 定稿口径）：选中=品牌粉 #D6529C 25% 实底、未选中=5% 黑、悬浮 10%/点击 14%，对勾 scheme.primary。第一组「转写方式」仍是整行单选（_vtOptionRow）不动。
+
+- l10n：voiceTranscriptAutoLabel 更名 voiceTranscriptTimingLabel（zh「转写时机」/ en「When to transcribe」），gen-l10n 重生成；标签/描述沿用 AutoOn/AutoOff/AutoModeDesc/ManualModeDesc。
+- chat_page.dart：时机组 children 改 Row(stretch)+两个 Expanded _vtTimingBlock（新增，Material+InkWell 方块，label 15/w600 + desc 12/onSurfaceVariant，选中行尾对勾）；类文档注释同步更新（原「勾选框」描述早已过时）。
+- 存储层不变：仍是同一个 bool _voiceTranscriptAuto，无迁移；_changed 判定与提交语义不变。
+- 验证：flutter analyze 干净；voice_transcript_line 12 + option_picker_sheet 6 全绿；golden 不覆盖此弹层。UI 待老板真机自测（更多设置→语音转写）。
