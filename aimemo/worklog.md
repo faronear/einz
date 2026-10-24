@@ -15859,3 +15859,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 方式组也改左右方块（老板）：弹层两组从此统一方块布局——「转写位置」左「本机」右「远程」（芯片/云前置图标保留，与气泡指示图标同款）。实现：_vtTimingBlock 泛化为 _vtBlock（加可选 IconData icon 形参，时机组不传），IntrinsicHeight+stretch Row 提为 _vtBlockPair（两组共用），_vtOptionRow 删除（无人引用）。回归用例扩展：位置组两块等高断言（vtEngineLocal/vtEngineServer keys）。
 
 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量 389 + 1 skip 全绿。UI 待老板真机自测（更多设置→语音转写）。
+
+**（2026-10-24T08:20:00Z / 2026-10-24 16:20）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+补完崩溃前任务（老板）：① chatPageMenuMore（"主菜单/Main menu"）从两个 arb 删除（汉堡菜单的 PopupMenuButton tooltip 已随删 tooltip 决策移除，文案键成孤儿）；② "Show menu" tooltip 残留根因=PopupMenuButton **不传 tooltip 时框架自动加默认 "Show menu/显示菜单"**（删 tooltip 决策的漏网），三处汉堡菜单（chat_page 9711 / lock_page 156 / setup_page 402）加 `tooltip: ''` 压掉。验证：analyze 干净 + 全量 389 测试绿。提交跨会话恢复：崩溃时改动已在工作区，重启后逐文件核对再提交。
