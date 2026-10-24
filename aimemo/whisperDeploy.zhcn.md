@@ -158,6 +158,22 @@ wget https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-20
 `EINZ_SENSEVOICE_MODEL` 指过去即可。node 依赖随 `npm ci` 自动装平台二进制
 （linux-x64 / darwin-arm64），无需额外编译。
 
+### Docker 部署与引擎开关（2026-10-24）
+
+compose 三个变体已内置 sensevoice（卷 + 环境变量，与 whisper 同 pattern）：
+
+- 卷：`../models/sensevoice:/opt/sensevoice:ro`（宿主 `server/models/sensevoice/`
+  缺文件时 Docker 会建个空目录 → 该引擎未配置 → 自动回落 whisper，graceful 退场）；
+- 环境：`EINZ_SENSEVOICE_MODEL=/opt/sensevoice`（容器内路径。.env 里那个**宿主机**
+  路径只服务于裸 node 跑法，不进容器——和 whisper 两个变量一样由 compose 硬编码覆盖）；
+- 开关：`EINZ_ASR_ENGINE`（写 `server/docker/.env` 或 shell 前缀，两处跑法同语义）：
+  - 不设 = 自动：sensevoice 配了（模型两文件齐全）就用，否则 whisper；
+  - `whisper` = 强制 whisper（装了 sensevoice 也不理）；
+  - `sensevoice` = 强制 sensevoice（没配好则端点报 TRANSCRIBE_DISABLED，**不静默回落**）。
+- 镜像需在 sherpa-onnx-node 进 package.json 之后**重新 build**
+  （`docker compose build server`）——否则容器里没有 node addon，请求报
+  `TRANSCRIBE_FAILED: sherpa-onnx-node unavailable`（错误明确，不静默）。
+
 **验证切换生效**：`curl -s http://127.0.0.1:3000/health` 应含
 `"asr_engine":"sensevoice"`（未配时不出现 transcribe/asr_engine 键）。
 ## 7. 验证与运维

@@ -37,10 +37,19 @@ services:
       # 模型文件缺失时 whisper-cli 启动即失败 → 503 TRANSCRIBE_FAILED。
       - EINZ_WHISPER_BIN=/opt/whisper/whisper-cli
       - EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin
+      # 转写引擎选择（2026-10-24）：sensevoice / whisper，留空 = 自动（sensevoice
+      # 配了就用，否则 whisper）。值经 .env 插值——裸 node 与 Docker 共用同一
+      # 语义；想固定引擎就在 .env 里写 EINZ_ASR_ENGINE=whisper（或 sensevoice）。
+      - EINZ_ASR_ENGINE=${EINZ_ASR_ENGINE:-}
+      # sensevoice 引擎（sherpa-onnx node addon，进程内识别）：模型目录在容器内
+      # 固定为 /opt/sensevoice（下方卷的挂载点，宿主侧 server/models/sensevoice）。
+      # 宿主目录缺文件 = 该引擎未配置 → 自动回落 whisper（ graceful 退场）。
+      - EINZ_SENSEVOICE_MODEL=/opt/sensevoice
     volumes:
       - ../config:/config:ro
       - ../data:/data
       - ../models/whisper.cpp/models:/opt/whisper/models:ro
+      - ../models/sensevoice:/opt/sensevoice:ro # sensevoice 模型（缺文件则该引擎退场）
     expose:
       - "3000"
     networks:
