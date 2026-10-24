@@ -15869,3 +15869,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 **v12 数据迁移（善后被写脏的存量库）**：① 把两个全局键的现值认领进每个空间的 per-space 键（INSERT OR IGNORE——已有 per-space 覆盖的空间不 clobber，那是 saveAll 清覆盖前的合法状态）；② 删除这两个全局键（不删则此后新建/未配置空间仍读到污染值）。效果：老板机器升级后各空间现值不变但彼此独立；从未配置的空间走默认（local/手动）；「所有秘境」勾选框随时可重新铺。踩坑：迁移块直接 INSERT 会在这台机器一类的人造落后库上抛 no such table: app_state（user_version=6 却只有四张表）——加了 PRAGMA table_info 守卫，没有设置表就整段跳过（第一个迁移测试实测抓到）。另一个坑：多层转义两次写错 SQL 字符串，最终按行号用 python 重写才稳——**含引号的 SQL 字符串一律用双引号 Dart 字符串，别用单引号转义**。
 
 测试：新建 test/voice_transcript_settings_test.dart（不勾范围→只写本空间+全局键不落+别空间不受影响；saveAll→写全局+清覆盖+所有空间跟随）；迁移测试加 v12 用例（认领/保全/清全局/旧 auth 键不动）+ 两个存量版本断言 11→12；chat_page_menu_test 转写弹层回归补「全局键不落」断言。验证：analyze lib+test 干净；全量 392 + 1 skip 全绿。
+
+**（2026-10-24T12:35:35Z / 2026-10-24 20:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
+「应用于本机所有秘境」勾选框样式优化（07437f29）。共享组件 LabeledCheckbox 卡片化：圆角 12 不再横贯弹层；老板后续拍板**默认无底色**（勾选框本身暗示可点，悬浮 10%/点按 14% 黑才显色）；上方间距 4→8。新增 horizontalInset 参数处理对齐分裂：底部选项弹层默认 12（与选项行同缩进）；AlertDialog（Email alerts/通道名称/My name）传 0——dialog content 左右 24 + 卡片内边距 12 正好对齐输入框。老板指出 burn 弹层勾选框超出上下元素宽度，根因是 burn 主体/按钮用 16 边距而非选项弹层的 12，方案=把 burn 主体白卡与提交按钮 16→12 与 OptionPickerSheet 统一口径（而非给勾选框传 16 特调）。analyze 通过；老板自查视觉，未跑 golden（政策：UI 改动 golden 失配保持红）。
