@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// 「语音转写」图标（老板 2026-10-24）：麦克风 + 文档（文档内三条横线示意"文字"），
@@ -17,8 +19,12 @@ class TranscribeIcon extends StatelessWidget {
   /// 图标主色（跟随菜单卡片前景色）。
   final Color color;
 
-  /// 图标边长。原始稿宽高比 1280:1024 = 1.25，绘制时按高度缩放、宽度自然延伸
-  /// （占位盒仍是正方形，墨迹水平居中）。
+  /// 图标边长（正方形占位盒）。
+  ///
+  /// 墨迹**fit-inside**：按 min(宽/1280, 高/1024) 等比缩放、双轴居中——正方形盒
+  /// 26 时的墨迹是 26×20.8，与邻居 Material 图标（字形自带内边距，26px 字号墨迹
+  /// 约 22px）同档。此前按高度缩放，26 盒画出 32.5 宽的墨迹，在菜单里明显比
+  /// 邻居大（老板 2026-10-24）。
   final double size;
 
   @override
@@ -30,7 +36,7 @@ class TranscribeIcon extends StatelessWidget {
   }
 }
 
-/// 坐标稿 = SVG viewBox（1280×1024），按 size 高度等比缩放后水平居中。
+/// 坐标稿 = SVG viewBox（1280×1024），fit-inside 等比缩放 + 双轴居中。
 class _TranscribePainter extends CustomPainter {
   _TranscribePainter({required this.color});
 
@@ -38,9 +44,10 @@ class _TranscribePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.height / 1024.0;
+    final scale = math.min(size.width / 1280.0, size.height / 1024.0);
     final dx = (size.width - 1280.0 * scale) / 2.0;
-    canvas.translate(dx, 0);
+    final dy = (size.height - 1024.0 * scale) / 2.0;
+    canvas.translate(dx, dy);
     canvas.scale(scale);
     final paint = Paint()
       ..color = color

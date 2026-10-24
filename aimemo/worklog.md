@@ -15670,3 +15670,6 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 
 **（2026-10-24T01:35:00Z / 2026-10-24 09:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 更多设置里的「语音转写」行图标同步换 TranscribeIcon（size 24，老板指出漏改；graphic_eq 全文件已无残留）。flutter analyze 干净。
+
+**（2026-10-24T01:45:00Z / 2026-10-24 09:45）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+TranscribeIcon 偏大（老板：操作菜单/汉堡菜单里都比邻居大）：原先按高度缩放，26px 正方形盒画出 26×32.5 的墨迹（宽超出）；改 fit-inside——min(宽/1280, 高/1024) 等比缩放 + 双轴居中，26 盒墨迹 26×20.8，与 Material 图标字形（自带内边距，约 22px 墨迹）同档。flutter analyze 干净。
