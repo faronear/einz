@@ -15582,6 +15582,24 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 测试适配（非代码回归）：老板并行把转写行从 Row+Text 重构为 Text.rich+WidgetSpan（图标嵌文本 span、左缩进 8px），find.text 找不到 TextSpan 内文字致 4 例挂——重写 voice_transcript_line_test 为 RichText.toPlainText 匹配 + 图标作为同 RichText 后代断言（最紧的“同行”判据），补 done 有文字/空文本隐藏两例，共 6 例全过；聊天页回归 74 例全过；analyze 零问题。
 - 手测步骤（待老板在 TestFlow 包上验）：删 App 重装（确保无模型）→ 转写一条语音 → 下载进度框弹出后点 Cancel → 预期：框关闭、留在聊天页、无黑屏无红屏、无错误 snackbar；再点转写可重新开始（.part 续传）。
 
+**（2026-10-24T04:00:00Z / 2026-10-24 12:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：转写设置弹层「自动转写」勾选改「自动/手动」二选一（老板 2026-10-24）
+- 老板要求：设置弹层里"自动转写"的勾选改成"自动"/"手动"二选一。
+- 实现（chat_page.dart 工作区，未提交——同文件混着老板正在做的"选中消息着色"384 行改动，按规矩不整体提交，留待其功能一并进）：_VoiceTranscriptSheet 第二组由 InkWell+Checkbox 改为与方式组同款单选行；_vtEngineRow 泛化为 _vtOptionRow（active+onTap+label+desc，两组共用）；菜单行当前值文案同步为「方式 · 自动/手动」（_voiceTranscriptLabel 的 timing 改取 voiceTranscriptAutoOff）。
+- l10n：沿用老板预改的键——AutoOn"自动"/AutoOff"手动"（老板已把 AutoOff 值改成"手动"）当两行标签；老板合并描述的 AutoDesc 拆成两个行的描述（用词原样取自其句子）：新增 voiceTranscriptAutoModeDesc/ManualModeDesc，删除已被拆掉的 AutoDesc（代码零引用后从两个 arb 移除并重新生成）。
+- 存储层无迁移：仍是同一个 _voiceTranscriptAuto bool，UI 只是呈现方式变了。
+- 验证：flutter analyze lib test 零问题；转写行 6 例 + 聊天页菜单 + wav_normalize 共 63 例全过；gen-l10n 重新生成确认新键在位、AutoDesc 全清（arb/生成/抽象基类三处均为 0）。
+- 并行编辑注意：本轮 arb 的 AutoDesc 旧行曾被并行保存重新带回来一次，用脚本二次清除；gen-l10n 前几次疑因竞态未生效（实际是老板并行重生成），以 mtime+ grep 双重确认。
+
+**（2026-10-24T05:00:00Z / 2026-10-24 13:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：compose 三变体内置 sensevoice（卷+环境变量）+ EINZ_ASR_ENGINE 自由开关（老板要求）
+- 老板问：裸 node 能用 server/models/sensevoice 后，Docker 跑法是否不改 .env 就能直接用？答案：不能——compose 的 environment 是硬编码容器内路径（whisper 两个变量即如此，.env 里的宿主机路径不进容器），EINZ_SENSEVOICE_MODEL 之前提都没提 → 容器里没这个变量 → sensevoice 未配置 → 静默回落 whisper。
+- 改动（3 个 compose 文件同款）：volumes 加 `../models/sensevoice:/opt/sensevoice:ro`；environment 加 `EINZ_SENSEVOICE_MODEL=/opt/sensevoice`（容器内路径，照 whisper pattern）+ `EINZ_ASR_ENGINE=${EINZ_ASR_ENGINE:-}`（.env/shell 插值，两种跑法同语义）。
+- 开关语义（resolveAsrEngine 既有逻辑）：不设=自动（sensevoice 配了优先，否则 whisper）；whisper=强制 whisper；sensevoice=强制 sensevoice（没配好报 DISABLED 不静默回落）。宿主 models/sensevoice 缺文件时 Docker 建空目录 → 该引擎 graceful 退场。
+- 验证：compose config ×4 全过；容器 env 预览三变量正确；shell 传 EINZ_ASR_ENGINE=whisper/sensevoice 均正确流入容器 config。
+- 附带：本地 server/docker/.env 加了三行注释说明开关（gitignore 不入库）；whisperDeploy §6 补「Docker 部署与引擎开关」小节（卷/环境/开关/重建镜像要求/health 验证）。
+- 遗留提醒：VPS 现有镜像建于 sherpa-onnx-node 进 package.json 之前，**必须 docker compose build server 重建**，否则容器无 node addon（报错明确不静默）。
+
+
+
 
 
 
@@ -15673,3 +15691,61 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 
 **（2026-10-24T01:45:00Z / 2026-10-24 09:45）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 TranscribeIcon 偏大（老板：操作菜单/汉堡菜单里都比邻居大）：原先按高度缩放，26px 正方形盒画出 26×32.5 的墨迹（宽超出）；改 fit-inside——min(宽/1280, 高/1024) 等比缩放 + 双轴居中，26 盒墨迹 26×20.8，与 Material 图标字形（自带内边距，约 22px 墨迹）同档。flutter analyze 干净。
+
+## 2026-10-24 消息操作菜单改锚定气泡浮层（微信式）
+
+**（2026-10-24T01:40:51Z / 2026-10-24 09:40）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板需求：操作菜单从底部弹层改为在原消息上方/下方打开（按位置自动选），不再需要消息预览行。
+
+**实现（chat_page.dart）：**
+- `_showMessageActions(BuildContext bubbleCtx, [m])`：从气泡子树 context 沿 RenderObject 祖先链找最近 RenderBox（长按目标是 Text，直接 findRenderObject 会拿到 RenderSliverList——测试实测踩坑），取全局坐标为锚点；
+- 新 `_MessageActionsPopupRoute extends PopupRoute<String>`：白底圆角卡片 + 20% 遮罩点击关闭、180ms 缩放淡入（锚点方向进入）。垂直：上方放得下选上方（微信习惯），否则下方，都放不下选空间大侧；水平：我的气泡右对齐/对方左对齐（与消息流同侧），钳屏内。宽度=一行四卡 420，窄屏收缩；估高 96 选边（卡片行数最多两行，够用）；
+- 菜单内容抽 `_buildMessageActionCards(m, ctx, l10n)`（锚定浮层与底部弹层兜底共用），动作语义（pop 值→处理）不变；
+- **预览行删除**：`_buildMessagePreviewRow`、`_tombstoneMenuPlaceholder` 整体移除（菜单里消息本体就在旁边，无需重复展示；原头像点开资料页的入口仍在消息流头像上）；
+- 兜底：拿不到 RenderBox 退回 `_showMessageActionsBottomSheet`（保留底部弹层实现，理论不可达）。
+
+**测试同步（3 个用例改写为「无预览行」断言）：** chat_page_menu_test（对齐测试→浮层弹出+无预览行；语音测试→浮层+「转写」卡）、chat_quote_image_test / chat_quote_video_test（预览行缩略图断言→浮层+无预览行）。46+4 全绿。
+
+flutter analyze 干净。
+
+## 2026-10-24 菜单箭头/贴气泡/悬浮 + 选中消息橘黄高亮
+
+**（2026-10-24T02:20:00Z / 2026-10-24 10:20）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板两个需求：① macOS 实测菜单总弹在屏幕最上方，要紧贴气泡；上下都不够放时直接悬浮在气泡上。② 微信同款：菜单小箭头指向气泡中心；选中消息在菜单打开期间渲染橘黄（与跳转高亮同色），菜单关闭恢复。
+
+**实现：**
+- **两阶段放置**（_MenuPlacement）：先 Offstage 按目标宽度真实测高（_MeasureSize=RenderProxyBox，layout 后上报；onChange 里 scheduleMicrotask 推迟 setState，否则"Build scheduled during frame"断言），下一帧按真实高度选位：上方够→上方、否则下方、都不够→悬浮盖在气泡垂直居中（老板指定）；水平跟气泡侧+钳屏。此前用估高 96 选边 + clamp 到屏缘 = macOS 贴顶的根因。
+- **小箭头**：旋转 45° 正方形（12px，白底无 elevation），above 时贴菜单底边、below 时贴顶边（负 offset 悬出），水平=气泡中心 x 钳在菜单内（8px 边距）；悬浮时不画（会扎进气泡）。随菜单一起缩放淡入。
+- **选中高亮**：_menuTargetMessageId 状态；气泡 AnimatedContainer 底色判定加 OR 分支（同 #FF9800）；_showMessageActions push 前置位、pop 后清位。
+- **PopupRoute 布局坑×2**：buildTransitions 结果直接进 Overlay（非 Stack）→ 需自包 Stack+Positioned.fill，否则 Positioned 抛 ParentData 断言；离屏测高分支不能再套 Positioned（ParentData 冲突）→ 改 Align+Offstage。clamp 上下限倒挂（窄屏/极端小窗）→ math.max 防御。
+- **l10n**：工作区另一会话的「转写时机」改动缺 5 个键，补齐 zh/en（TimingLabel/AutoModeDesc/ModeManual/ManualModeDesc），键名对齐 chat_page 引用（AutoModeDesc 而非 ModeAutoDesc），gen-l10n 通过。
+
+**验证：** flutter analyze 干净；chat_page_menu + quote_image + quote_video + duo_peer 44+48 全绿。
+
+**（2026-10-24T03:10:00Z / 2026-10-24 11:10）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+修菜单弹到屏幕正中（老板 macOS 实测 + 日志确诊）：anchor 算成了整条 item 的 Align（全宽 1096×700）→ spaceAbove/Below 全错 → 永远走 overlay 悬浮分支（正中+无箭头）。根因：长按回调捕获的 context 是 itemBuilder 的（其 RenderBox=item 根 Align），不是气泡的。修法：_showMessageActions 里沿 RenderBox 祖先链**从内向外找第一个宽度 < 屏宽 98% 的 box** 当锚点（气泡 maxWidth=75% 屏宽必中；行容器 Align 全宽被跳过；头像不在气泡祖先链不受影响）。
+⚠️ 流程教训：修括号失败后用 `git restore lib/chat_page.dart` 撤销，连带冲掉了工作区里另一会话未提交的改动风险——事后核实该会话的改动已在其自己的 commit（5dbf459e）里、零损失，只丢了我自己本轮的临时诊断日志。共享文件上 restore/reset 前必须先 git status + diff 确认没裹挟别人的未提交工作。
+验证：analyze 干净；menu/quote_image/quote_video 50 用例全绿。
+
+## 2026-10-24 菜单锚定改按点方案（前两次锚定全翻车后的定稿）
+
+**（2026-10-24T04:05:00Z / 2026-10-24 12:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板日志确诊 + 两轮翻车复盘：
+1. 第一版（气泡 RenderBox 祖先链）：itemBuilder 的 context 挂在 SliverList 层（RenderObject 是 RenderSliver 非 RenderBox），祖先链全是 viewport/页面级容器，永远摸不到气泡 → anchor=全屏矩形 → 永远 overlay 悬浮屏中、无箭头。
+2. 第二版（跳过全宽 box）：方向仍错——链里根本没有气泡 box 可跳。
+
+**定稿（老板简化口径）：锚点=按点全局坐标。**
+- 气泡长按：Clickable 改 `onLongPressStart`（回调自带 `details.globalPosition`），零 RenderBox 依赖；
+- 气泡「…」按钮：`Builder` 包裹拿按钮自身 context，锚点=按钮中心（localToGlobal(center)）；`_showMessageActionsBottomSheet` 兜底删除（不再有拿不到锚点的路径）；
+- `_showMessageActions(m, {anchorGlobal})`：anchor 退化为一个点（Rect.fromPoints(p,p)）；`mine` 参数全链删除（水平改为菜单中心对准按点 x，不再按气泡侧对齐）；
+- `_MenuPlacement` 选边：上方放得下→菜单**下边缘贴按点**；否则下方（上边缘贴按点）；都不够选空间大侧、允许屏缘裁切。按点必在气泡内 → 菜单必然压住气泡一部分，其余部分露出橘黄选中高亮（老板：这正是想要的效果，"菜单长在消息上"）；
+- 箭头永久显示（不再有 overlay 分支）：above 贴菜单下边、below 贴上边，水平对准按点 x（钳 8px 边距）。
+- 过程事故：python 手工插入 `_buildMessageActionCards` 括号错位引发 1107 错误 → `git checkout -- chat_page.dart` 回滚到 4eb50393 重做（此刻工作区该文件无他人未提交改动，已确认）；server/aimemo 的老板改动未触碰。
+
+**验证：** analyze 干净；menu/quote_image/quote_video 50 用例全绿。
+
+**（2026-10-24T04:25:00Z / 2026-10-24 12:25）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮层+删预览行 / e5869b72 两阶段放置+箭头+高亮 / 4eb50393 跳全宽翻车稿 / 3d9c79c9 按点定稿）soft reset 压成单提交 887663b4「菜单改微信式锚定浮层（按点方案定稿）」，force-with-lease 覆盖远程（仅老板两台 Mac 在用，已确认可改写已推送历史）；5076b9df（server compose）与 aimemo/server 未提交改动不受影响。废稿过程详见上方 2026-10-24 各条目与 worklog。
