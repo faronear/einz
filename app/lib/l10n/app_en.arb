@@ -658,7 +658,7 @@
   "voiceTranscriptManual": "Tap to transcribe",
   "voiceTranscriptLegacyAudio": "Legacy voice messages (m4a) can't be transcribed — only new recordings can",
   "chatPageMenuVoiceTranscriptAuth": "Voice transcription",
-  "voiceTranscriptAuthNote": "Choose how voice messages are transcribed.",
+  "voiceTranscriptAuthNote": "how to transcribe voice messages?",
   "voiceTranscriptAuthLocal": "Local",
   "voiceTranscriptAuthLocalDesc": "Transcription happens on this device (requires a model download at the first use).",
   "voiceTranscriptAuthServer": "Remote",

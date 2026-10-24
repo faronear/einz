@@ -1907,7 +1907,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthNote.
   ///
   /// In en, this message translates to:
-  /// **'Choose how voice messages are transcribed.'**
+  /// **'how to transcribe voice messages?'**
   String get voiceTranscriptAuthNote;
 
   /// No description provided for @voiceTranscriptAuthLocal.

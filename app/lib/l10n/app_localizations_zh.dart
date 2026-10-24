@@ -1046,7 +1046,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuVoiceTranscriptAuth => '语音转写';
 
   @override
-  String get voiceTranscriptAuthNote => '选择本设备如何转写语音消息。';
+  String get voiceTranscriptAuthNote => '怎样把语音消息转成文字？';
 
   @override
   String get voiceTranscriptAuthLocal => '本机转写';

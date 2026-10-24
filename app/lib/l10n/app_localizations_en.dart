@@ -1107,8 +1107,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuVoiceTranscriptAuth => 'Voice transcription';
 
   @override
-  String get voiceTranscriptAuthNote =>
-      'Choose how voice messages are transcribed.';
+  String get voiceTranscriptAuthNote => 'how to transcribe voice messages?';
 
   @override
   String get voiceTranscriptAuthLocal => 'Local';

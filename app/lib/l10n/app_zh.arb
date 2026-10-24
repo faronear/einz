@@ -620,7 +620,7 @@
   "voiceTranscriptManual": "点按转写文字",
   "voiceTranscriptLegacyAudio": "旧版语音（m4a）不支持转写，新录的语音才能转",
   "chatPageMenuVoiceTranscriptAuth": "语音转写",
-  "voiceTranscriptAuthNote": "选择本设备如何转写语音消息。",
+  "voiceTranscriptAuthNote": "怎样把语音消息转成文字？",
   "voiceTranscriptAuthLocal": "本机转写",
   "voiceTranscriptAuthLocalDesc": "在本机上直接转写，原始消息不离开本机（第一次使用会下载一个语音模型）",
   "voiceTranscriptAuthServer": "远程转写",
