@@ -15791,3 +15791,10 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 - 12 个 tooltip 删除遗留：chatPageMsgSent/SendingTap/Failed/Delivered、voiceCallMenuCall、chatPagePassphraseShow/Hide、chatPageLockNow、chatPageInviteCopyLink/CodeTooltip、chatPageEntranceListRefresh、chatPageEmojiKeyboard
 - 9 个历史遗留（转写功能改名后的旧键 voiceTranscriptTimingLabel/ModeManual、PIN 弹窗重构遗留 setPinDialog*、setupCreateCopy、chatPagePlaying/QuotedTombMessage/StatusOthersOnline/GroupNameEditTooltip 等）
 教训：**macOS grep 的 \b 不可靠**（GNU grep 语义的单词边界在 BSD grep 下失效），两次用 grep 判定孤儿都误报/漏报，最终用 Python 的 (?<![A-Za-z0-9_]) 前后断言才可信；l10n 孤儿判定必须排除 app_localizations{,_zh,_en}.dart 三个生成文件。gen-l10n 重新生成（纯删 257 行）+ analyze + 全量 385 绿。
+
+**（2026-10-24T07:30:26Z / 2026-10-24 15:30）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+演示秘境头像空白根因 + 修复（老板：imac 上演示空间对方和我的头像都空白，macbook/iOS/Android 正常）：
+- **根因**：这台 iMac（iMac19,1，Intel，macOS 15.8.1）跑 x86_64 Flutter 3.47.2 引擎 + Impeller-Metal 后端，`Picture.toImage()` 离屏栅格化产出**全透明空图**。实证：演示空间当天 14:49 种入的照片从 dev 库解密密文后是 1024×768 全透明 PNG（转 BMP 3.1MB 仅 22 个非零字节）。头像与照片同一套运行时绘制 → 同因空白。上游为 Flutter x86_64+Impeller 已知 bug 类（flutter/flutter#134399 等）；Apple 在收缩 x86_64 支持。全 app 仅 demo_space.dart 用 toImage，**影响限于演示秘境**，真实空间不受影响。
+- **修复（老板定夺：预生成 PNG 资产）**：绘制代码抽到 `lib/data/demo_art.dart`（画法唯一来源，原样保留）；`DemoSpace` 头像/照片改 `rootBundle.load('assets/demoSpace/*.png')`；3 张 PNG（avatarMe/avatarPeer/photoSunrise，共 ~65KB）已生成提交——在 iMac 上用 flutter test（测试 shell 栅格化没坏）跑出，像素核验 + 亲眼核验画面；种子版本 v2→v3（iMac 上 v2 实例存着空白照片，升版自动重种，演示消息随之重置）。
+- **生成器**：`test/demo_space_art_gen_test.dart` 双模式——默认当回归测试（3 张资产存在且不空白，防误删/空白资产进库），`GEN_DEMO_ASSETS=1`（或 `npm run demo-assets`）重画资产；Intel iMac 上引擎栅格化坏了会出空图，生成器自带覆盖率校验直接 test 失败挡住。另加 `test/demo_space_seed_test.dart`：ensureSeeded 后照片密文解密非空白 + 10 条消息 + 幂等。
+- 验证：analyze 干净 + 3 个新测试绿 + 全量 388 用例 +1 skip 全过。

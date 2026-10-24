@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import 'package:drift/drift.dart';
 import 'package:einz_shared/einz_shared.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 
 import 'local_database.dart';
@@ -19,6 +17,12 @@ import 'local_database.dart';
 /// **密钥说明（红线澄清）**：演示密钥是硬编码常量——它保护的全部内容就是
 /// 本文件里的演示文案，无任何真实用户数据，无保密价值；真实空间的 Space Key
 /// 仍只存在于 Vault，本机制不触碰锁包/PIN/SecureStore 结构。
+///
+/// **图片说明（2026-10-24）**：演示头像/照片是**预生成 PNG 资产**
+/// （assets/demoSpace/，见 [myAvatar]/[peerAvatar]）——Intel iMac（x86_64+
+/// Impeller）上 `Picture.toImage()` 运行时绘制出全透明空图（Flutter 上游已知
+/// bug 类），演示画面必须全设备可靠。重画资产：`npm run demo-assets`
+/// （画法唯一来源 lib/data/demo_art.dart）。
 class DemoSpace {
   DemoSpace._();
 
@@ -40,7 +44,9 @@ class DemoSpace {
 
   /// seeding 是否已完成的 app_state 键（内容结构版本，改演示内容时递增）。
   /// v2 = 2026-10-21 新增预设图片消息（老板：截图画面更丰富）。
-  static const String _kSeeded = 'demo_space.seeded_v2';
+  /// v3 = 2026-10-24 图片改预生成资产（Intel iMac 上 toImage 出空图，
+  ///      v2 已种入实例存着空白照片 → 升版重种；演示消息随之重置）。
+  static const String _kSeeded = 'demo_space.seeded_v3';
 
   /// 我的/对方的演示显示名（走 l10n，见 setup 进入点传入）。
   static const String demoMemberName = 'Einz';
@@ -185,12 +191,16 @@ class DemoSpace {
     seq++;
 
     // 图片消息（2026-10-21 老板：演示空间预设一张"照片"，截图画面更丰富）：
-    // 我方发的日出风景照（纯 Dart 运行时绘制，零二进制资产），走**真实的**
+    // 我方发的日出风景照（2026-10-24 起为预生成资产，不再运行时绘制——
+    // Intel iMac 上 toImage 出空图，见类头图片说明），走**真实的**
     // 附件链路——encryptAttachment 密文进 local_attachments.local_cipher，
     // 渲染/点击全屏与真实图片消息完全一致。caption 不上气泡，仅作载荷文本。
     final photoId = 'demo-msg-${seq.toString().padLeft(4, '0')}';
     final photoAttId = 'demo-att-${seq.toString().padLeft(4, '0')}';
-    final photoBytes = await _paintPhoto();
+    final photoBytes =
+        (await rootBundle.load('assets/demoSpace/photoSunrise.png'))
+            .buffer
+            .asUint8List();
     final enc = await encryptAttachment(
       fileBytes: photoBytes,
       spaceKey: spaceKey,
@@ -258,190 +268,18 @@ class DemoSpace {
 
   // ---------- 演示头像（老板 2026-10-20：截图要有头像，两个卡通头像即可） ----------
   //
-  // 纯 Dart 运行时绘制（ui.PictureRecorder → PNG bytes），不引入二进制资源：
-  // 演示空间没有服务端 memberId（api.getAvatar 走不通），ChatPage 的
-  // _loadMyAvatar/_loadPeerAvatar 在 isDemo 下改为取这里的 bytes。
+  // 预生成 PNG 资产（2026-10-24 起）：演示空间没有服务端 memberId
+  // （api.getAvatar 走不通），ChatPage 的 _loadMyAvatar/_loadPeerAvatar 在
+  // isDemo 下取这里的 bytes。曾为运行时绘制（零二进制资产），但 Intel iMac
+  // （x86_64+Impeller）上 toImage 出全透明空图（见类头图片说明）→ 改资产。
+  // rootBundle 自带缓存，聊天页多次进出不重复加载。
 
-  static Uint8List? _myAvatarCache;
-  static Uint8List? _peerAvatarCache;
-
-  /// 我的头像（女，粉）。结果缓存在内存——聊天页多次进出不重复绘制。
+  /// 我的头像（女，粉）。
   static Future<Uint8List> myAvatar() async =>
-      _myAvatarCache ??= await _paintAvatar(girl: true);
+      (await rootBundle.load('assets/demoSpace/avatarMe.png')).buffer.asUint8List();
 
   /// 对方头像（男，蓝，Einz）。
   static Future<Uint8List> peerAvatar() async =>
-      _peerAvatarCache ??= await _paintAvatar(girl: false);
+      (await rootBundle.load('assets/demoSpace/avatarPeer.png')).buffer.asUint8List();
 
-  /// 画一个卡通头像：圆脸 + 头发 + 五官 + 上衣，女孩加蝴蝶结、留长发。
-  /// 256×256 圆形构图（底色圆裁掉四角），输出 PNG bytes。
-  static Future<Uint8List> _paintAvatar({required bool girl}) async {
-    const size = 256.0;
-    final c = Offset(size / 2, size / 2);
-    final rec = ui.PictureRecorder();
-    final canvas = ui.Canvas(rec);
-
-    Paint fill(String hex) =>
-        Paint()..color = Color(int.parse('FF$hex', radix: 16))..style = PaintingStyle.fill;
-
-    // 底色圆（背景）
-    canvas.drawCircle(c, size / 2, fill(girl ? 'FDD6ED' : 'E3F2FD'));
-
-    // 上衣（底部梯形圆肩，先画、让脸盖在上面）
-    final shirt = RRect.fromRectAndCorners(
-      Rect.fromCenter(center: Offset(size / 2, size + 42), width: 132, height: 120),
-      topLeft: const Radius.circular(56),
-      topRight: const Radius.circular(56),
-    );
-    canvas.drawRRect(shirt, fill(girl ? 'D6529C' : '2271F7'));
-
-    // 头发：后层（女孩长两侧，男孩只露一圈边）
-    final hairBack = fill(girl ? '6D4C41' : '5D4037');
-    if (girl) {
-      canvas.drawOval(Rect.fromCenter(center: c - const Offset(0, 18), width: 150, height: 170), hairBack);
-    } else {
-      canvas.drawCircle(c - const Offset(0, 14), 70, hairBack);
-    }
-
-    // 脸
-    canvas.drawCircle(c - const Offset(0, 10), 58, fill('FFE3D0'));
-
-    // 前刘海：上半圆盖住额头
-    canvas.drawArc(
-      Rect.fromCenter(center: c - const Offset(0, 22), width: 124, height: 108),
-      3.34, // ~191°（左水平偏下）
-      2.94, // 到 ~359°（右水平偏下）——只盖上半
-      true,
-      fill(girl ? '6D4C41' : '5D4037'),
-    );
-
-    // 眼睛 + 微笑 + 腮红
-    final eye = fill('4E342E');
-    canvas.drawCircle(c - const Offset(20, 6), 5, eye);
-    canvas.drawCircle(c + const Offset(20, -6), 5, eye);
-    final smile = Paint()
-      ..color = const Color(0xFF4E342E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(Rect.fromCenter(center: c + const Offset(0, 6), width: 40, height: 32), 0.35, 2.45, false, smile);
-    final blush = fill(girl ? 'F8BBD0' : 'FFCCBC');
-    canvas.drawCircle(c - const Offset(38, 8), 8, blush);
-    canvas.drawCircle(c + const Offset(38, -8), 8, blush);
-
-    // 女孩：头顶蝴蝶结（两瓣 + 中心结）
-    if (girl) {
-      final bow = fill('EC407A');
-      final knot = c - const Offset(30, 74);
-      final path = ui.Path()
-        ..moveTo(knot.dx, knot.dy)
-        ..quadraticBezierTo(knot.dx - 30, knot.dy - 18, knot.dx - 26, knot.dy + 4)
-        ..quadraticBezierTo(knot.dx - 12, knot.dy + 12, knot.dx, knot.dy)
-        ..close();
-      canvas.drawPath(path, bow);
-      final path2 = ui.Path()
-        ..moveTo(knot.dx, knot.dy)
-        ..quadraticBezierTo(knot.dx + 30, knot.dy - 18, knot.dx + 26, knot.dy + 4)
-        ..quadraticBezierTo(knot.dx + 12, knot.dy + 12, knot.dx, knot.dy)
-        ..close();
-      canvas.drawPath(path2, bow);
-      canvas.drawCircle(knot, 7, fill('F06292'));
-    }
-
-    final image = await rec.endRecording().toImage(size.toInt(), size.toInt());
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data!.buffer.asUint8List();
-  }
-
-  /// 演示"照片"：纯 Dart 画的日出风景（与头像同一套零二进制资产手法）。
-  /// 1024×768（4:3 随手拍比例）：渐变晨空 + 太阳光晕 + 云 + 两层山剪影 +
-  /// 水面与太阳倒影。配色与 app 品牌粉蓝渐变呼应。
-  static Future<Uint8List> _paintPhoto() async {
-    const w = 1024.0, h = 768.0;
-    final rec = ui.PictureRecorder();
-    final canvas = ui.Canvas(rec);
-    final rect = Rect.fromLTWH(0, 0, w, h);
-
-    // 晨空：上冷下暖（晨蓝 → 粉 → 暖橙）
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset.zero,
-          Offset(0, h),
-          const [Color(0xFF7FA7E8), Color(0xFFF2A9B8), Color(0xFFFFD08A)],
-          const [0.0, 0.55, 1.0],
-        ),
-    );
-
-    // 太阳：光晕（大半透明圆）+ 亮核
-    final sun = Offset(w * 0.62, h * 0.46);
-    canvas.drawCircle(sun, 120, Paint()..color = const Color(0x66FFE9B8));
-    canvas.drawCircle(sun, 84, Paint()..color = const Color(0x99FFF0C8));
-    canvas.drawCircle(sun, 58, Paint()..color = const Color(0xFFFFF3C4));
-
-    // 云（半透明白椭圆组）
-    final cloud = Paint()..color = const Color(0x66FFFFFF);
-    canvas.drawOval(
-        Rect.fromCenter(center: Offset(w * 0.25, h * 0.22), width: 300, height: 58), cloud);
-    canvas.drawOval(
-        Rect.fromCenter(center: Offset(w * 0.32, h * 0.18), width: 180, height: 44), cloud);
-    canvas.drawOval(
-        Rect.fromCenter(center: Offset(w * 0.78, h * 0.30), width: 240, height: 48), cloud);
-
-    // 远山（淡紫）与近山（深紫）剪影
-    final back = ui.Path()
-      ..moveTo(0, h * 0.62)
-      ..quadraticBezierTo(w * 0.18, h * 0.46, w * 0.36, h * 0.60)
-      ..quadraticBezierTo(w * 0.52, h * 0.70, w * 0.68, h * 0.58)
-      ..quadraticBezierTo(w * 0.84, h * 0.48, w, h * 0.60)
-      ..lineTo(w, h * 0.74)
-      ..lineTo(0, h * 0.74)
-      ..close();
-    canvas.drawPath(back, Paint()..color = const Color(0xFF9B7EB8));
-    final front = ui.Path()
-      ..moveTo(0, h * 0.70)
-      ..quadraticBezierTo(w * 0.30, h * 0.58, w * 0.55, h * 0.70)
-      ..quadraticBezierTo(w * 0.78, h * 0.79, w, h * 0.68)
-      ..lineTo(w, h * 0.76)
-      ..lineTo(0, h * 0.76)
-      ..close();
-    canvas.drawPath(front, Paint()..color = const Color(0xFF6D5A8E));
-
-    // 水面：湖蓝渐变 + 高光提亮
-    const waterTop = 0.74;
-    canvas.drawRect(
-      Rect.fromLTWH(0, h * waterTop, w, h * (1 - waterTop)),
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(0, h * waterTop),
-          Offset(0, h),
-          const [Color(0xFF8E9BD8), Color(0xFF5C6BC0)],
-        ),
-    );
-    canvas.drawRect(Rect.fromLTWH(0, h * waterTop, w, h * (1 - waterTop)),
-        Paint()..color = const Color(0x26FFFFFF));
-
-    // 太阳倒影：一列渐短的横向亮条
-    final glint = Paint()..color = const Color(0x88FFE9B8);
-    for (var i = 0; i < 5; i++) {
-      canvas.drawRRect(
-        RRect.fromRectAndCorners(
-          Rect.fromCenter(
-              center: Offset(sun.dx, h * waterTop + 22.0 + i * 34),
-              width: 150 - i * 22,
-              height: 10),
-          topLeft: const Radius.circular(5),
-          topRight: const Radius.circular(5),
-          bottomLeft: const Radius.circular(5),
-          bottomRight: const Radius.circular(5),
-        ),
-        glint,
-      );
-    }
-
-    final image = await rec.endRecording().toImage(w.toInt(), h.toInt());
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data!.buffer.asUint8List();
-  }
 }

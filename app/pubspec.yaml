@@ -106,6 +106,11 @@ flutter:
   assets:
     - assets/logo.png
     - assets/spinnerLogo.png
+    # 演示秘境插画（2026-10-24）：2 个卡通头像 + 1 张日出照片，预生成 PNG——
+    # 运行时 toImage 绘制在 Intel iMac（x86_64+Impeller）出全透明空图，
+    # 演示画面必须全设备可靠，见 lib/data/demo_art.dart 头注；
+    # 重新生成：npm run demo-assets，产出的 PNG 随代码提交进库。
+    - assets/demoSpace/
     # 语音转写模型（sense-voice-small int8 ~239MB + tokens.txt）：二进制不进
     # git，构建前由 scripts/fetchVoiceModel.sh 拉取到此目录（幂等）；运行时
     # 首次转写从资产拷到应用目录，见 VoiceTranscriptModel.ensureInstalled。
