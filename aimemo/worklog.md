@@ -15598,6 +15598,14 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 - 附带：本地 server/docker/.env 加了三行注释说明开关（gitignore 不入库）；whisperDeploy §6 补「Docker 部署与引擎开关」小节（卷/环境/开关/重建镜像要求/health 验证）。
 - 遗留提醒：VPS 现有镜像建于 sherpa-onnx-node 进 package.json 之前，**必须 docker compose build server 重建**，否则容器无 node addon（报错明确不静默）。
 
+**（2026-10-24T06:00:00Z / 2026-10-24 14:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：compose 三变体全部合并——cftunnel 并入主文件（profiles 第三形态），老板定 Caddyfile 挂 server/Caddyfile
+- 老板要求：把 docker-compose.nocaddy.cftunnel.yml 也合并进来；并让 docker 引用 server/Caddyfile（挂载从 ./Caddyfile 改为 ../Caddyfile，即 server/Caddyfile）。
+- 合并版 docker-compose.yml（三形态，COMPOSE_PROFILES 开关，可组合）：默认 = 原 nocaddy（系统级 Caddy 反代回环）；caddy = 原 withcaddy（内置 Caddy 容器占 80/443，挂 ../Caddyfile）；cftunnel = 原 cftunnel 变体（系统级 Caddy 服备案域名 + cloudflared 隧道服境外域名，TUNNEL_TOKEN=${CF_TUNNEL_TOKEN:-}——默认形态不刷未设警告，启用后未配则容器启动即失败不静默）。原 cftunnel 文件头独有的 CF 建隧道/路由知识（Routes→Published application、Service URL 写 server:3000、删旧 A 记录、http2 协议原因）全部搬进合并版文件头与 cloudflared 服务注释。
+- 互斥语义：内置 caddy 与系统级 Caddy 都占宿主 80/443，二选一别同域名两套；caddy+cftunnel 可组合；提醒 VPS 上若还留着合并前独立 cftunnel 文件不要与新版同启（抢 127.0.0.1:3000）。
+- 文档同步：DEPLOYMENT.md §3.1 目录树（删 cftunnel 独立行、Caddyfile 从 docker/ 挪到 server/ 级说明）、§3.2 补 cftunnel 段落与 cp 目标改为 ../Caddyfile、§3.2.1 模板引用改 docker-compose.yml；server/Caddyfile.example 拷贝指引改为 server/Caddyfile；.env.example 补 CF_TUNNEL_TOKEN 与三个 profile 开关注释（本地 .env 同步加提示，gitignore）。
+- 验证：docker compose config 四形态（default/caddy/cftunnel/caddy,cftunnel）+ coturn 独立文件全过；默认形态无 CF_TUNNEL_TOKEN 警告；全仓无旧文件名引用（仅合并版文件头有意的历史说明）。
+
+
 
 
 

@@ -184,21 +184,23 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫通道�
 
 ```text
 server/
-├── Caddyfile.example     # Caddy 模板（docker / 裸 node 两种形态通用）：docker 部署拷贝为
-│                         #   docker/Caddyfile 后改域名；裸 node 部署照它改系统级 Caddyfile
+├── Caddyfile.example     # Caddy 模板（docker / 裸 node 两种形态通用）：docker 部署（内置
+│                         #   Caddy 形态）拷贝为上一级目录的 Caddyfile 后改域名——compose 的
+│                         #   caddy 服务挂的是 ../Caddyfile；裸 node 部署照它改系统级 Caddyfile
 ├── config/               # 可选：serverConfig.json（服务端参数，见下；gitignore，不入库）
 ├── data/                 # 运行数据：einz.sqlite.db + files/ + avatars/ + backups/（gitignore）
 ├── models/whisper.cpp/  # whisper.cpp 源码 + 构建 + 模型（models/ 子目录放 ggml；
 │                         #   整个目录 gitignore；Docker 部署只需把模型放进 models/ 子目录走卷）
 └── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models/whisper.cpp/models——
-    ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server（部署时拷贝为 docker-compose.yml）
-    ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000
-    ├── docker-compose.nocaddy.cftunnel.yml  # 模板：中国 origin + CF 隧道双入口
+    ├── docker-compose.yml            # 主 compose（2026-10-24 合并版）：默认只起 server，
+    │                                #   由系统级 Caddy 反代 127.0.0.1:3000；.env 里加
+    │                                #   COMPOSE_PROFILES=caddy 则同起内置 Caddy 容器（80/443）；
+    │                                #   COMPOSE_PROFILES=cftunnel 则同起 cloudflared
+    │                                #   （中国双入口：系统级 Caddy 服备案域名 + 隧道服境外域名）
     ├── docker-compose.coturn.yml     # TURN（独立 compose，项目名 einz-turn，可单独启停）
     ├── env.sh              # 生成 .env（EINZ_DB_BACKUP_KEY 等；.env gitignore，pull 不覆盖）
     ├── coturn/             # turnserver.conf.example
-    ├── .env                # 本地化密钥/配置（gitignore）
-    └── Caddyfile           # 部署时由 Caddyfile.example 拷贝生成（gitignore）
+    └── .env                # 本地化密钥/配置（gitignore）
 ```
 
 > **Node dev 与 Docker 共用同一份运行根**（老板 2026-10-23 定）：`config/` `data/`
@@ -208,8 +210,8 @@ server/
 > ⚠️ **头像目录必须挂在卷上**：server 的默认路径是容器内 `/app/data/avatars`，
 > **不在任何卷里**——每次 `docker compose up -d --build server` 重建容器都会清空，
 > 表现是所有人的头像同时消失（2026-09-26 实测踩到）。compose 里必须有：
-> `EINZ_AVATARS=/data/avatars`（`docker-compose.*.yml` 模板已加；VPS 上的
-> `docker-compose.yml` 是部署时从模板拷贝的、不入库，**升级时要手动补这一行**）。
+> `EINZ_AVATARS=/data/avatars`（`docker-compose.yml` 已加；早期部署若从旧模板拷贝
+> 过 `docker-compose.yml` 到 VPS、不入库，**升级时要手动补这一行**）。
 ```
 ```
 
@@ -238,30 +240,40 @@ echo '{"maxSpaces": 1}' > server/config/serverConfig.json
 ### 3.2 部署步骤
 
 ```bash
-# 1) 准备 Caddyfile：仓库里只有模板 server/Caddyfile.example，拷贝到 server/docker/ 再改域名
 cd server/docker
-cp ../Caddyfile.example Caddyfile
-sed -i 's/private.example.com/你的域名/' Caddyfile
 
-# 3) 备份密钥：生成 32 字节 base64 密钥（npm run backup 需要，见 §5）
+# 1) 备份密钥：生成 32 字节 base64 密钥（npm run backup 需要，见 §5）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
 # 记下输出，写入服务器环境（例如 docker-compose.yml 或 .env，勿入库）
 # （或跑 bash env.sh 自动写进 .env，见 docs/ONBOARDING.md 阶段 0）
 
-# 4) 起服务
+# 2) 起服务（默认形态：只起 server，系统级 Caddy 反代 127.0.0.1:3000）
 EINZ_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
-docker compose ps                       # 两个服务均 healthy/running
+docker compose ps                       # server  healthy/running
 ```
 
 > 说明：`docker-compose.yml` 已预置 `EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}` 注入
 > （由 compose 自动读取 `server/docker/.env` 提供，.env 已在 .gitignore、不入库）。
 > 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
 
+**要内置 Caddy 容器做总入口**（不用系统级 Caddy）：额外两步——在 .env 里加
+`COMPOSE_PROFILES=caddy`，并 `cp ../Caddyfile.example ../Caddyfile` 后把
+`private.example.com` 改成真实域名，再 `docker compose up -d`（caddy 占 80/443，
+server 改走容器网络；127.0.0.1:3000 仍会在回环暴露便于排障）。两种入口二选一，
+**别给同一个域名同时配两套**。
+
+**中国双入口（境外域名无备案，走 CF 隧道）**：在 .env 里加
+`COMPOSE_PROFILES=cftunnel`，并配一行 `CF_TUNNEL_TOKEN=<CF 控制台建的隧道 token>`
+（建隧道与 Published application 路由的详细步骤见 `docker-compose.yml` 文件头）。
+此形态下系统级 Caddy 继续服备案域名（回环反代），cloudflared 容器只出站连 CF、
+不开入站端口，境外域名由 CF 边缘终止 TLS 后经隧道转到 `server:3000`。
+`caddy` 与 `cftunnel` 可组合（`COMPOSE_PROFILES=caddy,cftunnel`）。
+
 #### 3.2.1 邮件通知（可选，不配 = 关闭）
 
 没进应用商店 → 没有后台推送，所以服务端给离线的一方**发一封邮件**把他拉回来
-（`docs/PROTOCOL.md` §7.5）。凭据同样走 `server/docker/.env`（compose `docker-compose.*.yml`
-模板已预置注入，部署时拷贝到服务器上的 `docker-compose.yml` 记得带上这几行）：
+（`docs/PROTOCOL.md` §7.5）。凭据同样走 `server/docker/.env`（`docker-compose.yml`
+已预置注入，部署时拷贝到服务器上的 `docker-compose.yml` 记得带上这几行）：
 
 ```bash
 # server/docker/.env（服务器本机，不入库）
