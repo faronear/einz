@@ -3229,10 +3229,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (_hasMultipleSpaces)
                 ValueListenableBuilder<bool>(
                   valueListenable: allSpaces,
+                  // horizontalInset 0：AlertDialog content 左右 24 + 卡片内边距
+                  // 12，正好与上方 Email 输入框边缘对齐（老板 2026-10-24）
                   builder: (_, all, _) => LabeledCheckbox(
                     value: all,
                     label: l10n.settingsScopeAll,
                     onChanged: (v) => allSpaces.value = v,
+                    horizontalInset: 0,
                   ),
                 ),
               // 已填但还没点链接：这一档不点明，用户会以为已经生效
@@ -5291,10 +5294,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (_hasMultipleSpaces)
                 ValueListenableBuilder<bool>(
                   valueListenable: allSpaces,
+                  // horizontalInset 0：与上方输入框边缘对齐（AlertDialog 口径）
                   builder: (_, all, _) => LabeledCheckbox(
                     value: all,
                     label: l10n.settingsScopeAll,
                     onChanged: (v) => allSpaces.value = v,
+                    horizontalInset: 0,
                   ),
                 ),
             ],
@@ -5748,10 +5753,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (_hasMultipleSpaces)
                 ValueListenableBuilder<bool>(
                   valueListenable: allSpaces,
+                  // horizontalInset 0：与上方名字输入框边缘对齐（AlertDialog 口径）
                   builder: (_, all, _) => LabeledCheckbox(
                     value: all,
                     label: l10n.settingsScopeAll,
                     onChanged: (v) => allSpaces.value = v,
+                    horizontalInset: 0,
                   ),
                 ),
             ],

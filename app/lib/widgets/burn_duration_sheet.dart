@@ -155,7 +155,8 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
             fit: FlexFit.loose,
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                // 12：与 OptionPickerSheet 的选项行/提交按钮同口径（老板 2026-10-24）
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                   decoration: BoxDecoration(
@@ -183,7 +184,7 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
             ),
           // 提交（满宽：表单主操作，与附件存储/墓碑的提交模式一致）
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
