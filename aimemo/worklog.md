@@ -15785,3 +15785,9 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 ② **阅后即焚弹层时间轴区套白色分组卡片**（参照 PIN 弹窗 _setLockGroup 2026-10-18 口径：surfaceContainerLowest 白底 + outlineVariant 60% 细描边 + 圆角 14）：时间轴+当前值预览+轴下标注整块圈成主要设置区，与弹层粉底分层。
 插曲：误删 chat_page 的 _DropHintOverlay.build（与任务无关），同轮发现并完整恢复。
 验证：analyze 干净 + 全量 385 绿（ui_style_switch_test 5 用例全过=迁移后 Theme 弹层交互正确）。
+
+**（2026-10-24T06:50:00Z / 2026-10-24 14:50）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+清理 tooltip 删除后的孤儿 l10n 键（老板）：全量扫描 471 个键的 lib/test 引用，删 21 个零引用键（两个 arb 对称删 + 2 个 @元数据块）：
+- 12 个 tooltip 删除遗留：chatPageMsgSent/SendingTap/Failed/Delivered、voiceCallMenuCall、chatPagePassphraseShow/Hide、chatPageLockNow、chatPageInviteCopyLink/CodeTooltip、chatPageEntranceListRefresh、chatPageEmojiKeyboard
+- 9 个历史遗留（转写功能改名后的旧键 voiceTranscriptTimingLabel/ModeManual、PIN 弹窗重构遗留 setPinDialog*、setupCreateCopy、chatPagePlaying/QuotedTombMessage/StatusOthersOnline/GroupNameEditTooltip 等）
+教训：**macOS grep 的 \b 不可靠**（GNU grep 语义的单词边界在 BSD grep 下失效），两次用 grep 判定孤儿都误报/漏报，最终用 Python 的 (?<![A-Za-z0-9_]) 前后断言才可信；l10n 孤儿判定必须排除 app_localizations{,_zh,_en}.dart 三个生成文件。gen-l10n 重新生成（纯删 257 行）+ analyze + 全量 385 绿。

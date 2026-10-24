@@ -274,9 +274,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupCreateCopy => '复制邀请链接';
-
-  @override
   String get setupPageInitFailed => '初始化失败，正在自动重试…';
 
   @override
@@ -314,12 +311,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setupJoinEntranceLimitReached => '该秘境的通道数量已达服务器上限，无法再开通新通道。';
-
-  @override
-  String get setPinDialogPinLabel => '新 PIN（至少 6 位数字）';
-
-  @override
-  String get setPinDialogConfirmLabel => '确认新 PIN';
 
   @override
   String get setPinDialogSetPin => '启用';
@@ -447,12 +438,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogReinviteFallbackName => '对方';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
-
-  @override
-  String get chatPageInviteCopyCodeTooltip => '复制通道码';
-
-  @override
   String get chatPageInviteLinkCopied => '邀请链接已复制';
 
   @override
@@ -503,9 +488,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageGroupNameTitle => '群组名称';
-
-  @override
-  String get chatPageGroupNameEditTooltip => '修改群名';
 
   @override
   String get chatPageGroupNameLabel => '名称';
@@ -753,12 +735,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePassphraseVerifyFailed => '验证失败，请重试';
 
   @override
-  String get chatPagePassphraseShow => '显示';
-
-  @override
-  String get chatPagePassphraseHide => '隐藏';
-
-  @override
   String get chatPageMembersInviteNew => '邀请新同伴';
 
   @override
@@ -779,13 +755,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListNew => '添加我的新通道';
 
   @override
-  String get chatPageEntranceListRefresh => '刷新';
-
-  @override
   String get chatPagePinLabel => '锁屏码';
-
-  @override
-  String get chatPageLockNow => '锁屏';
 
   @override
   String chatPagePinMenuValue(String duration) {
@@ -903,9 +873,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRecallFailed => '撤回失败，请稍后重试';
 
   @override
-  String get chatPageQuotedTombMessage => '（该消息已不存在）';
-
-  @override
   String get chatPageQuoteGoneNotice => '被引用消息已不存在';
 
   @override
@@ -983,18 +950,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageMsgSent => '已发送';
-
-  @override
-  String get chatPageMsgSendingTap => '发送中，点击验证是否已送达并重发';
-
-  @override
-  String get chatPageMsgDelivered => '已送达';
-
-  @override
-  String get chatPageMsgFailed => '发送失败，点击重试';
-
-  @override
   String get chatPageMsgFailedTap => '点击重发';
 
   @override
@@ -1049,9 +1004,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachEmoji => '表情符';
 
   @override
-  String get chatPageEmojiKeyboard => '键盘';
-
-  @override
   String get chatPageAttachPaste => '粘贴';
 
   @override
@@ -1071,9 +1023,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageAttachAnyFile => '任意文件';
-
-  @override
-  String get chatPagePlaying => '播放中…';
 
   @override
   String get chatPageVoiceLabel => '语音';
@@ -1139,13 +1088,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoOff => '手动';
 
   @override
-  String get voiceTranscriptTimingLabel => '转写时机';
-
-  @override
   String get voiceTranscriptAutoModeDesc => '所有语音消息一旦收到就自动转写。';
-
-  @override
-  String get voiceTranscriptModeManual => '手动';
 
   @override
   String get voiceTranscriptManualModeDesc => '每条语音消息都需要你手动发起转写。';
@@ -1439,14 +1382,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memberPending => '待加入';
-
-  @override
-  String chatPageStatusOthersOnline(int online, int total) {
-    return '$online/$total';
-  }
-
-  @override
-  String get voiceCallMenuCall => '语音通话';
 
   @override
   String get voiceCallIncoming => '来电';

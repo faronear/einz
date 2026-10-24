@@ -163,7 +163,6 @@
       }
     }
   },
-  "setupCreateCopy": "Copy invite link",
   "setupPageInitFailed": "Initialization failed, retrying…",
   "@setupPageInitFailed": {
     "description": "Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying"
@@ -189,8 +188,6 @@
     }
   },
   "setupJoinEntranceLimitReached": "This space has reached the server's entrance limit — no new entrance can be opened.",
-  "setPinDialogPinLabel": "New PIN (at least 6 digits)",
-  "setPinDialogConfirmLabel": "Confirm new PIN",
   "setPinDialogSetPin": "Apply",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
@@ -270,8 +267,6 @@
       }
     }
   },
-  "chatPageInviteCopyLinkTooltip": "Copy invite link",
-  "chatPageInviteCopyCodeTooltip": "Copy entrance token",
   "chatPageInviteLinkCopied": "Invite link copied",
   "chatPageInviteCodeCopied": "Entrance token copied",
   "chatPageInviteFailed": "Failed to create the entrance token: {error}",
@@ -302,7 +297,6 @@
   "chatPageRenameNameTitle": "My name",
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",
-  "chatPageGroupNameEditTooltip": "Change group name",
   "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
@@ -476,8 +470,6 @@
   "chatPagePassphraseWrong": "Incorrect passphrase",
   "chatPagePassphraseEmpty": "Enter the shared passphrase",
   "chatPagePassphraseVerifyFailed": "Verification failed, please try again",
-  "chatPagePassphraseShow": "Show",
-  "chatPagePassphraseHide": "Hide",
   "chatPageMembersInviteNew": "Invite a new companion",
   "chatPageMembersFullWithMax": "Space is full ({current}/{max})",
   "@chatPageMembersFullWithMax": {
@@ -494,9 +486,7 @@
   "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your authorized entrances to this space.",
   "chatPageEntranceListThisDevice": "Current entrance name",
   "chatPageEntranceListNew": "Add my new entrance",
-  "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
-  "chatPageLockNow": "Lock now",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
@@ -567,7 +557,6 @@
   "chatPageRecallConfirmOk": "Recall",
   "chatPageRecallBlocked": "Already delivered, can't recall",
   "chatPageRecallFailed": "Recall failed, try again later",
-  "chatPageQuotedTombMessage": "(This message is no longer available)",
   "chatPageQuoteGoneNotice": "The quoted message is no longer available",
   "chatPageActionQuote": "Quote",
   "chatPageActionSave": "Save",
@@ -612,10 +601,6 @@
       }
     }
   },
-  "chatPageMsgSent": "Sent",
-  "chatPageMsgSendingTap": "Sending… tap to verify and resend",
-  "chatPageMsgDelivered": "Delivered",
-  "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageMsgFailedTap": "Tap to resend",
   "chatPageMsgsUnsent": "Waiting to sync… {count} unsent, will retry when back online",
   "@chatPageMsgsUnsent": {
@@ -659,7 +644,6 @@
     }
   },
   "chatPageAttachEmoji": "Emoji",
-  "chatPageEmojiKeyboard": "Keyboard",
   "chatPageAttachPaste": "Paste",
   "chatPageAttachPhoto": "Take photo",
   "chatPageAttachGalleryImage": "Gallery image",
@@ -667,7 +651,6 @@
   "chatPageAttachVideoGallery": "Gallery video",
   "chatPageAttachAudioFile": "Audio file",
   "chatPageAttachAnyFile": "Any file",
-  "chatPagePlaying": "Playing…",
   "chatPageVoiceLabel": "Voice",
   "voiceTranscribing": "Transcribing…",
   "voiceTranscriptRetry": "Transcription failed, tap to retry",
@@ -688,9 +671,7 @@
   "voiceTranscriptEngineServerShort": "Remote",
   "voiceTranscriptAutoOn": "Auto",
   "voiceTranscriptAutoOff": "Manual",
-  "voiceTranscriptTimingLabel": "When to transcribe",
   "voiceTranscriptAutoModeDesc": "Transcribe every voice message as soon as it arrives.",
-  "voiceTranscriptModeManual": "Manual",
   "voiceTranscriptManualModeDesc": "Transcribe each voice message yourself, on demand.",
   "voiceTranscriptMenuTranscribe": "Transcribe",
   "@voiceTranscriptServerFailed": {
@@ -938,22 +919,6 @@
   "memberPending": "Waiting",
   "@memberPending": {
     "description": "Status word when a member has not joined yet (shared by the space card, space list, and members sheet)"
-  },
-  "chatPageStatusOthersOnline": "{online}/{total}",
-  "@chatPageStatusOthersOnline": {
-    "description": "Group space top bar, right of the member avatars: how many others are online / how many others there are. BOTH numbers exclude me.",
-    "placeholders": {
-      "online": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "voiceCallMenuCall": "Voice call",
-  "@voiceCallMenuCall": {
-    "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
   },
   "voiceCallIncoming": "Incoming call",
   "@voiceCallIncoming": {

@@ -296,9 +296,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupCreateCopy => 'Copy invite link';
-
-  @override
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
@@ -341,12 +338,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get setupJoinEntranceLimitReached =>
       'This space has reached the server\'s entrance limit — no new entrance can be opened.';
-
-  @override
-  String get setPinDialogPinLabel => 'New PIN (at least 6 digits)';
-
-  @override
-  String get setPinDialogConfirmLabel => 'Confirm new PIN';
 
   @override
   String get setPinDialogSetPin => 'Apply';
@@ -477,12 +468,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogReinviteFallbackName => 'them';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
-
-  @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy entrance token';
-
-  @override
   String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
@@ -533,9 +518,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageGroupNameTitle => 'Group name';
-
-  @override
-  String get chatPageGroupNameEditTooltip => 'Change group name';
 
   @override
   String get chatPageGroupNameLabel => 'Name';
@@ -800,12 +782,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Verification failed, please try again';
 
   @override
-  String get chatPagePassphraseShow => 'Show';
-
-  @override
-  String get chatPagePassphraseHide => 'Hide';
-
-  @override
   String get chatPageMembersInviteNew => 'Invite a new companion';
 
   @override
@@ -828,13 +804,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListNew => 'Add my new entrance';
 
   @override
-  String get chatPageEntranceListRefresh => 'Refresh';
-
-  @override
   String get chatPagePinLabel => 'PIN';
-
-  @override
-  String get chatPageLockNow => 'Lock now';
 
   @override
   String chatPagePinMenuValue(String duration) {
@@ -960,10 +930,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRecallFailed => 'Recall failed, try again later';
 
   @override
-  String get chatPageQuotedTombMessage =>
-      '(This message is no longer available)';
-
-  @override
   String get chatPageQuoteGoneNotice =>
       'The quoted message is no longer available';
 
@@ -1042,18 +1008,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageMsgSent => 'Sent';
-
-  @override
-  String get chatPageMsgSendingTap => 'Sending… tap to verify and resend';
-
-  @override
-  String get chatPageMsgDelivered => 'Delivered';
-
-  @override
-  String get chatPageMsgFailed => 'Send failed, tap to retry';
-
-  @override
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
@@ -1110,9 +1064,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageAttachEmoji => 'Emoji';
 
   @override
-  String get chatPageEmojiKeyboard => 'Keyboard';
-
-  @override
   String get chatPageAttachPaste => 'Paste';
 
   @override
@@ -1132,9 +1083,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachAnyFile => 'Any file';
-
-  @override
-  String get chatPagePlaying => 'Playing…';
 
   @override
   String get chatPageVoiceLabel => 'Voice';
@@ -1204,14 +1152,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptAutoOff => 'Manual';
 
   @override
-  String get voiceTranscriptTimingLabel => 'When to transcribe';
-
-  @override
   String get voiceTranscriptAutoModeDesc =>
       'Transcribe every voice message as soon as it arrives.';
-
-  @override
-  String get voiceTranscriptModeManual => 'Manual';
 
   @override
   String get voiceTranscriptManualModeDesc =>
@@ -1516,14 +1458,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberPending => 'Waiting';
-
-  @override
-  String chatPageStatusOthersOnline(int online, int total) {
-    return '$online/$total';
-  }
-
-  @override
-  String get voiceCallMenuCall => 'Voice call';
 
   @override
   String get voiceCallIncoming => 'Incoming call';

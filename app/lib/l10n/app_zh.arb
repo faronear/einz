@@ -149,7 +149,6 @@
       }
     }
   },
-  "setupCreateCopy": "复制邀请链接",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
     "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示，不展示技术细节（如 SqliteException），自动重试中"
@@ -175,8 +174,6 @@
     }
   },
   "setupJoinEntranceLimitReached": "该秘境的通道数量已达服务器上限，无法再开通新通道。",
-  "setPinDialogPinLabel": "新 PIN（至少 6 位数字）",
-  "setPinDialogConfirmLabel": "确认新 PIN",
   "setPinDialogSetPin": "启用",
   "setPinDialogPinTooShort": "PIN 至少 6 位数字",
   "setPinDialogPinDigitsOnly": "PIN 只能是数字",
@@ -256,8 +253,6 @@
       }
     }
   },
-  "chatPageInviteCopyLinkTooltip": "复制邀请链接",
-  "chatPageInviteCopyCodeTooltip": "复制通道码",
   "chatPageInviteLinkCopied": "邀请链接已复制",
   "chatPageInviteCodeCopied": "通道码已复制",
   "chatPageInviteFailed": "通道码生成失败: {error}",
@@ -288,7 +283,6 @@
   "chatPageRenameNameTitle": "我的名字",
   "chatPageRenameNameLabel": "名字",
   "chatPageGroupNameTitle": "群组名称",
-  "chatPageGroupNameEditTooltip": "修改群名",
   "chatPageGroupNameLabel": "名称",
   "chatPageGenderLabel": "性别",
   "chatPageRenameEntranceTitle": "当前通道",
@@ -448,17 +442,13 @@
   "chatPagePassphraseWrong": "口令错误",
   "chatPagePassphraseEmpty": "请输入共享口令",
   "chatPagePassphraseVerifyFailed": "验证失败，请重试",
-  "chatPagePassphraseShow": "显示",
-  "chatPagePassphraseHide": "隐藏",
   "chatPageMembersInviteNew": "邀请新同伴",
   "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
   "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",
   "chatPageEntranceScopeHint": "通道是设备连接到秘境的专属线路。以下是您绑定到当前秘境的所有通道。",
   "chatPageEntranceListThisDevice": "当前通道名称",
   "chatPageEntranceListNew": "添加我的新通道",
-  "chatPageEntranceListRefresh": "刷新",
   "chatPagePinLabel": "锁屏码",
-  "chatPageLockNow": "锁屏",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
@@ -529,7 +519,6 @@
   "chatPageRecallConfirmOk": "撤回",
   "chatPageRecallBlocked": "对方已接收，无法撤回",
   "chatPageRecallFailed": "撤回失败，请稍后重试",
-  "chatPageQuotedTombMessage": "（该消息已不存在）",
   "chatPageQuoteGoneNotice": "被引用消息已不存在",
   "chatPageActionQuote": "引用",
   "chatPageActionSave": "保存",
@@ -574,10 +563,6 @@
       }
     }
   },
-  "chatPageMsgSent": "已发送",
-  "chatPageMsgSendingTap": "发送中，点击验证是否已送达并重发",
-  "chatPageMsgDelivered": "已送达",
-  "chatPageMsgFailed": "发送失败，点击重试",
   "chatPageMsgFailedTap": "点击重发",
   "chatPageMsgsUnsent": "等待同步中… {count} 条消息待发送，网络恢复后自动重发",
   "@chatPageMsgsUnsent": {
@@ -621,7 +606,6 @@
     }
   },
   "chatPageAttachEmoji": "表情符",
-  "chatPageEmojiKeyboard": "键盘",
   "chatPageAttachPaste": "粘贴",
   "chatPageAttachPhoto": "拍照",
   "chatPageAttachGalleryImage": "相册图片",
@@ -629,7 +613,6 @@
   "chatPageAttachVideoGallery": "相册视频",
   "chatPageAttachAudioFile": "音频文件",
   "chatPageAttachAnyFile": "任意文件",
-  "chatPagePlaying": "播放中…",
   "chatPageVoiceLabel": "语音",
   "voiceTranscribing": "转写中…",
   "voiceTranscriptRetry": "转写失败，点按重试",
@@ -650,9 +633,7 @@
   "voiceTranscriptEngineServerShort": "远程",
   "voiceTranscriptAutoOn": "自动",
   "voiceTranscriptAutoOff": "手动",
-  "voiceTranscriptTimingLabel": "转写时机",
   "voiceTranscriptAutoModeDesc": "所有语音消息一旦收到就自动转写。",
-  "voiceTranscriptModeManual": "手动",
   "voiceTranscriptManualModeDesc": "每条语音消息都需要你手动发起转写。",
   "voiceTranscriptMenuTranscribe": "转写",
   "@voiceTranscriptServerFailed": {
@@ -890,11 +871,6 @@
   "memberPending": "待加入",
   "@memberPending": {
     "description": "成员尚未加入时的状态词（空间卡片、空间列表、成员弹层共用）"
-  },
-  "chatPageStatusOthersOnline": "{online}/{total}",
-  "voiceCallMenuCall": "语音通话",
-  "@voiceCallMenuCall": {
-    "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
   },
   "voiceCallIncoming": "来电",
   "@voiceCallIncoming": {
