@@ -12109,17 +12109,21 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
                     _vtGroup(
                       title: l10n.voiceTranscriptGroupEngine,
                       children: [
+                        // 前置图标与语音消息气泡里的转写来源指示图标同款
+                        // （_voiceTranscriptSourceIcon）：芯片=本机、云=远程
                         _vtOptionRow(
                           active: _engine == 'local',
                           onTap: () => setState(() => _engine = 'local'),
                           label: l10n.voiceTranscriptAuthLocal,
                           desc: l10n.voiceTranscriptAuthLocalDesc,
+                          icon: Icons.memory,
                         ),
                         _vtOptionRow(
                           active: _engine == 'server',
                           onTap: () => setState(() => _engine = 'server'),
                           label: l10n.voiceTranscriptAuthServer,
                           desc: l10n.voiceTranscriptAuthServerDesc,
+                          icon: Icons.cloud_outlined,
                         ),
                       ],
                     ),
@@ -12224,30 +12228,40 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
     );
   }
 
-  /// 通用单选行（方式组与时机组共用）：选中项 tint 背景 + 对勾（与
-  /// OptionPickerSheet 的选项行同款）。
+  /// 通用单选行（方式组用；时机组 2026-10-24 起改左右方块）：选中项 tint
+  /// 背景 + 对勾。配色与 OptionPickerSheet 的选项行同款（2026-10-24 老板定稿
+  /// 口径）：选中 = 品牌粉 #D6529C 25% 实底；未选中 = 5% 黑（**不再透明**——
+  /// 白卡上要给"可点"的淡灰暗示）；悬浮 10% / 点击 14%。
+  ///
+  /// [icon] 前置图标（方式组：芯片=本机 / 云=远程，与语音消息气泡里转写来源
+  /// 指示图标同款，见 [_voiceTranscriptSourceIcon]）。
   Widget _vtOptionRow({
     required bool active,
     required VoidCallback onTap,
     required String label,
     required String desc,
+    required IconData icon,
   }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
         color: active
-            ? scheme.secondaryContainer.withValues(alpha: 0.55)
-            : Colors.transparent,
+            ? const Color(0xFFD6529C).withValues(alpha: 0.25)
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(12),
+          hoverColor: Colors.black.withValues(alpha: 0.10),
+          highlightColor: Colors.black.withValues(alpha: 0.14),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
+                Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

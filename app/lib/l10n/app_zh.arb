@@ -627,14 +627,14 @@
   "voiceTranscriptAuthServerDesc": "把原始录音发送给远程服务器，完成转写后立即删除。",
   "voiceTranscriptServerFailed": "服务端转写失败：{error}",
   "voiceTranscriptServerDisabled": "服务器未启用转写，已改用本机模型",
-  "voiceTranscriptGroupEngine": "转写方式",
+  "voiceTranscriptGroupEngine": "转写位置",
   "voiceTranscriptTimingLabel": "转写时机",
   "voiceTranscriptEngineLocalShort": "本机",
   "voiceTranscriptEngineServerShort": "远程",
   "voiceTranscriptAutoOn": "自动",
   "voiceTranscriptAutoOff": "手动",
-  "voiceTranscriptAutoModeDesc": "所有语音消息一旦收到就自动转写。",
-  "voiceTranscriptManualModeDesc": "每条语音消息都需要你手动发起转写。",
+  "voiceTranscriptAutoModeDesc": "一旦收到就自动转写",
+  "voiceTranscriptManualModeDesc": "需要你手动发起转写",
   "voiceTranscriptMenuTranscribe": "转写",
   "@voiceTranscriptServerFailed": {
     "placeholders": {

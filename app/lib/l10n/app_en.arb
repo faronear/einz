@@ -665,14 +665,14 @@
   "voiceTranscriptAuthServerDesc": "Voice messages are sent to our cloud server, and deleted immediately after transcribing.",
   "voiceTranscriptServerFailed": "Server transcription failed: {error}",
   "voiceTranscriptServerDisabled": "Server transcription isn't enabled — used the local model instead",
-  "voiceTranscriptGroupEngine": "Method",
+  "voiceTranscriptGroupEngine": "Where to transcribe",
   "voiceTranscriptTimingLabel": "When to transcribe",
   "voiceTranscriptEngineLocalShort": "Local",
   "voiceTranscriptEngineServerShort": "Remote",
   "voiceTranscriptAutoOn": "Auto",
   "voiceTranscriptAutoOff": "Manual",
-  "voiceTranscriptAutoModeDesc": "Transcribe every voice message as soon as it arrives.",
-  "voiceTranscriptManualModeDesc": "Transcribe each voice message yourself, on demand.",
+  "voiceTranscriptAutoModeDesc": "Transcribe automatically when it arrives",
+  "voiceTranscriptManualModeDesc": "Transcribe on-demand when you ask it to",
   "voiceTranscriptMenuTranscribe": "Transcribe",
   "@voiceTranscriptServerFailed": {
     "placeholders": {
