@@ -475,9 +475,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuExit => '退出本应用';
 
   @override
-  String get chatPageMenuMore => '主菜单';
-
-  @override
   String get chatPageMsgMoreActions => '更多操作';
 
   @override
