@@ -15767,3 +15767,6 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 **（2026-10-24T05:35:00Z / 2026-10-24 13:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 可点击条目三态统一（老板）：**默认 5% 黑 → 悬浮 10% → 点击/长按 14%**（锚定「我的秘境」弹层「添加秘境」按钮 2026-09-24 的既有口径）。改动两处未选中项底色：Theme 弹层（ui_style_picker）3%→5%；OptionPickerSheet（Attachment storage/vanished messages/语言/阅后即焚等共用）透明→5%；两处 InkWell hoverColor/highlightColor 显式对齐 10%/14%（不再用默认浅值）。选中项高亮（secondaryContainer 55%）不变。老板纠偏记录：最初我理解成"往 Theme 的 3% 看齐"，实际 3% 才是太浅的一方，基准是 spaces/entrances 按钮的 5%。analyze 干净 + 全量 385 测试绿。
+
+**（2026-10-24T06:00:00Z / 2026-10-24 14:00）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+选中态改深粉（老板实测反馈：5% 灰与 secondaryContainer 55% 淡粉对比不足）：Theme 弹层 + OptionPickerSheet（共用组件，Attachment storage/vanished messages 等全部受益）的选中项底色 secondaryContainer 55% → **品牌粉 #D6529C 25%**（与气泡女性别色同源）；未选中三态（5%/10%/14%）维持不变——"可点"的暗示是对的，问题在选中态不够重。老板另问 Theme 为何独立于 OptionPickerSheet：因带渐变/纯色预览图（_StylePreview）而 OptionPickerItem 无预览槽——待办：给 OptionPickerItem 加可选 preview 槽把 Theme 迁移进来消重复（未做，等老板确认）。analyze 干净 + 全量 385 绿。

@@ -250,12 +250,11 @@ class _OptionRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
         // 未选中项的**默认灰**与「我的秘境」弹层「添加秘境」按钮统一为 5% 黑
-        // （老板 2026-10-24：透明底看不出可点；5% 是空间切换器 2026-09-24 定的
-        // 默认灰，Theme 弹层同款）。可点击条目三态：默认 5% 灰 → 悬浮 10% →
-        // 点击/长按 14%（hover/highlight 显式对齐）。
-        // 选中项仍是更明显的 tint 高亮（secondaryContainer 55%）。
+        // （老板 2026-10-24：三态口径——默认 5% → 悬浮 10% → 点击 14%）。
+        // 选中项**深粉**（老板 2026-10-24：原 secondaryContainer 55% 淡粉与 5%
+        // 灰对比不足；改品牌粉 25% 实底，与 Theme 弹层选中态同款）。
         color: active
-            ? scheme.secondaryContainer.withValues(alpha: 0.55)
+            ? const Color(0xFFD6529C).withValues(alpha: 0.25)
             : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(mouseCursor: SystemMouseCursors.click,

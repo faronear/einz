@@ -108,13 +108,12 @@ class _StyleOptionCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
         // 未选中项的**默认灰**与「我的秘境」弹层「添加秘境」按钮统一为 5% 黑
-        // （老板 2026-10-24：原 3% 太浅，与弹层底色几乎分不出、看不出可点；
-        // 5% 是空间切换器 2026-09-24 定的默认灰）。可点击条目三态统一：
-        // 默认 5% 灰 → 悬浮 10% → 点击/长按 14%（hover/highlight 显式对齐
-        // space_switcher，不用 InkWell 默认的浅值）。
-        // 选中项仍是更明显的浅 tint 高亮（secondaryContainer 55%），层次不变。
+        // （老板 2026-10-24：三态口径——默认 5% → 悬浮 10% → 点击 14%）。
+        // 选中项**深粉**（老板 2026-10-24：原 secondaryContainer 55% 淡粉与 5%
+        // 灰对比不足"分不出选中没选中"；改品牌粉 25% 实底，与气泡女性别色
+        // #D6529C 同源，一眼与灰底区分）。
         color: active
-            ? scheme.secondaryContainer.withValues(alpha: 0.55)
+            ? const Color(0xFFD6529C).withValues(alpha: 0.25)
             : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(mouseCursor: SystemMouseCursors.click,
