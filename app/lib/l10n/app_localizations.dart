@@ -743,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockDurationLabel.
   ///
   /// In en, this message translates to:
-  /// **'Auto-lock after inactivity'**
+  /// **'Lock after inactivity'**
   String get chatPageSetLockDurationLabel;
 
   /// No description provided for @chatPageSetLockTabChange.
@@ -761,13 +761,13 @@ abstract class AppLocalizations {
   /// No description provided for @lockDurationSecs.
   ///
   /// In en, this message translates to:
-  /// **'{n} sec'**
+  /// **'{n} s'**
   String lockDurationSecs(int n);
 
   /// No description provided for @lockDurationMin.
   ///
   /// In en, this message translates to:
-  /// **'{n} min'**
+  /// **'{n} m'**
   String lockDurationMin(int n);
 
   /// No description provided for @chatPageSetLockOldLabel.
@@ -2087,25 +2087,25 @@ abstract class AppLocalizations {
   /// No description provided for @burnUnitDays.
   ///
   /// In en, this message translates to:
-  /// **'{count}d'**
+  /// **'{count} d'**
   String burnUnitDays(int count);
 
   /// No description provided for @burnUnitHours.
   ///
   /// In en, this message translates to:
-  /// **'{count}h'**
+  /// **'{count} h'**
   String burnUnitHours(int count);
 
   /// No description provided for @burnUnitMinutes.
   ///
   /// In en, this message translates to:
-  /// **'{count}m'**
+  /// **'{count} m'**
   String burnUnitMinutes(int count);
 
   /// No description provided for @burnUnitSeconds.
   ///
   /// In en, this message translates to:
-  /// **'{count}s'**
+  /// **'{count} s'**
   String burnUnitSeconds(int count);
 
   /// No description provided for @burnAxisOffLabel.

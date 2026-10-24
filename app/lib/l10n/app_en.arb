@@ -210,10 +210,10 @@
   "chatPageSetLockNewPinLabel": "New PIN or leave blank",
   "chatPageSetLockNewPinLabelNoPin": "New PIN (at least 6 digits)",
   "chatPageSetLockSubmitChange": "Change",
-  "chatPageSetLockDurationLabel": "Auto-lock after inactivity",
+  "chatPageSetLockDurationLabel": "Lock after inactivity",
   "chatPageSetLockTabChange": "Change PIN",
   "chatPageSetLockClearButton": "Clear PIN",
-  "lockDurationSecs": "{n} sec",
+  "lockDurationSecs": "{n} s",
   "@lockDurationSecs": {
     "placeholders": {
       "n": {
@@ -221,7 +221,7 @@
       }
     }
   },
-  "lockDurationMin": "{n} min",
+  "lockDurationMin": "{n} m",
   "@lockDurationMin": {
     "placeholders": {
       "n": {
@@ -730,7 +730,7 @@
       }
     }
   },
-  "burnUnitDays": "{count}d",
+  "burnUnitDays": "{count} d",
   "@burnUnitDays": {
     "placeholders": {
       "count": {
@@ -738,7 +738,7 @@
       }
     }
   },
-  "burnUnitHours": "{count}h",
+  "burnUnitHours": "{count} h",
   "@burnUnitHours": {
     "placeholders": {
       "count": {
@@ -746,7 +746,7 @@
       }
     }
   },
-  "burnUnitMinutes": "{count}m",
+  "burnUnitMinutes": "{count} m",
   "@burnUnitMinutes": {
     "placeholders": {
       "count": {
@@ -754,7 +754,7 @@
       }
     }
   },
-  "burnUnitSeconds": "{count}s",
+  "burnUnitSeconds": "{count} s",
   "@burnUnitSeconds": {
     "placeholders": {
       "count": {

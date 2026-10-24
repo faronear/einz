@@ -390,7 +390,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockSubmitChange => 'Change';
 
   @override
-  String get chatPageSetLockDurationLabel => 'Auto-lock after inactivity';
+  String get chatPageSetLockDurationLabel => 'Lock after inactivity';
 
   @override
   String get chatPageSetLockTabChange => 'Change PIN';
@@ -400,12 +400,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String lockDurationSecs(int n) {
-    return '$n sec';
+    return '$n s';
   }
 
   @override
   String lockDurationMin(int n) {
-    return '$n min';
+    return '$n m';
   }
 
   @override
@@ -1218,22 +1218,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String burnUnitDays(int count) {
-    return '${count}d';
+    return '$count d';
   }
 
   @override
   String burnUnitHours(int count) {
-    return '${count}h';
+    return '$count h';
   }
 
   @override
   String burnUnitMinutes(int count) {
-    return '${count}m';
+    return '$count m';
   }
 
   @override
   String burnUnitSeconds(int count) {
-    return '${count}s';
+    return '$count s';
   }
 
   @override
