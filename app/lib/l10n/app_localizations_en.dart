@@ -1111,7 +1111,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'Transcription happens on this device (requires a model download at the first use).';
+      'Transcription happens on this device. A model download is required at the first use.';
 
   @override
   String get voiceTranscriptAuthServer => 'Remote';
@@ -1122,12 +1122,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String voiceTranscriptServerFailed(String error) {
-    return 'Server transcription failed: $error';
+    return 'Remote transcription failed: $error';
   }
 
   @override
   String get voiceTranscriptServerDisabled =>
-      'Server transcription isn\'t enabled — used the local model instead';
+      'Remote transcription isn\'t enabled — used the local model instead';
 
   @override
   String get voiceTranscriptGroupEngine => 'Where to transcribe';
@@ -1149,11 +1149,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAutoModeDesc =>
-      'Transcribe automatically when it arrives';
+      'Transcribe all voice messages automatically.';
 
   @override
   String get voiceTranscriptManualModeDesc =>
-      'Transcribe on-demand when you ask it to';
+      'Transcribe a voice message at your instruction.';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';

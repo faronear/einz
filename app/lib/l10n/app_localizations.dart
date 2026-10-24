@@ -1913,7 +1913,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcription happens on this device (requires a model download at the first use).'**
+  /// **'Transcription happens on this device. A model download is required at the first use.'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
@@ -1931,13 +1931,13 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptServerFailed.
   ///
   /// In en, this message translates to:
-  /// **'Server transcription failed: {error}'**
+  /// **'Remote transcription failed: {error}'**
   String voiceTranscriptServerFailed(String error);
 
   /// No description provided for @voiceTranscriptServerDisabled.
   ///
   /// In en, this message translates to:
-  /// **'Server transcription isn\'t enabled — used the local model instead'**
+  /// **'Remote transcription isn\'t enabled — used the local model instead'**
   String get voiceTranscriptServerDisabled;
 
   /// No description provided for @voiceTranscriptGroupEngine.
@@ -1979,13 +1979,13 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe automatically when it arrives'**
+  /// **'Transcribe all voice messages automatically.'**
   String get voiceTranscriptAutoModeDesc;
 
   /// No description provided for @voiceTranscriptManualModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe on-demand when you ask it to'**
+  /// **'Transcribe a voice message at your instruction.'**
   String get voiceTranscriptManualModeDesc;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.

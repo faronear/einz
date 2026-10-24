@@ -1049,8 +1049,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAuthLocal => '本机转写';
 
   @override
-  String get voiceTranscriptAuthLocalDesc =>
-      '在本机上直接转写，原始消息不离开本机（第一次使用会下载一个语音模型）';
+  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写。第一次使用需要下载一个语音模型。';
 
   @override
   String get voiceTranscriptAuthServer => '远程转写';
@@ -1060,11 +1059,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String voiceTranscriptServerFailed(String error) {
-    return '服务端转写失败：$error';
+    return '远程转写失败：$error';
   }
 
   @override
-  String get voiceTranscriptServerDisabled => '服务器未启用转写，已改用本机模型';
+  String get voiceTranscriptServerDisabled => '远程转写未启用，已改用本机模型';
 
   @override
   String get voiceTranscriptGroupEngine => '转写位置';
@@ -1085,10 +1084,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoOff => '手动';
 
   @override
-  String get voiceTranscriptAutoModeDesc => '一旦收到就自动转写';
+  String get voiceTranscriptAutoModeDesc => '每次收到语音消息就自动转写。';
 
   @override
-  String get voiceTranscriptManualModeDesc => '需要你手动发起转写';
+  String get voiceTranscriptManualModeDesc => '需要你手动发起转写一个语音消息。';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';
