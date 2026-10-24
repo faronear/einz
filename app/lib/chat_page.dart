@@ -9318,6 +9318,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 反差区分（白色系=播放区，深灰=转写区），素雅浅气泡上也自然可读。
         // app 只有浅色模式（main.dart 无 darkTheme），无需再分主题。
         const transcriptColor = Color(0xFF3A3A3A);
+        final l10n = AppLocalizations.of(context)!;
+        const style = TextStyle(fontSize: 13, color: transcriptColor);
+        // 图标与文字的对齐（老板 2026-10-23）：图标放进 Text.rich 的 WidgetSpan
+        // （PlaceholderAlignment.middle）——对齐**所在行文字的垂直中线**：
+        // 单行即上下居中；多行（转写最多 3 行）图标钉在第一行、与首行文字居中。
+        // 之前是 Row + crossAxisAlignment.start，图标顶到行框顶部，对 13px 文字
+        // 视觉偏上（「排列不整齐」的来源）。
+        Widget line(String iconModelId, String text, {TextStyle? textStyle}) =>
+            Text.rich(
+              TextSpan(
+                children: [
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child:
+                        _voiceTranscriptSourceIcon(iconModelId, transcriptColor),
+                  ),
+                  const WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: SizedBox(width: 4),
+                  ),
+                  TextSpan(text: text, style: textStyle ?? style),
+                ],
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            );
         if (t == null) {
           // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
           // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
@@ -9326,66 +9353,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 不加下划线（老板 2026-10-23）：这不是 URL 链接，实质是按钮，点击反馈
           // 由 Clickable 自带。
           if (!manualEntry) return const SizedBox.shrink();
-          final l10n = AppLocalizations.of(context)!;
-          const style = TextStyle(fontSize: 13, color: transcriptColor);
           return Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _voiceTranscriptSourceIcon(
-                    _voiceTranscriptEngine == 'server'
-                        ? 'whisper-server'
-                        : 'sense-voice-small',
-                    transcriptColor),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Clickable(
-                    onTap: () => _transcribeVoiceMessage(m),
-                    child: Text(l10n.voiceTranscriptManual,
-                        style: style.copyWith(
-                            color: transcriptColor.withValues(alpha: 0.7))),
-                  ),
-                ),
-              ],
+            child: Clickable(
+              onTap: () => _transcribeVoiceMessage(m),
+              child: line(
+                _voiceTranscriptEngine == 'server'
+                    ? 'whisper-server'
+                    : 'sense-voice-small',
+                l10n.voiceTranscriptManual,
+                textStyle: style.copyWith(
+                    color: transcriptColor.withValues(alpha: 0.7)),
+              ),
             ),
           );
         }
-        final l10n = AppLocalizations.of(context)!;
-        const style = TextStyle(fontSize: 13, color: transcriptColor);
         switch (t.status) {
           case 'done':
             if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.only(top: 4),
-              // mainAxisSize.min：Row 默认 max 会占满气泡最大宽，把整条语音气泡
-              // 拉到全宽（转写再短也一样，2026-10-23 实测），必须收缩到内容宽。
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _voiceTranscriptSourceIcon(t.modelId, transcriptColor),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(t.transcript.trim(),
-                        maxLines: 3, overflow: TextOverflow.ellipsis, style: style),
-                  ),
-                ],
-              ),
+              child: line(t.modelId, t.transcript.trim()),
             );
           case 'pending':
             return Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _voiceTranscriptSourceIcon(t.modelId, transcriptColor),
-                  const SizedBox(width: 4),
-                  Text(l10n.voiceTranscribing, style: style),
-                ],
-              ),
+              child: line(t.modelId, l10n.voiceTranscribing),
             );
           case 'failed':
           case 'stale':
@@ -9395,28 +9388,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 与 done/pending 同一判断，点按重试不改变来源语义。
             return Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _voiceTranscriptSourceIcon(t.modelId, transcriptColor),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Clickable(
-                      onTap: () => _transcribeVoiceMessage(m),
-                      child: Text(
-                        t.status == 'failed'
-                            ? l10n.voiceTranscriptRetry
-                            : t.status == 'stale'
-                                ? l10n.voiceTranscriptStale
-                                : l10n.voiceTranscriptManual,
-                        // 同上：按钮不是链接，不加下划线
-                        style: style.copyWith(
-                            color: transcriptColor.withValues(alpha: 0.7)),
-                      ),
-                    ),
-                  ),
-                ],
+              child: Clickable(
+                onTap: () => _transcribeVoiceMessage(m),
+                child: line(
+                  t.modelId,
+                  t.status == 'failed'
+                      ? l10n.voiceTranscriptRetry
+                      : t.status == 'stale'
+                          ? l10n.voiceTranscriptStale
+                          : l10n.voiceTranscriptManual,
+                  // 同上：按钮不是链接，不加下划线
+                  textStyle: style.copyWith(
+                      color: transcriptColor.withValues(alpha: 0.7)),
+                ),
               ),
             );
         }
@@ -9455,6 +9439,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // `!_debugLocked`，并发 ByteData 内存暴涨把 macOS 顶成黑屏）。
     // 2026-10-12 真机实测踩坑（Android 红屏 + macOS 黑屏），改动前先读这段。
     var started = false;
+    // 对话框只允许被 pop 一次：用户点 Cancel 时 route 进入退场动画但仍在导航栈里
+    // （ctx.mounted 仍为 true），随后 ensureInstalled 抛 _Cancelled，catch 里若
+    // 再 pop 就是双重 pop——把底下聊天页一起弹掉，黑屏（2026-10-24 真机实测）。
+    // 三路出口（完成/失败取消/用户取消）共用旗标，谁先到谁关窗。
+    var dismissed = false;
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -9470,9 +9459,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 },
                 cancelled: () => cancelled,
               );
-              if (ctx.mounted) Navigator.of(ctx).pop(true);
+              if (!dismissed && ctx.mounted) {
+                dismissed = true;
+                Navigator.of(ctx).pop(true);
+              }
             } catch (e) {
-              if (ctx.mounted) Navigator.of(ctx).pop(false);
+              if (!dismissed && ctx.mounted) {
+                dismissed = true;
+                Navigator.of(ctx).pop(false);
+              }
               // 用户主动取消（_Cancelled）不是失败：不弹错误，否则会露出
               // "Instance of '_Cancelled'" 这种内部异常名
               if (!cancelled) {
@@ -9500,7 +9495,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             TextButton(
               onPressed: () {
                 cancelled = true;
-                Navigator.of(ctx).pop(false);
+                // 与异步三路共用 dismissed：用户先关窗，随后 _Cancelled 的
+                // catch 看到旗标已置位便不再 pop（防双重 pop 黑屏）
+                if (!dismissed) {
+                  dismissed = true;
+                  Navigator.of(ctx).pop(false);
+                }
               },
               child: Text(l10n.cancel),
             ),

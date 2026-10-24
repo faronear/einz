@@ -15651,3 +15651,6 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 **（2026-10-23T23:54:31Z / 2026-10-24 07:54）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 转写区两个微调（老板）：① 尚未转写的行内入口文案「转写」→「点按转写文字」（voiceTranscriptManual；长按菜单卡片仍用短文案 voiceTranscriptMenuTranscribe）；② 「转写/重试」可点文字去下划线——不是 URL 链接、实质是按钮，点击反馈由 Clickable 自带。
 ⚠️ 教训：本文件**不要跑 `dart format` 全文件重排**——Dart 3.13 的 tall style 与 chat_page.dart 既有紧凑风格冲突，一次 +3354/-2259 行噪音 diff（已 git restore 恢复，两处小改动用 edit_file 重做）。flutter analyze 干净，diff 仅 ±9 行。
+
+**（2026-10-24T00:49:43Z / 2026-10-24 08:49）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+转写行图标对齐（老板）：云/芯片图标与文字排列不齐 → 改用 Text.rich + WidgetSpan(PlaceholderAlignment.middle)：单行时图标与文字上下居中；多行（转写最多 3 行）图标钉在第一行、与首行中线对齐——正是老板要的两种效果统一解。四个状态行（入口/done/pending/failed）共用 line() helper，Clickable 包整行（点击区更大）。flutter analyze 干净。
