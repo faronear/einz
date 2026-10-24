@@ -15667,3 +15667,6 @@ _startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ 
 
 **（2026-10-24T01:30:00Z / 2026-10-24 09:30）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
 「语音转写」菜单图标换自绘「麦克风+文档」（老板 2026-10-24，矢量稿 _tmp.gitomit.sfomit/语音转写.svg）：新增 app/lib/widgets/transcribe_icon.dart（CustomPainter，SVG path 离线转换为 Path 调用序列，21 段弧 large-arc/sweep 标志逐一核对一致；按项目惯例不引入 flutter_svg，同 CuteHouseIcon 先例）。_buildActionCard 泛化出 _buildActionCardWidget（icon 槽收 widget，IconTheme.merge 传色），转写卡片换用新图标（0xFF1A1A1A 近黑）。flutter analyze 干净。
+
+**（2026-10-24T01:35:00Z / 2026-10-24 09:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+更多设置里的「语音转写」行图标同步换 TranscribeIcon（size 24，老板指出漏改；graphic_eq 全文件已无残留）。flutter analyze 干净。

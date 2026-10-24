@@ -1799,7 +1799,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 onTap: () => Navigator.of(ctx).pop('tombstone'),
               ),
               ListTile(
-                leading: const Icon(Icons.graphic_eq),
+                // 麦克风+文档自绘图标（老板 2026-10-24）：与操作菜单「转写」卡同一
+                // 个图标，「语音转写」语义贯穿两处入口。
+                leading: const TranscribeIcon(size: 24, color: Color(0xFF1A1A1A)),
                 title: Text(l10n.chatPageMenuVoiceTranscriptAuth),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
