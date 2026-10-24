@@ -12850,7 +12850,10 @@ class _MessageActionsPopupRoute extends PopupRoute<String> {
   final WidgetBuilder menuBuilder;
 
   @override
-  Color? get barrierColor => Colors.black.withValues(alpha: 0.20);
+  // 与 app 里所有 showDialog / showModalBottomSheet 的默认 barrier 同款
+  // （Colors.black54，54% 黑）——菜单弹出时聊天页同样变暗，视觉一致
+  // （老板 2026-10-24：原先 20% 太浅，比别的弹层暗得明显不够）。
+  Color? get barrierColor => Colors.black54;
 
   @override
   bool get barrierDismissible => true;
