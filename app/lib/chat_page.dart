@@ -12013,11 +12013,12 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 /// 老板重构：原「本地/服务端/每条询问」三选一拆成两组——「每条询问」不再是
 /// 并列的第三个选项，而是**自动转写关闭时**的行为）。
 ///
-/// 结构（仿 PIN 更改弹窗的分组卡片）：
-/// - 第一组「转写方式」：本机 / 服务端 二选一（选中项 tint + 对勾）；
-/// - 第二组「转写时机」：手动 / 自动 两个方块二选一（选中打勾，老板
-///   2026-10-24；手动 = 每条询问——不论方式是本机还是服务端，执行前都会
-///   询问；省流量/上传。自动 = 按上面的方式自动转写）；
+/// 结构（仿 PIN 更改弹窗的分组卡片；2026-10-24 两组都改左右方块）：
+/// - 第一组「转写位置」：本机 / 远程 两个方块二选一（选中打勾；芯片/云
+///   前置图标与语音消息气泡里转写来源指示图标同款）；
+/// - 第二组「转写时机」：手动 / 自动 两个方块二选一（选中打勾；手动 =
+///   每条询问——不论方式是本机还是服务端，执行前都会询问；省流量/上传。
+///   自动 = 按上面的方式自动转写）；
 /// - 底部：「应用于本机所有秘境」勾选框 + 提交按钮（单选+提交模式，与附件
 ///   存储/墓碑弹层同构——两项都是本设备持久设置，提交前统一确认）。
 class _VoiceTranscriptSheet extends StatefulWidget {
@@ -12106,63 +12107,55 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // 转写位置：左「本机」右「远程」两个方块二选一（老板
+                    // 2026-10-24：与时机组同款方块布局）。前置图标与语音消息气泡里
+                    // 的转写来源指示图标同款（_voiceTranscriptSourceIcon）：
+                    // 芯片=本机、云=远程。存储层是 _voiceTranscriptEngine，无迁移。
                     _vtGroup(
                       title: l10n.voiceTranscriptGroupEngine,
                       children: [
-                        // 前置图标与语音消息气泡里的转写来源指示图标同款
-                        // （_voiceTranscriptSourceIcon）：芯片=本机、云=远程
-                        _vtOptionRow(
-                          active: _engine == 'local',
-                          onTap: () => setState(() => _engine = 'local'),
-                          label: l10n.voiceTranscriptAuthLocal,
-                          desc: l10n.voiceTranscriptAuthLocalDesc,
-                          icon: Icons.memory,
-                        ),
-                        _vtOptionRow(
-                          active: _engine == 'server',
-                          onTap: () => setState(() => _engine = 'server'),
-                          label: l10n.voiceTranscriptAuthServer,
-                          desc: l10n.voiceTranscriptAuthServerDesc,
-                          icon: Icons.cloud_outlined,
+                        _vtBlockPair(
+                          left: _vtBlock(
+                            active: _engine == 'local',
+                            onTap: () => setState(() => _engine = 'local'),
+                            label: l10n.voiceTranscriptAuthLocal,
+                            desc: l10n.voiceTranscriptAuthLocalDesc,
+                            icon: Icons.memory,
+                            keyName: 'vtEngineLocal',
+                          ),
+                          right: _vtBlock(
+                            active: _engine == 'server',
+                            onTap: () => setState(() => _engine = 'server'),
+                            label: l10n.voiceTranscriptAuthServer,
+                            desc: l10n.voiceTranscriptAuthServerDesc,
+                            icon: Icons.cloud_outlined,
+                            keyName: 'vtEngineServer',
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     // 转写时机：左「手动」右「自动」两个方块二选一（老板 2026-10-24：
                     // 参考空间向导里性别选择的方块按钮）——选中打勾，配色与
-                    // OptionPickerSheet 选项行同款（见 _vtTimingBlock）。存储层
+                    // OptionPickerSheet 选项行同款（见 _vtBlock）。存储层
                     // 仍是同一个 bool（_voiceTranscriptAuto），无迁移。
                     _vtGroup(
                       title: l10n.voiceTranscriptTimingLabel,
                       children: [
-                        // IntrinsicHeight：Row 在竖直滚动区里（高度无上界），
-                        // stretch 会拿到无限高约束直接抛「BoxConstraints forces
-                        // an infinite height」——先按两块内容量出齐高再拉伸
-                        // （等大方块的标准写法，2026-10-24 踩坑修复）。
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: _vtTimingBlock(
-                                  active: !_auto,
-                                  onTap: () => setState(() => _auto = false),
-                                  label: l10n.voiceTranscriptAutoOff,
-                                  desc: l10n.voiceTranscriptManualModeDesc,
-                                  keyName: 'vtTimingManual',
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _vtTimingBlock(
-                                  active: _auto,
-                                  onTap: () => setState(() => _auto = true),
-                                  label: l10n.voiceTranscriptAutoOn,
-                                  desc: l10n.voiceTranscriptAutoModeDesc,
-                                  keyName: 'vtTimingAuto',
-                                ),
-                              ),
-                            ],
+                        _vtBlockPair(
+                          left: _vtBlock(
+                            active: !_auto,
+                            onTap: () => setState(() => _auto = false),
+                            label: l10n.voiceTranscriptAutoOff,
+                            desc: l10n.voiceTranscriptManualModeDesc,
+                            keyName: 'vtTimingManual',
+                          ),
+                          right: _vtBlock(
+                            active: _auto,
+                            onTap: () => setState(() => _auto = true),
+                            label: l10n.voiceTranscriptAutoOn,
+                            desc: l10n.voiceTranscriptAutoModeDesc,
+                            keyName: 'vtTimingAuto',
                           ),
                         ),
                       ],
@@ -12228,75 +12221,40 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
     );
   }
 
-  /// 通用单选行（方式组用；时机组 2026-10-24 起改左右方块）：选中项 tint
-  /// 背景 + 对勾。配色与 OptionPickerSheet 的选项行同款（2026-10-24 老板定稿
-  /// 口径）：选中 = 品牌粉 #D6529C 25% 实底；未选中 = 5% 黑（**不再透明**——
-  /// 白卡上要给"可点"的淡灰暗示）；悬浮 10% / 点击 14%。
+  /// 左右两块等高排布（方式组 + 时机组两组二选一共用）。
   ///
-  /// [icon] 前置图标（方式组：芯片=本机 / 云=远程，与语音消息气泡里转写来源
-  /// 指示图标同款，见 [_voiceTranscriptSourceIcon]）。
-  Widget _vtOptionRow({
-    required bool active,
-    required VoidCallback onTap,
-    required String label,
-    required String desc,
-    required IconData icon,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Material(
-        color: active
-            ? const Color(0xFFD6529C).withValues(alpha: 0.25)
-            : Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          mouseCursor: SystemMouseCursors.click,
-          borderRadius: BorderRadius.circular(12),
-          hoverColor: Colors.black.withValues(alpha: 0.10),
-          highlightColor: Colors.black.withValues(alpha: 0.14),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 3),
-                      Text(desc,
-                          style: TextStyle(
-                              fontSize: 12, color: scheme.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-                if (active) Icon(Icons.check, size: 20, color: scheme.primary),
-              ],
-            ),
-          ),
-        ),
+  /// IntrinsicHeight 是必须的：Row 在弹层选项区的竖直滚动容器里（高度无上界），
+  /// stretch 会把无限高约束直接传给子块、performLayout 抛
+  /// 「BoxConstraints forces an infinite height」——先按两块内容量出齐高、
+  /// 再拉伸（等大方块的标准写法，2026-10-24 踩坑修复）。
+  Widget _vtBlockPair({required Widget left, required Widget right}) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 12),
+          Expanded(child: right),
+        ],
       ),
     );
   }
 
-  /// 转写时机方块（老板 2026-10-24）：左右并排两个方块二选一（布局参考空间
-  /// 向导里性别选择的卡片），左「手动」右「自动」；选中者打勾。
+  /// 单选方块（方式组 + 时机组共用；老板 2026-10-24：布局参考空间向导里
+  /// 性别选择的双卡片）：选中者打勾，未选中淡灰底暗示可点。
   ///
   /// 配色与 OptionPickerSheet 的选项行同款（2026-10-24 定稿口径）：选中 =
   /// 品牌粉 #D6529C 25% 实底；未选中 = 5% 黑；悬浮 10% / 点击 14%。
   ///
+  /// [icon] 可选前置图标（方式组：芯片=本机 / 云=远程，与语音消息气泡里
+  /// 转写来源指示图标同款，见 [_voiceTranscriptSourceIcon]）。
   /// [keyName] 供测试按块定位（等高/点选断言）；不传即无 key。
-  Widget _vtTimingBlock({
+  Widget _vtBlock({
     required bool active,
     required VoidCallback onTap,
     required String label,
     required String desc,
+    IconData? icon,
     String? keyName,
   }) {
     final scheme = Theme.of(context).colorScheme;
@@ -12320,6 +12278,10 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
             children: [
               Row(
                 children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(
                     child: Text(label,
                         style: const TextStyle(

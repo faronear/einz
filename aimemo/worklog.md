@@ -15854,3 +15854,8 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 
 **（2026-10-24T08:33:20Z / 2026-10-24 16:33）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
 英文文案 Vanished messages → **Removed messages**（老板定夺，仅 en 两处值，zh「消息留痕」不动）：老板先提 Dismissed，我给的意见是 ① Vanished 确实该改——vanishing/disappearing messages 在 Signal/WhatsApp/Telegram 里专指阅后即焚，与本设置（已删/焚/撤回消息的显示样式）撞车会误导；② Dismissed 更糟——iOS 语境是「用户划掉通知/关闭弹层」，动作方是读者、语义是忽略非销毁；③ 老板再提 Obsolete（因为 deleted 只是三类成因之一）——语义偏「过时/被取代/不再适用」（软件语境=deprecated），这三类消息不是过时是「没了」；最终伞词取 **Removed**：天然覆盖 deleted/burned/recalled 三类，且是通讯 app 通用占位词（This message was removed），与 note「How deleted/burned/recalled messages appear?」直接呼应。改动：app_en.arb 两处值 + gen-l10n 重生成；键名 chatPageTombstone*/chatPageMoreSettingsTombstone 与 zh 值不动，测试全走 getter 无需改。验证：analyze 干净 + tombstone_display_test 2 用例绿。
+**（2026-10-24T08:40:00Z / 2026-10-24 16:40）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+方式组也改左右方块（老板）：弹层两组从此统一方块布局——「转写位置」左「本机」右「远程」（芯片/云前置图标保留，与气泡指示图标同款）。实现：_vtTimingBlock 泛化为 _vtBlock（加可选 IconData icon 形参，时机组不传），IntrinsicHeight+stretch Row 提为 _vtBlockPair（两组共用），_vtOptionRow 删除（无人引用）。回归用例扩展：位置组两块等高断言（vtEngineLocal/vtEngineServer keys）。
+
+验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量 389 + 1 skip 全绿。UI 待老板真机自测（更多设置→语音转写）。

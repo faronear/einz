@@ -2528,12 +2528,18 @@ void main() {
             of: find.byType(BottomSheet), matching: find.byIcon(Icons.cloud_outlined)),
         findsOneWidget);
 
-    // 两块等高（IntrinsicHeight 把无界高度收敛成齐高再拉伸）
+    // 两块等高（IntrinsicHeight 把无界高度收敛成齐高再拉伸）——时机组与
+    // 位置组两对方块都断言（位置组 2026-10-24 同改方块，同一套约束陷阱）
     final manualHeight =
         tester.getSize(find.byKey(const ValueKey('vtTimingManual'))).height;
     final autoHeight =
         tester.getSize(find.byKey(const ValueKey('vtTimingAuto'))).height;
-    expect(manualHeight, autoHeight, reason: '左右两块应等高');
+    expect(manualHeight, autoHeight, reason: '时机组左右两块应等高');
+    final localHeight =
+        tester.getSize(find.byKey(const ValueKey('vtEngineLocal'))).height;
+    final remoteHeight =
+        tester.getSize(find.byKey(const ValueKey('vtEngineServer'))).height;
+    expect(localHeight, remoteHeight, reason: '位置组左右两块应等高');
 
     // 默认手动、无改动 → 提交按钮灰；点「自动」块 → 亮起 → 提交落盘
     final submit = find.widgetWithText(FilledButton, _zh.chatPageTombstoneSubmit);
