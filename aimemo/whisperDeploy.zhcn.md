@@ -112,7 +112,7 @@ EINZ_ASR_ENGINE=sensevoice
 
 - **内置镜像（推荐，2026-10-22 已落地）**：`server/Dockerfile` 新增 whisper 编译阶段
   ——二进制 + libggml 动态库烤进镜像（`/opt/whisper/`），模型**不进镜像**，走卷
-  `../models/whisper.cpp/models:/opt/whisper/models:ro`。compose（withcaddy 变体）已配
+  `../models/whisper.cpp/models:/opt/whisper/models:ro`。compose（docker-compose.yml）已配
   `EINZ_WHISPER_BIN=/opt/whisper/whisper-cli` + `EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin`。
   首次部署只剩一步：往 `server/models/whisper.cpp/models/` 放一份模型文件
   （**老板 2026-10-22 定**：模型是固定二进制资产，不进 `data/` 用户数据目录；
