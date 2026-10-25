@@ -21,7 +21,7 @@
       "detail": [
         "app/macos/Runner/MainFlutterWindow.swift：新增 einz.audio.input 频道 + lockInputDeviceToIntegerPcm（当前已是整数 PCM 则不动，避免打断 Teams 等采集客户端；否则挑采样率最接近请求值的整数格式，lockForConfiguration/activeFormat；失败静默）",
         "app/lib/chat_page.dart _startVoice：hasPermission 后、recorder.start 前，仅 macOS 经频道预锁（尽力而为，失败不阻塞）",
-        "aimemo/20261009_voiceTranscript.zhcn.md §8 补「macOS 设备格式的坑」",
+        "aimemo/20261009_voiceTranscript.zhcn.md §8 补「macOS 设备格式的坑」+「路线复盘」（方案3 用文件 API 旁路会照撞此坑且症状更隐蔽；流式旁路/方案2 免疫——坑的边界是 AVCaptureAudioFileOutput 的 WAV 写入链 × Float32 设备，不是 wav 容器）",
         "验证：flutter analyze lib 零问题；swiftc -typecheck（-F FlutterMacOS.xcframework/macos-arm64_x86_64 切片）零错误；原生复刻 A/B（Float32 态→锁→录成）已跑通；端到端待老板重启后 npm run app-mac-run 实测（重启才恢复 Float32 故障态）",
         "教训：swiftc -parse 只查语法不解析 import/类型，漏放了 AVFoundation import 导致老板首次构建失败（cannot find 'AVCaptureDevice' in scope）——Runner 改 Swift 后必须 -typecheck；activeFormat 是非 Optional，不能 if let"
       ]
