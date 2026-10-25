@@ -71,7 +71,6 @@ import 'widgets/sheet_close_button.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/clickable.dart';
 import 'widgets/transcribe_icon.dart';
-import 'widgets/voice_keyboard_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
@@ -11009,11 +11008,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       splashRadius:
                                           _kInputModeToggleSize / 2,
                                       onPressed: _onVoiceEntryTap,
-                                      icon: _inputMode == _InputMode.text
-                                          ? KeyboardFirstIcon(
-                                              color: _inputModeToggleColor())
-                                          : MicFirstIcon(
-                                              color: _inputModeToggleColor()),
+                                      // 麦+键盘并排（老板 2026-10-25 定稿，
+                                      // 取代自绘双元素图标）：两枚 Flutter 默认
+                                      // 图标（mic_none / keyboard_alt_outlined，
+                                      // 即合并前那两个入口图标）并排排在原有 48
+                                      // 圆形热区内；**右侧=当前有效的输入模式**
+                                      // （文字态键盘在右、语音态麦克风在右，紧挨
+                                      // 正式输入区），左侧=点按切过去的目标。
+                                      icon: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _inputMode == _InputMode.text
+                                                ? Icons.mic_none
+                                                : Icons
+                                                    .keyboard_alt_outlined,
+                                            size: 16,
+                                            color: _inputModeToggleColor(),
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Icon(
+                                            _inputMode == _InputMode.text
+                                                ? Icons
+                                                    .keyboard_alt_outlined
+                                                : Icons.mic_none,
+                                            size: 16,
+                                            color: _inputModeToggleColor(),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),

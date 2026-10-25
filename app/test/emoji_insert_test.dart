@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/widgets/emoji_panel.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 
@@ -93,8 +94,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.text, 'ab');
 
-    // 面板上的键盘键：收起面板并回到输入框
-    await tester.tap(find.byIcon(Icons.keyboard_alt_outlined));
+    // 面板上的键盘键：收起面板并回到输入框。finder 必须收窄到表情面板内——
+    // 输入台切换图标里也有 keyboard_alt_outlined（麦+键盘并排，2026-10-25），
+    // 全局 find.byIcon 会二义命中
+    await tester.tap(find.descendant(
+        of: find.byType(EmojiPanel),
+        matching: find.byIcon(Icons.keyboard_alt_outlined)));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.backspace_outlined), findsNothing);
     expect(tester.takeException(), isNull);
