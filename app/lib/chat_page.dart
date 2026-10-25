@@ -10832,6 +10832,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 decoration: InputDecoration(
                                   hintText: l10n.chatPageInputHint,
                                   isDense: true,
+                                  // 白底（老板 2026-10-25）：默认 transparent 会透出
+                                  // 页面淡粉背景，与语音条的白底观感不一致
+                                  filled: true,
+                                  fillColor: Colors.white,
                                   // 边框到文字的间距：主题里默认 16/16（那是给
                                   // 口令、名字这类表单用的，字段少、留白宽好读），
                                   // 聊天输入框是"反复打字、希望一行多放字"的场景，
