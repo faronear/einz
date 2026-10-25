@@ -7,6 +7,7 @@ import '../data/dns_poison_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
 import 'clickable.dart';
+import 'sheet_close_button.dart';
 import 'version_gate.dart';
 
 /// 链接色：品牌深蓝 #2271F7（与 LinkifiedText / 「邀请加入」链接同源）。
@@ -76,7 +77,8 @@ class _AboutSheetState extends State<AboutSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // 标题样式与留白同「界面语言」/「更多通道」等弹层：居中、上 14 下 10
+    // 标题样式与留白同「界面语言」/「更多通道」等弹层：居中、上 14 下 10；
+    // 右上角关闭圆钮与标题行水平对齐（老板 2026-10-24）——Stack 钉角
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -84,10 +86,19 @@ class _AboutSheetState extends State<AboutSheet> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Center(
-              child: Text(l10n.aboutPageTitle,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 16)),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Text(l10n.aboutPageTitle,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
+                Positioned(
+                  right: 0,
+                  child: SheetCloseButton(tooltip: l10n.close),
+                ),
+              ],
             ),
           ),
           Flexible(

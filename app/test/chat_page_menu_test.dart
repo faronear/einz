@@ -824,9 +824,7 @@ void main() {
     await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
     // 弹窗内只剩一个可编辑名字输入框（性别只读框 2026-10-17 已移到「我的资料」弹层）
-    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
+    // 老板 2026-10-24：弹窗一打开即可编辑，不再有初始只读+编辑按钮的冻结态
     await tester.enterText(
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
         '新名字');
@@ -870,9 +868,7 @@ void main() {
       await tapDeferred(tester, find.textContaining(menuItem));
       // 「我的资料」是弹层：先点名字胶囊进改名弹窗（两段错峰）
       await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
-      // 初始只读：先点「编辑」进可编辑态（只读态不接键盘输入）
-      await tester.tap(find.byIcon(Icons.edit));
-      await tester.pumpAndSettle();
+      // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
       final field = find
           .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
           .first;
@@ -891,8 +887,7 @@ void main() {
     /// （2026-10-02 起当前通道名不再有独立菜单项）。
     Future<String> typeIntoEntrance(String input) async {
       await _openCurrentEntranceRename(tester);
-      await tester.tap(find.byIcon(Icons.edit)); // 初始只读 → 进可编辑态
-      await tester.pumpAndSettle();
+      // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
       final field = find
           .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
           .first;
@@ -916,7 +911,7 @@ void main() {
     expect(entrance.length, kEntranceNameMaxLength, reason: '第 33 个字符应敲不进去');
   });
 
-  testWidgets('改名对话框：点输入框任意位置即进编辑态（不必点编辑图标）', (WidgetTester tester) async {
+  testWidgets('改名对话框：一打开即可编辑（老板 2026-10-24 取消冻结态）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -943,12 +938,8 @@ void main() {
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
     await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
-    expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
-    // 点名字输入框本身（不是右侧编辑图标）→ 也应切到编辑态
-    await tester.tap(
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first);
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.edit), findsNothing, reason: '点输入框内任意位置后应进入编辑态');
+    // 老板 2026-10-24：不再有初始只读态/编辑按钮——弹窗打开即直接输入
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '冻结态已取消，无编辑按钮');
     await tester.enterText(
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
         '新名字');
@@ -1183,8 +1174,7 @@ void main() {
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first; // 弹窗内只有一个名字输入框（性别框已移入「我的资料」弹层）
-    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
-    await tester.pumpAndSettle();
+    // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
     await tester.enterText(renameField, 'Alice');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -1245,11 +1235,8 @@ void main() {
 
     expect(find.text(_zh.chatPageRenameEntranceTitle), findsOneWidget, reason: '弹窗标题');
     expect(find.text(_zh.chatPageEntranceListThisDevice), findsWidgets, reason: '输入框标签');
-    // 初始只读态有「编辑」按钮；点它就进可编辑态
-    expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
-    await tester.tap(find.byIcon(Icons.edit));
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
+    // 老板 2026-10-24：不再有初始只读态/编辑按钮——弹窗打开即直接输入
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '冻结态已取消，无编辑按钮');
 
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
@@ -1340,8 +1327,7 @@ void main() {
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first;
-    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
-    await tester.pumpAndSettle();
+    // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
     await tester.enterText(dialogField, '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();

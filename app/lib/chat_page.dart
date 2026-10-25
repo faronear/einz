@@ -67,6 +67,7 @@ import 'widgets/passphrase_field.dart';
 import 'widgets/editable_field.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/labeled_checkbox.dart';
+import 'widgets/sheet_close_button.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/clickable.dart';
 import 'widgets/transcribe_icon.dart';
@@ -1743,13 +1744,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 标题居中（与其它选项弹层口径一致）
+              // 标题居中（与其它选项弹层口径一致）；右上角关闭圆钮与标题行
+              // 水平对齐（老板 2026-10-24）——Stack 钉角
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: Center(
-                  child: Text(l10n.chatPageMoreSettingsTitle,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(l10n.chatPageMoreSettingsTitle,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: SheetCloseButton(tooltip: l10n.close),
+                    ),
+                  ],
                 ),
               ),
               // 行尾当前值 + >：> 与顶层菜单的二级入口标识同款（老板 2026-10-15），
@@ -2777,13 +2788,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 标题居中（与其它选项弹层口径一致）
+                  // 标题居中（与其它选项弹层口径一致）；右上角关闭圆钮与标题行
+                  // 水平对齐（老板 2026-10-24）——Stack 钉角
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
-                    child: Center(
-                      child: Text(title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 16)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   // 标题下的备注（与 OptionPickerSheet 的 note 同款口径）：
@@ -3664,11 +3685,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Center(
-                      child: Text(
-                          l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(
+                              l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 16)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
@@ -3974,15 +4004,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 18),
-                    child: Center(
-                      child: Text(
-                          _isGroup
-                              ? l10n.chatPageMemberProfileTitle
-                              : l10n.chatPageMembersTitle('duo'),
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: scheme.onSurface)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(
+                              _isGroup
+                                  ? l10n.chatPageMemberProfileTitle
+                                  : l10n.chatPageMembersTitle('duo'),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: scheme.onSurface)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   Row(
@@ -4335,45 +4374,55 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 标题**居中**、上 14 下 5（与「界面语言」等弹层标题的居中与
-                  // 留白口径对齐）。右端挂「刷新」：就地重拉 /entrances 重建卡片，
-                  // 不用退出弹层、也不用等 30s 轮询。横向 padding 由 16 收到 0，
-                  // 让刷新按钮与下面的卡片**右对齐**；左边放同宽占位，标题仍在弹层
-                  // 正中（不会被按钮推歪）。
+                  // 留白口径对齐）。「刷新」**紧贴标题右侧**（老板 2026-10-24：
+                  // 原先钉在行最右，与关闭钮挤在一起——改成跟标题成组居中，
+                  // 标题组（标题+刷新）整体居中，行最右只留关闭钮）。
                   Padding(
                     padding: const EdgeInsets.fromLTRB(0, 4, 0, 5),
-                    child: Row(
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        const SizedBox(width: _entranceRefreshSize),
-                        Expanded(
-                          child: Center(
-                            child: Text(l10n.chatPageMenuEntranceList,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 16)),
+                        // Center 撑满行宽：标题组（标题+刷新）居中，Stack 随之
+                        // 拿到全宽，Positioned 的关闭钮才能钉到弹层右缘
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(l10n.chatPageMenuEntranceList,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600, fontSize: 16)),
+                              const SizedBox(width: 4),
+                              SizedBox(
+                                width: _entranceRefreshSize,
+                                height: _entranceRefreshSize,
+                                // 拉取中换成同尺寸的转圈：位置与大小都不跳
+                                child: refreshing
+                                    ? const Center(
+                                        child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2)),
+                                      )
+                                    : IconButton(
+                                        icon: const Icon(Icons.refresh, size: 20),
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () async {
+                                          setSheetState(() => refreshing = true);
+                                          await load();
+                                          // 弹层可能在这期间被关掉 → 不能再 setState
+                                          if (!ctx.mounted) return;
+                                          setSheetState(() => refreshing = false);
+                                        },
+                                      ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(
-                          width: _entranceRefreshSize,
-                          height: _entranceRefreshSize,
-                          // 拉取中换成同尺寸的转圈：位置与大小都不跳
-                          child: refreshing
-                              ? const Center(
-                                  child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2)),
-                                )
-                              : IconButton(
-                                  icon: const Icon(Icons.refresh, size: 20),
-                                  visualDensity: VisualDensity.compact,
-                                  onPressed: () async {
-                                    setSheetState(() => refreshing = true);
-                                    await load();
-                                    // 弹层可能在这期间被关掉 → 不能再 setState
-                                    if (!ctx.mounted) return;
-                                    setSheetState(() => refreshing = false);
-                                  },
-                                ),
+                        // 关闭圆钮（老板 2026-10-24）：钉标题行最右
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
                         ),
                       ],
                     ),
@@ -4732,13 +4781,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」/「更多通道」
-              // 等弹层标题口径一致——原来是自己一套 left + all 12 + 无字号）
+              // 等弹层标题口径一致——原来是自己一套 left + all 12 + 无字号）；
+              // 右上角关闭圆钮与标题行水平对齐（老板 2026-10-24）——Stack 钉角
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: Center(
-                  child: Text(l10n.advancedMenuTitle,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(l10n.advancedMenuTitle,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: SheetCloseButton(tooltip: l10n.close),
+                    ),
+                  ],
                 ),
               ),
               // 每行行尾 > ：与顶层菜单的二级入口标识同款（老板 2026-10-15）——
@@ -5204,9 +5263,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final ctrl = TextEditingController(text: _myEntranceName);
     // 名称为空/不合规警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
-    // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
-    final editing = ValueNotifier<bool>(false);
-    // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
+    // 名称输入框焦点：一打开就取焦（老板 2026-10-24：直接可编辑，不再有
+    // 初始只读+编辑按钮的冻结态——与群组名称弹窗同款）
     final nameFocus = FocusNode();
     // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
     // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
@@ -5236,41 +5294,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 14),
-              // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-              // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
-              ValueListenableBuilder<bool>(
-                valueListenable: editing,
-                builder: (_, isEditing, _) => TextField(
-                  controller: ctrl,
-                  focusNode: nameFocus,
-                  readOnly: !isEditing,
-                  onTap: () {
-                    if (editing.value) return;
-                    editing.value = true;
-                    nameFocus.requestFocus();
-                  },
-                  decoration: InputDecoration(
-                    labelText: l10n.chatPageEntranceListThisDevice,
-                    border: const OutlineInputBorder(),
-                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                    fillColor: Colors.white,
-                    counterText: '',
-                    suffixIcon: isEditing
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.edit, size: 18),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => editing.value = true,
-                          ),
-                  ),
-                  // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
-                  // 同一个常量（这里的拦截不替代提交时的白名单校验）
-                  maxLength: kEntranceNameMaxLength,
-                  // 开始填写即清除警示（与向导输入框一致）
-                  onChanged: (_) {
-                    if (nameError.value != null) nameError.value = null;
-                  },
+              // 通道名称输入框：一打开即可编辑 + 有焦点（老板 2026-10-24：不再有
+              // 初始只读透明 + 编辑按钮的冻结态——与群组名称弹窗同款）
+              TextField(
+                controller: ctrl,
+                focusNode: nameFocus,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageEntranceListThisDevice,
+                  border: const OutlineInputBorder(),
+                  counterText: '',
                 ),
+                // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
+                // 同一个常量（这里的拦截不替代提交时的白名单校验）
+                maxLength: kEntranceNameMaxLength,
+                // 开始填写即清除警示（与向导输入框一致）
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
               ValueListenableBuilder<String?>(
                 valueListenable: nameError,
@@ -5329,7 +5370,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
       nameError.dispose();
-      editing.dispose();
       nameFocus.dispose();
       allSpaces.dispose();
     });
@@ -5473,12 +5513,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 18),
-                    child: Center(
-                      child: Text(l10n.chatPageMenuMyProfile,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: scheme.onSurface)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(l10n.chatPageMenuMyProfile,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: scheme.onSurface)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   Row(
@@ -5669,9 +5718,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final ctrl = TextEditingController(text: _myMemberName);
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
-    // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
-    final editing = ValueNotifier<bool>(false);
-    // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
+    // 名称输入框焦点：一打开就取焦（老板 2026-10-24：直接可编辑，不再有
+    // 初始只读+编辑按钮的冻结态——与群组名称弹窗同款）
     final nameFocus = FocusNode();
     // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
     // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
@@ -5690,46 +5738,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-              // 白底可编辑、按钮消失（老板要求 2026-09-09）。
-              // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
-              // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
-              ValueListenableBuilder<bool>(
-                valueListenable: editing,
-                builder: (_, isEditing, _) => TextField(
-                  controller: ctrl,
-                  focusNode: nameFocus,
-                  readOnly: !isEditing,
-                  onTap: () {
-                    if (editing.value) return;
-                    editing.value = true;
-                    nameFocus.requestFocus();
-                  },
-                  decoration: InputDecoration(
-                    labelText: l10n.chatPageRenameNameLabel,
-                    border: const OutlineInputBorder(),
-                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                    fillColor: Colors.white,
-                    // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
-                    // 弹窗里不必多一行；下面 maxLength 才是硬拦
-                    counterText: '',
-                    suffixIcon: isEditing
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.edit, size: 18),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => editing.value = true,
-                          ),
-                  ),
-                  // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
-                  // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
-                  // （这里的拦截不替代提交时的白名单校验）。
-                  maxLength: kMemberNameMaxLength,
-                  // 开始填写即清除空名警示（与向导输入框一致）
-                  onChanged: (_) {
-                    if (nameError.value != null) nameError.value = null;
-                  },
+              // 名字输入框：一打开即可编辑 + 有焦点（老板 2026-10-24：不再有
+              // 初始只读透明 + 编辑按钮的冻结态——与群组名称弹窗同款）
+              TextField(
+                controller: ctrl,
+                focusNode: nameFocus,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageRenameNameLabel,
+                  border: const OutlineInputBorder(),
+                  // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
+                  // 弹窗里不必多一行；下面 maxLength 才是硬拦
+                  counterText: '',
                 ),
+                // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
+                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
+                // （这里的拦截不替代提交时的白名单校验）。
+                maxLength: kMemberNameMaxLength,
+                // 开始填写即清除空名警示（与向导输入框一致）
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
               ValueListenableBuilder<String?>(
                 valueListenable: nameError,
@@ -5822,7 +5851,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
       nameError.dispose();
-      editing.dispose();
       nameFocus.dispose();
       allSpaces.dispose();
     });
@@ -7919,7 +7947,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _buildActionCardGrid([
+          // 附件弹层无标题行：关闭圆钮单独成行、右对齐（老板 2026-10-24，
+          // 与其它弹层的钮位置一致）
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [SheetCloseButton(tooltip: l10n.close)],
+              ),
+              _buildActionCardGrid([
             // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
             if (_hasCameraCapture) ...[
               _buildActionCard(
@@ -7973,7 +8011,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 label: l10n.chatPageAttachPaste,
                 onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
               ),
-          ]),
+              ]),
+            ],
+          ),
         ),
       ),
     );
@@ -12089,13 +12129,23 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 标题**居中**（与其它选项弹层同款：靠左会与下面的选项行分不清层次）
+          // 标题**居中**（与其它选项弹层同款：靠左会与下面的选项行分不清层次）；
+          // 右上角关闭圆钮与标题行水平对齐（老板 2026-10-24）——Stack 钉角
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
-            child: Center(
-              child: Text(l10n.chatPageMenuVoiceTranscriptAuth,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 16)),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Text(l10n.chatPageMenuVoiceTranscriptAuth,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
+                Positioned(
+                  right: 0,
+                  child: SheetCloseButton(tooltip: l10n.close),
+                ),
+              ],
             ),
           ),
           // 标题下的小备注（outline 淡色，归标题那一组）

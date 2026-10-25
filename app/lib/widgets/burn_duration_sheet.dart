@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'labeled_checkbox.dart';
+import 'sheet_close_button.dart';
 
 /// 阅后即焚时长的下限/上限（老板 2026-10-24：10 秒 ~ 50 天；此前为 1 分钟~
 /// 60 天）。对数轴上最右的时长刻度要离「关闭」顶点足够远，拖/点稍偏不至于
@@ -157,13 +158,23 @@ class _BurnDurationSheetState extends State<BurnDurationSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 标题居中（与其它选项弹层口径一致）
+          // 标题居中（与其它选项弹层口径一致）；右上角关闭圆钮与标题行水平
+          // 对齐（老板 2026-10-24）——Stack 钉角，标题仍居中
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
-            child: Center(
-              child: Text(l10n.chatPageBurnHeading,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 16)),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Text(l10n.chatPageBurnHeading,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
+                Positioned(
+                  right: 0,
+                  child: SheetCloseButton(tooltip: l10n.close),
+                ),
+              ],
             ),
           ),
           // 备注：固定不滚、居中、归标题组（与 OptionPickerSheet 的 note 同款）

@@ -161,15 +161,15 @@ void main() {
         reason: '切回纯色后状态条仍为悬浮圆角（两风格统一）');
     expect(await settings.load(), 'plain');
 
-    // 无右上角 ✕（老板 2026-09-15 统一：几个设置弹层都不要关闭按钮）——
-    // 改成验证"未点选任何风格时下滑 / 系统返回也能关掉弹窗"
+    // 右上角关闭圆钮（老板 2026-10-24 新约定，推翻 2026-09-15 的"统一不设"）：
+    // 点它即关闭弹窗
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
-    expect(find.byIcon(Icons.close), findsNothing, reason: '设置弹层统一不设关闭按钮');
-    await tester.binding.handlePopRoute(); // 模拟系统返回/下滑关闭
+    expect(find.byIcon(Icons.close), findsOneWidget, reason: '标题行右上角有关闭圆钮');
+    await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.chatPageMenuStyleLabel), findsNothing, reason: '返回后弹窗应关闭');
+    expect(find.text(_zh.chatPageMenuStyleLabel), findsNothing, reason: '点关闭钮后弹窗应关闭');
     expect(tester.takeException(), isNull);
   });
 

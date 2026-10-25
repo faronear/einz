@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import 'labeled_checkbox.dart';
+import 'sheet_close_button.dart';
 
 /// 打开选项弹层（界面语言 / 阅后即焚 / 附件存储共用的入口）。
 ///
@@ -128,13 +130,23 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
           children: [
             // 标题**居中**（老板 2026-09-15）：靠左会与下面的选项行分不清层次。
             // 下边距 5（老板 2026-10-02：原标题-备注 10 太开，减半增加整体感；
-            // 有 note 的弹层由此获得紧凑的标题组）
+            // 有 note 的弹层由此获得紧凑的标题组）。右上角关闭圆钮（老板
+            // 2026-10-24）与标题行水平对齐——Stack 钉角，标题仍居中。
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
-              child: Center(
-                child: Text(widget.title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 16)),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: Text(widget.title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                  Positioned(
+                    right: 0,
+                    child: SheetCloseButton(tooltip: AppLocalizations.of(ctx)!.close),
+                  ),
+                ],
               ),
             ),
             // 标题下的小备注（老板 2026-09-25）。三级区分全靠字号/字重/颜色：
