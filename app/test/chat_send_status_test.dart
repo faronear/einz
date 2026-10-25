@@ -325,6 +325,17 @@ void main() {
     expect(plane, findsOneWidget, reason: 'pending 应显示可点按的小飞机');
     expect(api.posted, isEmpty, reason: '尚未点按前不该上传');
 
+    // 回归（老板 2026-10-25 二次实测）：调用点曾包 Flexible，有界宽度下
+    // Container(alignment:) 底层的 Align 会填满剩余空间 → 小飞机被拉成横跨
+    // 气泡的大胶囊（左右大片空白）。纯飞机状态钮必须是 28×28 方形热区。
+    final planeMaterialRect = tester.getRect(find
+        .ancestor(of: plane, matching: find.byType(Material))
+        .first);
+    expect(planeMaterialRect.width, planeMaterialRect.height,
+        reason: '纯飞机状态钮必须是正方形热区，不能被拉抻');
+    expect(planeMaterialRect.width, closeTo(28, 0.5),
+        reason: '热区边长 = 时间行控件统一高度 28');
+
     // 点按小飞机 → 用同一封消息重发（服务端幂等）→ 变单勾
     await tester.tap(plane);
     await tester.pumpAndSettle();
@@ -375,6 +386,25 @@ void main() {
 
     expect(find.text('点击重发'), findsOneWidget, reason: '失败气泡应有显式文字标签');
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+    // 回归（老板 2026-10-25 实测）：本钮曾被包在 CircleBorder + antiAlias 里，
+    // 内容被裁成直径 28 的圆——英文 "Tap to resend" 只剩中段 "rese"、⚠️
+    // 整个被切掉。带文字的控件必须是胶囊（StadiumBorder）；圆形 clips 只归
+    // 纯图标钮（_bubbleQuickAction）。布局尺寸不受裁切影响，只能查 shape。
+    final failedMaterial = tester.widget<Material>(find
+        .ancestor(of: find.text('点击重发'), matching: find.byType(Material))
+        .first);
+    expect(failedMaterial.shape, isA<StadiumBorder>(),
+        reason: '带文字的失败状态钮必须是胶囊形，不能是圆形裁切');
+
+    // 同回归（老板 2026-10-25）：失败胶囊按内容宽度（文字+⚠️）显示，
+    // 不是横跨气泡（zh「点击重发」+⚠️+padding ≈ 74px）
+    final failedRect = tester.getRect(find
+        .ancestor(of: find.text('点击重发'), matching: find.byType(Material))
+        .first);
+    expect(failedRect.height, closeTo(28, 0.5), reason: '高度 = 时间行控件统一高度');
+    expect(failedRect.width, lessThan(120),
+        reason: '失败胶囊按内容宽度显示，不该被拉抻');
   });
 
   testWidgets('服务端明确拒绝发送 → 顶部提示带「后台：」前缀', (WidgetTester tester) async {
@@ -540,6 +570,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('sendingPlane')));
     await tester.pump(const Duration(milliseconds: 10));
     expect(find.text('加速中…'), findsOneWidget, reason: '重发期间应显示进行中文案');
+
+    // 回归（老板 2026-10-25 实测）：带「加速中…」文字时本钮曾被圆形裁切，
+    // 英文 "Speeding up…" 只剩中段 "ing u"。必须是胶囊形。
+    final speedupMaterial = tester.widget<Material>(find
+        .ancestor(of: find.text('加速中…'), matching: find.byType(Material))
+        .first);
+    expect(speedupMaterial.shape, isA<StadiumBorder>(),
+        reason: '带文字的发送中状态钮必须是胶囊形，不能是圆形裁切');
 
     // 完成后 → 单勾，「加速中…」消失
     await tester.pump(const Duration(milliseconds: 300));

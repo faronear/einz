@@ -777,11 +777,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     if (m.status == 'failed') {
       // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）。
-      // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
-      // 引用/拷贝/保存快捷动作同款风格，别像裸文字）
+      // 悬浮/点击背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
+      // 引用/拷贝/保存快捷动作同款风格，别像裸文字）。
+      // **胶囊形（StadiumBorder）不是圆形**（老板 2026-10-25 实测修复）：本钮
+      // 带文字，CircleBorder + antiAlias 会把内容裁成直径 28 的圆——英文
+      // "Tap to resend" 只剩中段几个字母（截图里只见 "rese"）、⚠️ 整个被
+      // 切掉。圆形 clips 只属于纯图标钮（_bubbleQuickAction）；StadiumBorder
+      // 装在 28×28 纯图标场合渲染出来就是圆，视觉不变。
       return Material(
           color: Colors.transparent,
-          shape: const CircleBorder(),
+          shape: const StadiumBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             mouseCursor: SystemMouseCursors.click,
@@ -795,6 +800,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 不包 Flexible/ellipsis：外层是非 flex（无界宽度）时 Align
+                  // 收缩包裹，文字按内容宽度完整显示；强行加 Flexible 反而会
+                  // 因有界约束被拉抻（见调用点注释，老板 2026-10-25）
                   Text(busyLabel ?? l10n.chatPageMsgFailedTap,
                       style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
                   const SizedBox(width: 2),
@@ -849,9 +857,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 小飞机用超链接蓝提示可点——但渐变主题深蓝气泡上蓝飞机几乎看不见
     // （2026-10-11 老板），改白系（同快捷动作的 white70）；「加速中」期间
     // 仍用中性色，避免"点了还提示可点"的矛盾。
+    // **胶囊形（StadiumBorder）不是圆形**（老板 2026-10-25 实测修复）：带
+    // 「加速中…/重发中…」文字时圆形裁切会把文案切得只剩中段（英文
+    // "Speeding up…" 截图里只剩 "ing u"）；纯飞机图标时 28×28 胶囊渲染
+    // 出来就是圆，与快捷动作圆钮视觉一致。
     return Material(
         color: Colors.transparent,
-        shape: const CircleBorder(),
+        shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
@@ -866,6 +878,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (busyLabel != null) ...[
+                  // 同 failed 分支：不包 Flexible，靠非 flex 的无界宽度收缩
+                  // 包裹（老板 2026-10-25：包了会被拉抻成大胶囊）
                   Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
                   const SizedBox(width: 2),
                 ],
@@ -10468,6 +10482,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           // 不影响消息在服务器与对方的路径——所以状态与
                                           // 点按重发都该照旧可用。
                                           if (mine) ...[
+                                            // **不要包 Flexible**（老板 2026-10-25
+                                            // 二次实测）：有界宽度下
+                                            // Container(alignment:) 的 Align 会填满
+                                            // 剩余空间，小飞机被拉成横跨气泡的
+                                            // 大胶囊。非 flex 子节点拿到的是
+                                            // 无界宽度，Align 收缩包裹 → 尺寸随
+                                            // 内容（飞机=28×28 圆，文字=胶囊）
                                             _buildSendStatusIcon(m),
                                             const SizedBox(width: 4),
                                           ],
