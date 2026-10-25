@@ -71,6 +71,7 @@ import 'widgets/sheet_close_button.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/clickable.dart';
 import 'widgets/transcribe_icon.dart';
+import 'widgets/voice_keyboard_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
@@ -7588,13 +7589,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 合并图标颜色：录音中、或文字态还留着一条未发送的录音=青绿（与旧麦克风
-  /// 一致，提示「还留着一条」）；其余=默认图标色。
+  /// 合并图标颜色：**语音态**（提示/录音中/预览）=标准青绿；文字态=默认
+  /// 图标色——但文字态还留着一条未发送录音时也是青绿（提示「还留着一条」）。
   ///
   /// 保留提示原先用 colorScheme.primary——fromSeed 派生的深蓝近黑，与默认灰
-  /// 在桌面/手机上都难分辨（老板 2026-10-25），改用录音同款绿。
+  /// 难分辨（老板 2026-10-25）；随后老板要求提示态图标与「长按开始录音」文字
+  /// 一并统一青绿，即整个语音态都是标准青绿。
   Color _inputModeToggleColor() {
-    if (_inputMode == _InputMode.recording || _recordingPath != null) {
+    if (_inputMode != _InputMode.text || _recordingPath != null) {
       return Colors.green;
     }
     return Theme.of(context).colorScheme.onSurfaceVariant; // 与邻居 IconButton 默认色一致
@@ -8024,15 +8026,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       );
     }
-    // 提示态：文字说明版录音条（无波形），长按开始录音
+    // 提示态：文字说明版录音条（无波形），长按开始录音。麦克风小图标与
+    // 文案用语音态标准青绿（老板 2026-10-25：与合并图标、录音态同色系）
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.mic, size: 16, color: Colors.grey.shade600),
+        Icon(Icons.mic, size: 16, color: Colors.green),
         const SizedBox(width: 6),
         Text(
           AppLocalizations.of(context)!.chatPageLongPressToRecord,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          style: const TextStyle(color: Colors.green, fontSize: 13),
         ),
       ],
     );
@@ -11006,9 +11009,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       splashRadius:
                                           _kInputModeToggleSize / 2,
                                       onPressed: _onVoiceEntryTap,
-                                      icon: TranscribeIcon(
-                                          color: _inputModeToggleColor(),
-                                          size: 24),
+                                      icon: _inputMode == _InputMode.text
+                                          ? KeyboardFirstIcon(
+                                              color: _inputModeToggleColor())
+                                          : MicFirstIcon(
+                                              color: _inputModeToggleColor()),
                                     ),
                                   ),
                                 ),
