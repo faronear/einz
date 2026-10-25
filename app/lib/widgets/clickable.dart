@@ -32,6 +32,7 @@ class Clickable extends StatefulWidget {
     this.overlayColor,
     this.borderRadius,
     this.circle = false,
+    this.cursor,
     this.child,
   });
 
@@ -52,6 +53,13 @@ class Clickable extends StatefulWidget {
 
   /// 遮罩圆形（跟随圆形子组件轮廓，如头像）。
   final bool circle;
+
+  /// 鼠标光标覆盖（桌面端悬浮手型用）。默认按手势类型定：可单击=手型，
+  /// **纯长按=默认箭头**（老板 2026-09-28：长按没有"点"的语义，全部手型
+  /// 会让气泡与真正可单击的引用块/链接分不清）。个别"长按是主要操作方式"
+  /// 的区域（输入台提示态录音条、预览态波形图）显式传
+  /// [SystemMouseCursors.click]（老板 2026-10-25）。
+  final MouseCursor? cursor;
 
   final Widget? child;
 
@@ -79,8 +87,9 @@ class _ClickableState extends State<Clickable> {
     final child = widget.child;
     if (!_interactive) {
       return MouseRegion(
-        // MouseCursor.defer：不可点时别把光标改成手型（那是在骗人）
-        cursor: MouseCursor.defer,
+        // 默认 MouseCursor.defer：纯长按区域不出手型（见 [cursor]）；调用方
+        // 显式要求出手型的例外（输入台录音条/波形）传 [cursor] 覆盖
+        cursor: widget.cursor ?? MouseCursor.defer,
         child: GestureDetector(
           onTap: widget.onTap,
           onDoubleTap: widget.onDoubleTap,
@@ -96,7 +105,7 @@ class _ClickableState extends State<Clickable> {
     }
     final base = widget.overlayColor ?? Colors.black;
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: widget.cursor ?? SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() {
         _hovered = false;

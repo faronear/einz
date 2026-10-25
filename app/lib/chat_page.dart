@@ -7984,6 +7984,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 重录——预览态长按自 2026-09-13 起就是故意空操作）。
           child: Clickable(
             behavior: HitTestBehavior.opaque,
+            // 波形是长按转写目标：桌面悬浮出手型（老板 2026-10-25）
+            cursor: SystemMouseCursors.click,
             onLongPressStart: (_) => unawaited(_transcribePreviewRecording()),
             child: LayoutBuilder(builder: (context, constraints) {
               // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
@@ -11073,15 +11075,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           // 长按开始录音，进入录音态后此层不重建，松手
                                           // 能正常触发停止；预览态由 _startVoice 直接
                                           // 忽略（长按不重录，防误触冲掉刚录好的一条）
-                                          Positioned.fill(
-                                            child: Clickable(
-                                              onLongPressStart: (_) =>
-                                                  _startVoice(),
-                                              onLongPressEnd: (_) =>
-                                                  _stopVoice(),
-                                              child: _buildVoiceBarContent(),
-                                            ),
+                                                          Positioned.fill(
+                                          child: Clickable(
+                                            // 提示态整条都是长按目标：桌面悬浮
+                                            // 出手型（老板 2026-10-25）；录音/预览
+                                            // 态无可长按操作，保持默认箭头
+                                            cursor: _inputMode ==
+                                                    _InputMode.hint
+                                                ? SystemMouseCursors.click
+                                                : null,
+                                            onLongPressStart: (_) =>
+                                                _startVoice(),
+                                            onLongPressEnd: (_) =>
+                                                _stopVoice(),
+                                            child: _buildVoiceBarContent(),
                                           ),
+                                        ),
                                       ],
                                     ),
                                   ),
