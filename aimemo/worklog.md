@@ -15899,3 +15899,6 @@ aimemo 特性文档改名对齐 yyyymmdd_<feature> 规范（老板要求）：15
 | whisperDeploy.zhcn.md | 20261022_whisperDeploy.zhcn.md |
 | architectureReview20260915.md | 20260915_architectureReview.md |
 | architectureReview20260915_qwen38.md | 20260915_architectureReviewQwen38.md |
+
+**（2026-10-25T01:19:44Z / 2026-10-25 09:19）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
+弹层关闭圆钮 + 改名弹窗解冻（2cca0004）。① 新增 SheetCloseButton（圆形淡灰底），接入 12 处底部弹层标题行右上角（OptionPicker/Burn/更多设置/高级安全/邀请/成员/通道列表/附件/我的资料/我的同伴/空间切换/About）；通道列表刷新钮改紧贴标题右侧成组居中、关闭钮独占行最右；附件弹层无标题行，钮单独成行右对齐。② 通道名称/我的名字弹窗取消初始只读冻结态与编辑图标，一打开即可编辑 + autofocus（与群组名称弹窗同款），editing 通知器全部删除。**坑：chat_page.dart 的未提交改动曾整文件丢失**（其余文件的改动都在，stash 为空，原因不明——疑似老板侧操作），按同口径完整重做并全量验证通过。教训：跨多轮的未提交大改动有丢失风险，做完一个特性应尽快提交。测试：ui_style_switch 改断言关闭钮存在可点（推翻 2026-09-15「统一不设关闭钮」旧约定）；entrance_list 对齐参照改 SheetCloseButton 整钮（图标自带 padding 会差 11px）；chat_page_menu 六个旧编辑态用例改直接可编辑。工作区剩 app_zh.arb 两个文件的文案微调（老板自己改的），不代提交。
