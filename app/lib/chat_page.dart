@@ -7621,6 +7621,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
       }
+      // macOS 录音前把默认麦克风锁到整数 PCM 格式（2026-10-25 老板 iMac 实测修复）：
+      // iMac 重启后内置麦克风 HAL 默认 Float32，AVCaptureAudioFileOutput 的 WAV
+      // 写入链断（AudioFileCreateWithURL fmt? / startRecording -11805）→ 0 字节
+      // 文件 + 振幅流全静音 →「不出现波形图」+ 松手弹「录音内容为空」。Air 的
+      // 麦克风默认即整数 PCM，故同版本 debug 包在 Air 上一直能录。原生侧见
+      // macos/Runner/MainFlutterWindow.swift lockInputDeviceToIntegerPcm。
+      // 预锁失败（设备被独占等）不阻塞录音，行为同修复前。
+      if (Platform.isMacOS) {
+        try {
+          await const MethodChannel('einz.audio.input').invokeMethod(
+            'ensureIntegerFormat',
+            {'sampleRate': 16000, 'channels': 1},
+          );
+        } catch (_) {
+          // 忽略：预锁是尽力而为
+        }
+      }
       // 16kHz 单声道 WAV（20261009_voiceTranscript.zhcn.md §8/§14-2，老板 2026-10-10 拍板）：
       // 本地转写（sherpa readWave）只吃 PCM wav——m4a 无法转写；体积代价
       // 60s≈1.9MB 可接受。旧版 m4a 语音消息照常播放（AAC 解码走系统），

@@ -157,6 +157,18 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 > NaN/Inf 按静音处理。三个调用点：**录音落库前**（`_stopVoice`）、**本地转写喂
 > isolate 前**（`_processOne`，覆盖存量）、**服务端上送前**（`_serverVoiceTranscribe`）。
 > 服务端 `wavDurationMs` 同时改成接受 extensible（子格式 GUID 为 PCM 时），双保险。
+
+> **⚠️ macOS 设备格式的坑（2026-10-25 老板 iMac 实测修复）**：iMac（iMac19,1）**重启后**
+> 内置麦克风 HAL 默认 Float32（`AVCaptureDevice.formats` 只列 Int16/Int24，当前格式是列表外
+> 的 Float32），此时 AVCaptureAudioFileOutput 写 WAV 的文件链断——沙盒内
+> `AudioFileCreateWithURL failed (fmt?)`（kAudioFileUnsupportedDataFormatError），非沙盒
+> 直接 -11805 "The combination of audio file type and audio format in audioSettings is not
+> supported"→ **0 字节文件、振幅流全静音**（UI：无波形 + 松手弹「录音内容为空」）。
+> MacBook Air 麦克风默认即整数 PCM、9-24 正式版走 m4a/AAC，故两处都不坏（老板两机对照）。
+> 修法：录音前（`_startVoice` 里 hasPermission 后、`recorder.start` 前）经 `einz.audio.input`
+> 频道调 `lockInputDeviceToIntegerPcm`（MainFlutterWindow.swift）把默认输入设备锁到整数
+> PCM（优先 16-bit、采样率最接近请求值）；已是整数则不动，失败静默不阻塞。锁一次持久到
+> 下次重启。WAV + 纯虚拟设备（Teams 环回）不受此坑影响。
 协议层加 `meta.voiceContainerWav=true` 标识新消息（旧消息无此键 = m4a；`docs/PROTOCOL.md` §5.1 已登记），
 `_voiceExtOf` 在播放/转写/留存目录/手动入口四处统一扩展名口径；旧 m4a 消息播放照常（系统 AAC 解码），
 手动转写入口点按提示"旧格式不支持转写"，不打哑炮。体积代价 60s≈1.9MB 可接受；wav 音质

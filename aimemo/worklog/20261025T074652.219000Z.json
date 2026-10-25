@@ -1,0 +1,30 @@
+{
+  "utc": "20261025T074652.219000Z",
+  "time": "2026-10-25 15:46+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "macOS 录音空白根因：iMac 内置麦克风 Float32 + WAV 写入链断",
+      "detail": [
+        "老板报：npm run app-mac-run 起的 debug app 点录音无波形、松手弹「录音内容为空」；同机 9-24 正式版（m4a/AAC）能录，MacBook Air 上 debug 一直能录",
+        "统一日志实证：每次 startRecording 后 AudioFileCreateWithURL failed (1718449215=fmt?=kAudioFileUnsupportedDataFormatError)，文件 0 字节、振幅流全静音；TCC/entitlements 均正常（audio-input 早在 33e9976b 补过，今天 14:34 构建的包里在）",
+        "原生复刻（swift CLI 复刻插件同参数）：内置麦克风 + WAV/LPCM 任意采样率/声道 → -11805 'The combination of audio file type and audio format in audioSettings is not supported'；同设备 m4a/AAC → 正常；WAV + Teams 虚拟环回设备 → 正常",
+        "根因：iMac 重启后内置麦克风 HAL 默认 Float32（AVCaptureDevice.formats 只列 Int16/Int24，当前格式是列表外的 Float32），AVCaptureAudioFileOutput 的 WAV 写入链无法 Float32→Int16；Air 默认即整数 PCM 所以不坏；9-24 正式版走 AAC 所以不坏",
+        "设备锁 Int16 后 16kHz 单声道 WAV 录制全链路正常（67984B≈2s+FLLR 填充，与 10-23 在 Air 上的产出同形态）；锁一次持久到下次重启。诊断过程已把本机麦克风锁成 Int16——不重启直接测，新旧构建都能录"
+      ]
+    },
+    {
+      "brief": "修复：录音前把默认输入设备锁到整数 PCM",
+      "detail": [
+        "app/macos/Runner/MainFlutterWindow.swift：新增 einz.audio.input 频道 + lockInputDeviceToIntegerPcm（当前已是整数 PCM 则不动，避免打断 Teams 等采集客户端；否则挑采样率最接近请求值的整数格式，lockForConfiguration/activeFormat；失败静默）",
+        "app/lib/chat_page.dart _startVoice：hasPermission 后、recorder.start 前，仅 macOS 经频道预锁（尽力而为，失败不阻塞）",
+        "aimemo/20261009_voiceTranscript.zhcn.md §8 补「macOS 设备格式的坑」",
+        "验证：flutter analyze lib 零问题；swiftc -typecheck（-F FlutterMacOS.xcframework/macos-arm64_x86_64 切片）零错误；原生复刻 A/B（Float32 态→锁→录成）已跑通；端到端待老板重启后 npm run app-mac-run 实测（重启才恢复 Float32 故障态）",
+        "教训：swiftc -parse 只查语法不解析 import/类型，漏放了 AVFoundation import 导致老板首次构建失败（cannot find 'AVCaptureDevice' in scope）——Runner 改 Swift 后必须 -typecheck；activeFormat 是非 Optional，不能 if let"
+      ]
+    }
+  ]
+}
