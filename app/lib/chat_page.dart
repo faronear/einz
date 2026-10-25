@@ -153,9 +153,13 @@ bool _isLocalReadableFile(String path) {
   }
 }
 
-/// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
-/// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
-/// 发送复用右侧发送键）。
+/// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口
+/// 图标点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态
+/// （试听/取消，发送复用右侧发送键）。
+///
+/// 入口为输入盒内左侧**合并图标**（麦克风+文档，老板 2026-10-25）：点击=文字态 ↔
+/// 语音态互换——文字态进**提示态**（不自动开录，长按录音条才开始录）；录音中/预览态
+/// 点击回文字态但**保留**已录内容，再点可直接回预览态用（或点 X 删除）。
 enum _InputMode { text, hint, recording, preview }
 
 /// 「通道列表」卡片间距（一卡占满整行后只剩纵向间距，老板 2026-10-11）。
@@ -7540,38 +7544,91 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  // ---------- 语音：点击麦克风切提示态 → 长按提示态录音条录音 → 松手预览（试听/取消）→ 发送 ----------
+  // ---------- 语音：点输入盒内合并图标切提示态 → 长按提示态录音条录音 → 松手预览（试听/取消）→ 发送 ----------
 
-  /// 语音入口按钮点击：文字态=切提示态；提示/预览态=回文字态；录音中无操作。
+  /// 输入盒内合并图标（麦克风+文档，Vocie transcription 同款自制图标）点击：
+  /// 文字态 ↔ 语音态互换（老板 2026-10-25）：
+  /// - 文字态且无保留录音 → 进**提示态**（不自动开录；长按录音条才开始录）；
+  /// - 文字态且有保留录音 → 直接回该录音的**预览态**（可直接用，见下方注释）；
+  /// - 录音中 → 停录并**保留**已录内容，回键盘（文字）态；
+  /// - 预览态 → 回键盘态，录音仍保留（再点本图标可直接用，或点 X 删除）。
   void _onVoiceEntryTap() {
+    // 首次录音的授权弹窗等待期间再点 = 作废本次启动（等价于旧的松手，
+    // 见 _startVoice / _stopVoice 里 _voiceStarting 的处理）
+    if (_voiceStarting) {
+      unawaited(_stopVoice());
+      return;
+    }
     if (_inputMode == _InputMode.text) {
       FocusManager.instance.primaryFocus?.unfocus();
-      setState(() => _inputMode = _InputMode.hint);
+      if (_recordingPath != null) {
+        // 已保留的录音（录音中/预览态切回键盘时留下的）：直接回预览态，
+        // 波形冻结、可试听/发送/X 删除——不用重新录（老板 2026-10-25）
+        setState(() => _inputMode = _InputMode.preview);
+      } else {
+        setState(() => _inputMode = _InputMode.hint);
+      }
     } else if (_inputMode == _InputMode.hint) {
       setState(() => _inputMode = _InputMode.text);
+    } else if (_inputMode == _InputMode.recording) {
+      // 录音中切回键盘：停录但保留内容
+      unawaited(_stopVoice(backToTextInput: true));
     } else if (_inputMode == _InputMode.preview) {
-      // 键盘键=放弃录音回文字输入（与发送键一致）；X 键才回录音等待态
-      unawaited(_cancelVoice(backToTextInput: true));
+      // 预览态切回键盘：录音保留（再点本图标可直接用）；X 键才删除回提示态
+      setState(() => _inputMode = _InputMode.text);
     }
-    // recording：手势在录音条上，入口按钮不可达，无操作
   }
 
-  /// 语音入口按钮图标：文字态=麦克风；提示/预览态=键盘；录音中=红色麦克风。
-  IconData _voiceEntryIcon() {
-    switch (_inputMode) {
-      case _InputMode.text:
-        return Icons.mic_none;
-      case _InputMode.hint:
-      case _InputMode.preview:
-        return Icons.keyboard_alt_outlined;
-      case _InputMode.recording:
-        return Icons.mic;
+  /// 合并图标颜色：录音中=绿（与旧麦克风一致）；文字态有保留录音=主色
+  /// （提示「还留着一条未发送的录音」）；其余=默认图标色。
+  Color _inputModeToggleColor() {
+    if (_inputMode == _InputMode.recording) return Colors.green;
+    if (_recordingPath != null) return Theme.of(context).colorScheme.primary;
+    return Theme.of(context).colorScheme.onSurfaceVariant; // 与邻居 IconButton 默认色一致
+  }
+
+  /// 输入盒外观（老板 2026-10-25 合并图标入盒后的盒体）：文字态=白底+主题
+  /// 输入框描边（未聚焦浅粉/聚焦天蓝加粗，圆角同主题 12）；提示/预览态=灰底、
+  /// 录音中=绿底（后三者即旧录音条的外观，圆角保持 20）。
+  BoxDecoration _inputBoxDecoration() {
+    if (_inputMode == _InputMode.recording) {
+      return BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green.shade200),
+      );
     }
+    if (_inputMode != _InputMode.text) {
+      // 提示态/预览态：旧录音条的灰底灰边
+      return BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade300),
+      );
+    }
+    // 文字态：描边色/宽/圆角取自主题输入框（main.dart inputDecorationTheme），
+    // 聚焦态由输入框焦点节点驱动（输入盒外套 ListenableBuilder 监听）。
+    final theme = Theme.of(context).inputDecorationTheme;
+    final enabled = theme.enabledBorder ?? theme.border;
+    final side = _inputFocusNode.hasFocus
+        ? (theme.focusedBorder ?? enabled)
+        : enabled;
+    return BoxDecoration(
+      // 白底（老板 2026-10-25）：默认 transparent 会透出页面淡粉背景，
+      // 与语音态录音条的底色观感不一致
+      color: Colors.white,
+      borderRadius: enabled is OutlineInputBorder
+          ? enabled.borderRadius
+          : BorderRadius.circular(12),
+      border: side is OutlineInputBorder
+          ? Border.all(color: side.borderSide.color, width: side.borderSide.width)
+          : null,
+    );
   }
 
   Future<void> _startVoice() async {
-    // 预览态（刚录完、波形已冻结）不再开录：此时长按波形图/录音条什么也不做，
-    // 避免误触从头重录、冲掉刚录好的那条。只有前面的播放键和后面的 X 可点；
+    // 录音中/预览态（刚录完、波形已冻结）不再开录：此时长按波形图/录音条什么也不做，
+    // 避免误触从头重录、冲掉刚录好的那条。只有播放键、X、发送键和合并图标可点；
     // 点 X（_cancelVoice）回到等待录音的提示态，就又能长按开录了
     // （老板要求 2026-09-13）。
     if (_inputMode == _InputMode.recording || _inputMode == _InputMode.preview) {
@@ -7581,7 +7638,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     FocusManager.instance.primaryFocus?.unfocus();
     _voiceStarting = true;
     try {
-      // 重新录音（预览态再长按）：先清掉上一次未发送的临时文件
+      // 重新录音（提示态再长按）：先清掉上一次未发送的临时文件
       final old = _recordingPath;
       if (old != null) {
         final of = File(old);
@@ -7635,8 +7692,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
         path: path,
       );
-      // 上面 hasPermission() 等待授权弹窗期间用户可能已松手（_voiceStarting 已被
-      // _stopVoice 清掉）：此时录制已开但无人会再去停它，直接停掉并丢弃本次启动
+      // 上面 hasPermission() 等待授权弹窗期间用户可能已松手/又点入口取消
+      // （_voiceStarting 已被 _stopVoice 清掉）：此时录制已开但无人会再去停它，
+      // 直接停掉并丢弃本次启动
       if (!_voiceStarting) {
         await recorder.stop();
         return;
@@ -7672,11 +7730,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 松手 / 60s 到点：停录音 → 文件有效进预览态（不自动发送），空录音直接取消回输入框。
-  Future<void> _stopVoice() async {
+  /// 松手 / 点合并图标 / 60s 到点：停录音 → 文件有效进预览态（不自动发送）；
+  /// [backToTextInput]=true（录音中点合并图标切回键盘）→ 回文字态但**保留**录音
+  /// 内容，之后点合并图标可直接回预览态用；空录音直接取消回输入框。
+  Future<void> _stopVoice({bool backToTextInput = false}) async {
     if (_inputMode != _InputMode.recording) {
-      // 录音尚未真正开始（首次授权弹窗期间已松手）：只标记「本次启动作废」，
-      // _startVoice 在 recorder.start() 完成后看到标记会自行停掉并丢弃。
+      // 录音尚未真正开始（首次授权弹窗期间已松手/又点了入口）：只标记
+      // 「本次启动作废」，_startVoice 在 recorder.start() 完成后看到标记
+      // 会自行停掉并丢弃。
       _voiceStarting = false;
       return;
     }
@@ -7707,7 +7768,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 空录音（权限被系统拒后仍可能走到这里）不再静默回文字态，给明确反馈
       if (!ok) _notice(context, AppLocalizations.of(context)!.chatPageVoiceEmpty);
       setState(() {
-        _inputMode = ok ? _InputMode.preview : _InputMode.text;
+        _inputMode = ok
+            ? (backToTextInput ? _InputMode.text : _InputMode.preview)
+            : _InputMode.text;
         if (!ok) _recordingPath = null;
       });
     } catch (e) {
@@ -7768,16 +7831,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 预览态取消：删临时文件。默认回到**等待录音的提示态**（再长按即可重录，
-  /// 老板要求 2026-09-13）；[backToTextInput]=true 时回文字输入框（点键盘键/发送）。
-  Future<void> _cancelVoice({bool backToTextInput = false}) async {
+  /// 预览态取消（X 图标）：删临时文件。默认回到**等待录音的提示态**（再长按
+  /// 即可重录，老板要求 2026-09-13；单点入口图标则回文字输入框）。
+  Future<void> _cancelVoice() async {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
     _previewPlaying = false;
     await _player?.stop();
     if (!mounted) return;
     setState(() {
-      _inputMode = backToTextInput ? _InputMode.text : _InputMode.hint;
+      _inputMode = _InputMode.hint;
       _recordingPath = null;
       _recordSeconds = 0; // 提示态是干净的起点，不该留着上一次的秒数
       _voiceSamples.clear();
@@ -7818,77 +7881,73 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   List<double> _voiceLastSamples(int n) =>
       _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
 
-  /// 录音条（覆盖在文字输入框上）：提示态=「长按开始录音」文字（无波形）；
-  /// 录音中=实时波形+计时；预览态=冻结波形+试听/取消。
-  /// 由外部 Stack 给定与输入框完全一致的行高（移除固定高度，随约束填充）。
-  Widget _buildVoiceBar() {
+  /// 语音态输入区**内容**（提示态=「长按开始录音」文字；录音中=实时波形+计时；
+  /// 预览态=冻结波形+试听/取消）：圆角盒/底色/描边等外壳由输入盒 Container 按模式
+  /// 统一给出（见 build 内输入栏的 _inputBoxDecoration），合并图标也在盒内左侧原位
+  /// 可点；本方法只填盒内右侧内容。高度由外部 Stack 约束（与文字输入框一致，
+  /// 随草稿行数变）。
+  Widget _buildVoiceBarContent() {
     final recording = _inputMode == _InputMode.recording;
     final preview = _inputMode == _InputMode.preview;
     // 录音上限 60s：左侧直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
     final elapsed = _recordSeconds.toString().padLeft(2, '0');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: recording ? Colors.green.shade50 : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: recording ? Colors.green.shade200 : Colors.grey.shade300),
-      ),
-      child: recording
-          ? Row(
-              children: [
-                Text(elapsed,
-                    style: const TextStyle(
-                        color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _WaveformBars(
-                        samples: _voiceLastSamples(40), color: Colors.green)),
-              ],
-            )
-          : preview
-              ? Row(
-                  children: [
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 22,
-                      icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
-                          color: Theme.of(context).colorScheme.primary),
-                      onPressed: _playVoicePreview,
-                    ),
-                    Expanded(
-                      child: LayoutBuilder(builder: (context, constraints) {
-                        // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
-                        // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
-                        return _VoiceWaveform(
-                          playing: _previewPlaying,
-                          durationSeconds: _recordSeconds,
-                          samples: _voiceSamples,
-                          width: constraints.maxWidth,
-                          activeColor: Theme.of(context).colorScheme.primary,
-                          inactiveColor: Colors.grey.shade400,
-                        );
-                      }),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 22,
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                      onPressed: _cancelVoice,
-                    ),
-                  ],
-                )
-              : Row(
-                  // 提示态：文字说明版录音条（无波形），长按开始录音
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.mic, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 6),
-                    Text(
-                      AppLocalizations.of(context)!.chatPageLongPressToRecord,
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                    ),
-                  ],
-                ),
+    if (recording) {
+      return Row(
+        children: [
+          Text(elapsed,
+              style: const TextStyle(
+                  color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 10),
+          Expanded(
+              child: _WaveformBars(
+                  samples: _voiceLastSamples(40), color: Colors.green)),
+        ],
+      );
+    }
+    if (preview) {
+      return Row(
+        children: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 22,
+            icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
+                color: Theme.of(context).colorScheme.primary),
+            onPressed: _playVoicePreview,
+          ),
+          Expanded(
+            child: LayoutBuilder(builder: (context, constraints) {
+              // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
+              // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
+              return _VoiceWaveform(
+                playing: _previewPlaying,
+                durationSeconds: _recordSeconds,
+                samples: _voiceSamples,
+                width: constraints.maxWidth,
+                activeColor: Theme.of(context).colorScheme.primary,
+                inactiveColor: Colors.grey.shade400,
+              );
+            }),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 22,
+            icon: const Icon(Icons.close, color: Colors.grey),
+            onPressed: _cancelVoice,
+          ),
+        ],
+      );
+    }
+    // 提示态：文字说明版录音条（无波形），长按开始录音
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.mic, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 6),
+        Text(
+          AppLocalizations.of(context)!.chatPageLongPressToRecord,
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+        ),
+      ],
     );
   }
 
@@ -10806,102 +10865,151 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         onPressed: _showAttachmentSheet,
                         icon: const Icon(Icons.add_circle_outline),
                       ),
-                      // 语音入口：点按=切提示态/回文字态；长按=直接开始录音（与长按录音条等价）
-                      Clickable(
-                        onLongPressStart: (_) => _startVoice(),
-                        onLongPressEnd: (_) => _stopVoice(),
-                        child: IconButton(
-                          icon: Icon(_voiceEntryIcon(),
-                              color:
-                                  _inputMode == _InputMode.recording ? Colors.green : null),
-                          onPressed: _onVoiceEntryTap,
-                        ),
-                      ),
+                      // 输入盒（老板 2026-10-25）：麦克风/键盘两个入口合并成一个自制
+                      // 图标（Vocie transcription 同款：麦克风+文档），放进输入盒内左
+                      // 侧；正式输入区（文字框/录音条）在右。每次点击该图标=文字态 ↔
+                      // 语音态互换（文字态进提示态、不自动开录，长按录音条才开始录）；
+                      // 录音中/预览态图标仍在原位，点它切回键盘、已录内容保留。
                       Expanded(
-                        // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
-                        // 录音/预览时录音条 Positioned.fill 覆盖其上（与输入框严格同高）
-                        child: Stack(
-                          children: [
-                            // 录音条覆盖时完全隐藏输入框（maintainSize 保持占位高度，
-                            // 行高/按钮位置不变；避免圆角录音条透出输入框边角）
-                            Visibility(
-                              visible: _inputMode == _InputMode.text,
-                              maintainState: true,
-                              maintainSize: true,
-                              maintainAnimation: true,
-                              child: TextField(
-                                controller: _input,
-                                focusNode: _inputFocusNode,
-                                // 桌面端自动聚焦（老板 2026-10-12 粘贴功能配套）：
-                                // Cmd/Ctrl+V 走焦点链分发——新开聊天页若输入框无
-                                // 焦点，页面级 CallbackShortcuts 收不到按键，粘贴
-                                // 会"没反应"（实测五种焦点状态定的方案）。桌面聊天
-                                // 客户端打开会话即聚焦输入框也是惯例（Discord 同款）；
-                                // 移动端不抢焦点（会弹软键盘）。
-                                autofocus: _pasteShortcutSupported,
-                                // 多行输入框：文字到达宽度后自动折行，输入框随之增高，
-                                // 最多 8 行；超过 8 行不再增高，转为内部纵向滚动
-                                // （老板要求 2026-09-13：原先单行 + 横向滚动体验差）。
-                                // 非文字态（录音提示/录音/预览）把隐藏输入框按单行布局，
-                                // 录音条 Positioned.fill 才不会跟着草稿高度撑到 8 行高
-                                // （草稿保留在 controller 里，切回文字态自动恢复增高）
-                                minLines: 1,
-                                maxLines: _inputMode == _InputMode.text ? 8 : 1,
-                                // 多行折行；回车键仍为「发送」（键盘右下角显示「发送」，
-                                // iOS 按系统语言本地化），不插入换行——与微信一致
-                                keyboardType: TextInputType.multiline,
-                                textInputAction: TextInputAction.send,
-                                decoration: InputDecoration(
-                                  hintText: l10n.chatPageInputHint,
-                                  isDense: true,
-                                  // 白底（老板 2026-10-25）：默认 transparent 会透出
-                                  // 页面淡粉背景，与语音条的白底观感不一致
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  // 边框到文字的间距：主题里默认 16/16（那是给
-                                  // 口令、名字这类表单用的，字段少、留白宽好读），
-                                  // 聊天输入框是"反复打字、希望一行多放字"的场景，
-                                  // 左右收到 12（左右各省 4px），垂直同步收到 12——
-                                  // 顺带让输入框高度更贴近两侧按钮（老板 2026-09-26）
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 12),
+                        // ListenableBuilder：文字态盒描边跟随焦点（未聚焦浅粉/聚焦天
+                        // 蓝），即旧 TextField 自带的主题描边——图标入盒后改由输入盒
+                        // 绘制（见 _inputBoxDecoration）。
+                        child: ListenableBuilder(
+                          listenable: _inputFocusNode,
+                          builder: (context, _) => Container(
+                            decoration: _inputBoxDecoration(),
+                            // 文字态只留图标左侧内距（输入框自带左右内边距）；语音态
+                            // 用旧录音条的左右 12
+                            padding: _inputMode == _InputMode.text
+                                ? const EdgeInsets.only(left: 4)
+                                : const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              children: [
+                                // 文字/语音切换合并图标：每次点击切一次状态
+                                SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    onPressed: _onVoiceEntryTap,
+                                    icon: TranscribeIcon(
+                                        color: _inputModeToggleColor(),
+                                        size: 24),
+                                  ),
                                 ),
-                                // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
-                                onSubmitted: (_) {
-                                  _send();
-                                  _inputFocusNode.requestFocus();
-                                },
-                                // 发送后键盘常驻遮挡消息流；点按输入框以外的任意处
-                                // （消息列表/空白/其他控件）收起键盘（老板要求 2026-09-12）。
-                                // 移动端默认不动 focus，需显式 unfocus。
-                                // **桌面端不收起**：桌面没有软键盘要收，且失焦后
-                                // Cmd/Ctrl+V 粘贴快捷键（焦点链上的 CallbackShortcuts）
-                                // 就收不到按键了——点消息列表不该让粘贴失灵
-                                // （老板 2026-10-12 粘贴功能配套）。
-                                onTapOutside: (_) {
-                                  if (!_pasteShortcutSupported) {
-                                    FocusManager.instance.primaryFocus
-                                        ?.unfocus();
-                                  }
-                                },
-                              ),
+                                Expanded(
+                                  // Stack：文字输入框始终占位（行高恒定，切换录音条时
+                                  // 按钮不浮动），录音/预览时录音条 Positioned.fill
+                                  // 覆盖其上（与输入框严格同高）
+                                  child: Stack(
+                                    children: [
+                                      // 录音条覆盖时完全隐藏输入框（maintainSize
+                                      // 保持占位高度，行高/按钮位置不变；避免圆角
+                                      // 录音条透出输入框边角）
+                                      Visibility(
+                                        visible: _inputMode == _InputMode.text,
+                                        maintainState: true,
+                                        maintainSize: true,
+                                        maintainAnimation: true,
+                                        child: TextField(
+                                          controller: _input,
+                                          focusNode: _inputFocusNode,
+                                          // 桌面端自动聚焦（老板 2026-10-12 粘贴
+                                          // 功能配套）：Cmd/Ctrl+V 走焦点链分发——
+                                          // 新开聊天页若输入框无焦点，页面级
+                                          // CallbackShortcuts 收不到按键，粘贴会
+                                          // "没反应"（实测五种焦点状态定的方案）。
+                                          // 桌面聊天客户端打开会话即聚焦输入框也是
+                                          // 惯例（Discord 同款）；移动端不抢焦点
+                                          // （会弹软键盘）。
+                                          autofocus: _pasteShortcutSupported,
+                                          // 多行输入框：文字到达宽度后自动折行，输入
+                                          // 框随之增高，最多 8 行；超过 8 行不再增高，
+                                          // 转为内部纵向滚动（老板要求 2026-09-13：
+                                          // 原先单行 + 横向滚动体验差）。非文字态
+                                          // （录音中/预览）把隐藏输入框按单行布局，
+                                          // 录音条 Positioned.fill 才不会跟着草稿
+                                          // 高度撑到 8 行高（草稿保留在 controller
+                                          // 里，切回文字态自动恢复增高）
+                                          minLines: 1,
+                                          maxLines: _inputMode == _InputMode.text ? 8 : 1,
+                                          // 多行折行；回车键仍为「发送」（键盘右下角
+                                          // 显示「发送」，iOS 按系统语言本地化），
+                                          // 不插入换行——与微信一致
+                                          keyboardType: TextInputType.multiline,
+                                          textInputAction: TextInputAction.send,
+                                          decoration: InputDecoration(
+                                            hintText: l10n.chatPageInputHint,
+                                            isDense: true,
+                                            // 盒外观（白底/描边/圆角，老板
+                                            // 2026-10-25）由外层输入盒 Container
+                                            // 统一给出（_inputBoxDecoration）——
+                                            // 合并图标与输入框同盒，这里不画
+                                            // 自己的底色边框
+                                            border: InputBorder.none,
+                                            enabledBorder: InputBorder.none,
+                                            focusedBorder: InputBorder.none,
+                                            // 边框到文字的间距：主题里默认 16/16
+                                            // （那是给口令、名字这类表单用的，
+                                            // 字段少、留白宽好读），聊天输入框是
+                                            // "反复打字、希望一行多放字"的场景，
+                                            // 左右收到 8（左侧合并图标已占位，
+                                            // 右侧留 8），垂直 12——顺带让输入框
+                                            // 高度更贴近两侧按钮（老板 2026-09-26）
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 12),
+                                          ),
+                                          // 回车发送后焦点回到输入框（键盘完成动作
+                                          // 默认失焦——补回聚焦）
+                                          onSubmitted: (_) {
+                                            _send();
+                                            _inputFocusNode.requestFocus();
+                                          },
+                                          // 发送后键盘常驻遮挡消息流；点按输入框
+                                          // 以外的任意处（消息列表/空白/其他控件）
+                                          // 收起键盘（老板要求 2026-09-12）。移动端
+                                          // 默认不动 focus，需显式 unfocus。
+                                          // **桌面端不收起**：桌面没有软键盘要收，
+                                          // 且失焦后 Cmd/Ctrl+V 粘贴快捷键（焦点链
+                                          // 上的 CallbackShortcuts）就收不到按键了
+                                          // ——点消息列表不该让粘贴失灵（老板
+                                          // 2026-10-12 粘贴功能配套）。
+                                          onTapOutside: (_) {
+                                            if (!_pasteShortcutSupported) {
+                                              FocusManager.instance
+                                                  .primaryFocus
+                                                  ?.unfocus();
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      if (_inputMode != _InputMode.text)
+                                        // 长按手势挂在常驻的 Clickable 上：提示态
+                                        // 长按开始录音，进入录音态后此层不重建，松手
+                                        // 能正常触发停止；预览态由 _startVoice 直接
+                                        // 忽略（长按不重录，防误触冲掉刚录好的一条）
+                                        Positioned.fill(
+                                          child: Clickable(
+                                            onLongPressStart: (_) =>
+                                                _startVoice(),
+                                            onLongPressEnd: (_) =>
+                                                _stopVoice(),
+                                            child: _buildVoiceBarContent(),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (_inputMode != _InputMode.text)
-                              // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
-                              // 进入录音态后此层不重建，松手能正常触发停止；预览态由
-                              // _startVoice 直接忽略（长按不重录，防误触冲掉刚录好的一条）
-                              Positioned.fill(
-                                child: Clickable(
-                                  onLongPressStart: (_) => _startVoice(),
-                                  onLongPressEnd: (_) => _stopVoice(),
-                                  child: _buildVoiceBar(),
-                                ),
-                              ),
-                          ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发内容）
+                      // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发
+                      // 内容——录音中先松手或点合并图标停录，进预览态后再发）
                       // 纸飞机**朝上**（老板 2026-09-14）——消息流在输入框上方，朝上才
                       // 表达"发进上面的消息流"；Material 的 Icons.send 本身朝右，
                       // 逆时针转 90° 摆正。Transform 不改变占位，按钮布局不变
