@@ -272,9 +272,9 @@ void main() {
 
     // 在册成员在列（**限定在成员弹层内**：状态条头像条 2026-10-20 起也显示
     // 成员名字标签，全局 find.text 会撞成两个——同 group_status_bar_test 口径）
-    final sheet = find.ancestor(
-        of: find.text(_zh.chatPageMembersTitle('group')),
-        matching: find.byType(SingleChildScrollView));
+    // 弹层内容根（2026-10-25 起「只滚成员列表」，外层无
+    // SingleChildScrollView，改用定位 key）
+    final sheet = find.byKey(const ValueKey('membersSheet'));
     expect(find.descendant(of: sheet, matching: find.text('Alice')),
         findsOneWidget);
     expect(find.descendant(of: sheet, matching: find.text('Bob')),

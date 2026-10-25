@@ -3659,6 +3659,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// **group（我的群组）**：每行一张成员卡——底色=该成员性别色（男浅蓝 / 女浅粉 /
   /// 性别未知=中性灰）；左：真实头像 + 名字。
+  /// - 高度不够时**只有成员卡列表内部滚动**（老板 2026-10-25）：标题、群名胶囊、
+  ///   「邀请新同伴」/「退出群组」固定在两端不滚（Flexible(loose) + ListView
+  ///   (shrinkWrap)，与 [_showInviteDialog]、ScrollableCardArea 同款口径）；
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
   /// - 未满员时列表末尾是「邀请新同伴」大按钮；
   /// - **整卡可点**（老板 2026-10-20 二轮定；2026-10-06 否掉整卡可点的理由
@@ -3690,150 +3693,170 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
       builder: (ctx) {
         return SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Center(
-                          child: Text(
-                              l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 16)),
-                        ),
-                        Positioned(
-                          right: 0,
-                          child: SheetCloseButton(tooltip: l10n.close),
-                        ),
-                      ],
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              // key 供测试定位整个弹层内容（标题/群名行/成员卡/邀请/退出都在
+              // 这里面；2026-10-25 改「只滚成员列表」后外层不再是
+              // SingleChildScrollView，原锚点失效）
+              key: const ValueKey('membersSheet'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Center(
+                        child: Text(
+                            l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 16)),
+                      ),
+                      Positioned(
+                        right: 0,
+                        child: SheetCloseButton(tooltip: l10n.close),
+                      ),
+                    ],
                   ),
-                  // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
-                  // 「我的资料」弹层的名字胶囊同款——实底 + Material/InkWell 水波，
-                  // 文字+编辑图标一眼可点）。底色淡蓝 tertiaryContainer（老板：
-                  // 胶囊底不要粉色，淡蓝/灰皆可——两处胶囊统一淡蓝）。未设置 →
-                  // 淡色占位词；点击打开改群名弹窗（同状态条点群名）。
-                  if (_isGroup)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2, bottom: 14),
-                      child: Center(
-                        child: Material(
-                          // 与「添加秘境」/「新建通道」/「邀请新同伴」大按钮同款淡灰
-                          // （老板 2026-10-17：胶囊底也统一成淡灰，不再用淡蓝）
-                          color: Colors.black.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(999),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            // key 供测试定位群名行（状态条上可能有同文案，需区分）
-                            key: const ValueKey('membersSheetGroupNameRow'),
-                            mouseCursor: SystemMouseCursors.click,
-                            onTap: () {
-                              // 先收起成员弹层；等它收完再弹改群名弹窗（同
-                              // 「重新邀请」的 route 交接处理，见其注释）
-                              Navigator.of(ctx).pop();
-                              _menuAction(_showGroupNameDialog);
-                            },
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 9, 12, 9),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      // 占位词与改群名弹窗标题共用同一键（老板
-                                      // 2026-10-11：合并为一个文案「群组名称/
-                                      // Group name」，不另设占位词键）
-                                      _groupName.isEmpty
-                                          ? l10n.chatPageGroupNameTitle
-                                          : _groupName,
-                                      style: TextStyle(
-                                        // 占位词单独降档（老板 2026-10-11）：字号
-                                        // 小一档 + 更浅的 outline 色，别与真群名
-                                        // 的 20/w700 深色抢眼；有名字 → 胶囊里
-                                        // 最显眼（20/w700，与「我的资料」名字
-                                        // 胶囊同档）
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: _groupName.isEmpty ? 18 : 20,
-                                        height: 1.2,
-                                        color: _groupName.isEmpty
-                                            ? Theme.of(ctx).colorScheme.outline
-                                            : null,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                ),
+                // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
+                // 「我的资料」弹层的名字胶囊同款——实底 + Material/InkWell 水波，
+                // 文字+编辑图标一眼可点）。底色淡蓝 tertiaryContainer（老板：
+                // 胶囊底不要粉色，淡蓝/灰皆可——两处胶囊统一淡蓝）。未设置 →
+                // 淡色占位词；点击打开改群名弹窗（同状态条点群名）。
+                if (_isGroup)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 14),
+                    child: Center(
+                      child: Material(
+                        // 与「添加秘境」/「新建通道」/「邀请新同伴」大按钮同款淡灰
+                        // （老板 2026-10-17：胶囊底也统一成淡灰，不再用淡蓝）
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(999),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          // key 供测试定位群名行（状态条上可能有同文案，需区分）
+                          key: const ValueKey('membersSheetGroupNameRow'),
+                          mouseCursor: SystemMouseCursors.click,
+                          onTap: () {
+                            // 先收起成员弹层；等它收完再弹改群名弹窗（同
+                            // 「重新邀请」的 route 交接处理，见其注释）
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showGroupNameDialog);
+                          },
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 9, 12, 9),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    // 占位词与改群名弹窗标题共用同一键（老板
+                                    // 2026-10-11：合并为一个文案「群组名称/
+                                    // Group name」，不另设占位词键）
+                                    _groupName.isEmpty
+                                        ? l10n.chatPageGroupNameTitle
+                                        : _groupName,
+                                    style: TextStyle(
+                                      // 占位词单独降档（老板 2026-10-11）：字号
+                                      // 小一档 + 更浅的 outline 色，别与真群名
+                                      // 的 20/w700 深色抢眼；有名字 → 胶囊里
+                                      // 最显眼（20/w700，与「我的资料」名字
+                                      // 胶囊同档）
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: _groupName.isEmpty ? 18 : 20,
+                                      height: 1.2,
+                                      color: _groupName.isEmpty
+                                          ? Theme.of(ctx).colorScheme.outline
+                                          : null,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Icon(Icons.edit_outlined,
-                                      size: 18,
-                                      color: Theme.of(ctx)
-                                          .colorScheme
-                                          .onSurfaceVariant),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.edit_outlined,
+                                    size: 18,
+                                    color: Theme.of(ctx)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
-                  for (final e in others)
-                    _membersCard(
-                      memberId: e.key,
-                      gender: _memberGenders[e.key] ?? '',
-                      name: _memberNames[e.key],
-                      onTap: () {
-                        // 先收起成员弹层；**等它收完再开资料页**——紧接着
-                        // showModalBottomSheet 会让两条 route 在 Overlay 里
-                        // 交叉卸载（见 _waitRouteHandoff，与群名行同款）。
-                        Navigator.of(ctx).pop();
-                        _menuAction(
-                            () => _showMemberProfileSheet(e.key));
-                      },
-                    ),
-                  // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
-                  // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
-                  if (_canInvite)
-                    // 与成员卡片拉开一组间距：卡片间仅 8px（各自 vertical 4），
-                    // 这里给 12（合计 16），示意按钮不属于成员卡那一组（老板 2026-10-19）
-                    Column(
+                  ),
+                // 成员卡列表：**只有这一段滚动**（老板 2026-10-25：高度不够时
+                // 原来是整个弹层一起滚，标题/群名行/邀请/退出全被滚走）。
+                // Flexible(loose) + ListView(shrinkWrap)：人少时贴着内容（弹层
+                // 不撑高），人多吃满剩余高度、在这一段内部滚——标题、群名胶囊、
+                // 邀请与退出群组始终固定可见（与 _showInviteDialog、
+                // ScrollableCardArea 同款口径，见其注释）。
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Scrollbar(
+                    child: ListView(
+                      shrinkWrap: true,
                       children: [
-                        const SizedBox(height: 12),
-                        Material(
-                          // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
-                          // 三个大按钮底色统一）；hover/按住加深同口径
-                          color: Colors.black.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(mouseCursor: SystemMouseCursors.click,
+                        for (final e in others)
+                          _membersCard(
+                            memberId: e.key,
+                            gender: _memberGenders[e.key] ?? '',
+                            name: _memberNames[e.key],
                             onTap: () {
+                              // 先收起成员弹层；**等它收完再开资料页**——
+                              // 紧接着 showModalBottomSheet 会让两条 route
+                              // 在 Overlay 里交叉卸载（见 _waitRouteHandoff，
+                              // 与群名行同款）。
                               Navigator.of(ctx).pop();
                               _menuAction(
-                                  () => _showInviteDialog(purpose: 'invite'));
+                                  () => _showMemberProfileSheet(e.key));
                             },
-                            hoverColor: Colors.black.withValues(alpha: 0.10),
-                            highlightColor: Colors.black.withValues(alpha: 0.14),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.add),
-                                  const SizedBox(width: 6),
-                                  Text(l10n.chatPageMembersInviteNew),
-                                ],
-                              ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
+                // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
+                if (_canInvite)
+                  // 与成员卡片拉开一组间距：卡片间仅 8px（各自 vertical 4），
+                  // 这里给 12（合计 16），示意按钮不属于成员卡那一组（老板 2026-10-19）
+                  Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Material(
+                        // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
+                        // 三个大按钮底色统一）；hover/按住加深同口径
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(mouseCursor: SystemMouseCursors.click,
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _menuAction(
+                                () => _showInviteDialog(purpose: 'invite'));
+                          },
+                          hoverColor: Colors.black.withValues(alpha: 0.10),
+                          highlightColor: Colors.black.withValues(alpha: 0.14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.add),
+                                const SizedBox(width: 6),
+                                Text(l10n.chatPageMembersInviteNew),
+                              ],
                             ),
                           ),
                         ),
-                      ],
-                    )
+                      ),
+                    ],
+                  )
                   else if (_isGroup)
                     // 群组满员：末尾那张卡变灰（不可点、无按钮），只说"已满"。
                     // duo 满员不走这里——duo 用资料页里的「重新邀请」表达"满"。
@@ -3844,49 +3867,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _memberCount, _maxMembers),
                       muted: true,
                     ),
-                  // 「退出群组」（2026-10-19，aimemo/20261019_groupExitDesign.md §6.1）：
-                  // destructive 红字项。与「邀请新同伴」大按钮同款淡灰底（老板
-                  // 2026-10-17 统一口径），红图标+红字表达破坏性；**整块可点**
-                  // （老板偏好：别让人去点中某个小控件）。
-                  if (_isGroup)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Material(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          mouseCursor: SystemMouseCursors.click,
-                          onTap: () {
-                            // 先收弹层；等它收完再走确认闸门（route 交接，
-                            // 见 _waitRouteHandoff）
-                            Navigator.of(ctx).pop();
-                            _menuAction(_exitGroup);
-                          },
-                          hoverColor: Colors.black.withValues(alpha: 0.10),
-                          highlightColor: Colors.black.withValues(alpha: 0.14),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.logout,
-                                    color: Theme.of(ctx).colorScheme.error),
-                                const SizedBox(width: 6),
-                                Text(
-                                  l10n.exitGroupMenuItem,
-                                  style: TextStyle(
-                                    color: Theme.of(ctx).colorScheme.error,
-                                  ),
+                // 「退出群组」（2026-10-19，aimemo/20261019_groupExitDesign.md §6.1）：
+                // destructive 红字项。与「邀请新同伴」大按钮同款淡灰底（老板
+                // 2026-10-17 统一口径），红图标+红字表达破坏性；**整块可点**
+                // （老板偏好：别让人去点中某个小控件）。
+                if (_isGroup)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        mouseCursor: SystemMouseCursors.click,
+                        onTap: () {
+                          // 先收弹层；等它收完再走确认闸门（route 交接，
+                          // 见 _waitRouteHandoff）
+                          Navigator.of(ctx).pop();
+                          _menuAction(_exitGroup);
+                        },
+                        hoverColor: Colors.black.withValues(alpha: 0.10),
+                        highlightColor: Colors.black.withValues(alpha: 0.14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.logout,
+                                  color: Theme.of(ctx).colorScheme.error),
+                              const SizedBox(width: 6),
+                              Text(
+                                l10n.exitGroupMenuItem,
+                                style: TextStyle(
+                                  color: Theme.of(ctx).colorScheme.error,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         );

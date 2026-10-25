@@ -110,6 +110,40 @@ class _GroupApi extends ApiClient {
       NotifyEmailStatus(state: 'none');
 }
 
+/// 多人群 fake：我 + 7 位成员（maxMembers=9 未满 → 还有「邀请新同伴」）——
+/// 「列表超高只滚中间」的布局回归用。
+class _ManyMembersApi extends _GroupApi {
+  _ManyMembersApi(super.messages);
+
+  @override
+  Future<SpaceResult> getSpace(String token) async {
+    final names = <String, String>{'member-me': 'Lukas'};
+    final genders = <String, String>{'member-me': 'male'};
+    final slots = <String, int>{'member-me': 0};
+    final entrances = <SpaceEntrance>[
+      const SpaceEntrance(
+          entranceId: 'dev-me', memberId: 'member-me', status: 'active'),
+    ];
+    for (var i = 1; i <= 7; i++) {
+      final id = 'member-m$i';
+      names[id] = '成员$i';
+      genders[id] = i.isEven ? 'male' : 'female';
+      slots[id] = i;
+      entrances.add(SpaceEntrance(
+          entranceId: 'dev-m$i', memberId: id, status: 'active'));
+    }
+    return SpaceResult(
+      spaceId: 'space-demo',
+      entrances: entrances,
+      memberNames: names,
+      memberGenders: genders,
+      memberSlots: slots,
+      mode: 'group',
+      maxMembers: 9,
+    );
+  }
+}
+
 /// 口令错**一次**后就放行的 fake：验证「口令弹窗就地验证」——错口令应在弹窗
 /// 内联红字、弹窗不关，改正后再通过。
 class _WrongPassThenOkApi extends _GroupApi {
@@ -139,9 +173,7 @@ class _WrongPassThenOkApi extends _GroupApi {
 }
 
 /// 成员弹层（按标题定位，限定断言范围用）。
-Finder get _membersSheet => find.ancestor(
-    of: find.text(_zh.chatPageMembersTitle('group')),
-    matching: find.byType(SingleChildScrollView));
+Finder get _membersSheet => find.byKey(const ValueKey('membersSheet'));
 
 /// 成员资料页（标题「群组同伴」，老板 2026-10-20 定）。
 Finder get _profileSheet => find.ancestor(
@@ -533,6 +565,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageMenuMyProfile), findsOneWidget,
         reason: '点消息旁我的头像应开「我的资料」弹层');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('成员弹层高度不够：只有成员列表滚动，标题/邀请/退出固定',
+      (WidgetTester tester) async {
+    // 老板 2026-10-25：原来是整个弹层包在 SingleChildScrollView 里一起滚，
+    // 标题、群名行、邀请、退出全被滚走。改为中部 ListView 内部滚：矮窗 +
+    // 多人 → 列表滚、两端固定（与 _showInviteDialog 同款口径）。
+    // 矮窗（高度优先：列表必然超高；宽度留足，避开聊天页自身在极窄下的
+    // 布局问题——那不是本测试要覆盖的）
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await _pumpChat(tester, db, await generateSpaceKey(), const [],
+        api: _ManyMembersApi(const []));
+    await _openMembersSheet(tester);
+
+    // 成员卡挂在 ListView 里（消息流那个 ListView 在弹层之下，用弹层 key 限定）
+    final membersList = find.descendant(
+        of: find.byKey(const ValueKey('membersSheet')),
+        matching: find.byType(ListView));
+    expect(membersList, findsOneWidget, reason: '成员卡应在弹层的 ListView 里');
+    final position = tester
+        .state<ScrollableState>(find
+            .descendant(of: membersList, matching: find.byType(Scrollable))
+            .first)
+        .position;
+    expect(position.maxScrollExtent, greaterThan(0),
+        reason: '矮窗 + 7 人 → 成员列表应可滚');
+
+    // 两端固定在列表**外**：邀请 / 退出群组 不随列表滚走
+    expect(
+        find.descendant(of: membersList,
+            matching: find.text(_zh.chatPageMembersInviteNew)),
+        findsNothing,
+        reason: '「邀请新同伴」是固定底钮，不该在滚动列表里');
+    expect(
+        find.descendant(of: membersList,
+            matching: find.text(_zh.exitGroupMenuItem)),
+        findsNothing,
+        reason: '「退出群组」是固定底钮，不该在滚动列表里');
+
+    // 拖列表 → 列表滚起来、标题原地不动（固定）
+    final titleRect =
+        tester.getRect(find.text(_zh.chatPageMembersTitle('group')));
+    await tester.drag(membersList, const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0), reason: '拖动应滚动成员列表');
+    expect(tester.getRect(find.text(_zh.chatPageMembersTitle('group'))),
+        titleRect,
+        reason: '标题固定在顶部，不随列表滚');
     expect(tester.takeException(), isNull);
   });
 }
