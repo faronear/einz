@@ -1,0 +1,36 @@
+{
+  "utc": "20261025T105540.882891Z",
+  "time": "2026-10-25 18:55+08:00",
+  "host": "doomship",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "输入盒四态同框 + 麦键圆边与盒角贴齐（接 b2d72fdc 后的老板验收轮）",
+      "detail": [
+        "实测（临时 widget 测试量完即删）：单行盒高 48=TextField 12+24+12，与「+」「发送」钮等高",
+        "盒圆角定 24=半盒高（_kInputBoxCornerRadius）：盒左端即标准半圆；麦键图标热区直径 48（_kInputModeToggleSize=2×圆角）与其同圆心同半径，左半边精确重合；多行草稿盒长高时圆角保持 24",
+        "盒内内容套 ClipRRect(24)：图标水波纹/悬浮高亮按盒角裁切，不冒尖",
+        "左侧零内距（图标齐盒边）、右侧内距四态统一 12",
+        "20→24 是老板「录音框 20 不确定」后按贴齐要求推的值；右端随左端成标准半圆（pill）"
+      ]
+    },
+    {
+      "brief": "四态统一细粉描边 + 悬浮圆修正（老板反馈轮）",
+      "detail": [
+        "_inputBoxDecoration 重写：文字/提示/录音/预览四态共用同一条描边=文字态细描边（主题 enabledBorder 浅粉 1.0）——原语音态用灰/绿描边与同色系底色几乎不可见，盒角与圆按钮分不清；聚焦加粗（天蓝 1.6）仅文字态（语音态输入框已失焦）",
+        "播放/关闭/toggle 钮加 splashRadius（17/17/24）：根因是 IconButton 悬浮高亮为 drawCircle(center, Material.defaultSplashRadius=35) 与按钮大小无关，34px 按钮被 70px 圆溢出、经 ClipRRect(24) 裁成横向椭圆；老板复看仍报椭圆但明确「不重要」，未再追",
+        "_prepareVoiceModel 失败提示从 SnackBar 改为全 app 统一的顶部通知条（2026-09-08 起通知即迁至顶部通知条，此处是遗留 SnackBar）",
+        "顺带修复：app/pubspec.yaml 第 1行 name: einz 被并行编辑误加前导空格致 YAML 解析崩（Only expected one document），已删空格恢复与仓库一致"
+      ]
+    },
+    {
+      "brief": "验证与提交",
+      "detail": [
+        "flutter analyze 无 issue；全量 flutter test 393 过（1 个 golden 默认跳过）",
+        "本提交只含 app/lib/chat_page.dart（输入台改动）；voice_transcript_service.dart 新增的 transcribeFile（预览态转写用）尚未接线，留待功能完成随功能提交"
+      ]
+    }
+  ]
+}
