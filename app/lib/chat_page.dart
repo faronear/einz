@@ -7977,8 +7977,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 悬浮高亮/水波纹半径 17=按钮半边长（compact 下 34×34）：纯圆内切
             // 按钮。默认半径 35 会大幅溢出、被盒圆角裁成椭圆（老板 2026-10-25）
             splashRadius: 17,
+            // 青绿=录音同款色（老板 2026-10-25）：预览态播放/停止键与左侧
+            // 合并图标、波形统一色系，不再用深蓝主色（与青绿图标不协调）
             icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
-                color: Theme.of(context).colorScheme.primary),
+                color: Colors.green),
             onPressed: _playVoicePreview,
           ),
           Expanded(
@@ -7995,14 +7997,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   unawaited(_transcribePreviewRecording()),
               child: LayoutBuilder(builder: (context, constraints) {
                 // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
-                // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
+                // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区。
+                // 预览态波形用青绿双色（老板 2026-10-25，与录音态同色系）：
+                // active=深青绿 shade700——第三轮调整：shade100 浅色方案下
+                // 老板仍嫌已播/未播区分不足，要高亮再加深一档拉满区分度；
+                // inactive=浅青绿 shade200——第二轮 shade300→shade100 后老板
+                // 嫌最浅太淡，定在 shade200。
                 return _VoiceWaveform(
                   playing: _previewPlaying,
                   durationSeconds: _recordSeconds,
                   samples: _voiceSamples,
                   width: constraints.maxWidth,
-                  activeColor: Theme.of(context).colorScheme.primary,
-                  inactiveColor: Colors.grey.shade400,
+                  activeColor: Colors.green.shade700,
+                  inactiveColor: Colors.green.shade200,
                 );
               }),
             ),

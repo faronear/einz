@@ -24,6 +24,7 @@
         "_prepareVoiceModel 失败提示从遗留 SnackBar 改为顶部通知条（全 app 口径，随 1043fb85 提交）",
         "l10n 新增：voiceTranscriptFailed（带 error 占位）/voiceTranscriptNoText/apply；voiceTranscribing、voiceTranscriptMenuTranscribe（标题）、cancel 复用既有串",
         "合并图标颜色口径（老板 2026-10-25 验收轮）：保留录音提示原用 colorScheme.primary（fromSeed 深蓝近黑，与默认灰难分辨），改用录音同款青绿 Colors.green——录音中/有保留录音=绿，其余=默认灰",
+        "预览态配色统一青绿（老板 2026-10-25 验收轮，三轮迭代定稿）：预览态原用深蓝主色（播放键图标+波形 active）与左侧青绿合并图标不协调→全部改青绿系。波形双色明度对比迭代：green+shade300（太近）→green+shade100（太淡）→定稿 active=green.shade700（深青绿，已播+进度竖线）、inactive=green.shade200（浅青绿，未播静态）。播放键图标=Colors.green（与图标/录音态同款）；X 关闭键保持灰（中性删除键，录音态无对应物）；预览盒保持灰底（只统一元素色，未动盒底色）",
         "长按区域桌面悬浮出手型（老板 2026-10-25）：Clickable 新增可选 cursor 覆盖参数（默认仍按 2026-09-28 口径：纯长按=默认箭头）；输入台显式传 SystemMouseCursors.click 的四处——提示态麦键图标、提示态整条录音条、预览态波形图（转写入口）",
         "长按区扩大到整盒（老板 2026-10-25）：提示态下从麦键合并图标到录音条（右至关闭按钮）都是长按录音目标——整盒读作一个四角弧形按钮。实现取简（老板：麻烦就不要完全占满）：图标 SizedBox 内包一个同款 Clickable（文字态回调置空=零识别器，点按/悬浮/I-beam 不受影响）+ 录音条 Clickable 改 opaque（空白区也算热区）。二者拼出「左到图标、右到关闭按钮」的热区，不动整盒结构（避免文字态 TextField 子树重挂导致 autofocus 抢焦弹键盘）",
         "教训：大块旧文本的 Edit 曾发生模糊匹配错位（图标处多出一行 SizedBox(、录音条 cursor 被抹、波形 Clickable 整个消失，analyze 抓出 unused_element+语法错才发现）；且该次错位还**静默回退了两处语义编辑**（Apply 清除录音、图标青绿）—— analyze 对语义回退无声，是后来拆分提交时做全量 diff 复查才抓到并补回。结论：多行结构改动后除 analyze 外，必须对本轮所有编辑点逐一读回/grep 验证，不能信返回值、不能只验可疑点"
