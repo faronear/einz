@@ -11011,31 +11011,44 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       // 麦+键盘并排（老板 2026-10-25 定稿，
                                       // 取代自绘双元素图标）：两枚 Flutter 默认
                                       // 图标（mic_none / keyboard_alt_outlined，
-                                      // 即合并前那两个入口图标）并排排在原有 48
-                                      // 圆形热区内；**右侧=当前有效的输入模式**
-                                      // （文字态键盘在右、语音态麦克风在右，紧挨
-                                      // 正式输入区），左侧=点按切过去的目标。
-                                      icon: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _inputMode == _InputMode.text
-                                                ? Icons.mic_none
-                                                : Icons
-                                                    .keyboard_alt_outlined,
-                                            size: 16,
-                                            color: _inputModeToggleColor(),
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Icon(
-                                            _inputMode == _InputMode.text
-                                                ? Icons
-                                                    .keyboard_alt_outlined
-                                                : Icons.mic_none,
-                                            size: 16,
-                                            color: _inputModeToggleColor(),
-                                          ),
-                                        ],
+                                      // 即合并前那两个入口图标）排在原有 48 圆形
+                                      // 热区内。**右侧=当前有效输入模式**（文字态
+                                      // 键盘在右紧挨文字区、语音态麦克风在右）且
+                                      // 更大，压住左侧元素一小块表示主力；左侧=
+                                      // 点按切过去的目标（老板 2026-10-25：两图标
+                                      // 放大、靠拢成一个整体，右大左小有主次）。
+                                      icon: SizedBox(
+                                        width: 34,
+                                        height: 24,
+                                        child: Stack(
+                                          alignment: Alignment.centerLeft,
+                                          children: [
+                                            // 左：切换目标（小）
+                                            Icon(
+                                              _inputMode == _InputMode.text
+                                                  ? Icons.mic_none
+                                                  : Icons
+                                                      .keyboard_alt_outlined,
+                                              size: 18,
+                                              color:
+                                                  _inputModeToggleColor(),
+                                            ),
+                                            // 右：当前主力（大，压住左元素一小块）
+                                            Positioned(
+                                              left: 12,
+                                              child: Icon(
+                                                _inputMode ==
+                                                        _InputMode.text
+                                                    ? Icons
+                                                        .keyboard_alt_outlined
+                                                    : Icons.mic_none,
+                                                size: 21,
+                                                color:
+                                                    _inputModeToggleColor(),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
