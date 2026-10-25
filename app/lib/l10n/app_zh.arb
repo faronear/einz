@@ -97,7 +97,7 @@
   "wizardJoinPassphraseWrong": "口令错误！请询问你的秘境同伴获取正确的口令。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
-  "welcomeDialogMessage": "你的秘境已开启，所有消息端到端加密，确保绝对隐私。进入秘境，开始聊天吧！",
+  "welcomeDialogMessage": "你的秘境已开启，端到端加密，确保绝对隐私。进入秘境，开始聊天吧！",
   "welcomeDialogStart": "进入秘境",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
@@ -621,11 +621,11 @@
   "chatPageMenuVoiceTranscriptAuth": "语音转写",
   "voiceTranscriptAuthNote": "怎样把语音消息转成文字？",
   "voiceTranscriptAuthLocal": "本机转写",
-  "voiceTranscriptAuthLocalDesc": "在本机上直接转写，更稳定更安全。第一次使用会自动下载一个语音包。",
+  "voiceTranscriptAuthLocalDesc": "在本机上直接转写，数据不离开本机。第一次转写时自动安装语音包。",
   "voiceTranscriptAuthServer": "远程转写",
   "voiceTranscriptAuthServerDesc": "把原始录音发送给远程服务器，完成转写后将立即从服务器删除。",
   "voiceTranscriptServerFailed": "远程转写失败：{error}",
-  "voiceTranscriptServerDisabled": "远程转写未启用，已改用本机模型",
+  "voiceTranscriptServerDisabled": "远程转写未启用，已改用本机语音包",
   "voiceTranscriptGroupEngine": "转写位置",
   "voiceTranscriptTimingLabel": "转写时机",
   "voiceTranscriptEngineLocalShort": "本机",
@@ -633,7 +633,7 @@
   "voiceTranscriptAutoOn": "自动",
   "voiceTranscriptAutoOff": "手动",
   "voiceTranscriptAutoModeDesc": "每次收到语音消息就自动转写。",
-  "voiceTranscriptManualModeDesc": "需要你手动发起转写一个语音消息。",
+  "voiceTranscriptManualModeDesc": "需要你手动选择转写一个语音消息。",
   "voiceTranscriptMenuTranscribe": "转写",
   "@voiceTranscriptServerFailed": {
     "placeholders": {
@@ -642,8 +642,8 @@
       }
     }
   },
-  "voiceTranscriptPreparing": "正在准备转写模型…",
-  "voiceTranscriptPrepareFailed": "转写模型准备失败：{error}",
+  "voiceTranscriptPreparing": "正在安装语音包…",
+  "voiceTranscriptPrepareFailed": "语音包安装失败：{error}",
   "@voiceTranscriptPrepareFailed": {
     "placeholders": {
       "error": {

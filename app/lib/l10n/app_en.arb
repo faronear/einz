@@ -659,7 +659,7 @@
   "chatPageMenuVoiceTranscriptAuth": "Voice transcription",
   "voiceTranscriptAuthNote": "how to transcribe voice messages?",
   "voiceTranscriptAuthLocal": "Local",
-  "voiceTranscriptAuthLocalDesc": "Transcription happens on this device. A model download is required at the first use.",
+  "voiceTranscriptAuthLocalDesc": "Right on this device, nothing leaves your hands. A model install is required at the first use.",
   "voiceTranscriptAuthServer": "Remote",
   "voiceTranscriptAuthServerDesc": "Voice messages are sent to our cloud server, and deleted immediately after transcribing.",
   "voiceTranscriptServerFailed": "Remote transcription failed: {error}",
@@ -671,7 +671,7 @@
   "voiceTranscriptAutoOn": "Auto",
   "voiceTranscriptAutoOff": "Manual",
   "voiceTranscriptAutoModeDesc": "Transcribe all voice messages automatically.",
-  "voiceTranscriptManualModeDesc": "Transcribe a voice message at your instruction.",
+  "voiceTranscriptManualModeDesc": "Transcribe selected voice messages at your instruction.",
   "voiceTranscriptMenuTranscribe": "Transcribe",
   "@voiceTranscriptServerFailed": {
     "placeholders": {
@@ -680,8 +680,8 @@
       }
     }
   },
-  "voiceTranscriptPreparing": "Preparing transcription model…",
-  "voiceTranscriptPrepareFailed": "Failed to prepare transcription model: {error}",
+  "voiceTranscriptPreparing": "Installing voice model…",
+  "voiceTranscriptPrepareFailed": "Failed to install voice model: {error}",
   "@voiceTranscriptPrepareFailed": {
     "placeholders": {
       "error": {

@@ -202,7 +202,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '你的秘境已开启，所有消息端到端加密，确保绝对隐私。进入秘境，开始聊天吧！';
+  String get welcomeDialogMessage => '你的秘境已开启，端到端加密，确保绝对隐私。进入秘境，开始聊天吧！';
 
   @override
   String get welcomeDialogStart => '进入秘境';
@@ -1049,7 +1049,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAuthLocal => '本机转写';
 
   @override
-  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写，更稳定更安全。第一次使用会自动下载一个语音包。';
+  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写，数据不离开本机。第一次转写时自动安装语音包。';
 
   @override
   String get voiceTranscriptAuthServer => '远程转写';
@@ -1063,7 +1063,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get voiceTranscriptServerDisabled => '远程转写未启用，已改用本机模型';
+  String get voiceTranscriptServerDisabled => '远程转写未启用，已改用本机语音包';
 
   @override
   String get voiceTranscriptGroupEngine => '转写位置';
@@ -1087,17 +1087,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoModeDesc => '每次收到语音消息就自动转写。';
 
   @override
-  String get voiceTranscriptManualModeDesc => '需要你手动发起转写一个语音消息。';
+  String get voiceTranscriptManualModeDesc => '需要你手动选择转写一个语音消息。';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';
 
   @override
-  String get voiceTranscriptPreparing => '正在准备转写模型…';
+  String get voiceTranscriptPreparing => '正在安装语音包…';
 
   @override
   String voiceTranscriptPrepareFailed(String error) {
-    return '转写模型准备失败：$error';
+    return '语音包安装失败：$error';
   }
 
   @override

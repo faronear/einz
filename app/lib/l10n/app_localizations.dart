@@ -1913,7 +1913,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcription happens on this device. A model download is required at the first use.'**
+  /// **'Right on this device, nothing leaves your hands. A model install is required at the first use.'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
@@ -1985,7 +1985,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptManualModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe a voice message at your instruction.'**
+  /// **'Transcribe selected voice messages at your instruction.'**
   String get voiceTranscriptManualModeDesc;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.
@@ -1997,13 +1997,13 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptPreparing.
   ///
   /// In en, this message translates to:
-  /// **'Preparing transcription model…'**
+  /// **'Installing voice model…'**
   String get voiceTranscriptPreparing;
 
   /// No description provided for @voiceTranscriptPrepareFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to prepare transcription model: {error}'**
+  /// **'Failed to install voice model: {error}'**
   String voiceTranscriptPrepareFailed(String error);
 
   /// No description provided for @chatPageAttachmentMetaMissing.

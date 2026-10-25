@@ -1111,7 +1111,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'Transcription happens on this device. A model download is required at the first use.';
+      'Right on this device, nothing leaves your hands. A model install is required at the first use.';
 
   @override
   String get voiceTranscriptAuthServer => 'Remote';
@@ -1153,17 +1153,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptManualModeDesc =>
-      'Transcribe a voice message at your instruction.';
+      'Transcribe selected voice messages at your instruction.';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';
 
   @override
-  String get voiceTranscriptPreparing => 'Preparing transcription model…';
+  String get voiceTranscriptPreparing => 'Installing voice model…';
 
   @override
   String voiceTranscriptPrepareFailed(String error) {
-    return 'Failed to prepare transcription model: $error';
+    return 'Failed to install voice model: $error';
   }
 
   @override
