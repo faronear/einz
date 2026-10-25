@@ -1,0 +1,42 @@
+{
+  "utc": "20261025T111139.067382Z",
+  "time": "2026-10-25 19:11+08:00",
+  "host": "doomship",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "预览态长按波形图=即时转写（老板 2026-10-25，含两轮口径修正）",
+      "detail": [
+        "流程（老板修正后）：长按波形图→先备基础设施（模型未就绪弹准备对话框下载/安装，可取消）→就绪才弹转写窗；准备失败/取消→只出顶部通知条、不弹转写窗",
+        "转写窗：打开即自动开始本机转写，内容区显示「转写中…」（转圈），完成显示文字；底部 Cancel/Apply。失败在窗内显示「转写失败：error」，空结果显示「未识别到文字」，两者 Apply 均禁用",
+        "Apply=把转写文字追加到输入框现有文字最后（原文字非空时以一个空格分隔）、切回文字态，并**清除原录音**（删临时文件+清波形秒数，图标回默认色）——老板口径两度变化：先说「原录音不保留」→ 改口「还是继续保留」→ 最终定「Apply 后清除原录音」（内容已成文字进输入框，不必再留）",
+        "Cancel 或点对话框外=只关窗，预览态不动"
+      ]
+    },
+    {
+      "brief": "实现要点",
+      "detail": [
+        "voice_transcript_service.dart 新增 transcribeFile(path)：不落库、无 messageId，与消息转写共用串行队列(_tail)与 isolate 跑法；返回 (text, language)；模型未就绪抛 StateError、wav 头不合格抛 ArgumentError（同消息链路口径，绝不进 sherpa 原生层）。注意 _tail 是 Future<void>，本次用 previous.then+then(void,onError) 分离调用方返回值与队列链",
+        "chat_page：_transcribePreviewRecording（入口：isReady→_prepareVoiceModel→showDialog，备好后复检 mode/path 防切走）+ _applyPreviewTranscript（追加+切文字态+**清除原录音**）+ 私有 widget _PreviewTranscribeDialog（StatefulWidget：busy/text/error 三态，initState 即跑）",
+        "长按绑在预览态波形（Expanded>Clickable(behavior: opaque)）上：opaque 是因 CustomPaint 自身不吸收命中（临时探针实测：deferToChild 包裸 CustomPaint 收不到长按）；嵌套竞技场实测内层触发、外层录音条不触发（预览态外层本就被 _startVoice 守卫空转，不会误重录——老板问「长按已经有重录功能了？」：没有，预览态长按自 2026-09-13 起就是故意空操作）",
+        "_prepareVoiceModel 失败提示从遗留 SnackBar 改为顶部通知条（全 app 口径，随 1043fb85 提交）",
+        "l10n 新增：voiceTranscriptFailed（带 error 占位）/voiceTranscriptNoText/apply；voiceTranscribing、voiceTranscriptMenuTranscribe（标题）、cancel 复用既有串",
+        "合并图标颜色口径（老板 2026-10-25 验收轮）：保留录音提示原用 colorScheme.primary（fromSeed 深蓝近黑，与默认灰难分辨），改用录音同款青绿 Colors.green——录音中/有保留录音=绿，其余=默认灰",
+        "长按区域桌面悬浮出手型（老板 2026-10-25）：Clickable 新增可选 cursor 覆盖参数（默认仍按 2026-09-28 口径：纯长按=默认箭头）；输入台显式传 SystemMouseCursors.click 的四处——提示态麦键图标、提示态整条录音条、预览态波形图（转写入口）",
+        "长按区扩大到整盒（老板 2026-10-25）：提示态下从麦键合并图标到录音条（右至关闭按钮）都是长按录音目标——整盒读作一个四角弧形按钮。实现取简（老板：麻烦就不要完全占满）：图标 SizedBox 内包一个同款 Clickable（文字态回调置空=零识别器，点按/悬浮/I-beam 不受影响）+ 录音条 Clickable 改 opaque（空白区也算热区）。二者拼出「左到图标、右到关闭按钮」的热区，不动整盒结构（避免文字态 TextField 子树重挂导致 autofocus 抢焦弹键盘）",
+        "教训：大块旧文本的 Edit 曾发生模糊匹配错位（图标处多出一行 SizedBox(、录音条 cursor 被抹、波形 Clickable 整个消失，analyze 抓出 unused_element+语法错才发现）；且该次错位还**静默回退了两处语义编辑**（Apply 清除录音、图标青绿）—— analyze 对语义回退无声，是后来拆分提交时做全量 diff 复查才抓到并补回。结论：多行结构改动后除 analyze 外，必须对本轮所有编辑点逐一读回/grep 验证，不能信返回值、不能只验可疑点"
+      ]
+    },
+    {
+      "brief": "验证与状态",
+      "detail": [
+        "flutter analyze 无 issue；全量 flutter test 393 过（golden 默认跳过）",
+        "录音/转写链路需真机（record 插件+sherpa 模型）验证，按惯例交老板手测",
+        "按老板「单独提交 长按转写功能。再提交 长按悬浮手型，再提交其他的」拆三笔（feat/voice-transcript 分支）：05b5752f 转写功能（chat_page 方法/弹窗/波形长按 + service transcribeFile + l10n 三串）；936c3cf9 长按悬浮手型（Clickable cursor 参数 + 录音条/波形两处使用）；第三笔=其余（图标青绿、整盒长按区、文档修正）随本 worklog",
+        "拆分手法：chat_page.dart 一文件含三主题改动，用「备份终态→git checkout HEAD→按主题重建中间态→逐态提交→恢复终态」实现单文件多提交；终态恢复后必须全量 diff 复查（本次即借此抓到被 corrupt 轮静默回退的两处编辑）"
+      ]
+    }
+  ]
+}

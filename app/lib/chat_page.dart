@@ -7588,11 +7588,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 合并图标颜色：录音中=绿（与旧麦克风一致）；文字态有保留录音=主色
-  /// （提示「还留着一条未发送的录音」）；其余=默认图标色。
+  /// 合并图标颜色：录音中、或文字态还留着一条未发送的录音=青绿（与旧麦克风
+  /// 一致，提示「还留着一条」）；其余=默认图标色。
+  ///
+  /// 保留提示原先用 colorScheme.primary——fromSeed 派生的深蓝近黑，与默认灰
+  /// 在桌面/手机上都难分辨（老板 2026-10-25），改用录音同款绿。
   Color _inputModeToggleColor() {
-    if (_inputMode == _InputMode.recording) return Colors.green;
-    if (_recordingPath != null) return Theme.of(context).colorScheme.primary;
+    if (_inputMode == _InputMode.recording || _recordingPath != null) {
+      return Colors.green;
+    }
     return Theme.of(context).colorScheme.onSurfaceVariant; // 与邻居 IconButton 默认色一致
   }
 
@@ -7833,8 +7837,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 预览态取消（X 图标）：删临时文件。默认回到**等待录音的提示态**（再长按
-  /// 即可重录，老板要求 2026-09-13；单点入口图标则回文字输入框）。
+  /// 预览态取消（X 图标）：删临时文件，回到**等待录音的提示态**（再长按即可
+  /// 重录，老板要求 2026-09-13；单点入口图标则回文字输入框）。
   Future<void> _cancelVoice() async {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
@@ -7890,7 +7894,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 转写对话框 Apply（老板 2026-10-25）：把转写文字追加到输入框现有文字的
   /// 最后（原有文字非空时以一个空格分隔），切回文字输入态，并**清除原录音**
-  /// （删临时文件、清波形/秒数——录音内容已转成文字落进输入框，不再保留）。
+  /// （删临时文件、清波形/秒数——录音内容已转成文字落进输入框，不再保留；
+  /// 老板 2026-10-25 定）。图标随之回到默认色（无保留录音）。
   Future<void> _applyPreviewTranscript(String text) async {
     final trimmed = text.trim();
     if (trimmed.isNotEmpty) {
@@ -7976,31 +7981,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 color: Theme.of(context).colorScheme.primary),
             onPressed: _playVoicePreview,
           ),
-        Expanded(
-          // 长按波形图=即时转写（老板 2026-10-25）：先备模型（下载/安装），就绪
-          // 才弹转写对话框。opaque 保证纯图形区也收得到长按（CustomPaint 自身
-          // 不吸收命中——实测 deferToChild 包裸 CustomPaint 收不到）；内层在
-          // 手势竞技场赢外层（外层在预览态本就被 _startVoice 守卫空转，不会误
-          // 重录——预览态长按自 2026-09-13 起就是故意空操作）。
-          child: Clickable(
-            behavior: HitTestBehavior.opaque,
-            // 波形是长按转写目标：桌面悬浮出手型（老板 2026-10-25）
-            cursor: SystemMouseCursors.click,
-            onLongPressStart: (_) => unawaited(_transcribePreviewRecording()),
-            child: LayoutBuilder(builder: (context, constraints) {
-              // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
-              // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
-              return _VoiceWaveform(
-                playing: _previewPlaying,
-                durationSeconds: _recordSeconds,
-                samples: _voiceSamples,
-                width: constraints.maxWidth,
-                activeColor: Theme.of(context).colorScheme.primary,
-                inactiveColor: Colors.grey.shade400,
-              );
-            }),
+          Expanded(
+            // 长按波形图=即时转写（老板 2026-10-25）：先备模型（下载/安装），就绪
+            // 才弹转写对话框。opaque 保证纯图形区也收得到长按（CustomPaint 自身
+            // 不吸收命中——实测 deferToChild 包裸 CustomPaint 收不到）；内层在
+            // 手势竞技场赢外层（外层在预览态本就被 _startVoice 守卫空转，不会误
+            // 重录——预览态长按自 2026-09-13 起就是故意空操作）。
+            child: Clickable(
+              behavior: HitTestBehavior.opaque,
+              // 波形是长按转写目标：桌面悬浮出手型（老板 2026-10-25）
+              cursor: SystemMouseCursors.click,
+              onLongPressStart: (_) =>
+                  unawaited(_transcribePreviewRecording()),
+              child: LayoutBuilder(builder: (context, constraints) {
+                // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
+                // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
+                return _VoiceWaveform(
+                  playing: _previewPlaying,
+                  durationSeconds: _recordSeconds,
+                  samples: _voiceSamples,
+                  width: constraints.maxWidth,
+                  activeColor: Theme.of(context).colorScheme.primary,
+                  inactiveColor: Colors.grey.shade400,
+                );
+              }),
+            ),
           ),
-        ),
           IconButton(
             visualDensity: VisualDensity.compact,
             iconSize: 22,
@@ -10965,8 +10971,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 children: [
                                   // 文字/语音切换合并图标：每次点击切一次状态
                                   SizedBox(
-                                    width: _kInputModeToggleSize,
-                                    height: _kInputModeToggleSize,
+                                  width: _kInputModeToggleSize,
+                                  height: _kInputModeToggleSize,
+                                  // 语音态下图标也并入长按区（老板 2026-10-25：
+                                  // 整盒读作一个四角弧形按钮——长按从麦键图标到
+                                  // 录音条都算）。文字态回调置空=不注册识别器，
+                                  // 点按/悬浮不受影响（内层 IconButton 的单击
+                                  // 照常赢竞技场；I-beam 光标也不被盖）。
+                                  child: Clickable(
+                                    behavior: HitTestBehavior.opaque,
+                                    cursor: _inputMode == _InputMode.hint
+                                        ? SystemMouseCursors.click
+                                        : null,
+                                    onLongPressStart: _inputMode ==
+                                            _InputMode.text
+                                        ? null
+                                        : (_) => _startVoice(),
+                                    onLongPressEnd: _inputMode ==
+                                            _InputMode.text
+                                        ? null
+                                        : (_) => _stopVoice(),
                                     child: IconButton(
                                       padding: EdgeInsets.zero,
                                       // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
@@ -10980,6 +11004,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           size: 24),
                                     ),
                                   ),
+                                ),
                                   Expanded(
                                     // Stack：文字输入框始终占位（行高恒定，切换录音条时
                                     // 按钮不浮动），录音/预览时录音条 Positioned.fill
@@ -11075,22 +11100,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           // 长按开始录音，进入录音态后此层不重建，松手
                                           // 能正常触发停止；预览态由 _startVoice 直接
                                           // 忽略（长按不重录，防误触冲掉刚录好的一条）
-                                                          Positioned.fill(
-                                          child: Clickable(
-                                            // 提示态整条都是长按目标：桌面悬浮
-                                            // 出手型（老板 2026-10-25）；录音/预览
-                                            // 态无可长按操作，保持默认箭头
-                                            cursor: _inputMode ==
-                                                    _InputMode.hint
-                                                ? SystemMouseCursors.click
-                                                : null,
-                                            onLongPressStart: (_) =>
-                                                _startVoice(),
-                                            onLongPressEnd: (_) =>
-                                                _stopVoice(),
-                                            child: _buildVoiceBarContent(),
+                                          Positioned.fill(
+                                            child: Clickable(
+                                              // opaque：整条（含没有可命中子项的空白
+                                              // 区）都是长按区——与左侧麦键图标的
+                                              // Clickable 拼成「从图标到关闭按钮」的
+                                              // 整盒热区（老板 2026-10-25）
+                                              behavior:
+                                                  HitTestBehavior.opaque,
+                                              // 提示态整条都是长按目标：桌面悬浮
+                                              // 出手型（老板 2026-10-25）；录音/预览
+                                              // 态保持默认箭头（预览态波形另有手型）
+                                              cursor: _inputMode ==
+                                                      _InputMode.hint
+                                                  ? SystemMouseCursors.click
+                                                  : null,
+                                              onLongPressStart: (_) =>
+                                                  _startVoice(),
+                                              onLongPressEnd: (_) =>
+                                                  _stopVoice(),
+                                              child: _buildVoiceBarContent(),
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -12613,8 +12644,6 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
   }
 }
 
-/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；
-/// 按可用宽度只渲染能放下的条数（取尾部最新采样），窄屏也不会顶出屏幕。
 /// 预览态录音的即时转写对话框（老板 2026-10-25）：打开即自动开始本机转写
 /// （调用方已确保模型就绪），过程中内容区显示「转写中…」，完成显示转写文字；
 /// 底部 Cancel / Apply 两个按钮——Apply 把文字交回 [onApply]（追加进输入框现有
@@ -12710,6 +12739,9 @@ class _PreviewTranscribeDialogState
     );
   }
 }
+
+/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；
+/// 按可用宽度只渲染能放下的条数（取尾部最新采样），窄屏也不会顶出屏幕。
 class _WaveformBars extends StatelessWidget {
   const _WaveformBars({required this.samples, required this.color});
 
