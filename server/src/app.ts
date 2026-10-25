@@ -385,7 +385,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     sendJson(res, 200, r)
     return
   }
-  // 自愿退群（2026-10-19，aimemo/groupExitDesign.md）：**身份级**离场——本身份
+  // 自愿退群（2026-10-19，aimemo/20261019_groupExitDesign.md）：**身份级**离场——本身份
   // 全部通道一并注销、成员行转墓碑（保名让 slot）、旧 join token 作废。仅 group
   // （duo 在 leaveSpace 内 409 兜底）。与 /entrances/retire 的区别：retire 只退役
   // **本机这一条通道**（身份仍在册），leave 是**整个身份退出空间**。
@@ -551,7 +551,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
 
-  // 服务端转写（方案 D'，voiceTranscript.zhcn.md §15.2）：客户端本地解密后的
+  // 服务端转写（方案 D'，20261009_voiceTranscript.zhcn.md §15.2）：客户端本地解密后的
   // 16kHz/16bit/mono wav 原文上送，whisper.cpp 内存里过一遍即丢（不落盘、不进日志），
   // 返回文本。限速最严桶（per-IP 每小时）；未配置 EINZ_WHISPER_BIN/MODEL 时
   // transcribeWav 内部抛 TRANSCRIBE_DISABLED（503），不影响其余功能。

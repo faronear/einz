@@ -1,7 +1,7 @@
 # 空间作用域设置全谱：「应用于本机所有秘境」的四种方案
 
 **整理日期**：2026-10-24（老板复查触发：邮件通知走哪套？一次 apply-for-all 会成为未来新空间的默认值吗？）
-**关联设计**：multiSpaceDesign.zhcn.md（多空间总体设计）、voiceTranscript.zhcn.md §15.1（转写设置）
+**关联设计**：20260918_multiSpaceDesign.zhcn.md（多空间总体设计）、20261009_voiceTranscript.zhcn.md §15.1（转写设置）
 
 ---
 

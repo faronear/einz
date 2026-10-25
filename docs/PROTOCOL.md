@@ -309,7 +309,7 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 ### 6.3 服务端转写 POST /transcriptions（方案 D'，2026-10-22）
 
-自建 whisper.cpp 的按需转写（设计：`aimemo/voiceTranscript.zhcn.md` §15.2；部署：`aimemo/whisperDeploy.zhcn.md`）。**请求**：
+自建 whisper.cpp 的按需转写（设计：`aimemo/20261009_voiceTranscript.zhcn.md` §15.2；部署：`aimemo/20261022_whisperDeploy.zhcn.md`）。**请求**：
 
 - Header：`Authorization: Bearer <session>`；`X-Audio-Language: zh`（可选，ISO 639 小写 2-3 位，缺省 `zh`）
 - Body：**16kHz / 16bit / 单声道 PCM wav** 原文（客户端本地解密后的录音），上限 `EINZ_TRANSCRIBE_MAX_BYTES`（默认 10 MiB ≈ 5 分钟）

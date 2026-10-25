@@ -15878,3 +15878,24 @@ git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮�
 **（2026-10-24T10:05:00Z / 2026-10-24 18:05）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
 
 整理空间作用域设置全谱（老板复查「一次 apply-for-all 是否成为未来新空间默认值」）：新建 aimemo/20261024_spaceScopedSettings.zhcn.md——四种方案（A 全局键+清覆盖：转写/附件存储/墓碑，新空间继承；B 本地逐空间扇出：阅后即焚，新空间不继承；C 服务端 API 扇出：邮件通知，本地零键实测确认；D 无空间维度：主题），附 2026-10-24 转写全局键 bug 教训与「要不要统一」待评审项。含代码索引（行号已核对）。
+**（2026-10-24T10:40:00Z / 2026-10-24 18:40）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+aimemo 特性文档改名对齐 yyyymmdd_<feature> 规范（老板要求）：15 个专题文档按「文档内记载的日期」（与 git 创建日期交叉验证）加日期前缀，git mv 保历史；框架四件套（productLens/projectPlan/userProfile/worklog）不动。全仓引用同步更新（aimemo 各文档互引、docs/ 7 份、app/shared/server 代码注释、build 脚本、pubspec、compose）——旧文件名零残留（python 否定断言验证；worklog.md 历史条目按「追加式日志不改写」原则保留旧名，以本条映射表为准）。
+
+| 旧名 | 新名 |
+|---|---|
+| accountDesign.zhcn.md | 20261019_accountDesign.zhcn.md |
+| appStoreSubmission.zhcn.md | 20261019_appStoreSubmission.zhcn.md |
+| appWizardMultiverse.md | 20260910_appWizardMultiverse.md |
+| escrowArchivedKeys.md | 20260914_escrowArchivedKeys.md |
+| groupChatDesign.md | 20261003_groupChatDesign.md |
+| groupExitDesign.md | 20261019_groupExitDesign.md |
+| multiSpaceDesign.zhcn.md | 20260918_multiSpaceDesign.zhcn.md |
+| renamePlan.zhcn.md | 20260923_renamePlan.zhcn.md |
+| renameReview20260923.md | 20260923_renameReview.md |
+| upgradeToMultiverse.md | 20260910_upgradeToMultiverse.md |
+| voiceCall.zhcn.md | 20260918_voiceCall.zhcn.md |
+| voiceTranscript.zhcn.md | 20261009_voiceTranscript.zhcn.md |
+| whisperDeploy.zhcn.md | 20261022_whisperDeploy.zhcn.md |
+| architectureReview20260915.md | 20260915_architectureReview.md |
+| architectureReview20260915_qwen38.md | 20260915_architectureReviewQwen38.md |

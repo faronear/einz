@@ -54,7 +54,7 @@ dependencies:
   image_picker: ^1.2.3
   url_launcher: ^6.3.0 # 文本消息里的 URL 自动扫描 + 点击唤起系统浏览器（方案1，老板 2026-09-28）
   record: ^7.1.1
-  # 语音消息本地转写（aimemo/voiceTranscript.zhcn.md）：sherpa-onnx FFI 离线 ASR，
+  # 语音消息本地转写（aimemo/20261009_voiceTranscript.zhcn.md）：sherpa-onnx FFI 离线 ASR，
   # SenseVoice-Small 模型（不进 git，build 脚本/首次使用时拉取）
   sherpa_onnx: ^1.13.8
   audioplayers: ^6.8.1

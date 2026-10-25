@@ -10,7 +10,7 @@ library;
 ///   `person_id`→`member_id`、WS 帧 `device.revoked`→`entrance.revoked`、
 ///   错误码 `DEVICE_REVOKED`→`ENTRANCE_REVOKED`、`/devices/*`→`/entrances/*` 等，
 ///   见 docs/GLOSSARY.md「wire 字段改名」）；
-/// - `3` = 群聊一期（2026-10-03，aimemo/groupChatDesign.md）：create 删
+/// - `3` = 群聊一期（2026-10-03，aimemo/20261003_groupChatDesign.md）：create 删
 ///   `peer_name`/`peer_gender`（不再预置伴侣）、**create 新增 `mode`（duo|group，
 ///   创建时定死、永不改变——2026-10-04 取消升格）**、join slot 显式语义（不带
 ///   slot = 新身份 / 带 slot = 进已有身份，需 attach token）、join 请求新增
@@ -361,7 +361,7 @@ class SpaceResult {
   /// member_id → 成员状态（'active' | 'left'；老服务端无此键时为空表——
   /// 缺省按 active 处理，即没有墓碑）。
   ///
-  /// 用途（aimemo/groupExitDesign.md §4.2）：成员弹层名单只列 active、
+  /// 用途（aimemo/20261019_groupExitDesign.md §4.2）：成员弹层名单只列 active、
   /// 计数/邀请判定只数 active、消息发送者名字解析用全量（墓碑保名）。
   final Map<String, String> memberStatus;
 

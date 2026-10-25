@@ -96,7 +96,7 @@ push.ts:102 的成员查询带出 `status`，响应加 `member_status` map。客
 - **PROTOCOL_VERSION 建议不升**（维持 3）：纯增量（新端点 + 新帧），老客户端无退出
   按钮、收到未知帧忽略（上线前确认 `ws_client` 未知帧容错——现有单测已覆盖
   "未知帧不崩"）。若团队政策要求任何 wire 变化都升，则 3→4 与服务端同批上线
-  （一次性升级流程见 groupChatDesign.md §升级步骤）。
+  （一次性升级流程见 20261003_groupChatDesign.md §升级步骤）。
 
 ## 六、App 设计（~2-3 天）
 
@@ -144,7 +144,7 @@ retire 不打开这条旁路"（entrances.ts:113-114 注释）。本次**为自�
   ——身份仍在册，对方仍可 re-invite（attach token）帮你在新设备回来；
 - 产品后果明示：duo 是二人契约，身份一旦入群永不退群（与一期拍板一致）；
   关系结束的产品出路是双方各自销毁通道 / 另建空间；
-- `groupChatDesign.md` 的 duo 语义不变（恒 2 人、禁通话）。
+- `20261003_groupChatDesign.md` 的 duo 语义不变（恒 2 人、禁通话）。
 
 ## 九、重入（rejoin）
 
@@ -157,7 +157,7 @@ retire 不打开这条旁路"（entrances.ts:113-114 注释）。本次**为自�
 
 | 风险 | 等级 | 对策 |
 | --- | --- | --- |
-| **退出 ≠ 作废解密能力**：提前保存 Space Key / 密文者仍可解密历史 | 高（接受） | 二期密钥按成员封装（sender-keys）联动（groupChatDesign.md 早已绑定）；本期产品文案 / FAQ 明示；退出设备本地 Space Key 随 Vault 条目一并删除（app_lock.dart:214） |
+| **退出 ≠ 作废解密能力**：提前保存 Space Key / 密文者仍可解密历史 | 高（接受） | 二期密钥按成员封装（sender-keys）联动（20261003_groupChatDesign.md 早已绑定）；本期产品文案 / FAQ 明示；退出设备本地 Space Key 随 Vault 条目一并删除（app_lock.dart:214） |
 | 最后一人退出 → 空间冻结（无人可发邀请） | 中（接受） | 数据留服务端；FAQ 注明；duo 无此问题（不开放退出） |
 | 老客户端无退出按钮 + 未知帧 `member.left` | 低 | 上线前确认未知帧容错；必要时升 pv 3→4 |
 | slot 让位与并发 join 竞争 | 低 | 事务内 `max(slot)+1`，与最小空槽分配同事务 |
@@ -173,11 +173,11 @@ retire 不打开这条旁路"（entrances.ts:113-114 注释）。本次**为自�
    `_onMemberLeft` + 计数口径 active 化 + l10n（zh/en）+ `_FakeApi` stub。
 4. **文档**：`docs/PROTOCOL_MULTIVERSE.md`（端点 + 帧）、`docs/DATABASE.md`
    （status='left' / slot 让位）、`docs/SECURITY.md`（授权口径变化 + 退出密码学
-   边界）、FAQ（退出文案）、`aimemo/groupChatDesign.md`（二期候选第 1 条划掉）。
+   边界）、FAQ（退出文案）、`aimemo/20261003_groupChatDesign.md`（二期候选第 1 条划掉）。
 5. **真机自测**：三人群两人退出、退出后补位、退出后重入、多设备（手机退群 →
    平板上线自毁）、最后一人退出、duo 无入口。
 
 ## 十二、关联文档
 
-- `aimemo/groupChatDesign.md`（一期设计；"二期候选"第 1 条即本功能）
+- `aimemo/20261003_groupChatDesign.md`（一期设计；"二期候选"第 1 条即本功能）
 - `docs/SECURITY.md` §3（无密钥轮换）、§7.2（撤销语义）

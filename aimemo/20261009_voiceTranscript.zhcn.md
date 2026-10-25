@@ -3,7 +3,7 @@
 > 状态：**[已实现]**（Phase 1 MVP 2026-10-09 b856c75；2026-10-10 补齐 §8 wav 录音格式 + §11 模型首次使用下载。
 > 真机 A/B 与原生构建验证遗留，见 §12）
 > 关联：`aimemo/productLens.zhcn.md` §1.3 / §6.2 语音消息、`app/lib/chat_page.dart`（录音/播放）、
-> `shared/lib/src/protocol/message_payload.dart`（载荷 meta）、`aimemo/voiceCall.zhcn.md`（端侧插件先例）、
+> `shared/lib/src/protocol/message_payload.dart`（载荷 meta）、`aimemo/20260918_voiceCall.zhcn.md`（端侧插件先例）、
 > `docs/PROTOCOL.md`、`docs/SECURITY.md`
 
 ---

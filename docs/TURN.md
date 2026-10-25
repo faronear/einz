@@ -3,7 +3,7 @@
 > **为什么需要**：跨网（一台 4G、一台 WiFi；或跨运营商）时 P2P 打洞失败率很高。
 > 2026-09-26 实测：同 WiFi 双机能通，**跨网无 TURN 打不通**，部署 coturn 后打通。
 > 所以 TURN 是**必需**，不是可选优化。
-> 方案背景：`aimemo/voiceCall.zhcn.md` §3 / Phase C。
+> 方案背景：`aimemo/20260918_voiceCall.zhcn.md` §3 / Phase C。
 
 ---
 

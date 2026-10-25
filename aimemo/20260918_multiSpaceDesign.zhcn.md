@@ -2,7 +2,7 @@
 
 状态：`[已评审·部分定稿]`（2026-09-18 起草；方案 A 已获老板原则同意；**2026-09-22 代码核查后修订**：
 修正 6 处与现状不符的断言、补入 4 个漏掉的耦合点，⑤⑥⑦ 三项已定，①②③④ 待老板一句话确认）
-关联：`docs/PROTOCOL_MULTIVERSE.md`、`aimemo/appWizardMultiverse.md`、`aimemo/productLens.zhcn.md`
+关联：`docs/PROTOCOL_MULTIVERSE.md`、`aimemo/20260910_appWizardMultiverse.md`、`aimemo/productLens.zhcn.md`
 
 > 2026-09-22 修订依据：逐条对照 `server/src`（db/spaces/auth/guard/push）与 `app/lib`
 > （app_lock/server_config/chat_page/local_database/media_cache 等）核实原稿断言。
@@ -218,7 +218,7 @@ M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
 > 代码与文档用层名（`install` / `entrance` / `member`）。曾经的 wire 改名（`device_id` →
 > `entrance_id`、`person_id` → `partner_id`，2026-09-23）**已于 2026-09-23 全量落地**；
 > 其中身份词 `partner` 又于 **2026-09-24 续改为 `member`**（界面文案不动），见
-> **`aimemo/renamePlan.zhcn.md`**。
+> **`aimemo/20260923_renamePlan.zhcn.md`**。
 
 多空间让一台物理设备在每个空间各有一套**故意互不关联**的身份（entrance_id / 公私钥 /
 member_id / entrance_name）。这在协议上是干净的，但服务端因此**无法知道"这几行其实是

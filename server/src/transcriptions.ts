@@ -6,9 +6,9 @@ import { requireSession } from "./guard.js";
 import type { OfflineRecognizer } from "sherpa-onnx-node";
 
 /**
- * 服务端转写（方案 D' 演进，voiceTranscript.zhcn.md §15.2）：双引擎。
+ * 服务端转写（方案 D' 演进，20261009_voiceTranscript.zhcn.md §15.2）：双引擎。
  *
- * 隐私承诺（设计文档定稿，部署文档 aimemo/whisperDeploy.zhcn.md §0）：
+ * 隐私承诺（设计文档定稿，部署文档 aimemo/20261022_whisperDeploy.zhcn.md §0）：
  * - 明文音频**全程只在内存**——whisper 引擎经 stdin 管道（whisper-cli `-f -`）喂
  *   子进程；sensevoice 引擎进程内识别（sherpa-onnx node addon）。都不写临时文件、
  *   不落盘、不进日志；
@@ -130,7 +130,7 @@ export function wavDurationMs(wav: Buffer): number {
 /** 从 wav 缓冲提取 16kHz/mono PCM16 采样（归一化 Float32Array）——sensevoice 引擎
  *  的输入。容器解析与 [wavDurationMs] 同口径；多声道取第 0 声道（防御，客户端上传前
  *  已归一化为 mono）；非 16kHz 直接拒（sensevoice 模型只吃 16k，客户端契约保证，
- *  见 voiceTranscript.zhcn.md §8）。 */
+ *  见 20261009_voiceTranscript.zhcn.md §8）。 */
 export function wavPcmSamples(wav: Buffer): { samples: Float32Array; sampleRate: number } {
   if (wav.length < 44 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") {
     throw new ApiError("INVALID_REQUEST", "not a wav file", 400);

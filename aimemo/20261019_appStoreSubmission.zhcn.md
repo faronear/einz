@@ -1,6 +1,6 @@
 # Einz App Store 上架准备 — Review Notes 模板 与 Privacy Nutrition Labels 口径 `[已实现→待提审使用]`
 
-2026-10-19。承接 accountDesign.zhcn.md 的上架讨论与「内置演示秘境」（方案 A，见 worklog 2026-10-19 与 `app/lib/data/demo_space.dart`）。本文档是**提审时的操作物料**：每次提审从 §1 复制粘贴，§2 作为 App Store Connect 填表的对照口径。中国大陆区不考虑（ICP 备案前置，见 accountDesign §六.5）。
+2026-10-19。承接 20261019_accountDesign.zhcn.md 的上架讨论与「内置演示秘境」（方案 A，见 worklog 2026-10-19 与 `app/lib/data/demo_space.dart`）。本文档是**提审时的操作物料**：每次提审从 §1 复制粘贴，§2 作为 App Store Connect 填表的对照口径。中国大陆区不考虑（ICP 备案前置，见 accountDesign §六.5）。
 
 ---
 

@@ -1,6 +1,6 @@
 // Vault（多空间凭证集合）单测：drift 内存库 + SecureStore 测试替身。
 //
-// 覆盖 aimemo/multiSpaceDesign.zhcn.md §7 的 1–4：
+// 覆盖 aimemo/20260918_multiSpaceDesign.zhcn.md §7 的 1–4：
 // 单→多→删除→activeSpace 切换、旧单 payload 归一、PIN 错误/锁定、Spaces 行同步。
 //
 // 需要 LIBSODIUM_PATH 指向 libsodium.dll（与 app_lock_test 一致）。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 拉取语音转写模型（sense-voice-small int8）到 app/assets/voice_model/。
 #
-# 定位（aimemo/voiceTranscript.zhcn.md §11，2026-10-12 改回「打包进产物」）：
+# 定位（aimemo/20261009_voiceTranscript.zhcn.md §11，2026-10-12 改回「打包进产物」）：
 # 模型二进制**不进 git**（239MB），构建前由本脚本拉取，随 App 打包分发；
 # 运行时首次转写才从资产拷到应用目录（见 VoiceTranscriptModel.ensureInstalled）。
 #

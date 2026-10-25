@@ -826,7 +826,7 @@ class AppLockPayload {
       );
 }
 
-/// 一条通道上的**全部空间凭证**（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.2）。
+/// 一条通道上的**全部空间凭证**（多空间支持，见 `aimemo/20260918_multiSpaceDesign.zhcn.md` §3.2）。
 ///
 /// 存储形态：PIN 模式下整个对象加密后存 `app_lock.package`；跳过 PIN 模式明文存
 /// SecureStore `app_lock.plain`。旧版只有一个 [AppLockPayload] 的包在**读取时归一**

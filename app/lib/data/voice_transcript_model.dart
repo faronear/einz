@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-/// SenseVoice-Small int8 模型分发器（voiceTranscript.zhcn.md §11）。
+/// SenseVoice-Small int8 模型分发器（20261009_voiceTranscript.zhcn.md §11）。
 ///
 /// 定位（2026-10-12 改回「打包进产物」）：模型二进制**不进 git**，由
 /// `scripts/fetchVoiceModel.sh` 在构建前拉取到 `app/assets/voice_model/`，

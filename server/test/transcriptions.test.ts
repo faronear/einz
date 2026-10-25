@@ -1,5 +1,5 @@
 /**
- * 服务端转写 `POST /transcriptions`（方案 D'，voiceTranscript.zhcn.md §15.2）单测。
+ * 服务端转写 `POST /transcriptions`（方案 D'，20261009_voiceTranscript.zhcn.md §15.2）单测。
  *
  * 覆盖：
  * 1. wavDurationMs —— 16kHz/16bit/mono 时长计算 + 非 wav/非 PCM 拒绝；

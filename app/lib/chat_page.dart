@@ -295,7 +295,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 仅在实际录音/播放时才实例化（widget 测试环境无原生实现，渲染路径不触碰）。
   AudioRecorder? _recorder;
   AudioPlayer? _player;
-  // 语音消息本地转写（aimemo/voiceTranscript.zhcn.md §9）：纯本地派生，
+  // 语音消息本地转写（aimemo/20261009_voiceTranscript.zhcn.md §9）：纯本地派生，
   // 模型目录 Phase 0 接入前为 null → 行置 unavailable（UI 出手动入口）。
   VoiceTranscriptService? _transcriber;
   final _picker = ImagePicker();
@@ -457,7 +457,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 只影响消息流里墓碑（已删除/已焚毁）的呈现，数据行为不变。
   String _tombstoneDisplay = 'keep';
   /// 语音转写方式（'local'=本机模型 / 'server'=服务端 whisper；默认 local）。
-  /// 方案 D'（voiceTranscript.zhcn.md §15.1 ③），更多设置里可改。
+  /// 方案 D'（20261009_voiceTranscript.zhcn.md §15.1 ③），更多设置里可改。
   /// 2026-10-23 起与自动开关 [_voiceTranscriptAuto] 拆成两组（原三选一里的
   /// 「每条询问」改为自动关闭时的行为，不再是并列选项）。
   String _voiceTranscriptEngine = 'local';
@@ -532,7 +532,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final Map<String, String> _memberGenders = {};
   /// member_id → 成员状态（/space 的 member_status，2026-10-19 自愿退群配套）：
   /// 'active' | 'left'（墓碑）。**名字解析用全量**（墓碑保名，历史消息的
-  /// "谁说的"不丢）；**名单/计数/邀请判定只数 active**（aimemo/groupExitDesign.md
+  /// "谁说的"不丢）；**名单/计数/邀请判定只数 active**（aimemo/20261019_groupExitDesign.md
   /// §4.2 三分口径）。老服务端不下发 → 空表 → 全部按 active（没有墓碑）。
   final Map<String, String> _memberStatus = {};
   /// 空间模式（'duo' | 'group'，/space 下发）。**不靠"成员数 ≥3"猜**——duo 满员
@@ -1163,7 +1163,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     unawaited(_refreshProfileFromServer());
   }
 
-  /// 自愿退群（member.left，2026-10-19，aimemo/groupExitDesign.md §6.4）：
+  /// 自愿退群（member.left，2026-10-19，aimemo/20261019_groupExitDesign.md §6.4）：
   /// **别人**退出——与 [_onMemberJoined] 同构刷新名单/计数，另发一条顶部通知
   /// （告知形式=顶部通知+名单刷新，老板决策 3；不在聊天流落系统消息）。
   ///
@@ -3800,7 +3800,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _memberCount, _maxMembers),
                       muted: true,
                     ),
-                  // 「退出群组」（2026-10-19，aimemo/groupExitDesign.md §6.1）：
+                  // 「退出群组」（2026-10-19，aimemo/20261019_groupExitDesign.md §6.1）：
                   // destructive 红字项。与「邀请新同伴」大按钮同款淡灰底（老板
                   // 2026-10-17 统一口径），红图标+红字表达破坏性；**整块可点**
                   // （老板偏好：别让人去点中某个小控件）。
@@ -3850,7 +3850,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 退出群组（2026-10-19，aimemo/groupExitDesign.md §6.3）：确认闸门 →
+  /// 退出群组（2026-10-19，aimemo/20261019_groupExitDesign.md §6.3）：确认闸门 →
   /// 服务端 leaveSpace → 本地 removeSpace → 导航收尾。
   ///
   /// 执行链的顺序不能反：**leaveSpace 成功之后再清本地**（凭证在本地，清完就
@@ -7557,7 +7557,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
       }
-      // 16kHz 单声道 WAV（voiceTranscript.zhcn.md §8/§14-2，老板 2026-10-10 拍板）：
+      // 16kHz 单声道 WAV（20261009_voiceTranscript.zhcn.md §8/§14-2，老板 2026-10-10 拍板）：
       // 本地转写（sherpa readWave）只吃 PCM wav——m4a 无法转写；体积代价
       // 60s≈1.9MB 可接受。旧版 m4a 语音消息照常播放（AAC 解码走系统），
       // 只是转写入口会提示"旧格式不支持转写"。
@@ -9141,7 +9141,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         playAreaTappable,
-        // 语音消息：波形行下方挂本地转写行（aimemo/voiceTranscript.zhcn.md §10——
+        // 语音消息：波形行下方挂本地转写行（aimemo/20261009_voiceTranscript.zhcn.md §10——
         // 仅消息流气泡有；纯音频文件消息挂 wav 转写行，非 wav 不占位）
         // 手动模式（自动转写关）且还没有任何转写行时，转写行位置显示「图标+转写」
         // 的行内入口（老板 2026-10-23）：点击直接按当前方式发起转写，入队后被
@@ -9160,7 +9160,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 转写用的本地库：与页面其他数据同源（测试注入 [ChatPage.db]，生产用 shared）。
   LocalDatabase get _voiceDb => widget.db ?? LocalDatabase.shared;
 
-  /// 语音气泡下方的本地转写行（aimemo/voiceTranscript.zhcn.md §10）：
+  /// 语音气泡下方的本地转写行（aimemo/20261009_voiceTranscript.zhcn.md §10）：
   /// - done → 转写文本（最多 3 行，可读性优先）；
   /// - pending → 「转写中…」占位；
   /// - failed / stale → 可点的「重新转写」入口（不露错误堆栈）；
@@ -12021,7 +12021,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
   }
 }
 
-/// 语音转写设置弹层（方案 D'，voiceTranscript.zhcn.md §15.1 ③；2026-10-23
+/// 语音转写设置弹层（方案 D'，20261009_voiceTranscript.zhcn.md §15.1 ③；2026-10-23
 /// 老板重构：原「本地/服务端/每条询问」三选一拆成两组——「每条询问」不再是
 /// 并列的第三个选项，而是**自动转写关闭时**的行为）。
 ///

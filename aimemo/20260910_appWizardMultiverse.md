@@ -3,7 +3,7 @@
 > 状态：`[待评审] 改造计划，尚未实现`
 >
 > 配套：`docs/PROTOCOL_MULTIVERSE.md`（Multiverse 加入授权协议草案）、
-> `aimemo/upgradeToMultiverse.md`（总体升级计划 Phase U3）。
+> `aimemo/20260910_upgradeToMultiverse.md`（总体升级计划 Phase U3）。
 >
 > 本文是 App（Flutter `setup_page.dart`）改造的具体清单，与协议草案一一对应。
 

@@ -1,7 +1,7 @@
 # 字段/标识符改名计划：`device_*` → `entrance_*`/`install_*`、`person_*` → `partner_*`
 
 状态：**`[执行中]`**（2026-09-23 重新拍板并开工；原 2026-09-22 三期 alias 计划**作废**）
-关联：`docs/GLOSSARY.md`（术语分层的唯一权威）、`aimemo/multiSpaceDesign.zhcn.md` §3.7
+关联：`docs/GLOSSARY.md`（术语分层的唯一权威）、`aimemo/20260918_multiSpaceDesign.zhcn.md` §3.7
 
 ---
 
@@ -143,8 +143,8 @@ app 测试里那条 UI 断言也同步改了。**探针未实跑**（需真 serv
 
 ## 8. 历史快照不动（老板 2026-09-23 同意）
 
-`aimemo/architectureReview*.md`、`upgradeToMultiverse.md`、`appWizardMultiverse.md`、
-`escrowArchivedKeys.md`、`voiceCall.zhcn.md`、`worklog.md` 是**带日期的记录**，旧名保持原样
+`aimemo/architectureReview*.md`、`20260910_upgradeToMultiverse.md`、`20260910_appWizardMultiverse.md`、
+`20260914_escrowArchivedKeys.md`、`20260918_voiceCall.zhcn.md`、`worklog.md` 是**带日期的记录**，旧名保持原样
 （改了就是篡改历史）；`db.ts` 清理 v1 meta 的字面量 `'creator_person_id'` /
 `'person_name:%'` / `'person_gender:%'` 同理保留；goldens 文件名 `..._device.png` 也不动。
 

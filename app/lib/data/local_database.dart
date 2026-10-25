@@ -18,7 +18,7 @@ part 'local_database.g.dart';
 /// per-space 设置键：`space.<spaceId>.<key>`（多空间：设置按空间隔离）。
 ///
 /// 读取时回退同名旧全局键（v7 之前的设置没有空间维度），故存量用户的设置不会丢，
-/// 见 `aimemo/multiSpaceDesign.zhcn.md` §3.6。
+/// 见 `aimemo/20260918_multiSpaceDesign.zhcn.md` §3.6。
 String spaceScopedKey(String spaceId, String key) => 'space.$spaceId.$key';
 
 /// 本地消息（与 Server messages 同构 + 本地状态）。
@@ -106,7 +106,7 @@ class PeerReceipts extends Table {
   Set<Column> get primaryKey => {spaceId, memberId};
 }
 
-/// 本地已加入的 Space（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.1）。
+/// 本地已加入的 Space（多空间支持，见 `aimemo/20260918_multiSpaceDesign.zhcn.md` §3.1）。
 ///
 /// 定位是「**元数据 + 会话外状态**」：Space Key 只存在于 Vault（PIN 密文包 /
 /// SecureStore 明文包），本表**不存任何密钥**——避免两处真相。
@@ -136,7 +136,7 @@ class AppState extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-/// 语音消息本地转写（纯本地派生表，`aimemo/voiceTranscript.zhcn.md` §7）。
+/// 语音消息本地转写（纯本地派生表，`aimemo/20261009_voiceTranscript.zhcn.md` §7）。
 ///
 /// 定位是**可丢弃缓存**：转写文本 = f(明文音频, ASR 模型)，各端各自转写、
 /// 不进 E2EE 密文、不参与同步、服务端不可见；换模型/换版本后可对同一音频重算。
@@ -283,7 +283,7 @@ class LocalDatabase extends _$LocalDatabase {
           }
           if (from < 11) {
             // v11（2026-10-22）：新增 local_voice_transcripts 表（语音消息本地转写，
-            // 纯本地派生缓存——aimemo/voiceTranscript.zhcn.md §7）。纯新表，无回填。
+            // 纯本地派生缓存——aimemo/20261009_voiceTranscript.zhcn.md §7）。纯新表，无回填。
             //
             // **必须占独立版本号**：v10 已随 main 发布过（墓碑来路列），本分支起初把
             // 新表塞进上面的 from<10 块——已升到 v10 的存量库（生产/dev 都是）再打开

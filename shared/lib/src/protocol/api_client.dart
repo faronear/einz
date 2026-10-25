@@ -565,7 +565,7 @@ class ApiClient {
     await _post(Api.entranceRetire, {}, token: token);
   }
 
-  /// **自愿退群**（POST /spaces/{id}/leave，2026-10-19，aimemo/groupExitDesign.md）：
+  /// **自愿退群**（POST /spaces/{id}/leave，2026-10-19，aimemo/20261019_groupExitDesign.md）：
   /// 身份级离场——本人身份名下**全部**通道一并注销，成员行转墓碑（名字保留供
   /// 历史消息解析），本机数据由调用方随后清理。
   ///

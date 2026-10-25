@@ -90,7 +90,7 @@ Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 
 > 同一文件里的 `maxMembersPerSpace` 控制**单空间成员（身份）数量上限**：`0`=不限、`n`=最多
 > n 个身份（建议 4）。注意**双人秘境恒为 2 人**、与这个值无关（空间类型在创建时选定、不可改，
-> 详见 `aimemo/groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
+> 详见 `aimemo/20261003_groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
 >
 > **冻结闸（2026-10-04，原"强制升级闸"）**：`coldAppVersion` 声明**冻结线**——服务端
 > 当前可用的最低 App 版本，格式 `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，

@@ -9,7 +9,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import 'local_database.dart';
 import 'voice_transcript_model.dart';
 
-/// 语音消息本地转写服务（`aimemo/voiceTranscript.zhcn.md` §6/§7/§9）。
+/// 语音消息本地转写服务（`aimemo/20261009_voiceTranscript.zhcn.md` §6/§7/§9）。
 ///
 /// 定位：**纯本地派生缓存**——各端各自把已解密的明文音频转写成文字，结果只进
 /// 本地 `local_voice_transcripts` 表；不产生任何网络流量、服务端不可见。
@@ -207,7 +207,7 @@ class VoiceTranscriptService {
   }
 
   /// 转写链路的采样率约定（ sherpa sense-voice 与 whisper 都按 16kHz 口径，
-  /// voiceTranscript.zhcn.md §8）：规范化输出恒定 16kHz/16bit/mono PCM。
+  /// 20261009_voiceTranscript.zhcn.md §8）：规范化输出恒定 16kHz/16bit/mono PCM。
   static const int kTranscriptSampleRate = 16000;
 
   /// 把 wav 容器规范化成**标准 16kHz/16bit/mono PCM**（tag=1、44 字节头）；

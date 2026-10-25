@@ -1,6 +1,6 @@
 // 多空间数据隔离单测（M1）：drift 内存库 + SecureStore 替身。
 //
-// 覆盖 aimemo/multiSpaceDesign.zhcn.md §7 的 4–6：
+// 覆盖 aimemo/20260918_multiSpaceDesign.zhcn.md §7 的 4–6：
 // removeSpace 只清本空间、PIN 模式挂 pending 后解锁再摘凭证、per-space 设置互不干扰、
 // 媒体缓存保留名单跨空间。
 //

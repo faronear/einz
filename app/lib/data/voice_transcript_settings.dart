@@ -1,7 +1,7 @@
 import 'local_database.dart';
 import 'space_scoped_setting.dart';
 
-/// 语音转写的两项本设备设置（方案 D'，voiceTranscript.zhcn.md §15.1 ③）。
+/// 语音转写的两项本设备设置（方案 D'，20261009_voiceTranscript.zhcn.md §15.1 ③）。
 ///
 /// **2026-10-23 老板重构**：原「本地 / 服务端 / 每条询问」三选一拆成两组——
 /// 「每条询问」不再是并列的第三个选项，而是**自动转写关闭时**的行为：
