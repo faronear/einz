@@ -1892,6 +1892,24 @@ abstract class AppLocalizations {
   /// **'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can'**
   String get voiceTranscriptLegacyAudio;
 
+  /// No description provided for @voiceTranscriptFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed: {error}'**
+  String voiceTranscriptFailed(String error);
+
+  /// No description provided for @voiceTranscriptNoText.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech recognized'**
+  String get voiceTranscriptNoText;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
   /// No description provided for @chatPageMenuVoiceTranscriptAuth.
   ///
   /// In en, this message translates to:

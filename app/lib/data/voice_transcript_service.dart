@@ -63,6 +63,31 @@ class VoiceTranscriptService {
     _tail = _tail!.then((_) => _processOne(messageId, plainPath, cipherSha256));
   }
 
+  /// 转写一个**本地明文 wav 文件**（不落库、无 messageId 语义）——供录音预览态
+  /// 的即时转写用（老板 2026-10-25：预览态长按波形图弹窗转写，Apply 后文字
+  /// 追加进输入框、原录音保留）。返回 (text, language)。
+  ///
+  /// 与 [_processOne] 共用串行队列（_tail）与 isolate 跑法（不并发抢 CPU）；
+  /// 模型未就绪抛 [StateError]（调用方应先 ensureInstalled）；文件头不合格抛
+  /// [ArgumentError]（与消息链路同口径：先拦下，绝不进 sherpa 原生层）。
+  Future<(String, String)> transcribeFile(String plainPath) {
+    final previous = _tail?.catchError((_) {}) ?? Future.value();
+    final result = previous.then((_) => _transcribeFileNow(plainPath));
+    // 队列链只承接 void：把本次的结果/异常都咽掉——异常已透传给调用方的
+    // result（对话框照常显示失败），不会变成未处理的异步错误
+    _tail = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<(String, String)> _transcribeFileNow(String plainPath) async {
+    final dir = await _resolveModelDir();
+    if (dir == null) {
+      throw StateError('voice transcript model not installed');
+    }
+    // 预览态录音在 _stopVoice 时已规范化过；这里再兜底一次（幂等快路径）
+    normalizeWavFile(plainPath);
+    return _runIsolate(plainPath, dir);
+  }
   Future<void> _processOne(
       String messageId, String plainPath, String cipherSha256) async {
     final existing =

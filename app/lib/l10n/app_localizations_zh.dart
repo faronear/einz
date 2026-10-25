@@ -1040,6 +1040,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptLegacyAudio => '旧版语音（m4a）不支持转写，新录的语音才能转';
 
   @override
+  String voiceTranscriptFailed(String error) {
+    return '转写失败：$error';
+  }
+
+  @override
+  String get voiceTranscriptNoText => '未识别到文字';
+
+  @override
+  String get apply => '应用';
+
+  @override
   String get chatPageMenuVoiceTranscriptAuth => '语音转写';
 
   @override

@@ -7853,6 +7853,63 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 预览态长按波形图（老板 2026-10-25）：**先备基础设施**——模型未就绪 → 弹
+  /// 准备对话框（下载/安装进度，可取消）；就绪 → 弹转写对话框（打开即自动转写，
+  /// 见 [_PreviewTranscribeDialog]）。准备失败（用户取消/安装出错）→ 只出顶部
+  /// 通知条，不弹转写窗。
+  Future<void> _transcribePreviewRecording() async {
+    final path = _recordingPath;
+    if (path == null || _inputMode != _InputMode.preview) return;
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      if (!await VoiceTranscriptModel.isReady()) {
+        final ok = await _prepareVoiceModel();
+        // 用户取消或安装失败（失败已由 _prepareVoiceModel 出通知条）→ 到此为止
+        if (!ok || !mounted) return;
+      }
+    } catch (e) {
+      // isReady() 探活本身出错（极少见）：同准备失败口径，通知条说明
+      if (!mounted) return;
+      _notice(context, l10n.voiceTranscriptPrepareFailed('$e'));
+      return;
+    }
+    // 准备期间用户可能已切走（取消录音/切回文字/重录）：路径失效就不再弹窗
+    if (!mounted || _inputMode != _InputMode.preview || _recordingPath != path) {
+      return;
+    }
+    final transcriber = _transcriber ??= VoiceTranscriptService(_voiceDb);
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _PreviewTranscribeDialog(
+        transcriber: transcriber,
+        path: path,
+        onApply: _applyPreviewTranscript,
+      ),
+    );
+  }
+
+  /// 转写对话框 Apply（老板 2026-10-25）：把转写文字追加到输入框现有文字的
+  /// 最后（原有文字非空时以一个空格分隔），切回文字输入态，并**清除原录音**
+  /// （删临时文件、清波形/秒数——录音内容已转成文字落进输入框，不再保留）。
+  Future<void> _applyPreviewTranscript(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isNotEmpty) {
+      final old = _input.text;
+      final merged = old.isEmpty ? trimmed : '$old $trimmed';
+      _setInputValue(merged, merged.length);
+    }
+    final path = _recordingPath;
+    setState(() {
+      _inputMode = _InputMode.text;
+      _recordingPath = null;
+      _recordSeconds = 0;
+      _voiceSamples.clear();
+    });
+    if (path != null) {
+      final f = File(path);
+      if (await f.exists()) await f.delete().catchError((_) => f);
+    }
+  }
   /// 预览态试听：点播放/暂停切换（与消息播放互斥）。
   Future<void> _playVoicePreview() async {
     final path = _recordingPath;
@@ -7919,7 +7976,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 color: Theme.of(context).colorScheme.primary),
             onPressed: _playVoicePreview,
           ),
-          Expanded(
+        Expanded(
+          // 长按波形图=即时转写（老板 2026-10-25）：先备模型（下载/安装），就绪
+          // 才弹转写对话框。opaque 保证纯图形区也收得到长按（CustomPaint 自身
+          // 不吸收命中——实测 deferToChild 包裸 CustomPaint 收不到）；内层在
+          // 手势竞技场赢外层（外层在预览态本就被 _startVoice 守卫空转，不会误
+          // 重录——预览态长按自 2026-09-13 起就是故意空操作）。
+          child: Clickable(
+            behavior: HitTestBehavior.opaque,
+            onLongPressStart: (_) => unawaited(_transcribePreviewRecording()),
             child: LayoutBuilder(builder: (context, constraints) {
               // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
               // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
@@ -7933,6 +7998,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               );
             }),
           ),
+        ),
           IconButton(
             visualDensity: VisualDensity.compact,
             iconSize: 22,
@@ -12540,6 +12606,101 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
 
 /// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；
 /// 按可用宽度只渲染能放下的条数（取尾部最新采样），窄屏也不会顶出屏幕。
+/// 预览态录音的即时转写对话框（老板 2026-10-25）：打开即自动开始本机转写
+/// （调用方已确保模型就绪），过程中内容区显示「转写中…」，完成显示转写文字；
+/// 底部 Cancel / Apply 两个按钮——Apply 把文字交回 [onApply]（追加进输入框现有
+/// 文字末尾、切回文字态、**清除原录音**）；Cancel 或点对话框外只关窗，预览态不动。
+class _PreviewTranscribeDialog extends StatefulWidget {
+  const _PreviewTranscribeDialog({
+    required this.transcriber,
+    required this.path,
+    required this.onApply,
+  });
+
+  /// 转写服务（与消息转写链路共用实例：串行队列，不并发抢 CPU）。
+  final VoiceTranscriptService transcriber;
+
+  /// 预览态录音的临时 wav 路径（_stopVoice 时已规范化、已验证有音频数据）。
+  final String path;
+
+  /// Apply 回调（转写文字）。
+  final ValueChanged<String> onApply;
+
+  @override
+  State<_PreviewTranscribeDialog> createState() =>
+      _PreviewTranscribeDialogState();
+}
+
+class _PreviewTranscribeDialogState
+    extends State<_PreviewTranscribeDialog> {
+  bool _busy = true; // 转写中（打开即自动开始）
+  String _text = ''; // 转写结果
+  String? _error; // 失败信息（null=没失败）
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_transcribe());
+  }
+
+  Future<void> _transcribe() async {
+    try {
+      final r = await widget.transcriber.transcribeFile(widget.path);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _text = r.$1.trim();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // 有文字才可 Apply：转写中/失败/空结果一律禁用
+    final canApply = !_busy && _error == null && _text.isNotEmpty;
+    return AlertDialog(
+      title: Text(l10n.voiceTranscriptMenuTranscribe),
+      content: _busy
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Text(l10n.voiceTranscribing),
+              ],
+            )
+          : Text(_error != null
+              ? l10n.voiceTranscriptFailed(_error!)
+              : (_text.isEmpty ? l10n.voiceTranscriptNoText : _text)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: canApply
+              ? () {
+                  widget.onApply(_text);
+                  Navigator.of(context).pop();
+                }
+              : null,
+          child: Text(l10n.apply),
+        ),
+      ],
+    );
+  }
+}
 class _WaveformBars extends StatelessWidget {
   const _WaveformBars({required this.samples, required this.color});
 

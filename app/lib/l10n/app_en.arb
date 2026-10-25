@@ -656,6 +656,16 @@
   "voiceTranscriptStale": "Re-transcribe available",
   "voiceTranscriptManual": "Tap to transcribe",
   "voiceTranscriptLegacyAudio": "Legacy voice messages (m4a) can't be transcribed — only new recordings can",
+  "voiceTranscriptFailed": "Transcription failed: {error}",
+  "@voiceTranscriptFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceTranscriptNoText": "No speech recognized",
+  "apply": "Apply",
   "chatPageMenuVoiceTranscriptAuth": "Voice transcription",
   "voiceTranscriptAuthNote": "how to transcribe voice messages?",
   "voiceTranscriptAuthLocal": "Local",

@@ -1101,6 +1101,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can';
 
   @override
+  String voiceTranscriptFailed(String error) {
+    return 'Transcription failed: $error';
+  }
+
+  @override
+  String get voiceTranscriptNoText => 'No speech recognized';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
   String get chatPageMenuVoiceTranscriptAuth => 'Voice transcription';
 
   @override
