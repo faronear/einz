@@ -201,10 +201,13 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 | **打包进产物**（build 时脚本拉取，**不进 git**） | 装好即离线可用、无下载逻辑 | 产物 +239 MB |
 | **首次使用时下载** | 产物小 | 需处理下载/进度/失败/存储 |
 
-**结论（2026-10-12 老板拍板，改回打包）**：模型二进制**不进 git**，由
-`scripts/fetchVoiceModel.sh` 在**构建前**拉取到 `app/assets/voice_model/`
-（幂等：已就绪秒过；双源 + 3 轮重试；sha256 校验），随 App 打包分发。
-运行时**首次转写前**由 `VoiceTranscriptModel.ensureInstalled` 装到
+**结论（2026-10-12 老板拍板，改回打包；2026-10-25 再改为开关可选）**：模型
+二进制**不进 git**，由 `scripts/fetchVoiceModel.sh` 拉取到
+`app/assets/voice_model/`（幂等：已就绪秒过；双源 + 3 轮重试；sha256 校验）。
+**2026-10-25 起 pubspec 基线不再声明 `assets/voice_model/`**——只有
+`VOICE_MODEL=true` 时由 `scripts/insertVoiceModel.sh` 拉取模型、临时注入
+声明并执行 flutter 命令，结束（含失败）trap 还原。运行时**首次转写前**由
+`VoiceTranscriptModel.ensureInstalled` 装到
 `<ApplicationSupport>/voice_transcript/<kModelVersion>/`——已装过（含 10-10
 ~10-12 期间下载过模型的设备）直接复用，**零迁移**。
 
@@ -225,10 +228,15 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 - 版本演进：换模型 = 新 `kModelVersion` 目录 + 重新拉取/重转，永不覆盖旧目录；
   转写表 `modelVersion` 列同步更新（stale 判定自动生效）。
 - 与 A/B 两模型都留出**替换余地**（模型文件 + 配置可换）。
-- 构建入口挂钩：`app/ios/buildIos.sh` / `app/macos/buildMacos.sh` / npm
-  `app-apk-build` 都先跑 fetchVoiceModel.sh（幂等）；**拉取失败中断打包**——
-  不静默出没有转写功能的包。`.gitkeep` 保证新克隆也有资产目录（否则 pubspec
-  声明资产直接构建失败）。
+- 构建入口挂钩（2026-10-25 改为 VOICE_MODEL 开关）：`app/ios/buildIos.sh` /
+  `app/macos/buildMacos.sh` / npm `app-apk-build` `app-mac-build-raw` 的
+  flutter 命令都经 `scripts/insertVoiceModel.sh` 包装；run 类（`app-mac-run`
+  `app-ios-run` `app-apk-run`）同包装。**默认不打包模型**（产物 -239MB），
+  `VOICE_MODEL=true` 才拉取+注入 pubspec 声明；设了开关时**拉取失败中断
+  构建**。pubspec 基线不含声明，`.gitkeep` 保证目录存在（注入后构建不因
+  缺目录失败）。CI（buildMultiPlatform.yml）直接 flutter build、不经包装，
+  天然默认不带模型——与「默认轻产物」一致；要带模型需 CI 显式设
+  VOICE_MODEL=true 并跑 insertVoiceModel.sh（当前未设）。
 
 ---
 

@@ -111,11 +111,11 @@ flutter:
     # 演示画面必须全设备可靠，见 lib/data/demo_art.dart 头注；
     # 重新生成：npm run demo-assets，产出的 PNG 随代码提交进库。
     - assets/demoSpace/
-    # 语音转写模型（sense-voice-small int8 ~239MB + tokens.txt）：二进制不进
-    # git，构建前由 scripts/fetchVoiceModel.sh 拉取到此目录（幂等）；运行时
-    # 首次转写从资产拷到应用目录，见 VoiceTranscriptModel.ensureInstalled。
-    # 目录里的 .gitkeep 保证新克隆也有目录（否则此处构建直接失败）。
-    - assets/voice_model/
+    # 语音转写模型（sense-voice-small int8 ~239MB + tokens.txt）：**默认不打包**。
+    # VOICE_MODEL=true 时由 scripts/insertVoiceModel.sh 拉取模型并临时注入
+    # `- assets/voice_model/` 声明（命令结束自动还原）；包里没资产时运行时
+    # 走下载兜底，见 VoiceTranscriptModel.ensureInstalled。目录常驻仅 .gitkeep
+    # （保住目录本身，否则注入后的构建会因缺目录失败）。
 
 # sqlite3 原生库：用 sqlite3 包默认的捆绑预编译库（构建时从 GitHub releases
 # 下载并打入 APK）。曾配置 source: system 依赖系统 SQLite，但 Android 系统
