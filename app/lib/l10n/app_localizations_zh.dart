@@ -984,7 +984,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageVoiceEmpty => '录音内容为空，已丢弃。';
 
   @override
-  String get chatPageLongPressToRecord => '长按开始录音';
+  String get chatPageLongPressToRecord => '点按或长按开始录音';
 
   @override
   String get chatPageLongPressToTranscribe => '长按转文字';

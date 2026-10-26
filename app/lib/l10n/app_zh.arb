@@ -593,7 +593,7 @@
   },
   "chatPageVoicePermissionDenied": "麦克风权限被拒绝，请到系统设置里开启。",
   "chatPageVoiceEmpty": "录音内容为空，已丢弃。",
-  "chatPageLongPressToRecord": "长按开始录音",
+  "chatPageLongPressToRecord": "点按或长按开始录音",
   "chatPageLongPressToTranscribe": "长按转文字",
   "chatPageInputHint": "输入消息…",
   "chatPageAudioMetaMissing": "音频附件元数据缺失",

@@ -8081,6 +8081,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           Expanded(
               child: _WaveformBars(
                   samples: _voiceLastSamples(40), color: Colors.green)),
+          const SizedBox(width: 4),
+          // 停止钮（老板 2026-10-26 免提模式）：点按开录的用户不必一直
+          // 按着——点此停止=长按模式里的松手（停录进预览态、录音保留）。
+          // 位置与预览态关闭钮同位（盒内最右）；绿色 stop_circle 与播放/停止
+          // 图标同族（区别于预览态灰色删除钮 X）。长按开录的用户同样可用
+          // （不必死等松手时机）；60s 上限到点也会自动停进预览态。
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 22,
+            splashRadius: 17, // 纯圆内切 34 按钮，不溢出成椭圆
+            icon: const Icon(Icons.stop_circle, color: Colors.green),
+            onPressed: () => unawaited(_stopVoice()),
+          ),
         ],
       );
     }
@@ -11399,6 +11412,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               cursor: _inputMode ==
                                                       _InputMode.hint
                                                   ? SystemMouseCursors.click
+                                                  : null,
+                                              // 提示态**点按**也开始录音（老板
+                                              // 2026-10-26 免提模式）：长按最长要按
+                                              // 60 秒（拇指疲劳/桌面按住鼠标），点按
+                                              // 开录后右侧停止钮收尾（见
+                                              // _buildVoiceBarContent 录音态），停止
+                                              // =长按模式里的松手。仅提示态挂——
+                                              // 录音/预览态点按无意义（_startVoice
+                                              // 有守卫），挂了只会让光标变手型骗人。
+                                              // 与长按共存不冲突：快点快松=点按开录，
+                                              // 按住不放=长按开录松手即停。
+                                              onTap: _inputMode ==
+                                                      _InputMode.hint
+                                                  ? () => unawaited(
+                                                      _startVoice())
                                                   : null,
                                               onLongPressStart: (_) =>
                                                   _startVoice(),

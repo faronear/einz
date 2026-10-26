@@ -1044,7 +1044,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageVoiceEmpty => 'Recording was empty and was discarded.';
 
   @override
-  String get chatPageLongPressToRecord => 'Long press to record';
+  String get chatPageLongPressToRecord => 'Tap or long-press to record';
 
   @override
   String get chatPageLongPressToTranscribe => 'Long press to text';
