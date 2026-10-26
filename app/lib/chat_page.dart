@@ -10372,11 +10372,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.advancedMenuTitle, style: labelStyle),
                       const Spacer(),
-                      // 危险/警告图标（老板 2026-10-15）：弹层里是改口令/删全部
-                      // 消息/销毁通道这类破坏性操作，入口先给一个警示标识。**菜单里
-                      // 不用红色**——太引人注意，红色留给弹层内部那一行
-                      Icon(Icons.warning_amber_rounded,
-                          size: 18, color: labelStyle.color),
+                      // 危险/警告图标（老板 2026-10-15；2026-10-26 老板改闪电）：
+                      // 弹层里是改口令/删全部消息/销毁通道这类破坏性操作，入口给
+                      // 警示标识。warning 三角在 18px 下感叹号墨迹太小看不清（老板
+                      // 2026-10-26），换 bolt 闪电墨迹大。**菜单里不用红色**——太
+                      // 引人注意，红色留给弹层内部那一行
+                      Icon(Icons.bolt, size: 18, color: labelStyle.color),
                       const SizedBox(width: 2),
                       Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
