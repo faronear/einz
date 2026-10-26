@@ -70,16 +70,28 @@ class VoiceTranscriptService {
   /// 与 [_processOne] 共用串行队列（_tail）与 isolate 跑法（不并发抢 CPU）；
   /// 模型未就绪抛 [StateError]（调用方应先 ensureInstalled）；文件头不合格抛
   /// [ArgumentError]（与消息链路同口径：先拦下，绝不进 sherpa 原生层）。
-  Future<(String, String)> transcribeFile(String plainPath) {
+  /// [cancelled]：开跑前检查（同步、可多次调用）——调用方已撤（如转写弹层
+  /// 被关掉）时返回 true，本条**跳过不跑**（别白占 isolate/CPU）。注意只拦
+  /// 「还没轮到它」的情况：已经进 isolate 的 sherpa 识别杀不掉（Dart isolate
+  /// 无中断 API），照常跑完，结果由调用方自己丢弃。
+  Future<(String, String)> transcribeFile(String plainPath,
+      {bool Function()? cancelled}) {
     final previous = _tail?.catchError((_) {}) ?? Future.value();
-    final result = previous.then((_) => _transcribeFileNow(plainPath));
+    final result =
+        previous.then((_) => _transcribeFileNow(plainPath, cancelled));
     // 队列链只承接 void：把本次的结果/异常都咽掉——异常已透传给调用方的
     // result（对话框照常显示失败），不会变成未处理的异步错误
     _tail = result.then((_) {}, onError: (_) {});
     return result;
   }
 
-  Future<(String, String)> _transcribeFileNow(String plainPath) async {
+  Future<(String, String)> _transcribeFileNow(
+      String plainPath, bool Function()? cancelled) async {
+    // 队列轮到这条时调用方已撤：跳过（抛错仅供调用方 catch 里静默收尾，
+    // 队列链的 onError 会咽掉它继续跑下一条）
+    if (cancelled != null && cancelled()) {
+      throw StateError('voice transcription cancelled');
+    }
     final dir = await _resolveModelDir();
     if (dir == null) {
       throw StateError('voice transcript model not installed');

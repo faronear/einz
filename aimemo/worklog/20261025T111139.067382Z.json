@@ -49,7 +49,8 @@
         "预览态长按波形→模型未就绪先下载安装（进度对话框）；安装/探活失败→拉起底部弹层直接显示错误（不再走通知条）；用户取消→静默返回（不出弹层不出通知）",
         "_PreviewTranscribeDialog(AlertDialog)→_PreviewTranscribeSheet(showModalBottomSheet, isScrollControlled)：标题「语音转写」(voiceTranscriptSheetTitle 新串)，内容区=转写中…(转圈)/转写正文/失败信息(限高260+滚动)，仅转写成功(有文字)底部才出现 Apply；Cancel 恒在，右对齐",
         "_prepareVoiceModel 返回类型 bool→({bool ok, String? error}) 记录：错误文本交给调用方决定呈现方式——消息气泡路径仍出顶部通知条(notice 移到 _transcribeVoiceLocally)，预览态路径进弹层；用户取消(_Cancelled)记 null 不出错误",
-        "自动转写路径不弹下载框（已回答老板疑问）：_enqueueVoiceTranscripts 只入队，service _processOne 发现模型未装就落 unavailable 行(静默)，下载框只在手动入口(气泡行内点按/长按菜单/预览态长按)出现；且准备对话框是模态的，第一个开着时点不到第二个入口，不会叠窗"
+        "自动转写路径不弹下载框（已回答老板疑问）：_enqueueVoiceTranscripts 只入队，service _processOne 发现模型未装就落 unavailable 行(静默)，下载框只在手动入口(气泡行内点按/长按菜单/预览态长按)出现；且准备对话框是模态的，第一个开着时点不到第二个入口，不会叠窗；装好模型后手动入口自动继续转写该消息，无需二次点击",
+        "关层取消机制（老板 2026-10-25 三轮）：Cancel/点层外/下滑三条关层路径此前完全同构=只 pop 不通知转写（活照跑、结果因 mounted=false 丢弃）——已向老板确认无误后加 cancelled 回调：transcribeFile(path, {cancelled})，队列轮到本条时发现层已关(showModalBottomSheet future 完成即置位)就跳过不跑；已进 isolate 的 sherpa 识别杀不掉（Dart isolate 无中断 API），照常跑完结果丢弃；PR #1 已建（git.tic.cc Gitea API + git 凭证，gh 只登录了 github.com）"
       ]
     }
   ]

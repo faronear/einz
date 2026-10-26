@@ -7878,7 +7878,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 预览态长按波形图（老板 2026-10-25）：**先备基础设施**——模型未就绪 →
   /// 弹准备对话框（下载/安装进度，可取消）；安装/探活出错 → 拉起底部弹层
   /// 直接显示错误（不再走通知条）。就绪 → 弹转写弹层（打开即自动转写，见
-  /// [_PreviewTranscribeSheet]）。
+  /// [_PreviewTranscribeSheet]；关层后未轮到的转写会跳过，见 cancelled 旗标）。
   Future<void> _transcribePreviewRecording() async {
     final path = _recordingPath;
     if (path == null || _inputMode != _InputMode.preview) return;
@@ -7902,6 +7902,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return;
     }
     final transcriber = _transcriber ??= VoiceTranscriptService(_voiceDb);
+    // 关层旗标（Cancel/点层外/下滑三条路都算）：showModalBottomSheet 的 future
+    // 在退场动画结束后才完成——这之前轮到转写的话照跑（结果照样因
+    // mounted=false 丢弃，见 _PreviewTranscribeSheet._transcribe）；之后轮到的
+    // 由 transcribeFile 的 cancelled 检查跳过不跑（别白占 isolate）。
+    // Apply 也会走到这里置位，但那时转写早已跑完，无副作用。
+    var sheetDismissed = false;
     await showModalBottomSheet<void>(
       context: context,
       // 长转写文本可撑高：弹层限高内部滚动（见 _PreviewTranscribeSheet）
@@ -7910,9 +7916,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         transcriber: transcriber,
         path: path,
         prepError: prepError,
+        cancelled: () => sheetDismissed,
         onApply: _applyPreviewTranscript,
       ),
     );
+    sheetDismissed = true;
   }
 
   /// 转写对话框 Apply（老板 2026-10-25）：把转写文字追加到输入框现有文字的
@@ -12727,14 +12735,17 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
 /// 就失败，直接显示错误不开转）——标题「语音转写」，内容区=转写中…（转圈）/
 /// 转写正文/失败信息（失败信息在弹层内显示，不走通知条，老板 2026-10-25）；
 /// 仅转写成功（有文字）时底部才出现 Apply 按钮：把文字交回 [onApply]（追加进
-/// 输入框现有文字末尾、切回文字态、**清除原录音**）。Cancel 或下滑/点弹层外
-/// 只关弹层，预览态不动。
+/// 输入框现有文字末尾、切回文字态、**清除原录音**）。Cancel/下滑/点弹层外
+/// 只关弹层、预览态不动——关层≠停转写：本条若还没轮到就由 [cancelled]
+/// 跳过不跑；已进 isolate 的照常跑完、结果因 mounted=false 丢弃（再长按
+/// 波形可重转）。
 class _PreviewTranscribeSheet extends StatefulWidget {
   const _PreviewTranscribeSheet({
     required this.transcriber,
     required this.path,
     required this.onApply,
     this.prepError,
+    required this.cancelled,
   });
 
   /// 转写服务（与消息转写链路共用实例：串行队列，不并发抢 CPU）。
@@ -12748,6 +12759,10 @@ class _PreviewTranscribeSheet extends StatefulWidget {
 
   /// 准备阶段（模型下载/安装/探活）的错误信息；null=准备就绪，开层即转写。
   final String? prepError;
+
+  /// 取消检查（关层后返回 true）：透传给 [VoiceTranscriptService.transcribeFile]——
+  /// 队列轮到这条时发现层已关就跳过不跑；已进 isolate 的拦不住（跑完丢弃）。
+  final bool Function() cancelled;
 
   @override
   State<_PreviewTranscribeSheet> createState() =>
@@ -12770,7 +12785,8 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
 
   Future<void> _transcribe() async {
     try {
-      final r = await widget.transcriber.transcribeFile(widget.path);
+      final r = await widget.transcriber
+          .transcribeFile(widget.path, cancelled: widget.cancelled);
       if (!mounted) return;
       setState(() {
         _busy = false;
