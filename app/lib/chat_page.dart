@@ -8132,13 +8132,49 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           // 宽度撑满可用区。青绿双色（老板 2026-10-25 三轮
                           // 定稿）：active=shade700 深青绿（已播+进度竖线）、
                           // inactive=shade200 浅青绿（未播静态）。
-                          return _VoiceWaveform(
-                            playing: _previewPlaying,
-                            durationSeconds: _recordSeconds,
-                            samples: _voiceSamples,
-                            width: constraints.maxWidth,
-                            activeColor: Colors.green.shade700,
-                            inactiveColor: Colors.green.shade200,
+                          // 波形上叠「长按开始转写」提示（老板 2026-10-26）：
+                          // 录音条没有空间，提示直接落在波形图上（同提示态
+                          // 「长按开始录音」样式）。**无条件常显**（这不是
+                          // 气泡消息）；文字绿色同「长按开始录音」（老板
+                          // 2026-10-26），12px，压在波形上半区（上移出正中
+                          // 3px）。IgnorePointer 不吃手势，点播/长按仍归
+                          // 外层 Clickable 统一处理。
+                          return Stack(
+                            // 文字上移出正中：压在波形中线会被波形糊住
+                            alignment: Alignment.topCenter,
+                            children: [
+                              _VoiceWaveform(
+                                playing: _previewPlaying,
+                                durationSeconds: _recordSeconds,
+                                samples: _voiceSamples,
+                                width: constraints.maxWidth,
+                                activeColor: Colors.green.shade700,
+                                inactiveColor: Colors.green.shade200,
+                              ),
+                              Padding(
+                                // topCenter 顶到边太贴，下移 2px 落在波形
+                                // 上半区；再往上 12px 用 Transform（EdgeInsets
+                                // 不许负值；3+4+5px 累进，老板 2026-10-26）
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Transform.translate(
+                                  offset: const Offset(0, -12),
+                                  child: IgnorePointer(
+                                    child: Text(
+                                      AppLocalizations.of(context)!
+                                          .chatPageLongPressToTranscribe,
+                                      style: TextStyle(
+                                        // 淡青绿=波形未播静态同款 shade200
+                                        // （老板 2026-10-26：与波形淡色一致）
+                                        color: Colors.green.shade200,
+                                        // 11px（老板 2026-10-26：再小一号）
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         }),
                       ),

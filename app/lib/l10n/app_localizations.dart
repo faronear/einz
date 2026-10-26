@@ -1790,6 +1790,12 @@ abstract class AppLocalizations {
   /// **'Long press to record'**
   String get chatPageLongPressToRecord;
 
+  /// No description provided for @chatPageLongPressToTranscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Long press to transcribe'**
+  String get chatPageLongPressToTranscribe;
+
   /// No description provided for @chatPageInputHint.
   ///
   /// In en, this message translates to:
