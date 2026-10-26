@@ -1873,6 +1873,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 秘境」勾选框同款。
   Future<void> _showVoiceTranscriptPicker() async {
     final l10n = AppLocalizations.of(context)!;
+    // Apply 是否真发生过（弹层被直接关掉不算）——关窗后据此判断要不要
+    // upfront 备模型
+    var applied = false;
     await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => _VoiceTranscriptSheet(
@@ -1895,9 +1898,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               _voiceTranscriptAuto = auto;
             });
           }
+          applied = true;
         },
       ),
     );
+    if (!mounted) return;
+    // Apply 后 upfront 备模型（老板 2026-10-25）：本机方式 + 模型未就绪 → 弹
+    // 下载/安装窗，不必等第一次转写才弹——自动模式下新语音只静默落
+    // unavailable 行，用户根本不知道要点气泡才会走下载。服务端方式不需要
+    // 本机模型，不弹。取消/安装失败都不堵路：设置已保存，之后第一次转写
+    // 仍会走 _prepareVoiceModel 懒准备。
+    // 无需与退场动画错开：准备对话框→底部弹层 immediate 切换在本 app 已有
+    // 先例（_transcribePreviewRecording），Overlay 交叉卸载断言只发生在
+    // 「弹层→弹层」（_menuAction 的 300ms 延迟就是为那个）。
+    if (applied && _voiceTranscriptEngine == 'local') {
+      try {
+        if (!await VoiceTranscriptModel.isReady()) {
+          await _prepareVoiceModel();
+        }
+      } catch (_) {
+        // 探活出错（极少见）：不堵路，懒准备路径仍在
+      }
+    }
   }
 
   /// 墓碑消息显示模式当前值的展示文案（与选择器选项同名）。
