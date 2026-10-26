@@ -8098,6 +8098,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
     if (preview) {
+      // 胶囊高度 = 盒高 - 2px、半径 = 半高（老板 2026-10-26：胶囊上下贴边）。
+      // 48 真贴边会把盒子的 1px 描边盖断（白色填充压在描边线上），留 1px
+      // 后视觉上同样贴边、盒轮廓完整（2x 渲染对比过 48 vs 46）。
+      final capsuleHeight = _kInputModeToggleSize - 2;
+      final capsuleRadius = BorderRadius.circular(capsuleHeight / 2);
       return Row(
         children: [
           // 播放胶囊（老板 2026-10-25）：播放键+波形进同一个白底胶囊——点胶囊
@@ -8106,13 +8111,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 悬浮淡色/按压深色变色（遮罩圆角跟随胶囊轮廓）。
           Expanded(
             child: SizedBox(
-              height: 36,
+              height: capsuleHeight,
               child: Clickable(
                 // opaque：胶囊整块参与命中（波形 CustomPaint 自身不吸收命中，
                 // 实测 deferToChild 包裸图形收不到手势）
                 behavior: HitTestBehavior.opaque,
-                // 遮罩半径 18=半高：胶囊右端标准半圆，悬浮/按压变色不溢形
-                borderRadius: BorderRadius.circular(18),
+                // 遮罩半径=半高：胶囊两端标准半圆，悬浮/按压变色不溢形
+                borderRadius: capsuleRadius,
                 // 悬浮/按压浓度用 app 标准浅色面档 10%/14%（老板
                 // 2026-10-26）：默认 5% 叠白底与外围灰预览盒几乎同色，
                 // 悬浮时胶囊"溶进"盒里看不出可点；10%/14% 与淡灰按钮、
@@ -8126,7 +8131,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.only(left: 2, right: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: capsuleRadius,
                   ),
                   child: Row(
                     children: [
@@ -11202,13 +11207,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           listenable: _inputFocusNode,
                           builder: (context, _) => Container(
                             decoration: _inputBoxDecoration(),
-                            // 三态同框同内距：只留右侧 12（旧录音条口径）；**左侧
-                            // 不留**——麦键图标的圆形热区（直径=盒高）左边缘恰好
-                            // 贴在盒的左侧边上，且盒左端圆角=热区半径，圆边齐贴
-                            // （老板 2026-10-25）
-                            padding: const EdgeInsets.only(right: 12),
-                            // 圆形热区与盒左边缘齐平，其点按/悬浮水波纹按盒的
-                            // 圆角裁切，不会冒出盒角外
+                            // **整盒不再加内距**（老板 2026-10-26）：录音条的
+                            // 命中区要贴盒右沿——旧版整盒右内距 12 把 Clickable
+                            // 挡在内距以内，盒右缘那条 12px 的带子单击/长按全
+                            // 无反应。内距改为下放到内容（TextField 的
+                            // contentPadding 右 20、录音条内容右 12），视觉与
+                            // 旧版一致、命中区铺满。左侧本就不留——麦键图标的
+                            // 圆形热区（直径=盒高）左边缘恰好贴在盒的左侧边上
+                            // （老板 2026-10-25）。
                             child: ClipRRect(
                               borderRadius:
                                   BorderRadius.circular(_kInputBoxCornerRadius),
@@ -11307,8 +11313,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     // Stack：文字输入框始终占位（行高恒定，切换录音条时
                                     // 按钮不浮动），录音/预览时录音条 Positioned.fill
                                     // 覆盖其上（与输入框严格同高）
-                                    child: Stack(
-                                      children: [
+                                    // minHeight=图标热区直径=48：录音条的
+                                    // Clickable（Positioned.fill）与盒高对齐——
+                                    // 各平台字体度量不同，Stack 若按 TextField
+                                    // 自然高度收缩，上下就露出不可点的窄条
+                                    // （老板 2026-10-26）。多行草稿时 TextField
+                                    // 更高，Stack 随之长高，不封顶
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                          minHeight: _kInputModeToggleSize),
+                                      child: Stack(
+                                        // 居中：盒高被撑到 48 时 TextField 仍
+                                        // 垂直居中（旧版 Row center 的效果）
+                                        alignment: Alignment.center,
+                                        children: [
                                         // 录音条覆盖时完全隐藏输入框（maintainSize
                                         // 保持占位高度，行高/按钮位置不变；避免圆角
                                         // 录音条透出输入框边角）
@@ -11361,13 +11379,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               // （那是给口令、名字这类表单用的，
                                               // 字段少、留白宽好读），聊天输入框是
                                               // "反复打字、希望一行多放字"的场景，
-                                              // 左右收到 8（左侧合并图标已占位，
-                                              // 右侧留 8），垂直 12——顺带让输入框
-                                              // 高度更贴近两侧按钮（老板 2026-09-26）
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 12),
+                                              // 左侧收到 8（合并图标已占位）、右侧 20
+                                              // =旧「盒内距12+框内8」（输入盒本身不再
+                                              // 加内距，见外层 Container 注释），
+                                              // 垂直 12——顺带让输入框高度更贴近两侧
+                                              // 按钮（老板 2026-09-26/2026-10-26）
+                                              contentPadding: const EdgeInsets.only(
+                                                  left: 8,
+                                                  right: 20,
+                                                  top: 12,
+                                                  bottom: 12),
                                             ),
                                             // 回车发送后焦点回到输入框（键盘完成动作
                                             // 默认失焦——补回聚焦）
@@ -11413,6 +11434,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                       _InputMode.hint
                                                   ? SystemMouseCursors.click
                                                   : null,
+                                              // 遮罩形状=两端半圆的药丸（老板
+                                              // 2026-10-26）：此前遮罩是矩形，只有
+                                              // 右端被盒角裁成半圆、左端直角切口，
+                                              // 方头看着突兀。半径=半盒高→左右两端
+                                              // 都是标准半圆。只在提示态可见
+                                              // （录音/预览态本层无 onTap→无遮罩）。
+                                              borderRadius: BorderRadius.circular(
+                                                  _kInputModeToggleSize / 2),
                                               // 提示态**点按**也开始录音（老板
                                               // 2026-10-26 免提模式）：长按最长要按
                                               // 60 秒（拇指疲劳/桌面按住鼠标），点按
@@ -11432,10 +11461,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                   _startVoice(),
                                               onLongPressEnd: (_) =>
                                                   _stopVoice(),
-                                              child: _buildVoiceBarContent(),
+                                              // 内容右缩 12（命中区本身铺满到盒右
+                                              // 沿——内距加在内容上而不是盒上，见
+                                              // 外层 Container 注释）
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                    right: 12),
+                                                child: _buildVoiceBarContent(),
+                                              ),
                                             ),
                                           ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
