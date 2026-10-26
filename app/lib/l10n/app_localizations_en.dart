@@ -1366,7 +1366,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases all messages, attachments and credentials of the current entrance, then takes you back to the setup wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!';
+      'Permanently erases the current entrance, and you can\'t visit the current space on this device. This cannot be undone!';
 
   @override
   String resetEntranceNameLabel(String name) {

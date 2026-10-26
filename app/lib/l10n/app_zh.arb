@@ -799,7 +799,7 @@
     }
   },
   "leaveSpaceTitle": "销毁本通道？",
-  "leaveSpaceMessage": "彻底删除当前通道保存的全部消息、附件和凭证，并回到秘境向导页。当前秘境本身仍然存在，其他通道也不受影响。此操作无法撤销！",
+  "leaveSpaceMessage": "彻底销毁当前通道，无法再通过本设备访问当前秘境。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {

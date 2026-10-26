@@ -2333,7 +2333,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases all messages, attachments and credentials of the current entrance, then takes you back to the setup wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!'**
+  /// **'Permanently erases the current entrance, and you can\'t visit the current space on this device. This cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetEntranceNameLabel.
