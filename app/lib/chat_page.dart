@@ -1903,15 +1903,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     if (!mounted) return;
-    // Apply 后 upfront 备模型（老板 2026-10-25）：本机方式 + 模型未就绪 → 弹
-    // 下载/安装窗，不必等第一次转写才弹——自动模式下新语音只静默落
-    // unavailable 行，用户根本不知道要点气泡才会走下载。服务端方式不需要
-    // 本机模型，不弹。取消/安装失败都不堵路：设置已保存，之后第一次转写
-    // 仍会走 _prepareVoiceModel 懒准备。
+    // Apply 后 upfront 备模型（老板 2026-10-25）：模型未就绪 → 弹下载/安装窗，
+    // 不必等第一次转写才弹（懒准备）。**每一次 Apply 都走这个检查**（老板：
+    // 「没坏处，模型迟早需要准备好」）——包括服务端方式：预览态长按波形的
+    // 即时转写硬走本机（transcribeFile 是本地 isolate，从不过服务端），本机
+    // 模型迟早要用；且自动模式下新语音只静默落 unavailable 行，用户根本不
+    // 知道要点气泡才会弹下载。已就绪（isReady=true）自然什么都不弹。
+    // 取消/安装失败都不堵路：设置已保存，之后第一次转写仍会走懒准备。
     // 无需与退场动画错开：准备对话框→底部弹层 immediate 切换在本 app 已有
     // 先例（_transcribePreviewRecording），Overlay 交叉卸载断言只发生在
     // 「弹层→弹层」（_menuAction 的 300ms 延迟就是为那个）。
-    if (applied && _voiceTranscriptEngine == 'local') {
+    if (applied) {
       try {
         if (!await VoiceTranscriptModel.isReady()) {
           await _prepareVoiceModel();
