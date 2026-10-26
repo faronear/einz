@@ -1109,6 +1109,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptNoText => 'No speech recognized';
 
   @override
+  String get voiceTranscriptSheetTitle => 'Voice transcription';
+
+  @override
   String get apply => 'Apply';
 
   @override

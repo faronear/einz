@@ -1904,6 +1904,12 @@ abstract class AppLocalizations {
   /// **'No speech recognized'**
   String get voiceTranscriptNoText;
 
+  /// No description provided for @voiceTranscriptSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice transcription'**
+  String get voiceTranscriptSheetTitle;
+
   /// No description provided for @apply.
   ///
   /// In en, this message translates to:

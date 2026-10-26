@@ -64,8 +64,8 @@ class VoiceTranscriptService {
   }
 
   /// 转写一个**本地明文 wav 文件**（不落库、无 messageId 语义）——供录音预览态
-  /// 的即时转写用（老板 2026-10-25：预览态长按波形图弹窗转写，Apply 后文字
-  /// 追加进输入框、原录音保留）。返回 (text, language)。
+  /// 的即时转写用（老板 2026-10-25：预览态长按波形图从底部弹层转写，Apply 后
+  /// 文字追加进输入框、清除原录音）。返回 (text, language)。
   ///
   /// 与 [_processOne] 共用串行队列（_tail）与 isolate 跑法（不并发抢 CPU）；
   /// 模型未就绪抛 [StateError]（调用方应先 ensureInstalled）；文件头不合格抛

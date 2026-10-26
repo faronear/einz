@@ -7875,36 +7875,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 预览态长按波形图（老板 2026-10-25）：**先备基础设施**——模型未就绪 → 弹
-  /// 准备对话框（下载/安装进度，可取消）；就绪 → 弹转写对话框（打开即自动转写，
-  /// 见 [_PreviewTranscribeDialog]）。准备失败（用户取消/安装出错）→ 只出顶部
-  /// 通知条，不弹转写窗。
+  /// 预览态长按波形图（老板 2026-10-25）：**先备基础设施**——模型未就绪 →
+  /// 弹准备对话框（下载/安装进度，可取消）；安装/探活出错 → 拉起底部弹层
+  /// 直接显示错误（不再走通知条）。就绪 → 弹转写弹层（打开即自动转写，见
+  /// [_PreviewTranscribeSheet]）。
   Future<void> _transcribePreviewRecording() async {
     final path = _recordingPath;
     if (path == null || _inputMode != _InputMode.preview) return;
-    final l10n = AppLocalizations.of(context)!;
+    // 准备阶段的错误（null=无错）：用户取消也走这条路（error 仍为 null，见
+    // _prepareVoiceModel 约定）——取消是用户本意，不出弹层也不出通知
+    String? prepError;
     try {
       if (!await VoiceTranscriptModel.isReady()) {
-        final ok = await _prepareVoiceModel();
-        // 用户取消或安装失败（失败已由 _prepareVoiceModel 出通知条）→ 到此为止
-        if (!ok || !mounted) return;
+        final prep = await _prepareVoiceModel();
+        if (!prep.ok) {
+          prepError = prep.error;
+          if (prepError == null || !mounted) return; // 用户取消：到此为止
+        }
       }
     } catch (e) {
-      // isReady() 探活本身出错（极少见）：同准备失败口径，通知条说明
-      if (!mounted) return;
-      _notice(context, l10n.voiceTranscriptPrepareFailed('$e'));
-      return;
+      // isReady() 探活本身出错（极少见）：同安装失败口径，进弹层显示
+      prepError = '$e';
     }
-    // 准备期间用户可能已切走（取消录音/切回文字/重录）：路径失效就不再弹窗
+    // 准备期间用户可能已切走（取消录音/切回文字/重录）：路径失效就不再弹层
     if (!mounted || _inputMode != _InputMode.preview || _recordingPath != path) {
       return;
     }
     final transcriber = _transcriber ??= VoiceTranscriptService(_voiceDb);
-    await showDialog<void>(
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (_) => _PreviewTranscribeDialog(
+      // 长转写文本可撑高：弹层限高内部滚动（见 _PreviewTranscribeSheet）
+      isScrollControlled: true,
+      builder: (_) => _PreviewTranscribeSheet(
         transcriber: transcriber,
         path: path,
+        prepError: prepError,
         onApply: _applyPreviewTranscript,
       ),
     );
@@ -9545,10 +9550,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 正常发布构建 = 从包内资产拷进应用目录；dev 构建没跑 fetchVoiceModel.sh
   /// 时 ensureInstalled 自动回落下载，同一对话框不感知差异。
   /// 返回 true=模型就绪；false=用户取消或准备失败（失败已 notice 说明）。
-  Future<bool> _prepareVoiceModel() async {
+  Future<({bool ok, String? error})> _prepareVoiceModel() async {
     final l10n = AppLocalizations.of(context)!;
     var cancelled = false;
     var received = 0;
+    // 安装失败的错误文本（null=没出错/用户主动取消）：呈现方式交给调用方——
+    // 消息气泡路径走顶部通知条；预览态转写路径在底部弹层内显示（老板
+    // 2026-10-25：转写链路的失败信息统一进弹层，不再放通知条）。
+    String? error;
     final total = VoiceTranscriptModel.totalBytes;
     // ⚠️ 任务必须**只在 builder 首次执行时启动一次**：进度回调 setState 会让
     // StatefulBuilder 的 builder 整体重跑——启动语句若直接写在 builder 里，
@@ -9586,12 +9595,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 dismissed = true;
                 Navigator.of(ctx).pop(false);
               }
-              // 用户主动取消（_Cancelled）不是失败：不出通知，否则会露出
-              // "Instance of '_Cancelled'" 这种内部异常名。失败走全 app 统一的
-              // 顶部通知条（2026-09-08 起通知就从 SnackBar 迁到顶部通知条）
-              if (!cancelled && mounted) {
-                _notice(context, l10n.voiceTranscriptPrepareFailed('$e'));
-              }
+              // 用户主动取消（_Cancelled）不是失败：error 留 null，否则会
+              // 露出 "Instance of '_Cancelled'" 这种内部异常名；真失败记下文本，
+              // 由调用方决定通知条还是弹层显示
+              if (!cancelled) error = '$e';
             }
           }());
         }
@@ -9626,7 +9633,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
       }),
     );
-    return ok ?? false;
+    return (ok: ok ?? false, error: error);
   }
 
   /// 转写一条消息的总入口（长按菜单「转写」卡 + 行内 failed/stale/unavailable
@@ -9659,8 +9666,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _transcribeVoiceLocally(HistoryMessage m) async {
     try {
       if (!await VoiceTranscriptModel.isReady()) {
-        final ok = await _prepareVoiceModel();
-        if (!ok || !mounted) return;
+        final prep = await _prepareVoiceModel();
+        // 安装失败的错误由本路径出顶部通知条（_prepareVoiceModel 不再弹通知，
+        // 呈现方式交给调用方）；用户取消（error=null）静默返回
+        if (prep.error != null && mounted) {
+          _notice(context, AppLocalizations.of(context)!
+              .voiceTranscriptPrepareFailed(prep.error!));
+        }
+        if (!prep.ok || !mounted) return;
       }
       await _enqueueLocalVoiceTranscript(m, clearExisting: true);
       _updateAudioPlayback(() {});
@@ -12709,15 +12722,19 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
   }
 }
 
-/// 预览态录音的即时转写对话框（老板 2026-10-25）：打开即自动开始本机转写
-/// （调用方已确保模型就绪），过程中内容区显示「转写中…」，完成显示转写文字；
-/// 底部 Cancel / Apply 两个按钮——Apply 把文字交回 [onApply]（追加进输入框现有
-/// 文字末尾、切回文字态、**清除原录音**）；Cancel 或点对话框外只关窗，预览态不动。
-class _PreviewTranscribeDialog extends StatefulWidget {
-  const _PreviewTranscribeDialog({
+/// 预览态录音的即时转写**底部弹层**（老板 2026-10-25；早期是 AlertDialog，
+/// 老板要求改底部弹层）：打开即自动开始本机转写（[prepError] 非空=准备阶段
+/// 就失败，直接显示错误不开转）——标题「语音转写」，内容区=转写中…（转圈）/
+/// 转写正文/失败信息（失败信息在弹层内显示，不走通知条，老板 2026-10-25）；
+/// 仅转写成功（有文字）时底部才出现 Apply 按钮：把文字交回 [onApply]（追加进
+/// 输入框现有文字末尾、切回文字态、**清除原录音**）。Cancel 或下滑/点弹层外
+/// 只关弹层，预览态不动。
+class _PreviewTranscribeSheet extends StatefulWidget {
+  const _PreviewTranscribeSheet({
     required this.transcriber,
     required this.path,
     required this.onApply,
+    this.prepError,
   });
 
   /// 转写服务（与消息转写链路共用实例：串行队列，不并发抢 CPU）。
@@ -12729,21 +12746,26 @@ class _PreviewTranscribeDialog extends StatefulWidget {
   /// Apply 回调（转写文字）。
   final ValueChanged<String> onApply;
 
+  /// 准备阶段（模型下载/安装/探活）的错误信息；null=准备就绪，开层即转写。
+  final String? prepError;
+
   @override
-  State<_PreviewTranscribeDialog> createState() =>
-      _PreviewTranscribeDialogState();
+  State<_PreviewTranscribeSheet> createState() =>
+      _PreviewTranscribeSheetState();
 }
 
-class _PreviewTranscribeDialogState
-    extends State<_PreviewTranscribeDialog> {
-  bool _busy = true; // 转写中（打开即自动开始）
+class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
+  late bool _busy; // 转写中（打开即自动开始）
   String _text = ''; // 转写结果
   String? _error; // 失败信息（null=没失败）
 
   @override
   void initState() {
     super.initState();
-    unawaited(_transcribe());
+    // 准备阶段就失败的：不开转，直接显示错误
+    _busy = widget.prepError == null;
+    _error = widget.prepError;
+    if (_error == null) unawaited(_transcribe());
   }
 
   Future<void> _transcribe() async {
@@ -12766,41 +12788,79 @@ class _PreviewTranscribeDialogState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // 有文字才可 Apply：转写中/失败/空结果一律禁用
+    // 有文字才出 Apply：转写中/失败/空结果一律不出现 Apply 按钮
     final canApply = !_busy && _error == null && _text.isNotEmpty;
-    return AlertDialog(
-      title: Text(l10n.voiceTranscriptMenuTranscribe),
-      content: _busy
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题「语音转写」
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+              child: Text(l10n.voiceTranscriptSheetTitle,
+                  style: theme.textTheme.titleMedium),
+            ),
+            // 内容区：限高+滚动（长转写文本不炸屏）
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _busy
+                      ? Row(
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(l10n.voiceTranscribing),
+                          ],
+                        )
+                      : Text(
+                          _error != null
+                              ? l10n.voiceTranscriptFailed(_error!)
+                              : (_text.isEmpty
+                                  ? l10n.voiceTranscriptNoText
+                                  : _text),
+                          style: theme.textTheme.bodyLarge,
+                        ),
                 ),
-                const SizedBox(width: 12),
-                Text(l10n.voiceTranscribing),
-              ],
-            )
-          : Text(_error != null
-              ? l10n.voiceTranscriptFailed(_error!)
-              : (_text.isEmpty ? l10n.voiceTranscriptNoText : _text)),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 按钮行：Cancel 恒在；Apply 仅转写成功时出现（右对齐）
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(l10n.cancel),
+                  ),
+                  if (canApply) ...[
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () {
+                        widget.onApply(_text);
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(l10n.apply),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
-        FilledButton(
-          onPressed: canApply
-              ? () {
-                  widget.onApply(_text);
-                  Navigator.of(context).pop();
-                }
-              : null,
-          child: Text(l10n.apply),
-        ),
-      ],
+      ),
     );
   }
 }

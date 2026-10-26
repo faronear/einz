@@ -665,6 +665,7 @@
     }
   },
   "voiceTranscriptNoText": "No speech recognized",
+  "voiceTranscriptSheetTitle": "Voice transcription",
   "apply": "Apply",
   "chatPageMenuVoiceTranscriptAuth": "Voice transcription",
   "voiceTranscriptAuthNote": "how to transcribe voice messages?",
