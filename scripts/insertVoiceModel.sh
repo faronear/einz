@@ -10,15 +10,27 @@
 # 的三级解析不用改：包里没资产自然回落下载兜底。
 #
 # 用法（包装任意 flutter 命令，cwd 不限）：
-#   bash scripts/insertVoiceModel.sh flutter run -d macos ...
+#   bash scripts/insertVoiceModel.sh <label> flutter run -d macos ...
 #   VOICE_MODEL=true npm run app-mac-run        # package.json 内部已包装
+# <label> 标识调用入口（macos/ios/android），用于并发互斥与 backup 命名：
+#   多个 flutter run 同时带模型时（macos+ios+android 并行），pubspec 只能
+#   有一份注入态——用 flock 目录锁互斥（先到者独占注入，后到者阻塞等待，
+#   超时 60s 报错退出）；backup 文件名 pubspec.voice_model.<label>.nogit
+#   带平台标签，且 .nogit 后缀命中 .gitignore，绝不进 git status/diff。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PUBSPEC="${ROOT}/app/pubspec.yaml"
 ANCHOR="    - assets/demoSpace/"          # 现有资产行，注入点锚
 INJECT="    - assets/voice_model/"
-BACKUP="${PUBSPEC}.voice_model.bak"
+
+LABEL="${1:-}"; shift
+case "${LABEL}" in
+  macos|ios|android) ;;
+  *) echo "❌ 用法: insertVoiceModel.sh <macos|ios|android> <command...>" >&2; exit 1 ;;
+esac
+BACKUP="${PUBSPEC}.voice_model.${LABEL}.nogit"
+LOCKDIR="${ROOT}/app/.pubspec_voice_model.lock"
 
 restored=0
 restore() {
@@ -28,12 +40,21 @@ restore() {
     restored=1
     echo "· pubspec.yaml 已还原（语音模型声明移除）"
   fi
+  rmdir "${LOCKDIR}" 2>/dev/null || true
 }
 trap restore EXIT
 
 if [ "${VOICE_MODEL:-false}" = "true" ]; then
   echo "▶ VOICE_MODEL=true：拉取语音转写模型并打包进产物"
   bash "${ROOT}/scripts/fetchVoiceModel.sh"
+  # 并发互斥：另一入口正持有注入态（长驻 flutter run），等它释放
+  acquired=0
+  for i in $(seq 1 60); do
+    if mkdir "${LOCKDIR}" 2>/dev/null; then acquired=1; break; fi
+    [ "${i}" = 1 ] && echo "· 另一入口（macos/ios/android）正持有 pubspec 注入态，等待释放…"
+    sleep 1
+  done
+  [ "${acquired}" = 1 ] || { echo "❌ 等待 pubspec 注入锁超时（60s）——并行 run 请错开或只留一个带模型" >&2; exit 1; }
   # 只匹配真正的声明行（行首空格 + `- `），pubspec 注释里的字样不算
   if grep -qF "${INJECT}" "${PUBSPEC}"; then
     echo "· pubspec.yaml 已含语音模型声明，不重复注入"
@@ -44,7 +65,7 @@ if [ "${VOICE_MODEL:-false}" = "true" ]; then
       { print }
     ' "${PUBSPEC}" > "${PUBSPEC}.tmp"
     mv "${PUBSPEC}.tmp" "${PUBSPEC}"
-    echo "· pubspec.yaml 已临时注入 ${INJECT}（命令结束后自动还原）"
+    echo "· pubspec.yaml 已临时注入 ${INJECT}（命令结束后自动还原，backup=${BACKUP##*/}）"
   fi
 else
   # 默认路径：pubspec 基线本就无声明，模型文件即使躺在目录里也不会进包；
