@@ -15,8 +15,9 @@
 # <label> 标识调用入口（macos/ios/android），用于并发互斥与 backup 命名：
 #   多个 flutter run 同时带模型时（macos+ios+android 并行），pubspec 只能
 #   有一份注入态——用 flock 目录锁互斥（先到者独占注入，后到者阻塞等待，
-#   超时 60s 报错退出）；backup 文件名 pubspec.voice_model.<label>.nogit
-#   带平台标签，且 .nogit 后缀命中 .gitignore，绝不进 git status/diff。
+#   超时 60s 报错退出）；backup 文件名 pubspec.yaml.bak.<label>.nogit
+#   与锁目录 pubspec.yaml.nogit.lock 都带平台标签/命中 .gitignore
+#   （.nogit 后缀），绝不进 git status/diff。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +31,7 @@ case "${LABEL}" in
   *) echo "❌ 用法: insertVoiceModel.sh <macos|ios|android> <command...>" >&2; exit 1 ;;
 esac
 BACKUP="${PUBSPEC}.bak.${LABEL}.nogit"
-LOCKDIR="${ROOT}/app/.pubspec_voice_model.lock"
+LOCKDIR="${ROOT}/app/pubspec.yaml.nogit.lock"
 
 restored=0
 restore() {
