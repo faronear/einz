@@ -7610,14 +7610,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 合并图标颜色：**语音态**（提示/录音中/预览）=标准青绿；文字态=默认
-  /// 图标色——但文字态还留着一条未发送录音时也是青绿（提示「还留着一条」）。
+  /// 合并图标颜色：**两态**（老板 2026-10-26：不再用青绿提示「语音模式里还
+  /// 留着一条录音」）——文字态=默认图标色，语音态（提示/录音中/预览）=标准青绿。
   ///
   /// 保留提示原先用 colorScheme.primary——fromSeed 派生的深蓝近黑，与默认灰
   /// 难分辨（老板 2026-10-25）；随后老板要求提示态图标与「长按开始录音」文字
   /// 一并统一青绿，即整个语音态都是标准青绿。
   Color _inputModeToggleColor() {
-    if (_inputMode != _InputMode.text || _recordingPath != null) {
+    if (_inputMode != _InputMode.text) {
       return Colors.green;
     }
     return Theme.of(context).colorScheme.onSurfaceVariant; // 与邻居 IconButton 默认色一致
@@ -11190,22 +11190,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   height: _kInputModeToggleSize,
                                   // 语音态下图标也并入长按区（老板 2026-10-25：
                                   // 整盒读作一个四角弧形按钮——长按从麦键图标到
-                                  // 录音条都算）。文字态回调置空=不注册识别器，
-                                  // 点按/悬浮不受影响（内层 IconButton 的单击
-                                  // 照常赢竞技场；I-beam 光标也不被盖）。
+                                  // 录音条都算）。文字态长按=直接进语音态开录
+                                  // （老板 2026-10-26）：不必先点切模式、再长按
+                                  // 录音条两步；点按仍是切模式。_startVoice 自带
+                                  // 收键盘+切 recording，无需先切提示态。
                                   child: Clickable(
                                     behavior: HitTestBehavior.opaque,
                                     cursor: _inputMode == _InputMode.hint
                                         ? SystemMouseCursors.click
                                         : null,
-                                    onLongPressStart: _inputMode ==
-                                            _InputMode.text
-                                        ? null
-                                        : (_) => _startVoice(),
-                                    onLongPressEnd: _inputMode ==
-                                            _InputMode.text
-                                        ? null
-                                        : (_) => _stopVoice(),
+                                    onLongPressStart: (_) =>
+                                        unawaited(_startVoice()),
+                                    onLongPressEnd: (_) =>
+                                        unawaited(_stopVoice()),
                                     child: IconButton(
                                       padding: EdgeInsets.zero,
                                       // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
