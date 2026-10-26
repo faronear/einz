@@ -10,7 +10,7 @@
       "brief": "insertVoiceModel backup 改 .nogit 命名 + 并发锁",
       "detail": [
         "老板指出两点：① VOICE_MODEL=true 的 flutter run 期间 pubspec.yaml 及 .bak 备份一直躺在 git diff 里有误提交风险；② macos/ios/android 三个 run 并行时都改 pubspec 会互相冲突。",
-        "修法：① backup 改名 pubspec.yaml.voice_model.<label>.nogit——label 由调用入口传入（macos/ios/android，脚本第一参数，强制校验），.nogit 后缀命中 .gitignore 19-22 行四条规则，绝不进 git status；② 并发互斥用 mkdir 目录锁 app/.pubspec_voice_model.lock（原子），后到者每秒重试等 60s 超时报错，EXIT trap 里 rmdir 释放（崩溃进程留下的锁目录需手动删，可接受）。",
+        "修法：① backup 改名 pubspec.yaml.bak.<label>.nogit（初版 .voice_model.<label>.nogit 被老板纠正——备份存的是**不带** voice_model 声明的原文件，语义应是 .bak）——label 由调用入口传入（macos/ios/android，脚本第一参数，强制校验），.nogit 后缀命中 .gitignore 19-22 行四条规则，绝不进 git status；② 并发互斥用 mkdir 目录锁 app/.pubspec_voice_model.lock（原子），后到者每秒重试等 60s 超时报错，EXIT trap 里 rmdir 释放（崩溃进程留下的锁目录需手动删，可接受）。",
         "package.json 五处调用全部带 label（android×2 / ios / macos×2）。",
         "验证：用法校验、label=macos 注入还原且 nogit 不进 git status、并发实测（macos 持有期间 android 阻塞等待→释放→串行注入还原）全过。"
       ]

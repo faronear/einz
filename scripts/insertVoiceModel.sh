@@ -29,7 +29,7 @@ case "${LABEL}" in
   macos|ios|android) ;;
   *) echo "❌ 用法: insertVoiceModel.sh <macos|ios|android> <command...>" >&2; exit 1 ;;
 esac
-BACKUP="${PUBSPEC}.voice_model.${LABEL}.nogit"
+BACKUP="${PUBSPEC}.bak.${LABEL}.nogit"
 LOCKDIR="${ROOT}/app/.pubspec_voice_model.lock"
 
 restored=0
