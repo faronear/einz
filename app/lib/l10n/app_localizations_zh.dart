@@ -1051,6 +1051,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptSheetTitle => '语音转写';
 
   @override
+  String get voiceTranscriptSettingsLink => '设置转写方式';
+
+  @override
   String get apply => '应用';
 
   @override
@@ -1063,13 +1066,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAuthLocal => '本机转写';
 
   @override
-  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写，数据不离开本机。第一次转写时自动安装语音包。';
+  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写，数据不离开本机。';
 
   @override
   String get voiceTranscriptAuthServer => '远程转写';
 
   @override
-  String get voiceTranscriptAuthServerDesc => '把原始录音发送给远程服务器，完成转写后将立即从服务器删除。';
+  String get voiceTranscriptAuthServerDesc => '把原始录音发送给远程服务器，完成转写后将立即删除。';
 
   @override
   String voiceTranscriptServerFailed(String error) {
@@ -1101,13 +1104,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoModeDesc => '每次收到语音消息就自动转写。';
 
   @override
-  String get voiceTranscriptManualModeDesc => '需要你手动选择转写一个语音消息。';
+  String get voiceTranscriptManualModeDesc => '手动选择一个语音消息进行转写。';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';
 
   @override
-  String get voiceTranscriptPreparing => '正在安装语音包…';
+  String get voiceTranscriptPreparing => '首次转写：下载安装语音包';
 
   @override
   String voiceTranscriptPrepareFailed(String error) {

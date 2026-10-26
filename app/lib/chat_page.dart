@@ -7897,33 +7897,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 预览态长按波形图（老板 2026-10-25）：**先备基础设施**——模型未就绪 →
-  /// 弹准备对话框（下载/安装进度，可取消）；安装/探活出错 → 拉起底部弹层
-  /// 直接显示错误（不再走通知条）。就绪 → 弹转写弹层（打开即自动转写，见
-  /// [_PreviewTranscribeSheet]；关层后未轮到的转写会跳过，见 cancelled 旗标）。
+  /// 预览态长按波形图（老板 2026-10-25）：**按 Mode 路由**（与气泡消息转写
+  /// 同口径，老板 2026-10-25 要求）——本地方式先把模型备好（未就绪 → 弹准备
+  /// 对话框；安装/探活出错 → 弹层内显示错误，不走通知条）；服务端方式不需要
+  /// 本机模型，直接弹层（服务端未启用的话进去再按既定语义回落本地、现场备
+  /// 模型）。转写执行器见 [_transcribePreviewAudio]，弹层见
+  /// [_PreviewTranscribeSheet]（关层后未轮到的转写会跳过，见 cancelled 旗标）。
   Future<void> _transcribePreviewRecording() async {
     final path = _recordingPath;
     if (path == null || _inputMode != _InputMode.preview) return;
     // 准备阶段的错误（null=无错）：用户取消也走这条路（error 仍为 null，见
     // _prepareVoiceModel 约定）——取消是用户本意，不出弹层也不出通知
     String? prepError;
-    try {
-      if (!await VoiceTranscriptModel.isReady()) {
-        final prep = await _prepareVoiceModel();
-        if (!prep.ok) {
-          prepError = prep.error;
-          if (prepError == null || !mounted) return; // 用户取消：到此为止
+    // 仅**本地方式**需要 upfront 备模型；服务端方式进弹层再走服务端（未启用
+    // 才回落本地、现场备模型——见 _transcribePreviewAudio）
+    if (_voiceTranscriptEngine != 'server') {
+      try {
+        if (!await VoiceTranscriptModel.isReady()) {
+          final prep = await _prepareVoiceModel();
+          if (!prep.ok) {
+            prepError = prep.error;
+            if (prepError == null || !mounted) return; // 用户取消：到此为止
+          }
         }
+      } catch (e) {
+        // isReady() 探活本身出错（极少见）：同安装失败口径，进弹层显示
+        prepError = '$e';
       }
-    } catch (e) {
-      // isReady() 探活本身出错（极少见）：同安装失败口径，进弹层显示
-      prepError = '$e';
     }
     // 准备期间用户可能已切走（取消录音/切回文字/重录）：路径失效就不再弹层
     if (!mounted || _inputMode != _InputMode.preview || _recordingPath != path) {
       return;
     }
-    final transcriber = _transcriber ??= VoiceTranscriptService(_voiceDb);
     // 关层旗标（Cancel/点层外/下滑三条路都算）：showModalBottomSheet 的 future
     // 在退场动画结束后才完成——这之前轮到转写的话照跑（结果照样因
     // mounted=false 丢弃，见 _PreviewTranscribeSheet._transcribe）；之后轮到的
@@ -7935,14 +7940,72 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 长转写文本可撑高：弹层限高内部滚动（见 _PreviewTranscribeSheet）
       isScrollControlled: true,
       builder: (_) => _PreviewTranscribeSheet(
-        transcriber: transcriber,
+        transcribe: _transcribePreviewAudio,
         path: path,
         prepError: prepError,
         cancelled: () => sheetDismissed,
+        engine: _voiceTranscriptEngine,
         onApply: _applyPreviewTranscript,
       ),
     );
     sheetDismissed = true;
+  }
+
+  /// 预览态录音的转写执行器（按 Mode 路由，老板 2026-10-25：预览态长按转写
+  /// 与气泡消息转写同口径）：
+  /// - `server` → 服务端 whisper（[_transcribePreviewViaServer]）；未启用
+  ///   （disabled，notice 已出）→ 按 §15.1 ③ 既定回落语义落穿本地；
+  /// - `local` → 本机 sherpa（[VoiceTranscriptService.transcribeFile]，串行
+  ///   队列；本地方式开弹层前已备好模型，这里只在服务端回落时才现场备）。
+  /// 取消/失败抛错，由弹层内容区显示（转写链路的失败信息统一进弹层）。
+  Future<(String, String)> _transcribePreviewAudio(String path,
+      {bool Function()? cancelled}) async {
+    if (_voiceTranscriptEngine == 'server') {
+      final r = await _transcribePreviewViaServer(path);
+      if (r.outcome == _ServerTranscriptOutcome.done) return (r.text, '');
+      if (r.outcome == _ServerTranscriptOutcome.failed) {
+        throw StateError(r.error);
+      }
+      // disabled：notice 已出，落穿到本地（既定回落语义）
+    }
+    if (!await VoiceTranscriptModel.isReady()) {
+      final prep = await _prepareVoiceModel();
+      if (!prep.ok) throw StateError(prep.error ?? 'cancelled');
+    }
+    final transcriber = _transcriber ??= VoiceTranscriptService(_voiceDb);
+    return transcriber.transcribeFile(path, cancelled: cancelled);
+  }
+
+  /// 预览态录音的**服务端**转写（老板 2026-10-25：预览态长按转写遵 Mode
+  /// 设置）：本地 wav 明文归一化后 `POST /transcriptions`，服务端 whisper.cpp
+  /// 即转即删。**不落库、无 messageId**——录音还没成为消息，转写表里没有它的
+  /// 位置；结果直接回给弹层显示（与消息路径的 done/failed 行无关）。
+  ///
+  /// 返回 (outcome, text, error)：done=成功（text=转写文本）；failed=失败
+  /// （error=服务端错误原话，调用方抛进弹层显示）；disabled=服务端未启用
+  /// （503 TRANSCRIBE_DISABLED，notice 已出，调用方按既定语义回落本地）。
+  Future<({_ServerTranscriptOutcome outcome, String text, String error})>
+      _transcribePreviewViaServer(String path) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      // 上送前归一化（与消息路径同口径；_stopVoice 已规范化过，幂等快路径）
+      final wav = VoiceTranscriptService.normalizeWavBytes(
+          await File(path).readAsBytes());
+      final r = await _withAuth(
+          (t) => (widget.api ?? ApiClient(effectiveServer)).transcribeWav(
+                wav: wav,
+                token: t,
+              ));
+      return (outcome: _ServerTranscriptOutcome.done, text: r.text, error: '');
+    } catch (e) {
+      if (e is ApiException && e.code == 'TRANSCRIBE_DISABLED') {
+        if (mounted) {
+          _notice(context, l10n.voiceTranscriptServerDisabled);
+        }
+        return (outcome: _ServerTranscriptOutcome.disabled, text: '', error: '');
+      }
+      return (outcome: _ServerTranscriptOutcome.failed, text: '', error: '$e');
+    }
   }
 
   /// 转写对话框 Apply（老板 2026-10-25）：把转写文字追加到输入框现有文字的
@@ -9600,10 +9663,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 正常发布构建 = 从包内资产拷进应用目录；dev 构建没跑 fetchVoiceModel.sh
   /// 时 ensureInstalled 自动回落下载，同一对话框不感知差异。
   /// 返回 true=模型就绪；false=用户取消或准备失败（失败已 notice 说明）。
+  /// 用户在窗内点「设置转写方式」链接也算取消（返回 false/null）——紧接着
+  /// 会打开转写设置弹层（见方法尾部）。
   Future<({bool ok, String? error})> _prepareVoiceModel() async {
     final l10n = AppLocalizations.of(context)!;
     var cancelled = false;
     var received = 0;
+    // 点了「设置转写方式」链接：关窗后转开设置弹层（安装已取消，与点 Cancel
+    // 同路——cancelled 旗标会让 ensureInstalled 在下一个检查点中止，不会
+    // 与设置里 Apply 触发的下一轮安装并发）
+    var openSettings = false;
     // 安装失败的错误文本（null=没出错/用户主动取消）：呈现方式交给调用方——
     // 消息气泡路径走顶部通知条；预览态转写路径在底部弹层内显示（老板
     // 2026-10-25：转写链路的失败信息统一进弹层，不再放通知条）。
@@ -9667,6 +9736,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
+            // 「设置转写方式」链接（老板 2026-10-25）：下载中途改主意——取消
+            // 本次安装关窗，转开转写设置弹层（改方式/时机）。与 Cancel 钮同路
+            // （cancelled + dismissed 旗标），防双重 pop。
+            TextButton(
+              onPressed: () {
+                cancelled = true;
+                openSettings = true;
+                if (!dismissed) {
+                  dismissed = true;
+                  Navigator.of(ctx).pop(false);
+                }
+              },
+              child: Text(l10n.voiceTranscriptSettingsLink),
+            ),
             TextButton(
               onPressed: () {
                 cancelled = true;
@@ -9683,6 +9766,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
       }),
     );
+    // 点了「设置转写方式」：关窗后打开转写设置弹层。本方法随后返回
+    // false/null（=用户取消），调用方静默收尾——设置里 Apply 本地方式会
+    // 再走本方法开新一轮安装，链路自洽。
+    if (openSettings && mounted) {
+      await _showVoiceTranscriptPicker();
+    }
     return (ok: ok ?? false, error: error);
   }
 
@@ -12773,25 +12862,31 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
 }
 
 /// 预览态录音的即时转写**底部弹层**（老板 2026-10-25；早期是 AlertDialog，
-/// 老板要求改底部弹层）：打开即自动开始本机转写（[prepError] 非空=准备阶段
-/// 就失败，直接显示错误不开转）——标题「语音转写」，内容区=转写中…（转圈）/
+/// 老板要求改底部弹层）：打开即自动开始转写（[prepError] 非空=准备阶段
+/// 就失败，直接显示错误不开转）——标题「语音转写」+ 右侧当前 Mode 的来源
+/// 图标（芯片=本机 / 云=远程，按 _voiceTranscriptEngine 显示；转写执行由
+/// [transcribe] 按 Mode 路由，与气泡消息同口径），内容区=转写中…（转圈）/
 /// 转写正文/失败信息（失败信息在弹层内显示，不走通知条，老板 2026-10-25）；
 /// 仅转写成功（有文字）时底部才出现 Apply 按钮：把文字交回 [onApply]（追加进
 /// 输入框现有文字末尾、切回文字态、**清除原录音**）。Cancel/下滑/点弹层外
 /// 只关弹层、预览态不动——关层≠停转写：本条若还没轮到就由 [cancelled]
-/// 跳过不跑；已进 isolate 的照常跑完、结果因 mounted=false 丢弃（再长按
-/// 波形可重转）。
+/// 跳过不跑；已进 isolate/已发出的 POST 照常跑完、结果因 mounted=false
+/// 丢弃（再长按波形可重转）。
 class _PreviewTranscribeSheet extends StatefulWidget {
   const _PreviewTranscribeSheet({
-    required this.transcriber,
+    required this.transcribe,
     required this.path,
     required this.onApply,
     this.prepError,
     required this.cancelled,
+    required this.engine,
   });
 
-  /// 转写服务（与消息转写链路共用实例：串行队列，不并发抢 CPU）。
-  final VoiceTranscriptService transcriber;
+  /// 转写执行器（页面侧按 Mode 路由后注入，见 _transcribePreviewAudio）：
+  /// 本地=service.transcribeFile（与消息转写共用串行队列，不并发抢 CPU）；
+  /// 服务端=POST /transcriptions。取消/失败抛错，由本弹层内容区显示。
+  final Future<(String, String)> Function(String path,
+      {bool Function()? cancelled}) transcribe;
 
   /// 预览态录音的临时 wav 路径（_stopVoice 时已规范化、已验证有音频数据）。
   final String path;
@@ -12802,9 +12897,13 @@ class _PreviewTranscribeSheet extends StatefulWidget {
   /// 准备阶段（模型下载/安装/探活）的错误信息；null=准备就绪，开层即转写。
   final String? prepError;
 
-  /// 取消检查（关层后返回 true）：透传给 [VoiceTranscriptService.transcribeFile]——
-  /// 队列轮到这条时发现层已关就跳过不跑；已进 isolate 的拦不住（跑完丢弃）。
+  /// 取消检查（关层后返回 true）：透传给 [transcribe]——本地队列轮到这条时
+  /// 发现层已关就跳过不跑；已进 isolate/已发出的 POST 拦不住（跑完丢弃）。
   final bool Function() cancelled;
+
+  /// 当前转写 Mode（'server'=远程云 / 'local'=本机芯片）：标题右侧来源图标
+  /// 按它显示。服务端未启用而回落本机的边缘情况有 notice 说明，图标不翻转。
+  final String engine;
 
   @override
   State<_PreviewTranscribeSheet> createState() =>
@@ -12827,8 +12926,8 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
 
   Future<void> _transcribe() async {
     try {
-      final r = await widget.transcriber
-          .transcribeFile(widget.path, cancelled: widget.cancelled);
+      final r = await widget
+          .transcribe(widget.path, cancelled: widget.cancelled);
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -12861,14 +12960,11 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
             // 同款 SheetCloseButton（老板 2026-10-24 式样：圆形淡灰底+关闭
             // 图标），Stack 钉右上角、标题组仍居中（与阅后即焚/About 等
             // 弹层同布局）。
-            // 图标恒为芯片（本机）——这条链路的转写固定走本机：入口
-            // _transcribePreviewRecording 只检查/安装本机模型，transcribeFile
-            // 是本地 isolate 跑 sherpa，从不过服务端、音频不出本机。**不能**
-            // 按 _voiceTranscriptEngine 给云图标：那个设置只路由消息气泡的
-            // 转写，这里显示了云就是 mislead「音频出过本机」（隐私语义，
-            // 老板 2026-10-25 验收轮明确）。芯片=本机的约定与气泡转写行
-            // 来源图标、设置页引擎卡片一致（见 _voiceTranscriptSourceIcon）。
-            // 若将来预览态也支持远程路由，这里再按引擎给云图标。
+            // 来源图标按当前 Mode 给（芯片=本机 / 云=远程）——预览态转写自
+            // 2026-10-25 起与气泡消息同口径遵 Mode 路由（_transcribePreviewAudio），
+            // 图标与真正执行的引擎一致（服务端未启用而回落本机的边缘情况有
+            // notice 说明，图标不翻转）。约定同气泡转写行来源图标、设置页
+            // 引擎卡片（见 _voiceTranscriptSourceIcon）。
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
               child: Stack(
@@ -12882,10 +12978,17 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
                             style: theme.textTheme.titleMedium),
                         const SizedBox(width: 6),
                         Tooltip(
-                          // 图标含义靠猜不如给文字：桌面悬浮显示「本机」
-                          message: l10n.voiceTranscriptEngineLocalShort,
-                          child: const Icon(Icons.memory,
-                              size: 18, color: Colors.grey),
+                          // 图标含义靠猜不如给文字：桌面悬浮显示「本机/远程」
+                          message: widget.engine == 'server'
+                              ? l10n.voiceTranscriptEngineServerShort
+                              : l10n.voiceTranscriptEngineLocalShort,
+                          child: Icon(
+                            widget.engine == 'server'
+                                ? Icons.cloud_outlined
+                                : Icons.memory,
+                            size: 18,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),

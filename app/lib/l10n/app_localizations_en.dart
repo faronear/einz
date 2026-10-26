@@ -1112,6 +1112,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptSheetTitle => 'Voice transcription';
 
   @override
+  String get voiceTranscriptSettingsLink => 'Transcription settings';
+
+  @override
   String get apply => 'Apply';
 
   @override
@@ -1125,7 +1128,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'Right on this device, nothing leaves your hands. A model install is required at the first use.';
+      'Runs entirely on this device — your audio never leaves it.';
 
   @override
   String get voiceTranscriptAuthServer => 'Remote';
@@ -1163,17 +1166,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAutoModeDesc =>
-      'Transcribe all voice messages automatically.';
+      'Voice messages are transcribed automatically.';
 
   @override
   String get voiceTranscriptManualModeDesc =>
-      'Transcribe selected voice messages at your instruction.';
+      'Select voice messages of yourself to transcribe.';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';
 
   @override
-  String get voiceTranscriptPreparing => 'Installing voice model…';
+  String get voiceTranscriptPreparing => 'Installing voice model on first use';
 
   @override
   String voiceTranscriptPrepareFailed(String error) {

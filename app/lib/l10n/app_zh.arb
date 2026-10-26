@@ -628,13 +628,14 @@
   },
   "voiceTranscriptNoText": "未识别到文字",
   "voiceTranscriptSheetTitle": "语音转写",
+  "voiceTranscriptSettingsLink": "设置转写方式",
   "apply": "应用",
   "chatPageMenuVoiceTranscriptAuth": "语音转写",
   "voiceTranscriptAuthNote": "怎样把语音消息转成文字？",
   "voiceTranscriptAuthLocal": "本机转写",
-  "voiceTranscriptAuthLocalDesc": "在本机上直接转写，数据不离开本机。第一次转写时自动安装语音包。",
+  "voiceTranscriptAuthLocalDesc": "在本机上直接转写，数据不离开本机。",
   "voiceTranscriptAuthServer": "远程转写",
-  "voiceTranscriptAuthServerDesc": "把原始录音发送给远程服务器，完成转写后将立即从服务器删除。",
+  "voiceTranscriptAuthServerDesc": "把原始录音发送给远程服务器，完成转写后将立即删除。",
   "voiceTranscriptServerFailed": "远程转写失败：{error}",
   "voiceTranscriptServerDisabled": "远程转写未启用，已改用本机语音包",
   "voiceTranscriptGroupEngine": "转写位置",
@@ -644,7 +645,7 @@
   "voiceTranscriptAutoOn": "自动",
   "voiceTranscriptAutoOff": "手动",
   "voiceTranscriptAutoModeDesc": "每次收到语音消息就自动转写。",
-  "voiceTranscriptManualModeDesc": "需要你手动选择转写一个语音消息。",
+  "voiceTranscriptManualModeDesc": "手动选择一个语音消息进行转写。",
   "voiceTranscriptMenuTranscribe": "转写",
   "@voiceTranscriptServerFailed": {
     "placeholders": {
@@ -653,7 +654,7 @@
       }
     }
   },
-  "voiceTranscriptPreparing": "正在安装语音包…",
+  "voiceTranscriptPreparing": "首次转写：下载安装语音包",
   "voiceTranscriptPrepareFailed": "语音包安装失败：{error}",
   "@voiceTranscriptPrepareFailed": {
     "placeholders": {

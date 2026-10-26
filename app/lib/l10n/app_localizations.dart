@@ -1910,6 +1910,12 @@ abstract class AppLocalizations {
   /// **'Voice transcription'**
   String get voiceTranscriptSheetTitle;
 
+  /// No description provided for @voiceTranscriptSettingsLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription settings'**
+  String get voiceTranscriptSettingsLink;
+
   /// No description provided for @apply.
   ///
   /// In en, this message translates to:
@@ -1937,7 +1943,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'Right on this device, nothing leaves your hands. A model install is required at the first use.'**
+  /// **'Runs entirely on this device — your audio never leaves it.'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
@@ -2003,13 +2009,13 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe all voice messages automatically.'**
+  /// **'Voice messages are transcribed automatically.'**
   String get voiceTranscriptAutoModeDesc;
 
   /// No description provided for @voiceTranscriptManualModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Transcribe selected voice messages at your instruction.'**
+  /// **'Select voice messages of yourself to transcribe.'**
   String get voiceTranscriptManualModeDesc;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.
@@ -2021,7 +2027,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptPreparing.
   ///
   /// In en, this message translates to:
-  /// **'Installing voice model…'**
+  /// **'Installing voice model on first use'**
   String get voiceTranscriptPreparing;
 
   /// No description provided for @voiceTranscriptPrepareFailed.
