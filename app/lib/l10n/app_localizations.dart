@@ -1793,7 +1793,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageLongPressToTranscribe.
   ///
   /// In en, this message translates to:
-  /// **'Long press to transcribe'**
+  /// **'Long press to text'**
   String get chatPageLongPressToTranscribe;
 
   /// No description provided for @chatPageInputHint.
@@ -1919,7 +1919,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptSettingsLink.
   ///
   /// In en, this message translates to:
-  /// **'Transcription settings'**
+  /// **'Settings'**
   String get voiceTranscriptSettingsLink;
 
   /// No description provided for @apply.

@@ -33,6 +33,8 @@ class Clickable extends StatefulWidget {
     this.borderRadius,
     this.circle = false,
     this.cursor,
+    this.hoverAlpha,
+    this.pressAlpha,
     this.child,
   });
 
@@ -61,6 +63,18 @@ class Clickable extends StatefulWidget {
   /// [SystemMouseCursors.click]（老板 2026-10-25）。
   final MouseCursor? cursor;
 
+  /// 悬浮遮罩浓度覆盖（null=默认 5%）。
+  ///
+  /// 什么时候要传：**浅色大区块浮在浅色面上**时——默认 5% 叠白底与外围
+  /// 灰底几乎同色，悬浮看不出来（老板 2026-10-26：输入台播放胶囊白底浮在
+  /// 灰预览盒上，5%  hover 与盒外颜色无法分辨）。此类场景传 app 标准浅色面
+  /// 档 **0.10**（与「添加秘境」等淡灰按钮、选项行 InkWell 的 hoverColor
+  /// 同档，老板 2026-10-24 三档口径：默认 5% → 悬浮 10% → 按压 14%）。
+  final double? hoverAlpha;
+
+  /// 按压遮罩浓度覆盖（null=默认 10%；配 [hoverAlpha] 0.10 用 **0.14**）。
+  final double? pressAlpha;
+
   final Widget? child;
 
   @override
@@ -79,8 +93,11 @@ class _ClickableState extends State<Clickable> {
       widget.onDoubleTap != null ||
       widget.onSecondaryTap != null;
 
-  static const double _hoverAlpha = 0.05; // 悬浮：淡色遮罩
-  static const double _pressedAlpha = 0.10; // 按压/长按：深色遮罩
+  static const double _defaultHoverAlpha = 0.05; // 悬浮：淡色遮罩（默认档）
+  static const double _defaultPressAlpha = 0.10; // 按压/长按：深色遮罩（默认档）
+
+  double get _hoverA => widget.hoverAlpha ?? _defaultHoverAlpha;
+  double get _pressA => widget.pressAlpha ?? _defaultPressAlpha;
 
   @override
   Widget build(BuildContext context) {
@@ -133,9 +150,7 @@ class _ClickableState extends State<Clickable> {
             Positioned.fill(
               child: IgnorePointer(
                 child: AnimatedOpacity(
-                  opacity: _pressed
-                      ? _pressedAlpha
-                      : (_hovered ? _hoverAlpha : 0.0),
+                  opacity: _pressed ? _pressA : (_hovered ? _hoverA : 0.0),
                   duration: const Duration(milliseconds: 120),
                   child: DecoratedBox(
                     decoration: BoxDecoration(

@@ -1047,7 +1047,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageLongPressToRecord => 'Long press to record';
 
   @override
-  String get chatPageLongPressToTranscribe => 'Long press to transcribe';
+  String get chatPageLongPressToTranscribe => 'Long press to text';
 
   @override
   String get chatPageInputHint => 'Type a message…';
@@ -1115,7 +1115,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptSheetTitle => 'Voice transcription';
 
   @override
-  String get voiceTranscriptSettingsLink => 'Transcription settings';
+  String get voiceTranscriptSettingsLink => 'Settings';
 
   @override
   String get apply => 'Apply';

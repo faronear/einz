@@ -987,7 +987,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageLongPressToRecord => '长按开始录音';
 
   @override
-  String get chatPageLongPressToTranscribe => '长按转写';
+  String get chatPageLongPressToTranscribe => '长按转文字';
 
   @override
   String get chatPageInputHint => '输入消息…';
@@ -1054,7 +1054,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptSheetTitle => '语音转写';
 
   @override
-  String get voiceTranscriptSettingsLink => '设置转写方式';
+  String get voiceTranscriptSettingsLink => '设置';
 
   @override
   String get apply => '应用';

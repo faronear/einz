@@ -8100,6 +8100,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 behavior: HitTestBehavior.opaque,
                 // 遮罩半径 18=半高：胶囊右端标准半圆，悬浮/按压变色不溢形
                 borderRadius: BorderRadius.circular(18),
+                // 悬浮/按压浓度用 app 标准浅色面档 10%/14%（老板
+                // 2026-10-26）：默认 5% 叠白底与外围灰预览盒几乎同色，
+                // 悬浮时胶囊"溶进"盒里看不出可点；10%/14% 与淡灰按钮、
+                // 选项行 InkWell（hoverColor/highlightColor）同档
+                hoverAlpha: 0.10,
+                pressAlpha: 0.14,
                 onTap: _playVoicePreview,
                 onLongPressStart: (_) =>
                     unawaited(_transcribePreviewRecording()),
@@ -8132,13 +8138,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           // 宽度撑满可用区。青绿双色（老板 2026-10-25 三轮
                           // 定稿）：active=shade700 深青绿（已播+进度竖线）、
                           // inactive=shade200 浅青绿（未播静态）。
-                          // 波形上叠「长按开始转写」提示（老板 2026-10-26）：
-                          // 录音条没有空间，提示直接落在波形图上（同提示态
-                          // 「长按开始录音」样式）。**无条件常显**（这不是
-                          // 气泡消息）；文字绿色同「长按开始录音」（老板
-                          // 2026-10-26），12px，压在波形上半区（上移出正中
-                          // 3px）。IgnorePointer 不吃手势，点播/长按仍归
-                          // 外层 Clickable 统一处理。
+                          // 波形上叠「长按转写」提示（老板 2026-10-26）：
+                          // 录音条没有空间，提示落在波形图**上方**（同提示态
+                          // 「长按开始录音」样式；老板明确不要压在波形中间）。
+                          // **播放时淡出**（2026-10-26 加，AnimatedOpacity
+                          // 200ms easeInOut，停止/播完淡回）——播放时波形自己
+                          // 在"说话"，提示不抢注意力；静态时常显（这不是气泡
+                          // 消息）。文字绿色同「长按开始录音」（老板
+                          // 2026-10-26），11px。IgnorePointer 不吃手势，
+                          // 点播/长按仍归外层 Clickable 统一处理。
                           return Stack(
                             // 文字上移出正中：压在波形中线会被波形糊住
                             alignment: Alignment.topCenter,
@@ -8159,16 +8167,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 child: Transform.translate(
                                   offset: const Offset(0, -12),
                                   child: IgnorePointer(
-                                    child: Text(
-                                      AppLocalizations.of(context)!
-                                          .chatPageLongPressToTranscribe,
-                                      style: TextStyle(
-                                        // 淡青绿=波形未播静态同款 shade200
-                                        // （老板 2026-10-26：与波形淡色一致）
-                                        color: Colors.green.shade200,
-                                        // 11px（老板 2026-10-26：再小一号）
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                    // 播放时淡出（200ms easeInOut）：静态
+                                    // 常显、播放隐去、播完淡回。opacity 0
+                                    // 仍占位（Stack 覆盖层，无布局位移）
+                                    child: AnimatedOpacity(
+                                      opacity: _previewPlaying ? 0 : 1,
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      curve: Curves.easeInOut,
+                                      child: Text(
+                                        AppLocalizations.of(context)!
+                                            .chatPageLongPressToTranscribe,
+                                        style: TextStyle(
+                                          // 淡青绿=波形未播静态同款 shade200
+                                          // （老板 2026-10-26：与波形淡色一致）
+                                          color: Colors.green.shade200,
+                                          // 11px（老板 2026-10-26：再小一号）
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -11223,34 +11240,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       icon: SizedBox(
                                         width: 34,
                                         height: 24,
-                                        child: Stack(
-                                          alignment: Alignment.centerLeft,
-                                          children: [
-                                            // 左：切换目标（小）
-                                            Icon(
+                                        // 语音态整体右移 3px（老板 2026-10-26）：
+                                        // mic_none 字形左右侧留白大，同样的几何在
+                                        // 语音态（键盘在左+麦克风在右）会显得偏左、
+                                        // 靠近外面+号；右移后两种模式的线条都落在
+                                        // 圆钮同一右偏区域（文字态键盘贴近文字输入
+                                        // 的那份和谐感）。**只平移、不改线条区域
+                                        // 大小**；溢出 34 盒的 3px 落在 48 圆钮的
+                                        // 留白里，无裁切无视觉影响。
+                                        child: Transform.translate(
+                                          offset: Offset(
                                               _inputMode == _InputMode.text
-                                                  ? Icons.mic_none
-                                                  : Icons
-                                                      .keyboard_alt_outlined,
-                                              size: 18,
-                                              color:
-                                                  _inputModeToggleColor(),
-                                            ),
-                                            // 右：当前主力（大，压住左元素一小块）
-                                            Positioned(
-                                              left: 12,
-                                              child: Icon(
+                                                  ? 0
+                                                  : 3,
+                                              0),
+                                          child: Stack(
+                                            alignment:
+                                                Alignment.centerLeft,
+                                            children: [
+                                              // 左：切换目标（小）
+                                              Icon(
                                                 _inputMode ==
                                                         _InputMode.text
-                                                    ? Icons
-                                                        .keyboard_alt_outlined
-                                                    : Icons.mic_none,
-                                                size: 21,
+                                                    ? Icons.mic_none
+                                                    : Icons
+                                                        .keyboard_alt_outlined,
+                                                size: 18,
                                                 color:
                                                     _inputModeToggleColor(),
                                               ),
-                                            ),
-                                          ],
+                                              // 右：当前主力（大，压住左元素一小块）
+                                              Positioned(
+                                                left: 12,
+                                                child: Icon(
+                                                  _inputMode ==
+                                                          _InputMode.text
+                                                      ? Icons
+                                                          .keyboard_alt_outlined
+                                                      : Icons.mic_none,
+                                                  size: 21,
+                                                  color:
+                                                      _inputModeToggleColor(),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
