@@ -8002,53 +8002,73 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (preview) {
       return Row(
         children: [
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 22,
-            // 悬浮高亮/水波纹半径 17=按钮半边长（compact 下 34×34）：纯圆内切
-            // 按钮。默认半径 35 会大幅溢出、被盒圆角裁成椭圆（老板 2026-10-25）
-            splashRadius: 17,
-            // 青绿=录音同款色（老板 2026-10-25）：预览态播放/停止键与左侧
-            // 合并图标、波形统一色系，不再用深蓝主色（与青绿图标不协调）
-            icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
-                color: Colors.green),
-            onPressed: _playVoicePreview,
-          ),
+          // 播放胶囊（老板 2026-10-25）：播放键+波形进同一个白底胶囊——点胶囊
+          // 任意处=播放/停止（与气泡音频条一致：波形区域单击也能播，不必非点
+          // 中播放键），长按=即时转写；胶囊从预览盒的灰底里浮出，Clickable 给
+          // 悬浮淡色/按压深色变色（遮罩圆角跟随胶囊轮廓）。
           Expanded(
-            // 长按波形图=即时转写（老板 2026-10-25）：先备模型（下载/安装），就绪
-            // 才弹转写对话框。opaque 保证纯图形区也收得到长按（CustomPaint 自身
-            // 不吸收命中——实测 deferToChild 包裸 CustomPaint 收不到）；内层在
-            // 手势竞技场赢外层（外层在预览态本就被 _startVoice 守卫空转，不会误
-            // 重录——预览态长按自 2026-09-13 起就是故意空操作）。
-            child: Clickable(
-              behavior: HitTestBehavior.opaque,
-              // 波形是长按转写目标：桌面悬浮出手型（老板 2026-10-25）
-              cursor: SystemMouseCursors.click,
-              onLongPressStart: (_) =>
-                  unawaited(_transcribePreviewRecording()),
-              child: LayoutBuilder(builder: (context, constraints) {
-                // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
-                // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区。
-                // 预览态波形用青绿双色（老板 2026-10-25，与录音态同色系）：
-                // active=深青绿 shade700——第三轮调整：shade100 浅色方案下
-                // 老板仍嫌已播/未播区分不足，要高亮再加深一档拉满区分度；
-                // inactive=浅青绿 shade200——第二轮 shade300→shade100 后老板
-                // 嫌最浅太淡，定在 shade200。
-                return _VoiceWaveform(
-                  playing: _previewPlaying,
-                  durationSeconds: _recordSeconds,
-                  samples: _voiceSamples,
-                  width: constraints.maxWidth,
-                  activeColor: Colors.green.shade700,
-                  inactiveColor: Colors.green.shade200,
-                );
-              }),
+            child: SizedBox(
+              height: 36,
+              child: Clickable(
+                // opaque：胶囊整块参与命中（波形 CustomPaint 自身不吸收命中，
+                // 实测 deferToChild 包裸图形收不到手势）
+                behavior: HitTestBehavior.opaque,
+                // 遮罩半径 18=半高：胶囊右端标准半圆，悬浮/按压变色不溢形
+                borderRadius: BorderRadius.circular(18),
+                onTap: _playVoicePreview,
+                onLongPressStart: (_) =>
+                    unawaited(_transcribePreviewRecording()),
+                child: Container(
+                  padding: const EdgeInsets.only(left: 2, right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      // 播放/停止图标：纯图标不单独挂 onPressed——点击统一由
+                      // 胶囊处理。若内层挂 InkWell，点它时内层赢手势竞技场，
+                      // 胶囊的按压变色会被它的圆形水波纹顶掉，反馈不统一。
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(
+                          _previewPlaying
+                              ? Icons.stop_circle
+                              : Icons.play_circle,
+                          size: 22,
+                          // 青绿=录音同款色（老板 2026-10-25）
+                          color: Colors.green,
+                        ),
+                      ),
+                      Expanded(
+                        child: LayoutBuilder(builder: (context, constraints) {
+                          // 试听：波形按进度从左往右高亮（与气泡里的语音波形
+                          // 一致，老板要求 2026-09-13）——用本次真实振幅采样，
+                          // 宽度撑满可用区。青绿双色（老板 2026-10-25 三轮
+                          // 定稿）：active=shade700 深青绿（已播+进度竖线）、
+                          // inactive=shade200 浅青绿（未播静态）。
+                          return _VoiceWaveform(
+                            playing: _previewPlaying,
+                            durationSeconds: _recordSeconds,
+                            samples: _voiceSamples,
+                            width: constraints.maxWidth,
+                            activeColor: Colors.green.shade700,
+                            inactiveColor: Colors.green.shade200,
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
+          const SizedBox(width: 6),
+          // 关闭键在胶囊外：删除是破坏性操作，不该混进「点哪都播放」的范围
           IconButton(
             visualDensity: VisualDensity.compact,
             iconSize: 22,
-            splashRadius: 17, // 同播放键：纯圆内切 34 按钮，不溢出成椭圆
+            splashRadius: 17, // 纯圆内切 34 按钮，不溢出成椭圆
             icon: const Icon(Icons.close, color: Colors.grey),
             onPressed: _cancelVoice,
           ),
