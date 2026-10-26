@@ -12834,11 +12834,46 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 标题「语音转写」
+            // 标题组（老板 2026-10-25）：标题**居中**，转写来源图标紧邻标题
+            // 右手（不再占最右——那里让给右上角关闭圆钮）；关闭圆钮用各弹层
+            // 同款 SheetCloseButton（老板 2026-10-24 式样：圆形淡灰底+关闭
+            // 图标），Stack 钉右上角、标题组仍居中（与阅后即焚/About 等
+            // 弹层同布局）。
+            // 图标恒为芯片（本机）——这条链路的转写固定走本机：入口
+            // _transcribePreviewRecording 只检查/安装本机模型，transcribeFile
+            // 是本地 isolate 跑 sherpa，从不过服务端、音频不出本机。**不能**
+            // 按 _voiceTranscriptEngine 给云图标：那个设置只路由消息气泡的
+            // 转写，这里显示了云就是 mislead「音频出过本机」（隐私语义，
+            // 老板 2026-10-25 验收轮明确）。芯片=本机的约定与气泡转写行
+            // 来源图标、设置页引擎卡片一致（见 _voiceTranscriptSourceIcon）。
+            // 若将来预览态也支持远程路由，这里再按引擎给云图标。
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-              child: Text(l10n.voiceTranscriptSheetTitle,
-                  style: theme.textTheme.titleMedium),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.voiceTranscriptSheetTitle,
+                            style: theme.textTheme.titleMedium),
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          // 图标含义靠猜不如给文字：桌面悬浮显示「本机」
+                          message: l10n.voiceTranscriptEngineLocalShort,
+                          child: const Icon(Icons.memory,
+                              size: 18, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    child: SheetCloseButton(tooltip: l10n.close),
+                  ),
+                ],
+              ),
             ),
             // 内容区：限高+滚动（长转写文本不炸屏）
             Flexible(
