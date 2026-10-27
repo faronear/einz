@@ -1,0 +1,22 @@
+{
+  "utc": "20261027T051729.000000Z",
+  "time": "2026-10-27 13:17+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "长按消息菜单改橘黄主题 + 按压/弹出动效，与「+」附件菜单分成两套卡片",
+      "detail": [
+        "需求：气泡消息操作菜单要「更显眼、更生动」；选中气泡已是橘黄，菜单里操作按钮的图案也要橘黄；长按消息菜单（锚定浮窗）与「+」附件菜单（底部弹层）不再共用一套卡片的类型，将来各自演化。",
+        "结构：新增 _MessageActionCardTile（有状态、只服务消息菜单）——橘黄 10% 淡底 + 橘黄图案 + 橘黄水波/悬停 + 按下整卡缩到 0.94、松开弹回（110ms）。_buildActionCard/_buildActionCardWidget 收回成纯素色、只服务附件菜单；_buildActionCardGrid 仍共用（纯几何，两种排布将来要分再分）。",
+        "配色同源：新增文件级 const _kOrangeHighlight = #FF9800，气泡高亮底色、卡片淡底、卡片图案、转写自绘图标、选中柔光五处统一取它，不再各写字面量。",
+        "弹出动效：缩放曲线由 easeOutCubic 改 easeOutBack（0.85→1.0 收尾过冲约 1.6%），淡入仍 easeOutCubic；用 animation.drive 而非新建 CurvedAnimation（buildTransitions 每帧重跑，避免要手动释放的对象）。",
+        "选中气泡：加同色柔光 boxShadow（#FF9800 40%、blur 18、spread 2）——只画阴影不改布局（边框方案会改尺寸，2026-09-10 已弃用）；菜单打开/关闭的变色节奏由 1.5s 改为 180ms，与菜单弹入弹出同步；跳转高亮仍按 2026-09-10 定的 1.5s 渐变。",
+        "验证：flutter analyze 无问题（No issues found）。按 UI 改动惯例未跑测试、未构建，等老板真机自测。未提交。",
+        "工作区里另有锁屏默认 30s→1 分钟、l10n 文案调整等改动，不是本次范围；将来提交时要隔离（git apply --cached 分 hunk）。"
+      ]
+    }
+  ]
+}

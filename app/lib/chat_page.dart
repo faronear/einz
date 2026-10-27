@@ -285,6 +285,11 @@ const double kMessageFontSize = 16;
 /// 改这里两处一起变——此前引用条 24、引用块 40，两处各写各的。
 const double kQuoteThumbSize = 40;
 
+/// 消息高亮的橘黄（老板 2026-09-10 定，跳转目标闪烁用；2026-10-24 起长按菜单
+/// 打开期间被选中的气泡也用，2026-10-27 起菜单卡片的图案与柔光同色）：
+/// 气泡底色、卡片图标/淡底、选中柔光统一从这一个来源取，别再各写 #FF9800。
+const Color _kOrangeHighlight = Color(0xFFFF9800);
+
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   late final MessageRepository _repo;
@@ -7021,20 +7026,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除均无意义；
       // 删除本来也是打本地墓碑，已做了）
       if (m.deleted) ...[
-        _buildActionCard(
+        _buildMessageActionCard(
           icon: Icons.undo_outlined,
           label: l10n.chatPageActionRecall,
           onTap: () => Navigator.of(ctx).pop('recall'),
         ),
       ] else ...[
-        _buildActionCard(
+        _buildMessageActionCard(
           icon: Icons.format_quote,
           label: l10n.chatPageActionQuote,
           onTap: () => Navigator.of(ctx).pop('quote'),
         ),
         // 文字消息才有「拷贝」（媒体消息无文本可拷）
         if (m.env.type == 'text')
-          _buildActionCard(
+          _buildMessageActionCard(
             // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote 高一档
             // （2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24 与邻居光学对齐
             icon: Icons.copy_outlined,
@@ -7045,13 +7050,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件存到本机
         // （系统保存对话框选位置）；放「引用」后面
         if (m.attachment != null)
-          _buildActionCard(
+          _buildMessageActionCard(
             icon: Icons.save_alt,
             label: l10n.chatPageActionSave,
             onTap: () => Navigator.of(ctx).pop('save'),
           ),
         // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-        _buildActionCard(
+        _buildMessageActionCard(
           icon: Icons.timer_outlined,
           label: l10n.chatPageActionBurn,
           onTap: () => Navigator.of(ctx).pop('burn'),
@@ -7060,13 +7065,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // delivered 高水位原子判定，客户端只做**粗筛**减少无效入口（最终判定
         // 的权威在服务端 409）。放「删除」之后：撤回实质上比删除更重（2026-10-11）。
         // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
-        _buildActionCard(
+        _buildMessageActionCard(
           icon: Icons.delete_outline,
           label: l10n.chatPageActionDelete,
           onTap: () => Navigator.of(ctx).pop('delete'),
         ),
         if (_messageRecallable(m))
-          _buildActionCard(
+          _buildMessageActionCard(
             icon: Icons.undo_outlined,
             label: l10n.chatPageActionRecall,
             onTap: () => Navigator.of(ctx).pop('recall'),
@@ -7076,10 +7081,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 消息（任意容器）+ wav 音频文件。放**最后**（老板 2026-10-23）——
         // 转写是音频专属的低频动作，不挡常用项。
         if (_voiceTranscriptEligible(m))
-          _buildActionCardWidget(
+          _buildMessageActionCardWidget(
             // 麦克风+文档自绘图标（老板 2026-10-24）：纯波形只有"语音"半边，
-            // 加上文档线条才是完整的"语音→文字"。
-            iconWidget: const TranscribeIcon(color: Color(0xFF1A1A1A)),
+            // 加上文档线条才是完整的"语音→文字"。显式橘黄（同菜单其他卡片，
+            // 自绘图标不吃 IconTheme）。
+            iconWidget: const TranscribeIcon(color: _kOrangeHighlight),
             label: l10n.voiceTranscriptMenuTranscribe,
             onTap: () => Navigator.of(ctx).pop('transcribe'),
           ),
@@ -7090,7 +7096,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 底部菜单操作项布局：圆角方形卡片，一行最多 4 个。总数不超过 4 个时等距
   /// 均匀铺开；超过 4 个时每行 4 个、向左对齐（老板要求 2026-09-13）。卡片宽度
   /// 以「一行 4 个」为基准计算并设上限，保证尺寸不随数量或屏幕宽度剧烈变化。
-  /// 长按消息菜单与输入栏「+」附件菜单共用。
+  /// 纯几何布局，消息长按菜单（橘黄卡片）与输入栏「+」附件菜单（素色卡片）
+  /// 两种弹层类型共用；将来某型要不同的排布再各自另起。
   Widget _buildActionCardGrid(List<Widget> cards) {
     const maxPerRow = 4;
     const spacing = 12.0;
@@ -7163,8 +7170,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 底部菜单的操作卡片：圆角方形，内含图标与文字；destructive 用红色标示
-  /// 删除等不可逆操作。长按消息菜单与输入栏「+」附件菜单共用。
+  /// 输入栏「+」附件菜单的操作卡片：圆角方形，内含图标与文字；destructive 用
+  /// 红色标示删除等不可逆操作。图标随主题（素色）——消息长按菜单另用橘黄版
+  /// [_buildMessageActionCard]（2026-10-27 起两种菜单分开两种类型）。
   /// [iconSize] 供字形偏高的图标（如 copy_outlined 竖向占 20/24）单独缩小，
   /// 与邻居图标光学对齐（2026-10-08）；缺省 26 与原尺寸一致。
   Widget _buildActionCard({
@@ -7184,6 +7192,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 自定义 widget 图标版操作卡片（[_buildActionCard] 的泛化）：给自绘图标用
   /// （如「语音转写」的麦克风+文档 [TranscribeIcon]，IconData 表达不了）。
+  /// 只服务「+」附件菜单；消息长按菜单的卡片是另一套 [_MessageActionCardTile]
+  /// （2026-10-27 起两种菜单分开两种类型、各自演化）。
   Widget _buildActionCardWidget({
     required Widget iconWidget,
     required String label,
@@ -7221,6 +7231,49 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  // ---------- 消息长按菜单的操作卡片（橘黄主题版，2026-10-27） ----------
+  // 两种菜单是两种弹层形态，卡片也分开两种类型、各自演化：
+  //  · 消息菜单 = 长按点锚定的浮窗（_MessageActionsPopupRoute，老板 2026-10-24
+  //    由底部弹层改来），卡片是 [_MessageActionCardTile]：橘黄淡底 + 橘黄图案
+  //    + 按压缩放——与被选中的橘黄气泡连成一气（老板 2026-10-27 要“更显眼、
+  //    更生动”）；
+  //  · 附件菜单 = 底部弹层，素色卡片（上面的 [_buildActionCard]），不跟消息
+  //    菜单的配色与动效走。
+  // 将来再有新形态的菜单设计，照这个分法另起一套 tile / builder，不互相牵连。
+
+  /// 消息长按菜单专用操作卡片：结构同 [_buildActionCard]，视觉走
+  /// [_MessageActionCardTile]（橘黄主题，独立演化）。
+  /// [iconSize] 供字形偏高的图标单独缩小，同 [_buildActionCard]。
+  Widget _buildMessageActionCard({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+    double iconSize = 26,
+  }) {
+    return _buildMessageActionCardWidget(
+      iconWidget: Icon(icon, size: iconSize),
+      label: label,
+      onTap: onTap,
+      destructive: destructive,
+    );
+  }
+
+  /// 自绘图标版（[_buildMessageActionCard] 的泛化）：[iconWidget] 自带显式
+  /// color 时不吃 IconTheme（如 [TranscribeIcon]），由调用方直接给橘黄。
+  Widget _buildMessageActionCardWidget({
+    required Widget iconWidget,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+  }) {
+    return _MessageActionCardTile(
+      iconWidget: iconWidget,
+      label: label,
+      onTap: onTap,
+      destructive: destructive,
+    );
+  }
 
   /// 记录副本：标记为已删除/已焚毁（墓碑，内容隐藏、时间+焚毁记录保留）。
   /// [kind] 传墓碑来路（'delete'=本机删除、'recall'=撤回、缺省=焚毁到期）。
@@ -10807,6 +10860,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 头像开关打开时才算（配色永远按 member 走）。
                 final senderMemberId =
                     m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
+                // 高亮判定（老板 2026-09-10 跳转 2s / 2026-10-24 长按菜单期间）：
+                // 两者共用橘黄底色；菜单开关走短节奏（180ms，与菜单弹入弹出同步），
+                // 跳转仍走 1.5s 渐变（2026-10-27：菜单 180ms 就弹开，底色若还按
+                // 1.5s 渐变会明显慢半拍）。
+                final bool isMenuTarget = m.env.messageId == _menuTargetMessageId;
+                final bool isHighlighted =
+                    m.env.messageId == _highlightMessageId || isMenuTarget;
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
@@ -10886,8 +10946,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             : null,
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
-                          // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变
-                          duration: const Duration(milliseconds: 1500),
+                          // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变。
+                          // 长按菜单期间例外：跟菜单弹出的 180ms 同节奏（2026-10-27）。
+                          duration: Duration(
+                              milliseconds: isMenuTarget ? 180 : 1500),
                           curve: Curves.easeOut,
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -10897,16 +10959,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               maxWidth: MediaQuery.sizeOf(context).width * 0.75),
                           decoration: BoxDecoration(
                             // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）；
-                            // 跳转目标短暂高亮背景改为显眼橘黄 #FF9800（老板要求
+                            // 跳转目标短暂高亮背景改为显眼橘黄（老板要求
                             // 2026-09-10：不撞任何性别气泡色系；只换背景色、尺寸
                             // 不变——边框方案实测闪烁期间气泡尺寸变化，已弃用）
-                            color: m.env.messageId == _highlightMessageId ||
-                                    m.env.messageId == _menuTargetMessageId
-                                ? const Color(0xFFFF9800)
+                            color: isHighlighted
+                                ? _kOrangeHighlight
                                 // 群聊一期：group 空间按发送者 member 取哈希色板
                                 // （duo 走原来的性别/槽位规则，一字未改）
                                 : _bubbleColor(mine: mine, senderMemberId: senderMemberId),
                             borderRadius: BorderRadius.circular(12),
+                            // 选中/跳转时加一圈同色柔光（2026-10-27，老板要“更显眼”）：
+                            // 阴影不占布局，不会像边框方案那样改变气泡尺寸。
+                            boxShadow: isHighlighted
+                                ? const [
+                                    BoxShadow(
+                                      color: Color(0x66FF9800),
+                                      blurRadius: 18,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
                           ),
                           child: DefaultTextStyle.merge(
                             // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；
@@ -13649,6 +13721,94 @@ Future<void> showMyAvatarFullscreen(
       ));
 }
 
+/// 消息长按菜单的动作卡片（老板 2026-10-27“更显眼、更生动”）——与「+」附件
+/// 菜单的素色卡片 [_ChatPageState._buildActionCard] 是**两种类型**，各自演化
+/// （两种菜单本身就是两种弹层形态：锚定浮窗 / 底部弹层）。
+///
+/// 视觉：整块铺橘黄淡底（#FF9800 10%）、图案同橘黄——与菜单打开期间被选中的
+/// 橘黄气泡连成一气，视线从消息落到菜单不换色；文字仍用默认深色（浅橘底上
+/// 最清楚，老板 2026-10-27：橘黄的只是“图案”）。destructive 项改走红色系
+/// （消息菜单目前没有标红项，留给将来）。
+/// 手感：按下整卡缩到 0.94、松开弹回（110ms），水波/高亮/悬停都用橘黄调——
+/// 比默认灰色水波更“活”。
+class _MessageActionCardTile extends StatefulWidget {
+  const _MessageActionCardTile({
+    required this.iconWidget,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final Widget iconWidget;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  State<_MessageActionCardTile> createState() => _MessageActionCardTileState();
+}
+
+class _MessageActionCardTileState extends State<_MessageActionCardTile> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent =
+        widget.destructive ? Colors.red.shade400 : _kOrangeHighlight;
+    return Listener(
+      // 只做按压视觉反馈，不参与手势竞争（点按仍由内层 InkWell 处理）。
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: Material(
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            onTap: widget.onTap,
+            splashColor: accent.withValues(alpha: 0.18),
+            highlightColor: accent.withValues(alpha: 0.10),
+            hoverColor: accent.withValues(alpha: 0.06),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconTheme.merge(
+                    data: IconThemeData(color: accent),
+                    child: widget.iconWidget,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.destructive ? accent : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 消息操作菜单的**锚定浮层 route**（老板 2026-10-24）：内容是一个白底圆角卡片，
 /// **紧贴**锚点气泡（[anchor]，全局坐标）：上方放得下放上方、否则下方、**都不够放
 /// 时直接悬浮覆盖在气泡上**（老板指定，微信长链接同款）。水平跟随气泡侧
@@ -13692,8 +13852,11 @@ class _MessageActionsPopupRoute extends PopupRoute<String> {
   @override
   Widget buildTransitions(BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation, Widget child) {
-    final curved =
-        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    // 淡入走 easeOutCubic；缩放另走 easeOutBack——0.85→1.0 收尾时轻微过冲
+    // （约 1.6%），菜单“弹”一下，比匀速放大生动（老板 2026-10-27）。
+    // 用 drive 而非 CurvedAnimation：后者需手动 dispose，而 buildTransitions
+    // 每帧都会重跑，不在这里造要释放的对象。
+    final fade = animation.drive(CurveTween(curve: Curves.easeOutCubic));
     // PopupRoute 的 buildTransitions 结果直接进 Overlay（不是 Stack）——
     // 自己包一层 Stack，Positioned 才有合法宿主（实测：直接 Positioned 抛
     // ParentData 断言）。
@@ -13701,11 +13864,11 @@ class _MessageActionsPopupRoute extends PopupRoute<String> {
       children: [
         Positioned.fill(
           child: FadeTransition(
-            opacity: curved,
+            opacity: fade,
             child: _MenuPlacement(
               anchor: anchor,
               screen: screen,
-              curved: curved,
+              animation: animation,
               menuBuilder: menuBuilder,
             ),
           ),
@@ -13724,13 +13887,16 @@ class _MenuPlacement extends StatefulWidget {
   const _MenuPlacement({
     required this.anchor,
     required this.screen,
-    required this.curved,
+    required this.animation,
     required this.menuBuilder,
   });
 
   final Rect anchor;
   final Size screen;
-  final Animation<double> curved;
+
+  /// route 的原始动画（0→1）：淡入与缩放在这里各自挂不同的曲线，见 build。
+  final Animation<double> animation;
+
   final WidgetBuilder menuBuilder;
 
   @override
@@ -13750,7 +13916,11 @@ class _MenuPlacementState extends State<_MenuPlacement> {
     final menuWidth =
         _gridMaxWidth.clamp(0.0, screen.width - _edgeMargin * 2);
     final anchor = widget.anchor;
-    final curved = widget.curved;
+    // 弹出缩放：0.85→1.0，easeOutBack 收尾过冲一点（“弹”出来的生动感）。
+    final pop = widget.animation.drive(
+      Tween<double>(begin: 0.85, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+    );
     final menu = Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -13835,7 +14005,7 @@ class _MenuPlacementState extends State<_MenuPlacement> {
           child: ScaleTransition(
             alignment:
                 above ? Alignment.bottomCenter : Alignment.topCenter,
-            scale: Tween<double>(begin: 0.85, end: 1.0).animate(curved),
+            scale: pop,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
