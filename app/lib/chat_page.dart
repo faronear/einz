@@ -8454,17 +8454,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          // 附件弹层无标题行：关闭圆钮单独成行、右对齐（老板 2026-10-24，
-          // 与其它弹层的钮位置一致）
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [SheetCloseButton(tooltip: l10n.close)],
-              ),
-              _buildActionCardGrid([
+          // 无标题行、无关闭钮（老板 2026-10-27，与长按消息菜单统一）：两处
+          // 都靠「点弹层外」关闭，本弹层另有下滑关闭；关闭圆钮只留在设置类
+          // 弹层（我的通道/阅后即焚等），动作菜单不放。
+          child: _buildActionCardGrid([
             // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
             if (_hasCameraCapture) ...[
               _buildActionCard(
@@ -8518,9 +8511,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 label: l10n.chatPageAttachPaste,
                 onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
               ),
-              ]),
-            ],
-          ),
+          ]),
         ),
       ),
     );
