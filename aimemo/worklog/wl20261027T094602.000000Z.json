@@ -1,0 +1,22 @@
+{
+  "utc": "20261027T094602.000000Z",
+  "time": "2026-10-27 17:46+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "server/models → server/models.nogit：配置/文档/whisper 构建同步完成",
+      "detail": [
+        "老板已完成：仓库 .gitignore 加全局 *.nogit(*.nogit/、*.nogit.*、*.nogit.*/)，Seafile 里把 server/models 改名；cn1 还没部署合并版，不受影响。",
+        "本次补的同步点：.gitignore 删掉单列 server/models（全局规则已覆盖）并改注释；server/docker/docker-compose.yml 两处卷 + 两处注释；server/docker/env.example 三处 + 注释；本机 server/docker/.env（ignored，三处）；server/Dockerfile 注释；docs/DEPLOYMENT.md 目录树；aimemo/20261022_whisperDeploy.zhcn.md 七处路径。",
+        "whisper 关键坑（实测）：改名前 whisper-cli 直接 Abort trap 6（exit 134）——LC_RPATH 与 CMakeCache 都是绝对路径（原为 /Users/luk/einz/server/models/whisper.cpp/build/bin），改名后 @rpath 的 libwhisper/libggml 找不到。",
+        "修复：在 server/models.nogit/whisper.cpp 下 rm -rf build，重新 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release + cmake --build build --target whisper-cli；otool 确认 rpath 已指向新路径，--help 退出 0。",
+        "验证：docker compose config 的卷源解析为 server/models.nogit/{whisper.cpp/models,sensevoice}；git status 里 models.nogit 被忽略（check-ignore 命中 *.nogit/）。",
+        "遗留：重建后的 rpath 是 /Volumes/repodisk/... 绝对路径，另一台机器若仓路径不同，需要在那边各自重跑一次 cmake；worklog.md 里的历史路径不改。",
+        "提交隔离：worklog 文档里另有一处非本次的表格重排（未提交），按 hunk 只暂存我改的四处（git apply --cached），没有替别人提交。"
+      ]
+    }
+  ]
+}

@@ -48,8 +48,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)   # macOS: -j$(sysctl -n hw.ncpu)
 ```
 
-> 仓库内的位置对应：开发机上这棵树就在 `server/models/whisper.cpp/`（两机同步目录，
-> 整个 `server/models/` gitignore），`.env` 的 `EINZ_WHISPER_BIN` 直接指它的
+> 仓库内的位置对应：开发机上这棵树就在 `server/models.nogit/whisper.cpp/`（两机同步目录，
+> 整个 `server/models.nogit/` 由全局 `*.nogit` 规则忽略），`.env` 的 `EINZ_WHISPER_BIN` 直接指它的
 > `build/bin/whisper-cli`；上文 `/opt/whisper/` 是 VPS 裸 node 部署的独立位置，两者
 > 结构一致（源码 + build/ + models/ 同级）。
 
@@ -112,13 +112,13 @@ EINZ_ASR_ENGINE=sensevoice
 
 - **内置镜像（推荐，2026-10-22 已落地）**：`server/Dockerfile` 新增 whisper 编译阶段
   ——二进制 + libggml 动态库烤进镜像（`/opt/whisper/`），模型**不进镜像**，走卷
-  `../models/whisper.cpp/models:/opt/whisper/models:ro`。compose（docker-compose.yml）已配
+  `../models.nogit/whisper.cpp/models:/opt/whisper/models:ro`。compose（docker-compose.yml）已配
   `EINZ_WHISPER_BIN=/opt/whisper/whisper-cli` + `EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin`。
-  首次部署只剩一步：往 `server/models/whisper.cpp/models/` 放一份模型文件
+  首次部署只剩一步：往 `server/models.nogit/whisper.cpp/models/` 放一份模型文件
   （**老板 2026-10-22 定**：模型是固定二进制资产，不进 `data/` 用户数据目录；
   2026-10-23 整合为 whisper.cpp 源码树的 `models/` 子目录（其官方下载脚本
-  download-ggml-model.sh 的落点，§3 即下到这里）；整个 `server/models/` 目录
-  gitignore，466MB+ 绝不可入库）
+  download-ggml-model.sh 的落点，§3 即下到这里）；整个 `server/models.nogit/` 目录
+  被 `*.nogit` 规则忽略，466MB+ 绝不可入库）
   优点：换服务器 = 搬镜像 + 搬模型目录，零宿主机依赖；换模型档位不用重新 build。
 - **裸 Node + 宿主机 whisper**：§2-§5 的原方案，whisper 装宿主机、server 用绝对路径
   spawn（容器隔离问题不存在）。适合不想给镜像加编译时间的场景。
@@ -154,7 +154,7 @@ wget https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-20
 wget https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt
 ```
 
-放到 `server/models/sensevoice/`（整个 `server/models/` 已 gitignore）亦可，
+放到 `server/models.nogit/sensevoice/`（整个 `server/models.nogit/` 已被忽略）亦可，
 `EINZ_SENSEVOICE_MODEL` 指过去即可。node 依赖随 `npm ci` 自动装平台二进制
 （linux-x64 / darwin-arm64），无需额外编译。
 
@@ -162,7 +162,7 @@ wget https://hf-mirror.com/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-20
 
 compose 三个变体已内置 sensevoice（卷 + 环境变量，与 whisper 同 pattern）：
 
-- 卷：`../models/sensevoice:/opt/sensevoice:ro`（宿主 `server/models/sensevoice/`
+- 卷：`../models.nogit/sensevoice:/opt/sensevoice:ro`（宿主 `server/models.nogit/sensevoice/`
   缺文件时 Docker 会建个空目录 → 该引擎未配置 → 自动回落 whisper，graceful 退场）；
 - 环境：`EINZ_SENSEVOICE_MODEL=/opt/sensevoice`（容器内路径。.env 里那个**宿主机**
   路径只服务于裸 node 跑法，不进容器——和 whisper 两个变量一样由 compose 硬编码覆盖）；

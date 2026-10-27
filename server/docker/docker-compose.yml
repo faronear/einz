@@ -95,14 +95,14 @@ services:
       - EINZ_MAIL_FROM=${EINZ_MAIL_FROM}
       #################################
       # 服务端转写（方案 D'，PROTOCOL.md §6.3）：二进制在镜像内 /opt/whisper，
-      # 模型走卷（首次部署前放一份 ggml 模型到 ../models/whisper.cpp/models/（= server/models/whisper.cpp/models/），见
+      # 模型走卷（首次部署前放一份 ggml 模型到 ../models.nogit/whisper.cpp/models/（= server/models.nogit/whisper.cpp/models/），见
       # aimemo/20261022_whisperDeploy.zhcn.md §3）。两个变量都配 = 转写启用；
       # 模型文件缺失时 whisper-cli 启动即失败 → 503 TRANSCRIBE_FAILED。
       - EINZ_WHISPER_BIN=/opt/whisper/whisper-cli
       - EINZ_WHISPER_MODEL=/opt/whisper/models/ggml-small.bin
       #################################
       # sensevoice 引擎（sherpa-onnx node addon，进程内识别）：模型目录在容器内
-      # 固定为 /opt/sensevoice（下方卷的挂载点，宿主侧 server/models/sensevoice）。
+      # 固定为 /opt/sensevoice（下方卷的挂载点，宿主侧 server/models.nogit/sensevoice）。
       # 宿主目录缺文件 = 该引擎未配置 → 自动回落 whisper（ graceful 退场）。
       - EINZ_SENSEVOICE_MODEL=/opt/sensevoice
       #################################
@@ -117,8 +117,8 @@ services:
     volumes:
       - ../config:/config:ro
       - ../data:/data
-      - ../models/whisper.cpp/models:/opt/whisper/models:ro
-      - ../models/sensevoice:/opt/sensevoice:ro # sensevoice 模型（缺文件则该引擎退场）
+      - ../models.nogit/whisper.cpp/models:/opt/whisper/models:ro
+      - ../models.nogit/sensevoice:/opt/sensevoice:ro # sensevoice 模型（缺文件则该引擎退场）
     networks:
       - einz
 

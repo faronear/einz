@@ -36,7 +36,7 @@ COPY src ./src
 RUN npx tsc
 
 # ── whisper.cpp 编译阶段（方案 D'，2026-10-22）────────────────────────────────
-# 二进制烤进镜像、模型走卷（compose 挂 ../models/whisper.cpp/models——模型放在
+# 二进制烤进镜像、模型走卷（compose 挂 ../models.nogit/whisper.cpp/models——模型放在
 # whisper.cpp 源码树的 models/ 子目录，即其官方下载脚本的落点；与用户数据 ../data
 # 分开）。模型不进镜像：
 # 换模型档位不必重新 build，镜像体积也不被 466MB 模型撑爆。whisper 是 CLI 子进程

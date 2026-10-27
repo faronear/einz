@@ -189,9 +189,9 @@ server/
 │                         #   caddy 服务挂的是 ../Caddyfile；裸 node 部署照它改系统级 Caddyfile
 ├── config/               # 可选：serverConfig.json（服务端参数，见下；gitignore，不入库）
 ├── data/                 # 运行数据：einz.sqlite.db + files/ + avatars/ + backups/（gitignore）
-├── models/whisper.cpp/  # whisper.cpp 源码 + 构建 + 模型（models/ 子目录放 ggml；
-│                         #   整个目录 gitignore；Docker 部署只需把模型放进 models/ 子目录走卷）
-└── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models/whisper.cpp/models——
+├── models.nogit/         # whisper.cpp 源码 + 构建 + 模型（whisper.cpp/models/ 下放 ggml；
+│                         #   整个目录被 *.nogit 忽略；Docker 部署只需把模型放进 models/ 子目录走卷）
+└── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models.nogit/whisper.cpp/models——
     ├── docker-compose.yml            # 主 compose（2026-10-24 合并版）：默认只起 server，
     │                                #   由系统级 Caddy 反代 127.0.0.1:3000；.env 里加
     │                                #   COMPOSE_PROFILES=caddy 则同起内置 Caddy 容器（80/443）；
