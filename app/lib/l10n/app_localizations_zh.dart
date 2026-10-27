@@ -997,7 +997,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageAudioPlayFailed(String error) {
-    return '音频播放失败';
+    return '无法播放音频：$error';
   }
 
   @override

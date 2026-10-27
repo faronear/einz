@@ -597,7 +597,7 @@
   "chatPageLongPressToTranscribe": "长按转文字",
   "chatPageInputHint": "输入消息…",
   "chatPageAudioMetaMissing": "音频附件元数据缺失",
-  "chatPageAudioPlayFailed": "音频播放失败",
+  "chatPageAudioPlayFailed": "无法播放音频：{error}",
   "@chatPageAudioPlayFailed": {
     "placeholders": {
       "error": {

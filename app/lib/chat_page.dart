@@ -11259,11 +11259,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         onPressed: _showAttachmentSheet,
                         icon: const Icon(Icons.add_circle_outline),
                       ),
-                      // 输入盒（老板 2026-10-25）：麦克风/键盘两个入口合并成一个自制
-                      // 图标（Vocie transcription 同款：麦克风+文档），放进输入盒内左
-                      // 侧；正式输入区（文字框/录音条）在右。每次点击该图标=文字态 ↔
-                      // 语音态互换（文字态进提示态、不自动开录，长按录音条才开始录）；
-                      // 录音中/预览态图标仍在原位，点它切回键盘、已录内容保留。
+                      // 输入盒（老板 2026-10-25）：麦克风/键盘入口合并成一枚图标，放盒内左侧，
+                      // 右侧是正式输入区（文字框/录音条）。点它=文字态 ↔ 语音态互换（只切模式、
+                      // 不开录）；录音中/预览态点它切回键盘，已录内容保留。
                       Expanded(
                         // ListenableBuilder：文字态盒描边跟随焦点（未聚焦浅粉/聚焦天
                         // 蓝），即旧 TextField 自带的主题描边——图标入盒后改由输入盒
@@ -11272,14 +11270,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           listenable: _inputFocusNode,
                           builder: (context, _) => Container(
                             decoration: _inputBoxDecoration(),
-                            // **整盒不再加内距**（老板 2026-10-26）：录音条的
-                            // 命中区要贴盒右沿——旧版整盒右内距 12 把 Clickable
-                            // 挡在内距以内，盒右缘那条 12px 的带子单击/长按全
-                            // 无反应。内距改为下放到内容（TextField 的
-                            // contentPadding 右 20、录音条内容右 12），视觉与
-                            // 旧版一致、命中区铺满。左侧本就不留——麦键图标的
-                            // 圆形热区（直径=盒高）左边缘恰好贴在盒的左侧边上
-                            // （老板 2026-10-25）。
+                            // 整盒不加内距（老板 2026-10-26）：加了内距，Clickable 就只能到内距为止，
+                            // 盒右缘那条带子点不动、也不变色。内距下放到内容（TextField 右 20、录音条
+                            // 内容右 12），视觉不变、命中铺满；左侧不留——图标圆形热区恰好贴盒左边。
                             child: ClipRRect(
                               borderRadius:
                                   BorderRadius.circular(_kInputBoxCornerRadius),
@@ -11287,96 +11280,71 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 children: [
                                   // 文字/语音切换合并图标：每次点击切一次状态
                                   SizedBox(
-                                  width: _kInputModeToggleSize,
-                                  height: _kInputModeToggleSize,
-                                  // **只点按切模式，不再挂长按**（老板
-                                  // 2026-10-26 决定 C，撤回 c87cb1cd 的
-                                  // 「文字态长按组合图标直接开录」）：文字态
-                                  // 起手要先收键盘再启录音器，松手常常早于真
-                                  // 正开录，_startVoice 的 _voiceStarting 竞速
-                                  // 会静默丢弃这次启动（无录音条、无提示），
-                                  // 体感像「长按没反应」。长按开录统一交给
-                                  // 右侧录音条（提示/录音态整条都可点可长按），
-                                  // 图标这里只负责切换输入模式。
-                                  child: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
-                                    // 48 热区（即盒左端半圆），不会溢出盒角被
-                                    // ClipRRect 裁成椭圆（老板 2026-10-25）
-                                    splashRadius:
-                                        _kInputModeToggleSize / 2,
-                                    onPressed: _onVoiceEntryTap,
-                                    // 麦+键盘并排（老板 2026-10-25 定稿，
-                                    // 取代自绘双元素图标）：两枚 Flutter 默认
-                                    // 图标（mic_none / keyboard_alt_outlined，
-                                    // 即合并前那两个入口图标）排在原有 48 圆形
-                                    // 热区内。**右侧=当前有效输入模式**（文字态
-                                    // 键盘在右紧挨文字区、语音态麦克风在右）且
-                                    // 更大，压住左侧元素一小块表示主力；左侧=
-                                    // 点按切过去的目标（老板 2026-10-25：两图标
-                                    // 放大、靠拢成一个整体，右大左小有主次）。
-                                    icon: SizedBox(
-                                      width: 34,
-                                      height: 24,
-                                      // 语音态整体右移 3px（老板 2026-10-26）：
-                                      // mic_none 字形左右侧留白大，同样的几何在
-                                      // 语音态（键盘在左+麦克风在右）会显得偏左、
-                                      // 靠近外面+号；右移后两种模式的线条都落在
-                                      // 圆钮同一右偏区域（文字态键盘贴近文字输入
-                                      // 的那份和谐感）。**只平移、不改线条区域
-                                      // 大小**；溢出 34 盒的 3px 落在 48 圆钮的
-                                      // 留白里，无裁切无视觉影响。
-                                      child: Transform.translate(
-                                        offset: Offset(
-                                            _inputMode == _InputMode.text
-                                                ? 0
-                                                : 3,
-                                            0),
-                                        child: Stack(
-                                          alignment:
-                                              Alignment.centerLeft,
-                                          children: [
-                                            // 左：切换目标（小）
-                                            Icon(
-                                              _inputMode ==
-                                                      _InputMode.text
-                                                  ? Icons.mic_none
-                                                  : Icons
-                                                      .keyboard_alt_outlined,
-                                              size: 18,
-                                              color:
-                                                  _inputModeToggleColor(),
-                                            ),
-                                            // 右：当前主力（大，压住左元素一小块）
-                                            Positioned(
-                                              left: 12,
-                                              child: Icon(
+                                    width: _kInputModeToggleSize,
+                                    height: _kInputModeToggleSize,
+                                    // 只点按切模式，不挂长按（老板 2026-10-26）：文字态起手要先收键盘再启
+                                    // 录音器，松手常早于真正开录，_startVoice 的 _voiceStarting 竞速会静默
+                                    // 丢弃（体感像「没反应」）。长按开录统一交给右侧录音条。
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
+                                      // 48 热区（即盒左端半圆），不会溢出盒角被
+                                      // ClipRRect 裁成椭圆（老板 2026-10-25）
+                                      splashRadius:
+                                          _kInputModeToggleSize / 2,
+                                      onPressed: _onVoiceEntryTap,
+                                      // 麦+键盘并排（老板 2026-10-25）：右=当前输入模式（更大、压住左侧一小
+                                      // 块），左=点按切过去的目标；两枚 stock 图标排在 48 圆形热区内。
+                                      icon: SizedBox(
+                                        width: 34,
+                                        height: 24,
+                                        // 语音态整体右移 3px（老板 2026-10-26）：mic_none 侧留白大，同几何会显
+                                        // 偏左、贴外面的 +；只平移不改线条大小，溢出落在 48 圆钮的留白里。
+                                        child: Transform.translate(
+                                          offset: Offset(
+                                              _inputMode == _InputMode.text
+                                                  ? 0
+                                                  : 3,
+                                              0),
+                                          child: Stack(
+                                            alignment:
+                                                Alignment.centerLeft,
+                                            children: [
+                                              // 左：切换目标（小）
+                                              Icon(
                                                 _inputMode ==
                                                         _InputMode.text
-                                                    ? Icons
-                                                        .keyboard_alt_outlined
-                                                    : Icons.mic_none,
-                                                size: 21,
+                                                    ? Icons.mic_none
+                                                    : Icons
+                                                        .keyboard_alt_outlined,
+                                                size: 18,
                                                 color:
                                                     _inputModeToggleColor(),
                                               ),
-                                            ),
-                                          ],
+                                              // 右：当前主力（大，压住左元素一小块）
+                                              Positioned(
+                                                left: 12,
+                                                child: Icon(
+                                                  _inputMode ==
+                                                          _InputMode.text
+                                                      ? Icons
+                                                          .keyboard_alt_outlined
+                                                      : Icons.mic_none,
+                                                  size: 21,
+                                                  color:
+                                                      _inputModeToggleColor(),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
                                   Expanded(
-                                    // Stack：文字输入框始终占位（行高恒定，切换录音条时
-                                    // 按钮不浮动），录音/预览时录音条 Positioned.fill
-                                    // 覆盖其上（与输入框严格同高）
-                                    // minHeight=图标热区直径=48：录音条的
-                                    // Clickable（Positioned.fill）与盒高对齐——
-                                    // 各平台字体度量不同，Stack 若按 TextField
-                                    // 自然高度收缩，上下就露出不可点的窄条
-                                    // （老板 2026-10-26）。多行草稿时 TextField
-                                    // 更高，Stack 随之长高，不封顶
+                                    // Stack：文字框始终占位（行高恒定，切录音条时按钮不浮动），录音/预览时
+                                    // 录音条 Positioned.fill 覆盖其上；minHeight=48 让命中区与盒高对齐（各平台
+                                    // 字体度量不同也不露窄条），多行草稿时随之长高、不封顶。
                                     child: ConstrainedBox(
                                       constraints: const BoxConstraints(
                                           minHeight: _kInputModeToggleSize),
@@ -11385,102 +11353,82 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         // 垂直居中（旧版 Row center 的效果）
                                         alignment: Alignment.center,
                                         children: [
-                                        // 录音条覆盖时完全隐藏输入框（maintainSize
-                                        // 保持占位高度，行高/按钮位置不变；避免圆角
-                                        // 录音条透出输入框边角）
-                                        Visibility(
-                                          visible: _inputMode == _InputMode.text,
-                                          maintainState: true,
-                                          maintainSize: true,
-                                          maintainAnimation: true,
-                                          child: TextField(
-                                            controller: _input,
-                                            focusNode: _inputFocusNode,
-                                            // 桌面端自动聚焦（老板 2026-10-12 粘贴
-                                            // 功能配套）：Cmd/Ctrl+V 走焦点链分发——
-                                            // 新开聊天页若输入框无焦点，页面级
-                                            // CallbackShortcuts 收不到按键，粘贴会
-                                            // "没反应"（实测五种焦点状态定的方案）。
-                                            // 桌面聊天客户端打开会话即聚焦输入框也是
-                                            // 惯例（Discord 同款）；移动端不抢焦点
-                                            // （会弹软键盘）。
-                                            autofocus: _pasteShortcutSupported,
-                                            // 多行输入框：文字到达宽度后自动折行，输入
-                                            // 框随之增高，最多 8 行；超过 8 行不再增高，
-                                            // 转为内部纵向滚动（老板要求 2026-09-13：
-                                            // 原先单行 + 横向滚动体验差）。非文字态
-                                            // （录音中/预览）把隐藏输入框按单行布局，
-                                            // 录音条 Positioned.fill 才不会跟着草稿
-                                            // 高度撑到 8 行高（草稿保留在 controller
-                                            // 里，切回文字态自动恢复增高）
-                                            minLines: 1,
-                                            maxLines: _inputMode == _InputMode.text
-                                                ? 8
-                                                : 1,
-                                            // 多行折行；回车键仍为「发送」（键盘右下角
-                                            // 显示「发送」，iOS 按系统语言本地化），
-                                            // 不插入换行——与微信一致
-                                            keyboardType: TextInputType.multiline,
-                                            textInputAction: TextInputAction.send,
-                                            decoration: InputDecoration(
-                                              hintText: l10n.chatPageInputHint,
-                                              isDense: true,
-                                              // 盒外观（白底/描边/圆角，老板
-                                              // 2026-10-25）由外层输入盒 Container
-                                              // 统一给出（_inputBoxDecoration）——
-                                              // 合并图标与输入框同盒，这里不画
-                                              // 自己的底色边框
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              // 边框到文字的间距：主题里默认 16/16
-                                              // （那是给口令、名字这类表单用的，
-                                              // 字段少、留白宽好读），聊天输入框是
-                                              // "反复打字、希望一行多放字"的场景，
-                                              // 左侧收到 8（合并图标已占位）、右侧 20
-                                              // =旧「盒内距12+框内8」（输入盒本身不再
-                                              // 加内距，见外层 Container 注释），
-                                              // 垂直 12——顺带让输入框高度更贴近两侧
-                                              // 按钮（老板 2026-09-26/2026-10-26）
-                                              contentPadding: const EdgeInsets.only(
-                                                  left: 8,
-                                                  right: 20,
-                                                  top: 12,
-                                                  bottom: 12),
+                                          // 录音条覆盖时完全隐藏输入框（maintainSize
+                                          // 保持占位高度，行高/按钮位置不变；避免圆角
+                                          // 录音条透出输入框边角）
+                                          Visibility(
+                                            visible: _inputMode == _InputMode.text,
+                                            maintainState: true,
+                                            maintainSize: true,
+                                            maintainAnimation: true,
+                                            child: TextField(
+                                              controller: _input,
+                                              focusNode: _inputFocusNode,
+                                              // 桌面端自动聚焦（老板 2026-10-12）：Cmd/Ctrl+V 走焦点链，无焦点时页面级
+                                              // CallbackShortcuts 收不到按键、粘贴「没反应」；移动端不抢焦点（会弹键盘）。
+                                              autofocus: _pasteShortcutSupported,
+                                              // 多行输入框：到达宽度自动折行、最高 8 行，再高转内部滚动（老板
+                                              // 2026-09-13）。非文字态强制单行——否则录音条 Positioned.fill 会跟着
+                                              // 草稿高度撑到 8 行（草稿留在 controller 里，切回文字态自动恢复）。
+                                              minLines: 1,
+                                              maxLines: _inputMode == _InputMode.text
+                                                  ? 8
+                                                  : 1,
+                                              // 多行折行；回车键仍为「发送」（键盘右下角
+                                              // 显示「发送」，iOS 按系统语言本地化），
+                                              // 不插入换行——与微信一致
+                                              keyboardType: TextInputType.multiline,
+                                              textInputAction: TextInputAction.send,
+                                              decoration: InputDecoration(
+                                                hintText: l10n.chatPageInputHint,
+                                                isDense: true,
+                                                // 盒外观（白底/描边/圆角，老板
+                                                // 2026-10-25）由外层输入盒 Container
+                                                // 统一给出（_inputBoxDecoration）——
+                                                // 合并图标与输入框同盒，这里不画
+                                                // 自己的底色边框
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                // 边框到文字的间距：主题里默认 16/16
+                                                // （那是给口令、名字这类表单用的，
+                                                // 字段少、留白宽好读），聊天输入框是
+                                                // "反复打字、希望一行多放字"的场景，
+                                                // 左侧收到 8（合并图标已占位）、右侧 20
+                                                // =旧「盒内距12+框内8」（输入盒本身不再
+                                                // 加内距，见外层 Container 注释），
+                                                // 垂直 12——顺带让输入框高度更贴近两侧
+                                                // 按钮（老板 2026-09-26/2026-10-26）
+                                                contentPadding: const EdgeInsets.only(
+                                                    left: 8,
+                                                    right: 20,
+                                                    top: 12,
+                                                    bottom: 12),
+                                              ),
+                                              // 回车发送后焦点回到输入框（键盘完成动作
+                                              // 默认失焦——补回聚焦）
+                                              onSubmitted: (_) {
+                                                _send();
+                                                _inputFocusNode.requestFocus();
+                                              },
+                                              // 点输入框以外收起键盘（移动端；老板 2026-09-12）。**桌面端不收起**：
+                                              // 失焦后 Cmd/Ctrl+V 的 CallbackShortcuts 收不到按键，粘贴会失灵
+                                              // （2026-10-12 粘贴功能配套）。
+                                              onTapOutside: (_) {
+                                                if (!_pasteShortcutSupported) {
+                                                  FocusManager.instance
+                                                      .primaryFocus
+                                                      ?.unfocus();
+                                                }
+                                              },
                                             ),
-                                            // 回车发送后焦点回到输入框（键盘完成动作
-                                            // 默认失焦——补回聚焦）
-                                            onSubmitted: (_) {
-                                              _send();
-                                              _inputFocusNode.requestFocus();
-                                            },
-                                            // 发送后键盘常驻遮挡消息流；点按输入框
-                                            // 以外的任意处（消息列表/空白/其他控件）
-                                            // 收起键盘（老板要求 2026-09-12）。移动端
-                                            // 默认不动 focus，需显式 unfocus。
-                                            // **桌面端不收起**：桌面没有软键盘要收，
-                                            // 且失焦后 Cmd/Ctrl+V 粘贴快捷键（焦点链
-                                            // 上的 CallbackShortcuts）就收不到按键了
-                                            // ——点消息列表不该让粘贴失灵（老板
-                                            // 2026-10-12 粘贴功能配套）。
-                                            onTapOutside: (_) {
-                                              if (!_pasteShortcutSupported) {
-                                                FocusManager.instance
-                                                    .primaryFocus
-                                                    ?.unfocus();
-                                              }
-                                            },
                                           ),
-                                        ),
-                                        if (_inputMode != _InputMode.text)
-                                          // 内容自己就是手势层（白胶囊里挂
-                                          // Clickable，见 _voiceCapsule）——外层
-                                          // 只负责铺满盒高，不再挂整条命中区：那样
-                                          // 遮罩是 48/r24、胶囊是 46/r23，悬浮时
-                                          // 胶囊外会多出一圈变色（老板 2026-10-26）
-                                          Positioned.fill(
-                                            child: _buildVoiceBarContent(),
-                                          ),
+                                          if (_inputMode != _InputMode.text)
+                                            // 内容自己就是手势层（白胶囊里挂 Clickable）：外层只负责铺满盒高，不再
+                                            // 挂整条命中——否则遮罩 48/r24 比胶囊 46/r23 多出一圈变色。
+                                            Positioned.fill(
+                                              child: _buildVoiceBarContent(),
+                                            ),
                                         ],
                                       ),
                                     ),
