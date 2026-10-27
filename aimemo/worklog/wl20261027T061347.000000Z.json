@@ -1,0 +1,21 @@
+{
+  "utc": "20261027T061347.000000Z",
+  "time": "2026-10-27 14:13+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "worklog 条目统一加 wl 前缀（10 个存量 + 一处引用修正）",
+      "detail": [
+        "背景：老板 2026-10-27 更新 AGENTS.md——当月条目改为 wl<yyyymmddTHHMMSS.ffffffZ>.json，归档改为 wl<yyyymm>.jsonl，检索选择器同步锚定 ^wl。" ,
+        "判断：存量条目必须重命名。新规范的检索模式是锚定的 ^wl\\d{8}T...，不改名会被文档化的 glob 静默漏检——这是检索正确性问题，不是美观问题；文件只有 10 个（10-25 七个、10-27 三个），成本极低。",
+        "做法：git mv 全部加 wl 前缀，文件内容一字未动（utc 字段本来只存时间戳、不含 wl，与文件名规则一致）。",
+        "引用修正：aimemo/20261009_voiceTranscript.zhcn.md 里的 worklog/20261025T*.json → wl20261025T*.json。",
+        "保留项：单文件 aimemo/worklog.md（旧格式）按 AGENTS.md 明文保留原样，不迁移不回改。",
+        "后续：2026-11 归档时文件名是 wl202610.jsonl（此前规范是 202610.jsonl）。"
+      ]
+    }
+  ]
+}

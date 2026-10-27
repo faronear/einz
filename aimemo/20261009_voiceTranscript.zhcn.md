@@ -102,7 +102,7 @@
 图标（麦克风+文档，Vocie transcription 同款），点击=文字态↔语音态互换；四态
 （文字/提示/录音中/预览）与「长按录音条开录、松手停」手势保留不变。录音中或预览态
 点图标切回键盘会**保留**已录内容，再点可直接回预览态用；X 删除后回提示态。
-详见 aimemo/worklog/20261025T*.json 与 chat_page.dart `_onVoiceEntryTap`。）
+详见 aimemo/worklog/wl20261025T*.json 与 chat_page.dart `_onVoiceEntryTap`。）
 
 接收端：收到消息 ─► 下载密文附件 ─► 解密为本地明文 ─► 后台 isolate: ASR ─► 本地转写表 ─► 显示
 ```
