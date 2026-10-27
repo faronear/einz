@@ -114,9 +114,10 @@ realm 与凭证不受影响（realm 不参与解析）。实证：STUN Binding R
 **实测结论（2026-09-26）**：同一个 WiFi 下两机通话**正常**；一旦走不同网络（XR 切 4G）
 就卡在「正在接通…」直到超时——**跨网打洞失败，必须上 TURN**。这不再是"观察后再定"。
 
-- [x] 部署文件：`server/docker/coturn/docker-compose.yml` + `server/docker/coturn/turnserver.conf.example`
+- [x] 部署文件：`server/coturn/docker-compose.yml` + `server/coturn/turnserver.conf.example`
       （host 网络、3478 + 中继段 49152–65535、长期凭证、拒绝中继到私有网段；
-      2026-10-24 从 `server/docker/docker-compose.coturn.yml` 迁入 coturn/ 子目录）
+      2026-10-24 从 `server/docker/docker-compose.coturn.yml` 迁入 coturn/ 子目录，
+      2026-10-27 再迁到 `server/coturn/`）
 - [x] **已部署并验证（2026-09-26）**：coturn 跑在 `einz.yuanjinx.com`（3478 端口已通），
       **XR 走 4G ↔ 安卓走 WiFi 打通** ✅ —— 跨网通话成立
 - [x] 客户端接入：`--dart-define-from-file=app/localConfig.turn.json`

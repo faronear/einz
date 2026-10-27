@@ -5,15 +5,16 @@
 #     把 coturn 塞进去会让每次重建 server 都多带一个容器；
 #   - TURN 只在跨网打洞失败时才用得上，可单独启停、单独观察。
 #
-# 用法（在 server/docker/coturn/ 目录下；或仓库根 `npm run coturn-run-docker`）：
+# 用法（在 server/coturn/ 目录下；或仓库根 `npm run coturn-run-docker`）：
 #   1) cp turnserver.conf.example turnserver.conf
 #   2) 编辑 turnserver.conf：填 user= 的密码、realm、external-ip（若在 NAT 后）
 #   3) docker compose up -d
 #   4) docker compose logs -f
 #
 # 位置迁移（老板 2026-10-24）：从 server/docker/docker-compose.coturn.yml 移到
-# server/docker/coturn/docker-compose.yml——compose 与 turnserver.conf 同目录，
+# coturn/ 子目录——compose 与 turnserver.conf 同目录，
 # volume 挂载随之从 ./coturn/turnserver.conf 简化为 ./turnserver.conf。
+# （2026-10-27 再次迁移：server/docker/coturn/ → server/coturn/。）
 #
 # 用 host 网络：TURN 要用 49152–65535 这一大段 UDP 端口，且需要知道真实公网 IP，
 # 走 docker 桥接 + 端口映射既麻烦又容易在 external-ip 上踩坑。
@@ -27,7 +28,8 @@
 #   docker rm -f einz-coturn        # 旧容器挂在主项目 serverdocker 下，新文件 down 不到它
 #   docker compose -f docker-compose.coturn.yml up -d   # 新项目 einz-turn 重建
 #
-# 2026-10-24 文件位置迁移（server/docker/ → server/docker/coturn/）：项目名
+# 2026-10-24 文件位置迁移（server/docker/ → coturn/ 子目录，2026-10-27 又迁到
+# server/coturn/）：项目名
 # `einz-turn` 与容器名 `einz-coturn` 都不变，VPS 上正在跑的容器会被新路径的
 # `docker compose up -d` 直接采纳（按项目名+服务名匹配），**无需** docker rm
 # 重建——只有 compose 配置真正变了 docker 才会重建。

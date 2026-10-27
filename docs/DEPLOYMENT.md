@@ -198,11 +198,13 @@ server/
     │                                #   COMPOSE_PROFILES=cftunnel 则同起 cloudflared
     │                                #   （中国双入口：系统级 Caddy 服备案域名 + 隧道服境外域名）
     ├── env.sh              # 生成 .env（EINZ_DB_BACKUP_KEY 等；.env gitignore，pull 不覆盖）
-    ├── coturn/             # TURN 独立 compose + 配置（项目名 einz-turn，可单独启停）
-    │   ├── docker-compose.yml        #   host 网络；`npm run coturn-run-docker` 在此启动
-    │   └── turnserver.conf.example   #   cp 成 turnserver.conf 填密码/realm/external-ip
     └── .env                # 本地化密钥/配置（gitignore）
 ```
+
+> **coturn/ 已移出 docker/**（2026-10-27）：现为 `server/coturn/`——TURN 独立
+> compose + 配置（项目名 einz-turn，host 网络，可单独启停；`npm run
+> coturn-run-docker` 在此启动；turnserver.conf.example cp 成 turnserver.conf 填
+> 密码/realm/external-ip）。
 
 > **Node dev 与 Docker 共用同一份运行根**（老板 2026-10-23 定）：`config/` `data/`
 > `models/` 都在 `server/` 下，`npm run dev` 与 `docker compose` 跑的是同一份数据/

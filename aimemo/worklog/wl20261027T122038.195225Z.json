@@ -1,0 +1,19 @@
+{
+  "utc": "20261027T122038.195225Z",
+  "time": "2026-10-27 20:20+08:00",
+  "host": "doomship.local",
+  "os": "macOS 27.0.1",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "coturn 目录再迁 server/coturn/",
+      "detail": [
+        "老板要求把 server/docker/coturn/ 迁到 server/coturn/（coturn 与 docker 部署同层级，不再嵌在 docker/ 下）。",
+        "git mv 保留历史（docker-compose.yml、turnserver.conf.example）；两个本地未跟踪的真实 conf（einz.tic.cc / einz.yuanjinx.com）随目录移动。",
+        "同步更新：package.json coturn-run-docker 路径、server/coturn/docker-compose.yml 头部注释、docs/TURN.md 部署路径与位置说明、docs/DEPLOYMENT.md 目录树（coturn 移出 docker/ 树并以注记说明）、aimemo/20260918_voiceCall.zhcn.md。",
+        "compose 项目名 einz-turn 与容器名 einz-coturn 不变，VPS 上正在跑的容器无需重建；只有文件路径变化。"
+      ]
+    }
+  ]
+}

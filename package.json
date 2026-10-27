@@ -13,7 +13,7 @@
     "dns-audit": "cd cli && dart run bin/dns_audit.dart",
     "dns-report": "ssh.sh cn1 'curl -s -H \"X-Protocol-Version: 3\" http://127.0.0.1:3000/network/dns-report'; echo",
     "server-run-dev": "echo CLEAN=$CLEAN; if [ \"$CLEAN\" = \"true\" ]; then echo Renaming old data...; mv server/data server/data.$(date -u +%Y%m%dT%H%M%S); fi; cd server && npm run dev",
-    "coturn-run-docker": "cd server/docker/coturn; sudo docker compose -f docker-compose.yml up -d;",
+    "coturn-run-docker": "cd server/coturn; sudo docker compose -f docker-compose.yml up -d;",
     "server-run-docker": "cd server/docker; sudo git pull; echo CLEAN=$CLEAN; if [ \"$CLEAN\" = \"true\" ]; then echo Removing old data...; mv ../data ../data.$(date -u +%Y%m%dT%H%M%S); fi; echo MIRROR=$MIRROR; if [ \"$MIRROR\" = \"true\" ]; then sudo docker compose build --build-arg NPM_MIRROR=https://registry.npmmirror.com --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 server && docker compose up -d server; else sudo docker compose up -d --build server; fi; docker compose logs -f server",
     "server-update-remote": "ssh.sh cn1 'cd /faronear/einz/; sudo git pull; npm run coturn-run-docker; MIRROR=true npm run server-run-docker'",
     "app-apk-boot": " ~/Library/Android/sdk/emulator/emulator -avd einz_emu",
