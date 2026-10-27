@@ -90,8 +90,12 @@ eval "$(node ../scripts/appVersion.js)"
 # 语音通话 TURN 配置（可选）：localConfig.turn.json 存在就带上（同 buildIos.sh 口径，
 # 共用 scripts/turnDefineArgs.sh——2026-10-11 补，此前 dist/dev 包都不带 TURN）
 TURN_ARGS="$(bash ../../scripts/turnDefineArgs.sh)"
-echo "==> flutter build macos --release ${APP_BUILD_NAME} (${APP_BUILD_NUMBER})"
-flutter build macos --release $TURN_ARGS --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+# 语音转写模型：默认不打包（VOICE_MODEL=true 才拉取+注入 pubspec 声明，
+# scripts/insertVoiceModel.sh 包装 flutter build；运行时自动回落下载兜底）。
+# 2026-10-25 改：此前无条件 fetchVoiceModel.sh + pubspec 声明，模型默默进包。
+# 注：flutter build 由下方 insertVoiceModel.sh 包装执行（VOICE_MODEL 开关）。
+echo "==> flutter build macos --release ${APP_BUILD_NAME} (${APP_BUILD_NUMBER})（经 insertVoiceModel.sh 包装，VOICE_MODEL 开关）"
+bash "${REPO_ROOT}/scripts/insertVoiceModel.sh" flutter build macos --release $TURN_ARGS --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
 
 APP="build/macos/Build/Products/Release/einz.app"
 

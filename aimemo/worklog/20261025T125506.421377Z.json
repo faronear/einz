@@ -1,0 +1,21 @@
+{
+  "utc": "20261025T125506.421377Z",
+  "time": "2026-10-25 20:55+08:00",
+  "host": "doomship.local",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "语音模型改 VOICE_MODEL 开关打包（方案A1）",
+      "detail": [
+        "老板不想让 239MB 语音转写模型默默打进包（2026-10-12 7a15ffbe 改回打包时 pubspec 无条件声明 assets/voice_model/，目录里有文件就进包）；选定 A1：pubspec 基线删声明 + 新 scripts/withVoiceModel.sh 包装——VOICE_MODEL=true 才跑 fetchVoiceModel.sh 并临时注入 `- assets/voice_model/` 声明，命令结束（含失败）EXIT trap 还原 pubspec；默认路径不发网络请求。",
+        "接入入口：build 入口 app-apk-build / app-mac-build-raw / buildIos.sh / buildMacos.sh（fetch 调用替换为包装 flutter build）；run 入口 app-mac-run / app-ios-run / app-apk-run 同包装——老板要求 run 也能切换。CI（buildMultiPlatform.yml）不经包装，天然默认不带模型（老板已确认此前 CI 产物本就没变大）。",
+        "坑：withVoiceModel.sh 首版用 grep -qF 'assets/voice_model/' 判断'已注入'，会被 pubspec 注释里的字样误命中导致 true 时不注入；改为匹配完整声明行 '    - assets/voice_model/'。",
+        "顺手处理：app/assets/voice_model/ 的 .bak 两文件已改回正式名（model.int8.onnx/tokens.txt，sha256=基线 c71f0ce0…/f449eb28…，确系 2026-10-12 人工改名残留，非脚本行为）；.bak 后缀不救急——pubspec 按目录收集，白占包体且代码按正式名找不到。",
+        "验证（不真跑 flutter）：默认路径声明不注入且 pubspec 不变；VOICE_MODEL=true 注入→命令内可见→结束后还原且与原始 diff 一致、无 backup 残留；命令失败路径 trap 也还原。三例全过；flutter pub get 正常。",
+        "文档同步：aimemo/20261009_voiceTranscript.zhcn.md §11 结论与'构建入口挂钩'段更新为开关语义。未 git commit——含 pubspec/package.json 等多处改动，待老板验收后一并提交。"
+      ]
+    }
+  ]
+}

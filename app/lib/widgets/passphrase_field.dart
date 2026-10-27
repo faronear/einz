@@ -113,7 +113,6 @@ class _PassphraseFieldState extends State<PassphraseField> {
           ? IconButton(
               focusNode: _revealFocusNode, // TAB 跳过（见字段注释）
               icon: Icon(_revealed ? Icons.visibility : Icons.visibility_off),
-              tooltip: widget.revealTip,
               onPressed: _toggle,
             )
           : null,

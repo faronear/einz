@@ -97,7 +97,7 @@
   "wizardJoinPassphraseWrong": "口令错误！请询问你的秘境同伴获取正确的口令。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
-  "welcomeDialogMessage": "你的秘境已开启，所有消息端到端加密，确保绝对隐私。进入秘境，开始聊天吧！",
+  "welcomeDialogMessage": "你的秘境已开启，端到端加密，确保绝对隐私。进入秘境，开始聊天吧！",
   "welcomeDialogStart": "进入秘境",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
@@ -149,7 +149,6 @@
       }
     }
   },
-  "setupCreateCopy": "复制邀请链接",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
     "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示，不展示技术细节（如 SqliteException），自动重试中"
@@ -175,8 +174,6 @@
     }
   },
   "setupJoinEntranceLimitReached": "该秘境的通道数量已达服务器上限，无法再开通新通道。",
-  "setPinDialogPinLabel": "新 PIN（至少 6 位数字）",
-  "setPinDialogConfirmLabel": "确认新 PIN",
   "setPinDialogSetPin": "启用",
   "setPinDialogPinTooShort": "PIN 至少 6 位数字",
   "setPinDialogPinDigitsOnly": "PIN 只能是数字",
@@ -256,8 +253,6 @@
       }
     }
   },
-  "chatPageInviteCopyLinkTooltip": "复制邀请链接",
-  "chatPageInviteCopyCodeTooltip": "复制通道码",
   "chatPageInviteLinkCopied": "邀请链接已复制",
   "chatPageInviteCodeCopied": "通道码已复制",
   "chatPageInviteFailed": "通道码生成失败: {error}",
@@ -283,12 +278,10 @@
   },
   "chatPageNameUnset": "未设置",
   "chatPageMenuExit": "退出本应用",
-  "chatPageMenuMore": "主菜单",
   "chatPageMsgMoreActions": "更多操作",
   "chatPageRenameNameTitle": "我的名字",
   "chatPageRenameNameLabel": "名字",
   "chatPageGroupNameTitle": "群组名称",
-  "chatPageGroupNameEditTooltip": "修改群名",
   "chatPageGroupNameLabel": "名称",
   "chatPageGenderLabel": "性别",
   "chatPageRenameEntranceTitle": "当前通道",
@@ -448,17 +441,13 @@
   "chatPagePassphraseWrong": "口令错误",
   "chatPagePassphraseEmpty": "请输入共享口令",
   "chatPagePassphraseVerifyFailed": "验证失败，请重试",
-  "chatPagePassphraseShow": "显示",
-  "chatPagePassphraseHide": "隐藏",
   "chatPageMembersInviteNew": "邀请新同伴",
   "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
   "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",
-  "chatPageEntranceScopeHint": "通道是设备连接到秘境的专属线路。以下是您绑定到当前秘境的所有通道。",
+  "chatPageEntranceScopeHint": "通道是设备连接到秘境的专属线路。以下是您在当前秘境的所有通道。",
   "chatPageEntranceListThisDevice": "当前通道名称",
   "chatPageEntranceListNew": "添加我的新通道",
-  "chatPageEntranceListRefresh": "刷新",
   "chatPagePinLabel": "锁屏码",
-  "chatPageLockNow": "锁屏",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
@@ -529,13 +518,12 @@
   "chatPageRecallConfirmOk": "撤回",
   "chatPageRecallBlocked": "对方已接收，无法撤回",
   "chatPageRecallFailed": "撤回失败，请稍后重试",
-  "chatPageQuotedTombMessage": "（该消息已不存在）",
   "chatPageQuoteGoneNotice": "被引用消息已不存在",
   "chatPageActionQuote": "引用",
   "chatPageActionSave": "保存",
   "chatPageAttachmentSaved": "已保存。",
   "chatPageFileSaveFailed": "保存失败: {error}",
-  "chatPageActionBurn": "阅后即焚",
+  "chatPageActionBurn": "延时即焚",
   "chatPageDeleteConfirmTitle": "删除消息？",
   "chatPageDeleteConfirmMessage": "删除仅在本机生效（你的和同伴的其他设备都不受影响），且无法恢复。确定删除这条消息吗？",
   "chatPageDeleteCancel": "取消",
@@ -574,10 +562,6 @@
       }
     }
   },
-  "chatPageMsgSent": "已发送",
-  "chatPageMsgSendingTap": "发送中，点击验证是否已送达并重发",
-  "chatPageMsgDelivered": "已送达",
-  "chatPageMsgFailed": "发送失败，点击重试",
   "chatPageMsgFailedTap": "点击重发",
   "chatPageMsgsUnsent": "等待同步中… {count} 条消息待发送，网络恢复后自动重发",
   "@chatPageMsgsUnsent": {
@@ -609,10 +593,11 @@
   },
   "chatPageVoicePermissionDenied": "麦克风权限被拒绝，请到系统设置里开启。",
   "chatPageVoiceEmpty": "录音内容为空，已丢弃。",
-  "chatPageLongPressToRecord": "长按开始录音",
+  "chatPageLongPressToRecord": "点按或长按开始录音",
+  "chatPageLongPressToTranscribe": "长按转文字",
   "chatPageInputHint": "输入消息…",
   "chatPageAudioMetaMissing": "音频附件元数据缺失",
-  "chatPageAudioPlayFailed": "音频播放失败",
+  "chatPageAudioPlayFailed": "无法播放音频：{error}",
   "@chatPageAudioPlayFailed": {
     "placeholders": {
       "error": {
@@ -621,7 +606,6 @@
     }
   },
   "chatPageAttachEmoji": "表情符",
-  "chatPageEmojiKeyboard": "键盘",
   "chatPageAttachPaste": "粘贴",
   "chatPageAttachPhoto": "拍照",
   "chatPageAttachGalleryImage": "相册图片",
@@ -629,8 +613,57 @@
   "chatPageAttachVideoGallery": "相册视频",
   "chatPageAttachAudioFile": "音频文件",
   "chatPageAttachAnyFile": "任意文件",
-  "chatPagePlaying": "播放中…",
   "chatPageVoiceLabel": "语音",
+  "voiceTranscribing": "转写中…",
+  "voiceTranscriptRetry": "转写失败，点按重试",
+  "voiceTranscriptStale": "可重新转写",
+  "voiceTranscriptManual": "点按转写文字",
+  "voiceTranscriptLegacyAudio": "旧版语音（m4a）不支持转写，新录的语音才能转",
+  "voiceTranscriptFailed": "转写失败：{error}",
+  "@voiceTranscriptFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceTranscriptNoText": "未识别到文字",
+  "voiceTranscriptSheetTitle": "语音转写",
+  "voiceTranscriptSettingsLink": "设置",
+  "apply": "应用",
+  "chatPageMenuVoiceTranscriptAuth": "语音转写",
+  "voiceTranscriptAuthNote": "怎样把语音消息转成文字？",
+  "voiceTranscriptAuthLocal": "本机转写",
+  "voiceTranscriptAuthLocalDesc": "在本机上直接转写，数据不离开本机",
+  "voiceTranscriptAuthServer": "远程转写",
+  "voiceTranscriptAuthServerDesc": "把原始录音发送给远程服务器，完成转写后将立即删除",
+  "voiceTranscriptServerFailed": "远程转写失败：{error}",
+  "voiceTranscriptServerDisabled": "远程转写未启用，已改用本机语音包",
+  "voiceTranscriptGroupEngine": "转写位置",
+  "voiceTranscriptTimingLabel": "转写时机",
+  "voiceTranscriptEngineLocalShort": "本机",
+  "voiceTranscriptEngineServerShort": "远程",
+  "voiceTranscriptAutoOn": "自动",
+  "voiceTranscriptAutoOff": "手动",
+  "voiceTranscriptAutoModeDesc": "每次收到语音消息就自动转写",
+  "voiceTranscriptManualModeDesc": "你自己手动选择语音消息进行转写",
+  "voiceTranscriptMenuTranscribe": "转写",
+  "@voiceTranscriptServerFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceTranscriptPreparing": "首次转写：下载安装语音包",
+  "voiceTranscriptPrepareFailed": "语音包安装失败：{error}",
+  "@voiceTranscriptPrepareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageAttachmentMetaMissing": "附件元数据缺失",
   "chatPageAttachmentUnusable": "附件不可用",
   "chatPageAttachmentRetry": "点按重试",
@@ -767,7 +800,7 @@
     }
   },
   "leaveSpaceTitle": "销毁本通道？",
-  "leaveSpaceMessage": "彻底删除当前通道保存的全部消息、附件和凭证，并回到秘境向导页。当前秘境本身仍然存在，其他通道也不受影响。此操作无法撤销！",
+  "leaveSpaceMessage": "彻底销毁当前通道，无法再通过本设备访问当前秘境。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {
@@ -850,11 +883,6 @@
   "memberPending": "待加入",
   "@memberPending": {
     "description": "成员尚未加入时的状态词（空间卡片、空间列表、成员弹层共用）"
-  },
-  "chatPageStatusOthersOnline": "{online}/{total}",
-  "voiceCallMenuCall": "语音通话",
-  "@voiceCallMenuCall": {
-    "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
   },
   "voiceCallIncoming": "来电",
   "@voiceCallIncoming": {

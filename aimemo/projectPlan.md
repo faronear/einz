@@ -17,10 +17,10 @@
 
 | 专项 | 状态 | 细节文档 |
 | --- | --- | --- |
-| **多空间**（一条通道进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 ✅（2026-09-22 完成）**——剩真机自测 | `aimemo/multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
-| **字段改名**（`device_id`→`entrance_id`、`person_id`→**`member_id`**、`device_uid`→`install_uid`） | `[x]` **2026-09-23 主线完成**（一次性机械替换，无 alias）；身份词 **2026-09-24 续改 `partner`→`member`**（界面文案不动） | `aimemo/renamePlan.zhcn.md` §9 |
-| **多人群聊（一期）** | `[>]` **2026-10-04 三次修订：取消升格 + 定向 token（丢设备可找回）**（老板拍板"定了双人就永远不变"）——类型改为创建时选定（向导第 2 步 双人/群组），升格全套删除；服务端/shared/App/CLI 已同步，全量 `npm test` 绿（34s）。剩真机自测 | `aimemo/groupChatDesign.md` |
-| **语音实时通话** | `[⏸]` 待评审（评审通过才拆任务） | `aimemo/voiceCall.zhcn.md` |
+| **多空间**（一条通道进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 ✅（2026-09-22 完成）**——剩真机自测 | `aimemo/20260918_multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
+| **字段改名**（`device_id`→`entrance_id`、`person_id`→**`member_id`**、`device_uid`→`install_uid`） | `[x]` **2026-09-23 主线完成**（一次性机械替换，无 alias）；身份词 **2026-09-24 续改 `partner`→`member`**（界面文案不动） | `aimemo/20260923_renamePlan.zhcn.md` §9 |
+| **多人群聊（一期）** | `[>]` **2026-10-04 三次修订：取消升格 + 定向 token（丢设备可找回）**（老板拍板"定了双人就永远不变"）——类型改为创建时选定（向导第 2 步 双人/群组），升格全套删除；服务端/shared/App/CLI 已同步，全量 `npm test` 绿（34s）。剩真机自测 | `aimemo/20261003_groupChatDesign.md` |
+| **语音实时通话** | `[⏸]` 待评审（评审通过才拆任务） | `aimemo/20260918_voiceCall.zhcn.md` |
 
 ## 待办（跨专项；一行一项，细节在各自文档）
 
@@ -30,8 +30,8 @@
   空间列表不再有破坏性入口
 - `[ ]` `productLens` 剩余复核：§12 通道管理 / §14 路线图仍是 v1 口径（§2 概念模型已修）
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
-- `[x]` 字段改名**执行**（2026-09-23，见 `renamePlan.zhcn.md`）
-- `[x]` **中文「设备」→「通道」清扫 + CLI `/device`→`/entrance`**（2026-09-23，见 `renamePlan.zhcn.md` §7）
+- `[x]` 字段改名**执行**（2026-09-23，见 `20260923_renamePlan.zhcn.md`）
+- `[x]` **中文「设备」→「通道」清扫 + CLI `/device`→`/entrance`**（2026-09-23，见 `20260923_renamePlan.zhcn.md` §7）
 - `[x]` **邮件通知（替代后台推送）**——2026-10-01 全线完成
   server `[x]`：`notify_emails`/`notify_tokens` 表 + `space_members.email`、`notifier.ts`
   （派生式 tick + 四道闸门）、`mailer.ts`、`PUT|GET|DELETE /notify/email` +
@@ -43,7 +43,7 @@
 - `[ ]` **群组成员退出（自愿退群）**（2026-10-19 定稿）：仅 group 空间开放（**duo 不退出**，
   想离开只能销毁本通道）；身份级离场=本身份全部通道一并退役 + 其他设备上线自毁
   （复用 `entrance.revoked` / `ENTRANCE_REVOKED` 口径）；墓碑行保名字 + slot 让位；
-  `member.left` 广播 + 顶部通知（不落聊天流）；不做踢人。细节见 `aimemo/groupExitDesign.md`
+  `member.left` 广播 + 顶部通知（不落聊天流）；不做踢人。细节见 `aimemo/20261019_groupExitDesign.md`
 - `[ ]` **撤销的 App 入口**（通道列表「撤销这条通道」：口令 + 二次确认；`ApiClient.revokeEntrance` 已就绪）
 - `[x]` **向导 PIN 步骤残留代码清理**（2026-10-19）：老板拍板彻底删除（"删掉只有好处，
   简化了许多"）——`_buildStepPin` / `_buildStepPinReuse` / `_isPinStep` /
@@ -65,7 +65,31 @@
 - `[ ]` **TUI/CLI 接入 escrow**（生产化加固候选）：新通道接入改走 `escrow download`
   （凭口令取 Space Key）替代直接传 sealed 文件；配套考察加密 store
 - `[ ]` 文档债：`projectPlan` 之外的旧文档复核（`docs/DATABASE.md`/`PROTOCOL.md` 的
-  Draft v0.1 头、`aimemo/upgradeToMultiverse.md` 是否仍与实际一致）
+  Draft v0.1 头、`aimemo/20260910_upgradeToMultiverse.md` 是否仍与实际一致）
+- `[x]` **语音转写 Phase 1 MVP**（2026-10-09，feat/voice-transcript 分支 b856c75）：按
+  `aimemo/20261009_voiceTranscript.zhcn.md` 落地——`local_voice_transcripts` 表（schema **v11**，
+  随消息级联删除、不进密文/不同步/不入备份）；`VoiceTranscriptService` 后台 isolate 串行
+  跑 sherpa-onnx SenseVoice（isolate 只收纯值参数防捕获 drift 句柄；重试 2 次；模型未
+  就绪置 unavailable）；语音明文落盘后自动入队（`_autoStoreAttachments` 统一钩子）；气泡
+  下方转写行四态（done/pending/failed·stale·unavailable 可点入口，watch 单行刷新）。
+  验证：全量 analyze 零告警、迁移测试（含 v10 存量库补建回归）全过、group/multi_space
+  测试全过。2026-10-10 补齐两块：录音改 16kHz 单声道 WAV（§8 方案 1，
+  `meta.voiceContainerWav` 标识新消息，`_voiceExtOf` 统一四处扩展名口径）+ 模型首次
+  使用下载（§11，hf-mirror 双源、Range 续传，sha256 校验，~228MB 不进 git/不打包）。
+  **2026-10-22 修复两笔**（详见 worklog 当日条目）：① 转写行的 drift watch 流是全 App
+  第一处 widget 内 drift 流，其卸载时 drift 内部 `Timer.run`（markAsClosed 缓存流）
+  在 flutter_test FakeAsync 里永不触发 → chat_page_menu_test 语音用例 `!timersPending`
+  断言炸 + `db.close()` 吊死 10 分钟——修法：两个连接路径 executor 外包
+  `DatabaseConnection(closeStreamsSynchronously: true)`；② 新表曾塞进 `from < 10` 块，
+  v10 已随 main 发布导致存量库永远补不到该表 → schemaVersion 10→11 独立迁移块。
+  **2026-10-22 再修三笔**（33e9976b，老板 MacBook 实测问题）：① 录音全静音根因=
+  `DebugProfile.entitlements` 缺 `com.apple.security.device.audio-input`（Release 已有、
+  Debug 漏——TCC 静默拒绝，同 09-26 FilePicker 款 Debug/Release 差异）；② "转写失败"
+  根因=转写 isolate 缺 `sherpa.initBindings()`（包要求每 isolate 各自初始化，缺了建
+  recognizer 即抛，重试耗尽落 failed）；③ 转写触发+气泡转写行扩展到 **wav 音频文件**
+  （非 wav 不入队不占位）。测试素材：say TTS 生成 16kHz wav 于老板桌面。
+  **遗留 Phase 0 验证**：真机 A/B（SenseVoice vs Paraformer + wav 音质）、iOS/Android
+  原生构建跑一遍（sherpa_onnx 重 FFI，唯一可能翻车点）。
 - `[x]` **3 个 pty E2E 测试 rot 修复**（2026-10-09 完成）：根因=e2421d6 新增「秘境类型」
   问答 + 预置名机制删除 + 2026-10-04 purpose 收敛（invite=开新身份/attach=进已有身份、
   attach 不再问名字）+ 协议版本升 3。修复 4 个测试：presence/revoked/revoke_command/

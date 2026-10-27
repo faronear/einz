@@ -1,0 +1,22 @@
+{
+  "utc": "20261027T040432.000000Z",
+  "time": "2026-10-27 12:04+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修 server 转写报 sherpa-onnx-node unavailable（iMac x64）",
+      "detail": [
+        "老板在 iMac 本地测试：models/sensevoice 模型就位、.env 配好 EINZ_SENSEVOICE_MODEL，app 点转写报 TRANSCRIBE_FAILED: sherpa-onnx-node unavailable。",
+        "根因不是环境/模型：lockfile 缺 node_modules/sherpa-onnx-darwin-x64 与 node_modules/sherpa-onnx-linux-x64 两个独立条目（414ae39b 于 2026-10-24 在 arm64 机器生成 lockfile，npm 把不匹配本机平台的 optional 条目丢了；darwin-arm64/linux-arm64/win-* 都在，唯独缺这两个）。",
+        "npm ci 严格按 lockfile packages 条目安装——没有条目就静默跳过，所以 iMac 跑过 npm ci 也没装上；cn1 VPS（linux-x64）同样是这个坑，不只 iMac。",
+        "佐证：本机 npm _logs 无任何近期 ci/install 记录的问题排查走了弯路；干净目录复现 npm ci 确认必然不装，才定位到 lockfile 本身。",
+        "修复：npm install --save-optional sherpa-onnx-darwin-x64@2.0.0 + sherpa-onnx-linux-x64@2.0.0——两包自带 os/cpu 门控，arm64 mac 上自动跳过无副作用；lockfile 7 个平台条目补齐。",
+        "验证：干净目录 npm ci 复验 darwin-x64 正确装上，import('sherpa-onnx-node') LOAD OK；iMac node_modules 已就绪，重启 server 后 curl /health 应见 asr_engine:sensevoice。",
+        "教训：npm 在非本机平台上重新生成 lockfile 会静默丢 optional 平台包条目；npm install 不会补回已丢失的条目，需显式 --save-optional。跨平台仓库加原生平台 optional 依赖后，应在每个目标平台各跑一次干净 npm ci 验证。"
+      ]
+    }
+  ]
+}

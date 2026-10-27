@@ -64,20 +64,6 @@
           "cd ~/einz",
           "if [ $(hostname) = 'DoomBase' ]; then npm run app-ios-boot && npm run app-ios-run; else exit; fi;"
         ]
-      },
-      {
-        "name": "远端server",
-        "autoExecuteCommands": true,
-        "commands": [
-          "ssh.sh cn1"
-        ]
-      },
-      {
-        "name": "tui--远端",
-        "autoExecuteCommands": true,
-        "commands": [
-          "cd ~/einz/cli && dart bin/einz_tui.dart"
-        ]
       }
     ]
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import 'labeled_checkbox.dart';
+import 'sheet_close_button.dart';
 
 /// 打开选项弹层（界面语言 / 阅后即焚 / 附件存储共用的入口）。
 ///
@@ -80,17 +82,23 @@ class OptionPickerSheet extends StatefulWidget {
   State<OptionPickerSheet> createState() => _OptionPickerSheetState();
 }
 
-/// 一个选项：[value] 为存库值，[label] 主文案，[description] 可选副标题。
+/// 一个选项：[value] 为存库值，[label] 主文案，[description] 可选副标题，
+/// [preview] 可选**前置预览图**（Theme 弹层的渐变/纯色缩略卡；非空时该行改为
+/// 「预览图 + 文字」横向布局，与 ui_style_picker 原卡片同款）。
 class OptionPickerItem {
   const OptionPickerItem({
     required this.value,
     required this.label,
     this.description,
+    this.preview,
   });
 
   final String value;
   final String label;
   final String? description;
+
+  /// 可选预览 widget（如 Theme 选项的配色缩略卡）。非空 = 行布局带前置预览。
+  final Widget? preview;
 }
 
 class _OptionPickerSheetState extends State<OptionPickerSheet> {
@@ -122,13 +130,23 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
           children: [
             // 标题**居中**（老板 2026-09-15）：靠左会与下面的选项行分不清层次。
             // 下边距 5（老板 2026-10-02：原标题-备注 10 太开，减半增加整体感；
-            // 有 note 的弹层由此获得紧凑的标题组）
+            // 有 note 的弹层由此获得紧凑的标题组）。右上角关闭圆钮（老板
+            // 2026-10-24）与标题行水平对齐——Stack 钉角，标题仍居中。
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
-              child: Center(
-                child: Text(widget.title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 16)),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: Text(widget.title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                  Positioned(
+                    right: 0,
+                    child: SheetCloseButton(tooltip: AppLocalizations.of(ctx)!.close),
+                  ),
+                ],
               ),
             ),
             // 标题下的小备注（老板 2026-09-25）。三级区分全靠字号/字重/颜色：
@@ -249,17 +267,33 @@ class _OptionRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
+        // 未选中项的**默认灰**与「我的秘境」弹层「添加秘境」按钮统一为 5% 黑
+        // （老板 2026-10-24：三态口径——默认 5% → 悬浮 10% → 点击 14%）。
+        // 选中项**深粉**（老板 2026-10-24：原 secondaryContainer 55% 淡粉与 5%
+        // 灰对比不足；改品牌粉 25% 实底，与 Theme 弹层选中态同款）。
         color: active
-            ? scheme.secondaryContainer.withValues(alpha: 0.55)
-            : Colors.transparent,
+            ? const Color(0xFFD6529C).withValues(alpha: 0.25)
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(12),
+          hoverColor: Colors.black.withValues(alpha: 0.10),
+          highlightColor: Colors.black.withValues(alpha: 0.14),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            // 带 preview 的行（Theme 迁移）体量更大：垂直内边距从 10 加到 12，
+            // 预览图 64 高不至于贴边（与原 ui_style_picker 卡片体量一致）。
+            padding: option.preview != null
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+                : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
+                // 前置预览图（Theme 弹层的渐变/纯色缩略卡；有 preview 的选项行
+                // 垂直内边距加大一圈，与原 ui_style_picker 卡片体量一致）。
+                if (option.preview != null) ...[
+                  option.preview!,
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

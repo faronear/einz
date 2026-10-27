@@ -4,11 +4,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+// drift 的 Value 包装（服务端转写写 local_voice_transcripts 行用）：
+// show 导入避免与页面里其他同名符号冲突
+import 'package:drift/drift.dart' show Value;
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/services.dart';
 
 import 'widgets/linkified_text.dart';
@@ -29,6 +34,7 @@ import 'widgets/burn_duration_sheet.dart';
 import 'widgets/version_gate.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/tombstone_settings.dart';
+import 'data/voice_transcript_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
@@ -39,6 +45,8 @@ import 'error_text.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
+import 'data/voice_transcript_model.dart';
+import 'data/voice_transcript_service.dart';
 import 'data/media_saver.dart';
 import 'data/message_repository.dart';
 import 'data/space_session.dart';
@@ -59,9 +67,10 @@ import 'widgets/passphrase_field.dart';
 import 'widgets/editable_field.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/labeled_checkbox.dart';
+import 'widgets/sheet_close_button.dart';
 import 'widgets/top_notice.dart';
-import 'widgets/ui_style_picker.dart';
 import 'widgets/clickable.dart';
+import 'widgets/transcribe_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
@@ -144,13 +153,30 @@ bool _isLocalReadableFile(String path) {
   }
 }
 
-/// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
-/// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
-/// 发送复用右侧发送键）。
+/// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口
+/// 图标点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态
+/// （试听/取消，发送复用右侧发送键）。
+///
+/// 入口为输入盒内左侧**合并图标**（麦克风+文档，老板 2026-10-25）：点击=文字态 ↔
+/// 语音态互换——文字态进**提示态**（不自动开录，长按录音条才开始录）；录音中/预览态
+/// 点击回文字态但**保留**已录内容，再点可直接回预览态用（或点 X 删除）。
 enum _InputMode { text, hint, recording, preview }
 
 /// 「通道列表」卡片间距（一卡占满整行后只剩纵向间距，老板 2026-10-11）。
 const double _entranceCardSpacing = 12;
+
+/// 输入盒圆角（老板 2026-10-25）：文字/提示/录音/预览三态共用同一个外框，弧度
+/// 取单行盒高（48=TextField 12+24+12）的一半 24——盒左端即标准半圆，与盒内
+/// 左侧合并图标的圆形热区（直径同盒高，见 [_kInputModeToggleSize]）左半边完全
+/// 贴合，点按水波纹不会冒出盒角。多行草稿盒长高时圆角保持 24。
+const double _kInputBoxCornerRadius = 24;
+
+/// 输入盒内合并图标的圆形热区边长：直径=盒高=盒左端半圆的直径，保证圆边贴齐。
+const double _kInputModeToggleSize = _kInputBoxCornerRadius * 2;
+
+/// 语音条白胶囊高度（提示/录音/预览三态共用）：盒高减 2px——上下各留 1px，
+/// 让输入盒自己的 1px 描边不被白色填充盖断（老板 2026-10-26 验收）。
+const double _kVoiceCapsuleHeight = _kInputModeToggleSize - 2;
 
 /// 气泡时间行里各小控件的**统一高度**（老板 2026-10-08）：引用/拷贝/保存的圆钮，
 /// 以及「沙漏+时长」胶囊——三者的背景高度必须一样（此前沙漏那块的文字把胶囊撑得
@@ -165,6 +191,13 @@ const double _entranceRefreshSize = 40;
 /// 桌面端宽屏下这张身份卡会被拉成一条空旷的长带——限到 480 后居中停在窗口底部，
 /// 手机端本就比它窄，不受影响。
 const double kMyProfileSheetMaxWidth = 480;
+
+/// 服务端转写一次尝试的结果（_ChatPageState._serverVoiceTranscribe 返回值）：
+/// - [done]：拿到文本（行已置 done）；
+/// - [failed]：失败（行已置 failed、notice 已出）；
+/// - [disabled]：服务端未启用转写（503 TRANSCRIBE_DISABLED）——按 §15.1 ③
+///   既定回落语义，调用方改走本地模型（说明 notice 已由该方法出）。
+enum _ServerTranscriptOutcome { done, failed, disabled }
 
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
@@ -252,6 +285,11 @@ const double kMessageFontSize = 16;
 /// 改这里两处一起变——此前引用条 24、引用块 40，两处各写各的。
 const double kQuoteThumbSize = 40;
 
+/// 消息高亮的橘黄（老板 2026-09-10 定，跳转目标闪烁用；2026-10-24 起长按菜单
+/// 打开期间被选中的气泡也用，2026-10-27 起菜单卡片的图案与柔光同色）：
+/// 气泡底色、卡片图标/淡底、选中柔光统一从这一个来源取，别再各写 #FF9800。
+const Color _kOrangeHighlight = Color(0xFFFF9800);
+
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   late final MessageRepository _repo;
@@ -280,6 +318,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 仅在实际录音/播放时才实例化（widget 测试环境无原生实现，渲染路径不触碰）。
   AudioRecorder? _recorder;
   AudioPlayer? _player;
+  // 语音消息本地转写（aimemo/20261009_voiceTranscript.zhcn.md §9）：纯本地派生，
+  // 模型目录 Phase 0 接入前为 null → 行置 unavailable（UI 出手动入口）。
+  VoiceTranscriptService? _transcriber;
   final _picker = ImagePicker();
   // 图片解密缓存（messageId → Future<bytes>），避免重复下载解密。
   final Map<String, Future<Uint8List>> _imageCache = {};
@@ -438,6 +479,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 墓碑消息显示模式（'keep'=保留消息状态 / 'hide'=彻底隐藏；默认 keep）。
   /// 只影响消息流里墓碑（已删除/已焚毁）的呈现，数据行为不变。
   String _tombstoneDisplay = 'keep';
+  /// 语音转写方式（'local'=本机模型 / 'server'=服务端 whisper；默认 local）。
+  /// 方案 D'（20261009_voiceTranscript.zhcn.md §15.1 ③），更多设置里可改。
+  /// 2026-10-23 起与自动开关 [_voiceTranscriptAuto] 拆成两组（原三选一里的
+  /// 「每条询问」改为自动关闭时的行为，不再是并列选项）。
+  String _voiceTranscriptEngine = 'local';
+  /// 是否自动转写（默认 false = 每条询问：不论本机还是服务端，执行前都会问；
+  /// true = 按 [_voiceTranscriptEngine] 自动转写）。
+  bool _voiceTranscriptAuto = false;
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
@@ -448,6 +497,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 气泡尺寸变化已弃用，老板要求 2026-09-10）
   String? _highlightMessageId;
   Timer? _highlightTimer;
+  // 操作菜单选中的消息：菜单打开期间持续橘黄（#FF9800，同跳转高亮色，老板
+  // 2026-10-24：微信同款「选中的消息着色」），菜单关闭即恢复。与跳转高亮共用
+  // 气泡底色的判定口（见 itemBuilder 里 AnimatedContainer 的 color 分支）。
+  String? _menuTargetMessageId;
   late String _uiStyle; // 当前界面主题（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
 
   /// 当前附件存储模式：'secured'=不留存明文（默认）/ 'stored'=明文留在本机、直接打开。
@@ -502,7 +555,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final Map<String, String> _memberGenders = {};
   /// member_id → 成员状态（/space 的 member_status，2026-10-19 自愿退群配套）：
   /// 'active' | 'left'（墓碑）。**名字解析用全量**（墓碑保名，历史消息的
-  /// "谁说的"不丢）；**名单/计数/邀请判定只数 active**（aimemo/groupExitDesign.md
+  /// "谁说的"不丢）；**名单/计数/邀请判定只数 active**（aimemo/20261019_groupExitDesign.md
   /// §4.2 三分口径）。老服务端不下发 → 空表 → 全部按 active（没有墓碑）。
   final Map<String, String> _memberStatus = {};
   /// 空间模式（'duo' | 'group'，/space 下发）。**不靠"成员数 ≥3"猜**——duo 满员
@@ -602,9 +655,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// `burned: false` 恒真——顶栏标记只在焚毁**生效前**显示。
   /// 配色不单独指定：跟锁屏等顶栏图标同色。
   Widget _buildBurnBadge(AppLocalizations l10n) {
-    return Tooltip(
-      message: l10n.chatPageBurnHeading,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
+    return InkWell(mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(16),
         onTap: _showBurnPicker,
         child: Padding(
@@ -619,8 +670,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 消息发送时间标注：当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM。
@@ -702,9 +752,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       color: Colors.transparent,
       shape: const CircleBorder(), // 圆形背景（老板 2026-10-02：同状态栏电话图标）
       clipBehavior: Clip.antiAlias,
-      child: Tooltip(
-        message: label,
-        child: InkWell(
+      child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           // 悬浮/点击背景（老板 2026-10-02）：与状态栏电话/设备图标同档
           // hover/highlight 色，浅灰淡染——gradient 深色气泡下黑 alpha 同样可见
@@ -718,7 +766,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Center(child: Icon(icon, size: iconSize, color: subtle)),
           ),
         ),
-      ),
     );
   }
 
@@ -752,13 +799,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     if (m.status == 'failed') {
       // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）。
-      // 悬浮/点击圆形背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
-      // 引用/拷贝/保存快捷动作同款风格，别像裸文字）
-      return Tooltip(
-        message: l10n.chatPageMsgFailed,
-        child: Material(
+      // 悬浮/点击背景遮罩 + 图标 16（2026-10-11 老板：与时间戳后面的
+      // 引用/拷贝/保存快捷动作同款风格，别像裸文字）。
+      // **胶囊形（StadiumBorder）不是圆形**（老板 2026-10-25 实测修复）：本钮
+      // 带文字，CircleBorder + antiAlias 会把内容裁成直径 28 的圆——英文
+      // "Tap to resend" 只剩中段几个字母（截图里只见 "rese"）、⚠️ 整个被
+      // 切掉。圆形 clips 只属于纯图标钮（_bubbleQuickAction）；StadiumBorder
+      // 装在 28×28 纯图标场合渲染出来就是圆，视觉不变。
+      return Material(
           color: Colors.transparent,
-          shape: const CircleBorder(),
+          shape: const StadiumBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             mouseCursor: SystemMouseCursors.click,
@@ -772,6 +822,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 不包 Flexible/ellipsis：外层是非 flex（无界宽度）时 Align
+                  // 收缩包裹，文字按内容宽度完整显示；强行加 Flexible 反而会
+                  // 因有界约束被拉抻（见调用点注释，老板 2026-10-25）
                   Text(busyLabel ?? l10n.chatPageMsgFailedTap,
                       style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
                   const SizedBox(width: 2),
@@ -780,8 +833,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-        ),
-      );
+        );
     }
 
     // 撤回墓碑永远显示单勾（2026-10-11 老板）：服务端消息行已真删（对方永远
@@ -789,10 +841,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 任何更大 seq 的消息都会越过它的 seq，按常规判定会误显双勾。撤回=没送达，
     // 固定单勾才符合事实。
     if (m.deletedKind == 'recall') {
-      return Tooltip(
-        message: l10n.chatPageMsgSent,
-        child: Icon(Icons.check, size: 12, color: subtle),
-      );
+      return Icon(Icons.check, size: 12, color: subtle);
     }
 
     // 送达进度（老板 2026-10-12 定稿）：k=0 → 单勾；k≥1 → 「k 双勾」（数字在
@@ -807,11 +856,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final allReceived = MessageRepository.receiptOf(
               m.env.serverSequence, _peerReceipts) !=
           null;
-      return Tooltip(
-        message: allReceived
-            ? l10n.chatPageMsgDelivered
-            : l10n.chatPageMsgSent,
-        child: Row(
+      return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             // duo（peers=1）全员送达 → 裸双勾；群 → 永远带人数（含全员时），
@@ -823,14 +868,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
             Icon(Icons.done_all, size: 12, color: subtle),
           ],
-        ),
-      );
+        );
     }
     if (m.status == 'sent' || m.status == 'delivered' || m.status == 'read') {
-      return Tooltip(
-        message: l10n.chatPageMsgSent,
-        child: Icon(Icons.check, size: 12, color: subtle),
-      );
+      return Icon(Icons.check, size: 12, color: subtle);
     }
 
     // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）。
@@ -838,11 +879,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 小飞机用超链接蓝提示可点——但渐变主题深蓝气泡上蓝飞机几乎看不见
     // （2026-10-11 老板），改白系（同快捷动作的 white70）；「加速中」期间
     // 仍用中性色，避免"点了还提示可点"的矛盾。
-    return Tooltip(
-      message: l10n.chatPageMsgSendingTap,
-      child: Material(
+    // **胶囊形（StadiumBorder）不是圆形**（老板 2026-10-25 实测修复）：带
+    // 「加速中…/重发中…」文字时圆形裁切会把文案切得只剩中段（英文
+    // "Speeding up…" 截图里只剩 "ing u"）；纯飞机图标时 28×28 胶囊渲染
+    // 出来就是圆，与快捷动作圆钮视觉一致。
+    return Material(
         color: Colors.transparent,
-        shape: const CircleBorder(),
+        shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
@@ -857,10 +900,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (busyLabel != null) ...[
+                  // 同 failed 分支：不包 Flexible，靠非 flex 的无界宽度收缩
+                  // 包裹（老板 2026-10-25：包了会被拉抻成大胶囊）
                   Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
                   const SizedBox(width: 2),
                 ],
+                // key：测试定位锚点（Tooltip 删除后 byTooltip 不可用，老板
+                // 2026-10-24 删 tooltip 决策的配套）
                 _SendingPlane(
+                  key: const ValueKey('sendingPlane'),
                   size: 16,
                   color: busyLabel != null
                       ? subtle
@@ -872,8 +920,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 点按状态小标 → 幂等重发（服务端按 message_id 去重），期间显示进行中文案。
@@ -979,8 +1026,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _input.addListener(_onInputInteraction);
     _loadBurnLabel();
     _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
+    _loadVoiceTranscriptSettings(); // 语音转写设置（方式+自动，方案 D'，更多设置里可改）
     _refreshPinStatus();
-    _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 30s；两个计时器共用）
+    _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 1 分钟；两个计时器共用）
     // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
     // 交互信号由 build 根的 Listener（点/滑）+ 滚动通知（滚轮）+ 输入框监听（打字）
     // 喂给 _armIdleLock；解锁/关弹层 pop 回聊天时由 push Future（_pushLockOverlay）
@@ -1152,7 +1200,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     unawaited(_refreshProfileFromServer());
   }
 
-  /// 自愿退群（member.left，2026-10-19，aimemo/groupExitDesign.md §6.4）：
+  /// 自愿退群（member.left，2026-10-19，aimemo/20261019_groupExitDesign.md §6.4）：
   /// **别人**退出——与 [_onMemberJoined] 同构刷新名单/计数，另发一条顶部通知
   /// （告知形式=顶部通知+名单刷新，老板决策 3；不在聊天流落系统消息）。
   ///
@@ -1535,6 +1583,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _tombstoneDisplay = mode);
   }
 
+  /// 加载语音转写设置（方式 + 自动开关；每设备、每空间独立，方案 D'）。
+  Future<void> _loadVoiceTranscriptSettings() async {
+    final s = VoiceTranscriptSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
+    final engine = await s.loadEngine();
+    final auto = await s.loadAuto();
+    if (mounted) {
+      setState(() {
+        _voiceTranscriptEngine = engine;
+        _voiceTranscriptAuto = auto;
+      });
+    }
+  }
+
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
   Future<void> _showLocalePicker() async {
     final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
@@ -1719,13 +1780,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 标题居中（与其它选项弹层口径一致）
+              // 标题居中（与其它选项弹层口径一致）；右上角关闭圆钮与标题行
+              // 水平对齐（老板 2026-10-24）——Stack 钉角
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: Center(
-                  child: Text(l10n.chatPageMoreSettingsTitle,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(l10n.chatPageMoreSettingsTitle,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: SheetCloseButton(tooltip: l10n.close),
+                    ),
+                  ],
                 ),
               ),
               // 行尾当前值 + >：> 与顶层菜单的二级入口标识同款（老板 2026-10-15），
@@ -1758,6 +1829,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 onTap: () => Navigator.of(ctx).pop('tombstone'),
               ),
+              ListTile(
+                // 麦克风+文档自绘图标（老板 2026-10-24）：与操作菜单「转写」卡同一
+                // 个图标，「语音转写」语义贯穿两处入口。
+                leading: const TranscribeIcon(size: 24, color: Color(0xFF1A1A1A)),
+                title: Text(l10n.chatPageMenuVoiceTranscriptAuth),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_voiceTranscriptLabel(l10n), style: valueStyle),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
+                onTap: () => Navigator.of(ctx).pop('voiceTranscriptAuth'),
+              ),
               // 底部留白（同「高级安全」弹层：末行不贴屏幕底边）
               const SizedBox(height: 16),
             ],
@@ -1773,6 +1859,75 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _showAttachmentStoragePicker();
     } else if (picked == 'tombstone') {
       await _showTombstonePicker();
+    } else if (picked == 'voiceTranscriptAuth') {
+      await _showVoiceTranscriptPicker();
+    }
+  }
+
+  /// 语音转写菜单行当前值：「方式 · 自动/手动」（如「服务端 · 手动」）。
+  /// 方式与时机都用短标签——与附件存储等行的当前值同款长度风格。
+  String _voiceTranscriptLabel(AppLocalizations l10n) {
+    final engine = _voiceTranscriptEngine == 'server'
+        ? l10n.voiceTranscriptEngineServerShort
+        : l10n.voiceTranscriptEngineLocalShort;
+    final timing =
+        _voiceTranscriptAuto ? l10n.voiceTranscriptAutoOn : l10n.voiceTranscriptAutoOff;
+    return '$engine · $timing';
+  }
+
+  /// 语音转写设置弹层（方案 D'，§15.1 ③；2026-10-23 老板重构为两组，
+  /// 2026-10-24 第二组由勾选改单选）：第一组「转写方式」本机/服务端二选一；
+  /// 第二组「转写时机」自动/手动二选一（默认手动=长按逐条转写，省流量/上传）。
+  /// 单选 + 提交（有副作用数据写入，与附件存储/墓碑同构）；「应用于本机所有
+  /// 秘境」勾选框同款。
+  Future<void> _showVoiceTranscriptPicker() async {
+    final l10n = AppLocalizations.of(context)!;
+    // Apply 是否真发生过（弹层被直接关掉不算）——关窗后据此判断要不要
+    // upfront 备模型
+    var applied = false;
+    await showOptionPickerSheet<void>(
+      context: context,
+      builder: (ctx) => _VoiceTranscriptSheet(
+        engine: _voiceTranscriptEngine,
+        auto: _voiceTranscriptAuto,
+        scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
+        onApply: (engine, auto, {required bool scopeAll}) async {
+          final settings = VoiceTranscriptSettings(
+              widget.db ?? LocalDatabase.shared,
+              spaceId: widget.spaceId);
+          if (scopeAll) {
+            await settings.saveAll(engine: engine, auto: auto);
+          } else {
+            await settings.saveEngine(engine);
+            await settings.saveAuto(auto);
+          }
+          if (mounted) {
+            setState(() {
+              _voiceTranscriptEngine = engine;
+              _voiceTranscriptAuto = auto;
+            });
+          }
+          applied = true;
+        },
+      ),
+    );
+    if (!mounted) return;
+    // Apply 后 upfront 备模型（老板 2026-10-25）：本机方式 + 模型未就绪 → 弹
+    // 下载/安装窗，不必等第一次转写才弹——自动模式下新语音只静默落
+    // unavailable 行，用户根本不知道要点气泡才会走下载。服务端方式不需要
+    // 本机模型，不弹。取消/安装失败都不堵路：设置已保存，之后第一次转写
+    // 仍会走 _prepareVoiceModel 懒准备。
+    // 无需与退场动画错开：准备对话框→底部弹层 immediate 切换在本 app 已有
+    // 先例（_transcribePreviewRecording），Overlay 交叉卸载断言只发生在
+    // 「弹层→弹层」（_menuAction 的 300ms 延迟就是为那个）。
+    if (applied && _voiceTranscriptEngine == 'local') {
+      try {
+        if (!await VoiceTranscriptModel.isReady()) {
+          await _prepareVoiceModel();
+        }
+      } catch (_) {
+        // 探活出错（极少见）：不堵路，懒准备路径仍在
+      }
     }
   }
 
@@ -1887,14 +2042,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ),
     );
-    return Tooltip(
-      message: l10n.spaceListSwitch,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
+    return InkWell(mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(10),
         onTap: _openSpacePicker,
         child: titleRow,
-      ),
-    );
+      );
   }
 
   /// 性别底色：淡粉（女）/ 淡蓝（男）/ 淡灰（未登记）。
@@ -2102,11 +2254,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 空群占位头像自带 tooltip「我的同伴」；已有成员时头像条里每个头像自带
     // 人名 tooltip（`_stripAvatar`）。
     final Widget avatarSlot = others.isEmpty
-        ? Tooltip(
-            // 三个「我的群组/同伴」文案（菜单项/弹层标题/本 tooltip）共享
-            // 同一键（老板 2026-10-11）
-            message: l10n.chatPageMembersTitle('group'),
-            child: SizedBox(
+        ? SizedBox(
               width: kStatusMemberAvatarSize,
               height: kStatusMemberAvatarSize,
               // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
@@ -2119,17 +2267,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 child: const Icon(Icons.groups_outlined, size: 22),
               ),
-            ),
-          )
+            )
         : _avatarStrip(others, avatarBudget);
 
     // **一个大胶囊**（2026-10-11 老板）：多人头像条 + 群名/编辑图标 + 在线
     // 人数整体包进同一个 StadiumBorder 胶囊，悬浮/按住显色，点击打开
     // 「我的群组」弹层（改名走弹层里的群名行）。tooltip 与菜单项/弹层标题
     // 共享同一文案键（2026-10-11 老板）。
-    return Tooltip(
-      message: l10n.chatPageMembersTitle('group'),
-      child: Material(
+    return Material(
         color: Colors.transparent,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
@@ -2167,8 +2312,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 除我之外的成员：**在线的在前**，同在线内按"上线时刻"**新近优先**；离线的
@@ -2245,6 +2389,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           )
         : avatar;
     final name = _senderNameOf(memberId);
+    // Tooltip **仅这一处保留**（老板 2026-10-24）：状态条群成员头像 hover 出
+    // 完整名字——头像下方那格名字是截断的（clip），hover 是唯一能看全名的途径；
+    // 其余全 app 的 Tooltip 已按老板决策删除（手机无 hover 无价值、长按抢手势）。
+    // 触屏天然无 hover，不会与气泡长按菜单抢手势。
     return Tooltip(
       message: name.isEmpty
           ? AppLocalizations.of(context)!.chatPageMembersUnnamed
@@ -2385,11 +2533,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             alignment: Alignment.centerLeft,
             widthFactor: 1.0,
             child: _othersSummary(l10n))
-        : Tooltip(
-            // 大胶囊 tooltip 与「My companion」弹层标题、菜单项共享同一文案键
-            // chatPageMembersTitle('duo')（老板 2026-10-11，与 group 空间同款）。
-            message: l10n.chatPageMembersTitle('duo'),
-            child: Material(
+        : Material(
               color: Colors.transparent,
               shape: const StadiumBorder(),
               clipBehavior: Clip.antiAlias,
@@ -2478,8 +2622,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-            ),
-          );
+            );
 
     final Widget inviteLink = _peerJoined != false
         ? const SizedBox.shrink()
@@ -2525,9 +2668,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 群聊一期（2026-10-03）：**群空间不挂**——群内通话一期不做，服务端也会
     // 静默丢弃 call.* 信令（挂出来点了没人接，只能干等超时）。
     final Widget callButton = _peerJoined == true && !_isGroup
-        ? Tooltip(
-            message: l10n.voiceCallMenuCall,
-            child: Material(
+        ? Material(
               color: Colors.transparent,
               shape: const CircleBorder(), // 真圆：状态条加高后 24 圆角成了圆角矩形
               clipBehavior: Clip.antiAlias,
@@ -2542,8 +2683,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       size: 20, color: Color(0xFF2271F7)),
                 ),
               ),
-            ),
-          )
+            )
         : const SizedBox.shrink();
 
     // 芯片右侧挂一块：**未加入=邀请加入 / 已加入=语音通话**（老板 2026-09-26）。
@@ -2591,12 +2731,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 顶栏 🎨：切换界面主题（素雅纯色/渐变粉蓝）。弹窗内点选即生效并立即关闭，
   /// 回到对话消息页（老板要求 2026-09-13；此前是保持打开供边看边试）。
   Future<void> _showStylePicker() async {
-    await showModalBottomSheet<void>(
+    // 2026-10-24 迁移到 OptionPickerSheet（老板：与界面语言等选择弹层统一，
+    // 三态底色/选中深粉一处维护；预览图走 OptionPickerItem.preview 槽）。
+    // 交互保留原语义：点选即生效、立即关闭（无提交按钮）。
+    final l10n = AppLocalizations.of(context)!;
+    await showOptionPickerSheet<void>(
       context: context,
-      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
-      isScrollControlled: true,
-      builder: (_) => UiStylePickerSheet(
-        settings: UiStyleSettings(widget.db ?? LocalDatabase.shared),
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageMenuStyleLabel,
+        selected: uiStyleNotifier.value,
+        options: [
+          for (final option in kUiStyleOptions)
+            OptionPickerItem(
+              value: option,
+              label: option == 'gradient'
+                  ? AppLocalizations.of(context)!.chatPageUiStyleGradient
+                  : AppLocalizations.of(context)!.chatPageUiStylePlain,
+              description: option == 'gradient'
+                  ? AppLocalizations.of(context)!.chatPageUiStyleGradientDesc
+                  : AppLocalizations.of(context)!.chatPageUiStylePlainDesc,
+              preview: _UiStylePreview(option: option),
+            ),
+        ],
+        onApply: (value, {bool scopeAll = false}) async {
+          await UiStyleSettings(widget.db ?? LocalDatabase.shared).save(value);
+        },
       ),
     );
   }
@@ -2687,13 +2846,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 标题居中（与其它选项弹层口径一致）
+                  // 标题居中（与其它选项弹层口径一致）；右上角关闭圆钮与标题行
+                  // 水平对齐（老板 2026-10-24）——Stack 钉角
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
-                    child: Center(
-                      child: Text(title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 16)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   // 标题下的备注（与 OptionPickerSheet 的 note 同款口径）：
@@ -2746,7 +2915,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 16),
                                 color: scheme.onSurfaceVariant,
-                                tooltip: l10n.chatPageInviteCopyCodeTooltip,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 visualDensity: VisualDensity.compact,
@@ -2772,7 +2940,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 16),
                                 color: const Color(0xFF2271F7),
-                                tooltip: l10n.chatPageInviteCopyLinkTooltip,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 visualDensity: VisualDensity.compact,
@@ -2913,7 +3080,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _armIdleLock();
   }
 
-  /// 恢复用户自选的锁屏时长（「设置锁屏码」弹窗的滚动轴写入；默认 30s）。
+  /// 恢复用户自选的锁屏时长（「设置锁屏码」弹窗的滚动轴写入；默认 1 分钟）。
   /// 前台闲置锁与后台锁共用同一阈值：回填 [_lockSeconds]（idle Timer 下次重排生效）
   /// 与 [_lockTimer.backgroundLockSeconds]（回前台判定即时生效），并重排 idle。
   Future<void> _loadLockSeconds() async {
@@ -3141,10 +3308,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (_hasMultipleSpaces)
                 ValueListenableBuilder<bool>(
                   valueListenable: allSpaces,
+                  // horizontalInset 0：AlertDialog content 左右 24 + 卡片内边距
+                  // 12，正好与上方 Email 输入框边缘对齐（老板 2026-10-24）
                   builder: (_, all, _) => LabeledCheckbox(
                     value: all,
                     label: l10n.settingsScopeAll,
                     onChanged: (v) => allSpaces.value = v,
+                    horizontalInset: 0,
                   ),
                 ),
               // 已填但还没点链接：这一档不点明，用户会以为已经生效
@@ -3473,9 +3643,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       hintText: l10n.chatPagePassphraseFieldHint,
                       suffixIcon: IconButton(
                         icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                        tooltip: obscure
-                            ? l10n.chatPagePassphraseShow
-                            : l10n.chatPagePassphraseHide,
                         onPressed: () => setLocal(() => obscure = !obscure),
                       ),
                     ),
@@ -3536,6 +3703,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// **group（我的群组）**：每行一张成员卡——底色=该成员性别色（男浅蓝 / 女浅粉 /
   /// 性别未知=中性灰）；左：真实头像 + 名字。
+  /// - 高度不够时**只有成员卡列表内部滚动**（老板 2026-10-25）：标题、群名胶囊、
+  ///   「邀请新同伴」/「退出群组」固定在两端不滚（Flexible(loose) + ListView
+  ///   (shrinkWrap)，与 [_showInviteDialog]、ScrollableCardArea 同款口径）；
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
   /// - 未满员时列表末尾是「邀请新同伴」大按钮；
   /// - **整卡可点**（老板 2026-10-20 二轮定；2026-10-06 否掉整卡可点的理由
@@ -3567,141 +3737,170 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
       builder: (ctx) {
         return SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Center(
-                      child: Text(
-                          l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              // key 供测试定位整个弹层内容（标题/群名行/成员卡/邀请/退出都在
+              // 这里面；2026-10-25 改「只滚成员列表」后外层不再是
+              // SingleChildScrollView，原锚点失效）
+              key: const ValueKey('membersSheet'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Center(
+                        child: Text(
+                            l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 16)),
+                      ),
+                      Positioned(
+                        right: 0,
+                        child: SheetCloseButton(tooltip: l10n.close),
+                      ),
+                    ],
                   ),
-                  // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
-                  // 「我的资料」弹层的名字胶囊同款——实底 + Material/InkWell 水波，
-                  // 文字+编辑图标一眼可点）。底色淡蓝 tertiaryContainer（老板：
-                  // 胶囊底不要粉色，淡蓝/灰皆可——两处胶囊统一淡蓝）。未设置 →
-                  // 淡色占位词；点击打开改群名弹窗（同状态条点群名）。
-                  if (_isGroup)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2, bottom: 14),
-                      child: Center(
-                        child: Material(
-                          // 与「添加秘境」/「新建通道」/「邀请新同伴」大按钮同款淡灰
-                          // （老板 2026-10-17：胶囊底也统一成淡灰，不再用淡蓝）
-                          color: Colors.black.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(999),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            // key 供测试定位群名行（状态条上可能有同文案，需区分）
-                            key: const ValueKey('membersSheetGroupNameRow'),
-                            mouseCursor: SystemMouseCursors.click,
-                            onTap: () {
-                              // 先收起成员弹层；等它收完再弹改群名弹窗（同
-                              // 「重新邀请」的 route 交接处理，见其注释）
-                              Navigator.of(ctx).pop();
-                              _menuAction(_showGroupNameDialog);
-                            },
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 9, 12, 9),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      // 占位词与改群名弹窗标题共用同一键（老板
-                                      // 2026-10-11：合并为一个文案「群组名称/
-                                      // Group name」，不另设占位词键）
-                                      _groupName.isEmpty
-                                          ? l10n.chatPageGroupNameTitle
-                                          : _groupName,
-                                      style: TextStyle(
-                                        // 占位词单独降档（老板 2026-10-11）：字号
-                                        // 小一档 + 更浅的 outline 色，别与真群名
-                                        // 的 20/w700 深色抢眼；有名字 → 胶囊里
-                                        // 最显眼（20/w700，与「我的资料」名字
-                                        // 胶囊同档）
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: _groupName.isEmpty ? 18 : 20,
-                                        height: 1.2,
-                                        color: _groupName.isEmpty
-                                            ? Theme.of(ctx).colorScheme.outline
-                                            : null,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                ),
+                // 群空间：成员列表前放「群名胶囊」行（老板 2026-10-17：与
+                // 「我的资料」弹层的名字胶囊同款——实底 + Material/InkWell 水波，
+                // 文字+编辑图标一眼可点）。底色淡蓝 tertiaryContainer（老板：
+                // 胶囊底不要粉色，淡蓝/灰皆可——两处胶囊统一淡蓝）。未设置 →
+                // 淡色占位词；点击打开改群名弹窗（同状态条点群名）。
+                if (_isGroup)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 14),
+                    child: Center(
+                      child: Material(
+                        // 与「添加秘境」/「新建通道」/「邀请新同伴」大按钮同款淡灰
+                        // （老板 2026-10-17：胶囊底也统一成淡灰，不再用淡蓝）
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(999),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          // key 供测试定位群名行（状态条上可能有同文案，需区分）
+                          key: const ValueKey('membersSheetGroupNameRow'),
+                          mouseCursor: SystemMouseCursors.click,
+                          onTap: () {
+                            // 先收起成员弹层；等它收完再弹改群名弹窗（同
+                            // 「重新邀请」的 route 交接处理，见其注释）
+                            Navigator.of(ctx).pop();
+                            _menuAction(_showGroupNameDialog);
+                          },
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 9, 12, 9),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    // 占位词与改群名弹窗标题共用同一键（老板
+                                    // 2026-10-11：合并为一个文案「群组名称/
+                                    // Group name」，不另设占位词键）
+                                    _groupName.isEmpty
+                                        ? l10n.chatPageGroupNameTitle
+                                        : _groupName,
+                                    style: TextStyle(
+                                      // 占位词单独降档（老板 2026-10-11）：字号
+                                      // 小一档 + 更浅的 outline 色，别与真群名
+                                      // 的 20/w700 深色抢眼；有名字 → 胶囊里
+                                      // 最显眼（20/w700，与「我的资料」名字
+                                      // 胶囊同档）
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: _groupName.isEmpty ? 18 : 20,
+                                      height: 1.2,
+                                      color: _groupName.isEmpty
+                                          ? Theme.of(ctx).colorScheme.outline
+                                          : null,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Icon(Icons.edit_outlined,
-                                      size: 18,
-                                      color: Theme.of(ctx)
-                                          .colorScheme
-                                          .onSurfaceVariant),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.edit_outlined,
+                                    size: 18,
+                                    color: Theme.of(ctx)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
-                  for (final e in others)
-                    _membersCard(
-                      memberId: e.key,
-                      gender: _memberGenders[e.key] ?? '',
-                      name: _memberNames[e.key],
-                      onTap: () {
-                        // 先收起成员弹层；**等它收完再开资料页**——紧接着
-                        // showModalBottomSheet 会让两条 route 在 Overlay 里
-                        // 交叉卸载（见 _waitRouteHandoff，与群名行同款）。
-                        Navigator.of(ctx).pop();
-                        _menuAction(
-                            () => _showMemberProfileSheet(e.key));
-                      },
-                    ),
-                  // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
-                  // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
-                  if (_canInvite)
-                    // 与成员卡片拉开一组间距：卡片间仅 8px（各自 vertical 4），
-                    // 这里给 12（合计 16），示意按钮不属于成员卡那一组（老板 2026-10-19）
-                    Column(
+                  ),
+                // 成员卡列表：**只有这一段滚动**（老板 2026-10-25：高度不够时
+                // 原来是整个弹层一起滚，标题/群名行/邀请/退出全被滚走）。
+                // Flexible(loose) + ListView(shrinkWrap)：人少时贴着内容（弹层
+                // 不撑高），人多吃满剩余高度、在这一段内部滚——标题、群名胶囊、
+                // 邀请与退出群组始终固定可见（与 _showInviteDialog、
+                // ScrollableCardArea 同款口径，见其注释）。
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Scrollbar(
+                    child: ListView(
+                      shrinkWrap: true,
                       children: [
-                        const SizedBox(height: 12),
-                        Material(
-                          // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
-                          // 三个大按钮底色统一）；hover/按住加深同口径
-                          color: Colors.black.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(mouseCursor: SystemMouseCursors.click,
+                        for (final e in others)
+                          _membersCard(
+                            memberId: e.key,
+                            gender: _memberGenders[e.key] ?? '',
+                            name: _memberNames[e.key],
                             onTap: () {
+                              // 先收起成员弹层；**等它收完再开资料页**——
+                              // 紧接着 showModalBottomSheet 会让两条 route
+                              // 在 Overlay 里交叉卸载（见 _waitRouteHandoff，
+                              // 与群名行同款）。
                               Navigator.of(ctx).pop();
                               _menuAction(
-                                  () => _showInviteDialog(purpose: 'invite'));
+                                  () => _showMemberProfileSheet(e.key));
                             },
-                            hoverColor: Colors.black.withValues(alpha: 0.10),
-                            highlightColor: Colors.black.withValues(alpha: 0.14),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.add),
-                                  const SizedBox(width: 6),
-                                  Text(l10n.chatPageMembersInviteNew),
-                                ],
-                              ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                // 未满 → 「邀请新同伴」大按钮（加号图标 + 文字整体居中，
+                // 老板 2026-10-06；duo 的邀请在「我的同伴」身份卡里，不走这里）
+                if (_canInvite)
+                  // 与成员卡片拉开一组间距：卡片间仅 8px（各自 vertical 4），
+                  // 这里给 12（合计 16），示意按钮不属于成员卡那一组（老板 2026-10-19）
+                  Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Material(
+                        // 与「添加秘境」/「新建通道」大按钮同款淡灰底（老板 2026-10-17：
+                        // 三个大按钮底色统一）；hover/按住加深同口径
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(mouseCursor: SystemMouseCursors.click,
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _menuAction(
+                                () => _showInviteDialog(purpose: 'invite'));
+                          },
+                          hoverColor: Colors.black.withValues(alpha: 0.10),
+                          highlightColor: Colors.black.withValues(alpha: 0.14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.add),
+                                const SizedBox(width: 6),
+                                Text(l10n.chatPageMembersInviteNew),
+                              ],
                             ),
                           ),
                         ),
-                      ],
-                    )
+                      ),
+                    ],
+                  )
                   else if (_isGroup)
                     // 群组满员：末尾那张卡变灰（不可点、无按钮），只说"已满"。
                     // duo 满员不走这里——duo 用资料页里的「重新邀请」表达"满"。
@@ -3712,49 +3911,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           _memberCount, _maxMembers),
                       muted: true,
                     ),
-                  // 「退出群组」（2026-10-19，aimemo/groupExitDesign.md §6.1）：
-                  // destructive 红字项。与「邀请新同伴」大按钮同款淡灰底（老板
-                  // 2026-10-17 统一口径），红图标+红字表达破坏性；**整块可点**
-                  // （老板偏好：别让人去点中某个小控件）。
-                  if (_isGroup)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Material(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          mouseCursor: SystemMouseCursors.click,
-                          onTap: () {
-                            // 先收弹层；等它收完再走确认闸门（route 交接，
-                            // 见 _waitRouteHandoff）
-                            Navigator.of(ctx).pop();
-                            _menuAction(_exitGroup);
-                          },
-                          hoverColor: Colors.black.withValues(alpha: 0.10),
-                          highlightColor: Colors.black.withValues(alpha: 0.14),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.logout,
-                                    color: Theme.of(ctx).colorScheme.error),
-                                const SizedBox(width: 6),
-                                Text(
-                                  l10n.exitGroupMenuItem,
-                                  style: TextStyle(
-                                    color: Theme.of(ctx).colorScheme.error,
-                                  ),
+                // 「退出群组」（2026-10-19，aimemo/20261019_groupExitDesign.md §6.1）：
+                // destructive 红字项。与「邀请新同伴」大按钮同款淡灰底（老板
+                // 2026-10-17 统一口径），红图标+红字表达破坏性；**整块可点**
+                // （老板偏好：别让人去点中某个小控件）。
+                if (_isGroup)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        mouseCursor: SystemMouseCursors.click,
+                        onTap: () {
+                          // 先收弹层；等它收完再走确认闸门（route 交接，
+                          // 见 _waitRouteHandoff）
+                          Navigator.of(ctx).pop();
+                          _menuAction(_exitGroup);
+                        },
+                        hoverColor: Colors.black.withValues(alpha: 0.10),
+                        highlightColor: Colors.black.withValues(alpha: 0.14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.logout,
+                                  color: Theme.of(ctx).colorScheme.error),
+                              const SizedBox(width: 6),
+                              Text(
+                                l10n.exitGroupMenuItem,
+                                style: TextStyle(
+                                  color: Theme.of(ctx).colorScheme.error,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         );
@@ -3762,7 +3960,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 退出群组（2026-10-19，aimemo/groupExitDesign.md §6.3）：确认闸门 →
+  /// 退出群组（2026-10-19，aimemo/20261019_groupExitDesign.md §6.3）：确认闸门 →
   /// 服务端 leaveSpace → 本地 removeSpace → 导航收尾。
   ///
   /// 执行链的顺序不能反：**leaveSpace 成功之后再清本地**（凭证在本地，清完就
@@ -3886,15 +4084,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 18),
-                    child: Center(
-                      child: Text(
-                          _isGroup
-                              ? l10n.chatPageMemberProfileTitle
-                              : l10n.chatPageMembersTitle('duo'),
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: scheme.onSurface)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(
+                              _isGroup
+                                  ? l10n.chatPageMemberProfileTitle
+                                  : l10n.chatPageMembersTitle('duo'),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: scheme.onSurface)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   Row(
@@ -4247,46 +4454,55 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 标题**居中**、上 14 下 5（与「界面语言」等弹层标题的居中与
-                  // 留白口径对齐）。右端挂「刷新」：就地重拉 /entrances 重建卡片，
-                  // 不用退出弹层、也不用等 30s 轮询。横向 padding 由 16 收到 0，
-                  // 让刷新按钮与下面的卡片**右对齐**；左边放同宽占位，标题仍在弹层
-                  // 正中（不会被按钮推歪）。
+                  // 留白口径对齐）。「刷新」**紧贴标题右侧**（老板 2026-10-24：
+                  // 原先钉在行最右，与关闭钮挤在一起——改成跟标题成组居中，
+                  // 标题组（标题+刷新）整体居中，行最右只留关闭钮）。
                   Padding(
                     padding: const EdgeInsets.fromLTRB(0, 4, 0, 5),
-                    child: Row(
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        const SizedBox(width: _entranceRefreshSize),
-                        Expanded(
-                          child: Center(
-                            child: Text(l10n.chatPageMenuEntranceList,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 16)),
+                        // Center 撑满行宽：标题组（标题+刷新）居中，Stack 随之
+                        // 拿到全宽，Positioned 的关闭钮才能钉到弹层右缘
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(l10n.chatPageMenuEntranceList,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600, fontSize: 16)),
+                              const SizedBox(width: 4),
+                              SizedBox(
+                                width: _entranceRefreshSize,
+                                height: _entranceRefreshSize,
+                                // 拉取中换成同尺寸的转圈：位置与大小都不跳
+                                child: refreshing
+                                    ? const Center(
+                                        child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2)),
+                                      )
+                                    : IconButton(
+                                        icon: const Icon(Icons.refresh, size: 20),
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () async {
+                                          setSheetState(() => refreshing = true);
+                                          await load();
+                                          // 弹层可能在这期间被关掉 → 不能再 setState
+                                          if (!ctx.mounted) return;
+                                          setSheetState(() => refreshing = false);
+                                        },
+                                      ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(
-                          width: _entranceRefreshSize,
-                          height: _entranceRefreshSize,
-                          // 拉取中换成同尺寸的转圈：位置与大小都不跳
-                          child: refreshing
-                              ? const Center(
-                                  child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2)),
-                                )
-                              : IconButton(
-                                  icon: const Icon(Icons.refresh, size: 20),
-                                  tooltip: l10n.chatPageEntranceListRefresh,
-                                  visualDensity: VisualDensity.compact,
-                                  onPressed: () async {
-                                    setSheetState(() => refreshing = true);
-                                    await load();
-                                    // 弹层可能在这期间被关掉 → 不能再 setState
-                                    if (!ctx.mounted) return;
-                                    setSheetState(() => refreshing = false);
-                                  },
-                                ),
+                        // 关闭圆钮（老板 2026-10-24）：钉标题行最右
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
                         ),
                       ],
                     ),
@@ -4394,10 +4610,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                           ? 18
                                                           : 0),
                                                   child: isLocal
-                                                      ? Tooltip(
-                                                          message:
-                                                              l10n.chatPageEdit,
-                                                          child: Material(
+                                                      ? Material(
                                                             // 胶囊底：淡灰圆角
                                                             // （同卡片蒙版/占位那一档
                                                             // 灰），悬浮/点击有反馈
@@ -4474,8 +4687,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                                 ),
                                                               ),
                                                             ),
-                                                          ),
-                                                        )
+                                                          )
                                                       : Padding(
                                                           // 纯名字卡补上与本机
                                                           // 胶囊相同的纵向
@@ -4649,13 +4861,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」/「更多通道」
-              // 等弹层标题口径一致——原来是自己一套 left + all 12 + 无字号）
+              // 等弹层标题口径一致——原来是自己一套 left + all 12 + 无字号）；
+              // 右上角关闭圆钮与标题行水平对齐（老板 2026-10-24）——Stack 钉角
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: Center(
-                  child: Text(l10n.advancedMenuTitle,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(l10n.advancedMenuTitle,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: SheetCloseButton(tooltip: l10n.close),
+                    ),
+                  ],
                 ),
               ),
               // 每行行尾 > ：与顶层菜单的二级入口标识同款（老板 2026-10-15）——
@@ -5121,9 +5343,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final ctrl = TextEditingController(text: _myEntranceName);
     // 名称为空/不合规警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
-    // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
-    final editing = ValueNotifier<bool>(false);
-    // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
+    // 名称输入框焦点：一打开就取焦（老板 2026-10-24：直接可编辑，不再有
+    // 初始只读+编辑按钮的冻结态——与群组名称弹窗同款）
     final nameFocus = FocusNode();
     // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
     // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
@@ -5153,42 +5374,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 14),
-              // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-              // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
-              ValueListenableBuilder<bool>(
-                valueListenable: editing,
-                builder: (_, isEditing, _) => TextField(
-                  controller: ctrl,
-                  focusNode: nameFocus,
-                  readOnly: !isEditing,
-                  onTap: () {
-                    if (editing.value) return;
-                    editing.value = true;
-                    nameFocus.requestFocus();
-                  },
-                  decoration: InputDecoration(
-                    labelText: l10n.chatPageEntranceListThisDevice,
-                    border: const OutlineInputBorder(),
-                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                    fillColor: Colors.white,
-                    counterText: '',
-                    suffixIcon: isEditing
-                        ? null
-                        : IconButton(
-                            tooltip: l10n.chatPageEdit,
-                            icon: const Icon(Icons.edit, size: 18),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => editing.value = true,
-                          ),
-                  ),
-                  // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
-                  // 同一个常量（这里的拦截不替代提交时的白名单校验）
-                  maxLength: kEntranceNameMaxLength,
-                  // 开始填写即清除警示（与向导输入框一致）
-                  onChanged: (_) {
-                    if (nameError.value != null) nameError.value = null;
-                  },
+              // 通道名称输入框：一打开即可编辑 + 有焦点（老板 2026-10-24：不再有
+              // 初始只读透明 + 编辑按钮的冻结态——与群组名称弹窗同款）
+              TextField(
+                controller: ctrl,
+                focusNode: nameFocus,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageEntranceListThisDevice,
+                  border: const OutlineInputBorder(),
+                  counterText: '',
                 ),
+                // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
+                // 同一个常量（这里的拦截不替代提交时的白名单校验）
+                maxLength: kEntranceNameMaxLength,
+                // 开始填写即清除警示（与向导输入框一致）
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
               ValueListenableBuilder<String?>(
                 valueListenable: nameError,
@@ -5212,10 +5415,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (_hasMultipleSpaces)
                 ValueListenableBuilder<bool>(
                   valueListenable: allSpaces,
+                  // horizontalInset 0：与上方输入框边缘对齐（AlertDialog 口径）
                   builder: (_, all, _) => LabeledCheckbox(
                     value: all,
                     label: l10n.settingsScopeAll,
                     onChanged: (v) => allSpaces.value = v,
+                    horizontalInset: 0,
                   ),
                 ),
             ],
@@ -5245,7 +5450,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
       nameError.dispose();
-      editing.dispose();
       nameFocus.dispose();
       allSpaces.dispose();
     });
@@ -5389,12 +5593,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 18),
-                    child: Center(
-                      child: Text(l10n.chatPageMenuMyProfile,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: scheme.onSurface)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
+                          child: Text(l10n.chatPageMenuMyProfile,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: scheme.onSurface)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          child: SheetCloseButton(tooltip: l10n.close),
+                        ),
+                      ],
                     ),
                   ),
                   Row(
@@ -5585,9 +5798,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final ctrl = TextEditingController(text: _myMemberName);
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
-    // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
-    final editing = ValueNotifier<bool>(false);
-    // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
+    // 名称输入框焦点：一打开就取焦（老板 2026-10-24：直接可编辑，不再有
+    // 初始只读+编辑按钮的冻结态——与群组名称弹窗同款）
     final nameFocus = FocusNode();
     // 作用域勾选（老板 2026-10-15）：勾选＝这次改名同步到本机所有秘境（服务端
     // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
@@ -5606,47 +5818,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-              // 白底可编辑、按钮消失（老板要求 2026-09-09）。
-              // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
-              // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
-              ValueListenableBuilder<bool>(
-                valueListenable: editing,
-                builder: (_, isEditing, _) => TextField(
-                  controller: ctrl,
-                  focusNode: nameFocus,
-                  readOnly: !isEditing,
-                  onTap: () {
-                    if (editing.value) return;
-                    editing.value = true;
-                    nameFocus.requestFocus();
-                  },
-                  decoration: InputDecoration(
-                    labelText: l10n.chatPageRenameNameLabel,
-                    border: const OutlineInputBorder(),
-                    filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
-                    fillColor: Colors.white,
-                    // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
-                    // 弹窗里不必多一行；下面 maxLength 才是硬拦
-                    counterText: '',
-                    suffixIcon: isEditing
-                        ? null
-                        : IconButton(
-                            tooltip: l10n.chatPageEdit,
-                            icon: const Icon(Icons.edit, size: 18),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => editing.value = true,
-                          ),
-                  ),
-                  // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
-                  // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
-                  // （这里的拦截不替代提交时的白名单校验）。
-                  maxLength: kMemberNameMaxLength,
-                  // 开始填写即清除空名警示（与向导输入框一致）
-                  onChanged: (_) {
-                    if (nameError.value != null) nameError.value = null;
-                  },
+              // 名字输入框：一打开即可编辑 + 有焦点（老板 2026-10-24：不再有
+              // 初始只读透明 + 编辑按钮的冻结态——与群组名称弹窗同款）
+              TextField(
+                controller: ctrl,
+                focusNode: nameFocus,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageRenameNameLabel,
+                  border: const OutlineInputBorder(),
+                  // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
+                  // 弹窗里不必多一行；下面 maxLength 才是硬拦
+                  counterText: '',
                 ),
+                // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
+                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
+                // （这里的拦截不替代提交时的白名单校验）。
+                maxLength: kMemberNameMaxLength,
+                // 开始填写即清除空名警示（与向导输入框一致）
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
               ValueListenableBuilder<String?>(
                 valueListenable: nameError,
@@ -5670,10 +5862,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (_hasMultipleSpaces)
                 ValueListenableBuilder<bool>(
                   valueListenable: allSpaces,
+                  // horizontalInset 0：与上方名字输入框边缘对齐（AlertDialog 口径）
                   builder: (_, all, _) => LabeledCheckbox(
                     value: all,
                     label: l10n.settingsScopeAll,
                     onChanged: (v) => allSpaces.value = v,
+                    horizontalInset: 0,
                   ),
                 ),
             ],
@@ -5737,7 +5931,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
       nameError.dispose();
-      editing.dispose();
       nameFocus.dispose();
       allSpaces.dispose();
     });
@@ -6736,6 +6929,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   已不可靠——复杂度失控，干脆墓碑不提供任何菜单入口）。
   bool _messageHasActions(HistoryMessage m) => !m.deleted;
 
+  /// 是否可转写（长按菜单「转写」卡的显示条件；与自动入队 filter 同口径）：
+  /// **仅语音消息**（任意容器）。音频文件消息不给（老板 2026-10-26：音频很
+  /// 可能不是语音、也可能超 60s——不自动转写、无提示、菜单无转写项）；此前
+  /// wav 音频文件也给转写，sherpa 与服务端虽只吃 PCM16 wav，但语义上文件类
+  /// 消息不该进语音转写。
+  bool _voiceTranscriptEligible(HistoryMessage m) =>
+      m.attachment != null && m.env.type == 'voice';
+
   /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
   /// [_messageHasActions]）：自己消息 + 以下其一——
   /// - 已有 serverSequence：服务端已收下、且**纯粹单勾**——还没有任何人收到
@@ -6758,89 +6959,40 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         0;
   }
 
-  Future<void> _showMessageActions(HistoryMessage m) async {
+  /// 消息操作菜单（老板 2026-10-24 改版）：**锚定气泡的浮层**——在气泡上方或下方
+  /// 打开（按气泡在屏幕中的位置自动选），不再从底部弹出。微信同款交互：菜单出现在
+  /// 原消息旁，用户视线不用跳，也不再需要顶部的消息预览行。
+  ///
+  /// - [bubbleCtx] 必须是**气泡子树内**的 context（长按回调传消息气泡的 context），
+  ///   用它拿 RenderBox 全局坐标：垂直方向按上/下方剩余空间选边，都放得下时选
+  ///   上方（微信习惯）；水平方向跟随气泡侧（我的靠右、对方靠左），与消息流对齐。
+  /// - 走 [PopupRoute] 而非 showModalBottomSheet：barrier 点击关闭、缩放淡入
+  ///   动画从锚点方向进入；route 仍要守 _waitRouteHandoff 衔接规则（点「引用」
+  ///   等动作后 menuAction 错峰）。
+  Future<void> _showMessageActions(
+    HistoryMessage m, {
+    required Offset anchorGlobal,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
-            // 老板要求 2026-09-10）；底色与被引消息的引用块同款浅灰，代替原来
-            // 的分隔横线（老板要求 2026-09-13）。
-            // 墓碑消息不展示内容（已删/已焚毁）：改一条灰字占位（老板 2026-10-10
-            // 起墓碑也可开菜单——只剩撤回一项）
-            m.deleted ? _tombstoneMenuPlaceholder() : _buildMessagePreviewRow(m, ctx),
-            // 操作项改为圆角方形卡片（图标 + 文字），不再是列表式 ListTile
-            // （老板要求 2026-09-13）
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: _buildActionCardGrid([
-                // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除
-                // 均无意义；删除本来也是打本地墓碑，已做了）
-                if (m.deleted) ...[
-                  _buildActionCard(
-                    icon: Icons.undo_outlined,
-                    label: l10n.chatPageActionRecall,
-                    onTap: () => Navigator.of(ctx).pop('recall'),
-                  ),
-                ] else ...[
-                  _buildActionCard(
-                    icon: Icons.format_quote,
-                    label: l10n.chatPageActionQuote,
-                    onTap: () => Navigator.of(ctx).pop('quote'),
-                  ),
-                  // 文字消息才有「拷贝」（媒体消息无文本可拷）
-                  if (m.env.type == 'text')
-                    _buildActionCard(
-                      // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
-                      // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
-                      // 与邻居光学对齐
-                      icon: Icons.copy_outlined,
-                      iconSize: 24,
-                      label: l10n.chatPageCopy,
-                      onTap: () => Navigator.of(ctx).pop('copy'),
-                    ),
-                  // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
-                  // 存到本机（系统保存对话框选位置）；放「引用」后面
-                  if (m.attachment != null)
-                    _buildActionCard(
-                      icon: Icons.save_alt,
-                      label: l10n.chatPageActionSave,
-                      onTap: () => Navigator.of(ctx).pop('save'),
-                    ),
-                  // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-                  _buildActionCard(
-                    icon: Icons.timer_outlined,
-                    label: l10n.chatPageActionBurn,
-                    onTap: () => Navigator.of(ctx).pop('burn'),
-                  ),
-                  // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——
-                  // 服务端按 delivered 高水位原子判定，客户端只做**粗筛**减少
-                  // 无效入口（最终判定的权威在服务端 409）。放「删除」之后：
-                  // 撤回实质上比删除更重（删自己的还让别人收不到；2026-10-11）。
-                  // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
-                  _buildActionCard(
-                    icon: Icons.delete_outline,
-                    label: l10n.chatPageActionDelete,
-                    onTap: () => Navigator.of(ctx).pop('delete'),
-                  ),
-                  if (_messageRecallable(m))
-                    _buildActionCard(
-                      icon: Icons.undo_outlined,
-                      label: l10n.chatPageActionRecall,
-                      onTap: () => Navigator.of(ctx).pop('recall'),
-                    ),
-                ]
-              ]),
-            ),
-          ],
-        ),
-      ),
-    );
+    // 锚点 = **按点的全局坐标**（老板 2026-10-24 定稿）：按点必在气泡内，菜单
+    // 边缘贴按点弹出 → 必然压住气泡一部分，其余部分露出橘黄选中高亮——微信同款
+    // "菜单长在消息上"。不再爬 RenderBox 祖先链：itemBuilder 的 context 挂在
+    // SliverList 层（RenderObject 是 RenderSliver），爬上去全是 viewport 级
+    // 容器、摸不到气泡（macOS 日志确诊 2026-10-24）。
+    final screen = MediaQuery.sizeOf(context);
+    final Rect anchor = Rect.fromPoints(anchorGlobal, anchorGlobal);
+    // 选中高亮（老板 2026-10-24，微信同款）：菜单打开期间该消息橘黄（#FF9800，
+    // 与跳转高亮同色同一判定口），菜单关闭即恢复。
+    setState(() => _menuTargetMessageId = m.env.messageId);
+    final action = await Navigator.of(context).push<String>(_MessageActionsPopupRoute(
+      anchor: anchor,
+      screen: screen,
+      menuBuilder: (ctx) =>
+          _buildActionCardGrid(_buildMessageActionCards(m, ctx, l10n)),
+    ));
+    if (mounted) {
+      setState(() => _menuTargetMessageId = null);
+    }
     if (!mounted) return;
     if (action == 'delete') {
       await _deleteMessage(m);
@@ -6859,15 +7011,93 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } else if (action == 'save') {
       await _saveAttachment(m);
+    } else if (action == 'transcribe') {
+      await _transcribeVoiceMessage(m);
     } else if (action == 'burn') {
       await _setMessageBurn(m);
     }
   }
 
+  /// 消息操作菜单的**动作卡片列表**（锚定浮层与底部弹层兜底共用；从
+  /// [_showMessageActions] 抽出——菜单内容与承载方式解耦）。
+  List<Widget> _buildMessageActionCards(
+      HistoryMessage m, BuildContext ctx, AppLocalizations l10n) {
+    return [
+      // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除均无意义；
+      // 删除本来也是打本地墓碑，已做了）
+      if (m.deleted) ...[
+        _buildMessageActionCard(
+          icon: Icons.undo_outlined,
+          label: l10n.chatPageActionRecall,
+          onTap: () => Navigator.of(ctx).pop('recall'),
+        ),
+      ] else ...[
+        _buildMessageActionCard(
+          icon: Icons.format_quote,
+          label: l10n.chatPageActionQuote,
+          onTap: () => Navigator.of(ctx).pop('quote'),
+        ),
+        // 文字消息才有「拷贝」（媒体消息无文本可拷）
+        if (m.env.type == 'text')
+          _buildMessageActionCard(
+            // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote 高一档
+            // （2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24 与邻居光学对齐
+            icon: Icons.copy_outlined,
+            iconSize: 24,
+            label: l10n.chatPageCopy,
+            onTap: () => Navigator.of(ctx).pop('copy'),
+          ),
+        // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件存到本机
+        // （系统保存对话框选位置）；放「引用」后面
+        if (m.attachment != null)
+          _buildMessageActionCard(
+            icon: Icons.save_alt,
+            label: l10n.chatPageActionSave,
+            onTap: () => Navigator.of(ctx).pop('save'),
+          ),
+        // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
+        _buildMessageActionCard(
+          icon: Icons.timer_outlined,
+          label: l10n.chatPageActionBurn,
+          onTap: () => Navigator.of(ctx).pop('burn'),
+        ),
+        // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——服务端按
+        // delivered 高水位原子判定，客户端只做**粗筛**减少无效入口（最终判定
+        // 的权威在服务端 409）。放「删除」之后：撤回实质上比删除更重（2026-10-11）。
+        // 两者都不标红（2026-10-11 老板：有确认弹窗把关，不必特殊显示）
+        _buildMessageActionCard(
+          icon: Icons.delete_outline,
+          label: l10n.chatPageActionDelete,
+          onTap: () => Navigator.of(ctx).pop('delete'),
+        ),
+        if (_messageRecallable(m))
+          _buildMessageActionCard(
+            icon: Icons.undo_outlined,
+            label: l10n.chatPageActionRecall,
+            onTap: () => Navigator.of(ctx).pop('recall'),
+          ),
+        // 语音转写（自动转写关闭时的唯一入口——没有行就没有行内提示，必须从
+        // 菜单进；自动开启时也可用它手动重转）。显示条件与自动入队同口径：语音
+        // 消息（任意容器）+ wav 音频文件。放**最后**（老板 2026-10-23）——
+        // 转写是音频专属的低频动作，不挡常用项。
+        if (_voiceTranscriptEligible(m))
+          _buildMessageActionCardWidget(
+            // 麦克风+文档自绘图标（老板 2026-10-24）：纯波形只有"语音"半边，
+            // 加上文档线条才是完整的"语音→文字"。显式橘黄（同菜单其他卡片，
+            // 自绘图标不吃 IconTheme）。
+            iconWidget: const TranscribeIcon(color: _kOrangeHighlight),
+            label: l10n.voiceTranscriptMenuTranscribe,
+            onTap: () => Navigator.of(ctx).pop('transcribe'),
+          ),
+      ],
+    ];
+  }
+
   /// 底部菜单操作项布局：圆角方形卡片，一行最多 4 个。总数不超过 4 个时等距
   /// 均匀铺开；超过 4 个时每行 4 个、向左对齐（老板要求 2026-09-13）。卡片宽度
   /// 以「一行 4 个」为基准计算并设上限，保证尺寸不随数量或屏幕宽度剧烈变化。
-  /// 长按消息菜单与输入栏「+」附件菜单共用。
+  /// 纯几何布局，消息长按菜单（橘黄卡片）与输入栏「+」附件菜单（素色卡片）
+  /// 两种弹层类型共用；将来某型要不同的排布再各自另起。
   Widget _buildActionCardGrid(List<Widget> cards) {
     const maxPerRow = 4;
     const spacing = 12.0;
@@ -6940,8 +7170,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 底部菜单的操作卡片：圆角方形，内含图标与文字；destructive 用红色标示
-  /// 删除等不可逆操作。长按消息菜单与输入栏「+」附件菜单共用。
+  /// 输入栏「+」附件菜单的操作卡片：圆角方形，内含图标与文字；destructive 用
+  /// 红色标示删除等不可逆操作。图标随主题（素色）——消息长按菜单另用橘黄版
+  /// [_buildMessageActionCard]（2026-10-27 起两种菜单分开两种类型）。
   /// [iconSize] 供字形偏高的图标（如 copy_outlined 竖向占 20/24）单独缩小，
   /// 与邻居图标光学对齐（2026-10-08）；缺省 26 与原尺寸一致。
   Widget _buildActionCard({
@@ -6950,6 +7181,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required VoidCallback onTap,
     bool destructive = false,
     double iconSize = 26,
+  }) {
+    return _buildActionCardWidget(
+      iconWidget: Icon(icon, size: iconSize),
+      label: label,
+      onTap: onTap,
+      destructive: destructive,
+    );
+  }
+
+  /// 自定义 widget 图标版操作卡片（[_buildActionCard] 的泛化）：给自绘图标用
+  /// （如「语音转写」的麦克风+文档 [TranscribeIcon]，IconData 表达不了）。
+  /// 只服务「+」附件菜单；消息长按菜单的卡片是另一套 [_MessageActionCardTile]
+  /// （2026-10-27 起两种菜单分开两种类型、各自演化）。
+  Widget _buildActionCardWidget({
+    required Widget iconWidget,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
   }) {
     final foreground = destructive ? Colors.red.shade400 : null;
     return Material(
@@ -6963,7 +7212,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: iconSize, color: foreground),
+              IconTheme.merge(
+                data: IconThemeData(color: foreground),
+                child: iconWidget,
+              ),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -6979,151 +7231,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 长按菜单顶部的消息预览行：发言人头像 + 按性别气泡风格的正文。
-  /// 正文单行截断不溢出（老板要求 2026-09-10）；头像左右位置与消息流一致
-  /// （我的在右、对方在左）；附件消息无正文时显示消息类型作占位。语音/音频文件
-  /// 消息直接复用消息流的音频条（播放键 + 波形 + 时长，可点按播放/停止，
-  /// 老板要求 2026-09-13）。
-  /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
-  /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
-  /// 2026-09-10 修复）。
-  ///
-  /// [sheetCtx] = 菜单弹层自己的 BuildContext：点头像开个人资料页时要先把它
-  /// 收起（见下方 openProfile 的 route 交接注释）。
-  /// 长按菜单顶部占位行（墓碑消息专用，2026-10-10）：消息已删/已焚毁，
-  /// 不展示内容，只留一条淡灰说明——菜单里只剩「撤回」一项
-  Widget _tombstoneMenuPlaceholder() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        AppLocalizations.of(context)!.chatPageQuotedTombMessage,
-        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+  // ---------- 消息长按菜单的操作卡片（橘黄主题版，2026-10-27） ----------
+  // 两种菜单是两种弹层形态，卡片也分开两种类型、各自演化：
+  //  · 消息菜单 = 长按点锚定的浮窗（_MessageActionsPopupRoute，老板 2026-10-24
+  //    由底部弹层改来），卡片是 [_MessageActionCardTile]：橘黄淡底 + 橘黄图案
+  //    + 按压缩放——与被选中的橘黄气泡连成一气（老板 2026-10-27 要“更显眼、
+  //    更生动”）；
+  //  · 附件菜单 = 底部弹层，素色卡片（上面的 [_buildActionCard]），不跟消息
+  //    菜单的配色与动效走。
+  // 将来再有新形态的菜单设计，照这个分法另起一套 tile / builder，不互相牵连。
+
+  /// 消息长按菜单专用操作卡片：结构同 [_buildActionCard]，视觉走
+  /// [_MessageActionCardTile]（橘黄主题，独立演化）。
+  /// [iconSize] 供字形偏高的图标单独缩小，同 [_buildActionCard]。
+  Widget _buildMessageActionCard({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+    double iconSize = 26,
+  }) {
+    return _buildMessageActionCardWidget(
+      iconWidget: Icon(icon, size: iconSize),
+      label: label,
+      onTap: onTap,
+      destructive: destructive,
     );
   }
 
-  Widget _buildMessagePreviewRow(HistoryMessage m, BuildContext sheetCtx) {
-    final mine = m.sender == 'me';
-    final avatarMemberId =
-        m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
-    // 头像点击（老板 2026-10-20）：开个人资料页——与消息气泡旁头像、群成员卡
-    // 同一批入口。我的 → 「我的资料」弹层；别人的 → 对方资料页；memberId
-    // 解析不出（旧消息 + 通道映射也没兜到）时不猜：头像不可点。
-    // 先收菜单、错峰 300ms 再开弹层——紧接着 showModalBottomSheet 会让两条
-    // route 在 Overlay 里交叉卸载（见 _waitRouteHandoff，与成员弹层同款）。
-    final VoidCallback? openProfile;
-    if (mine) {
-      openProfile = () {
-        Navigator.of(sheetCtx).pop();
-        _menuAction(_showMyProfileSheet);
-      };
-    } else if (avatarMemberId != null) {
-      openProfile = () {
-        Navigator.of(sheetCtx).pop();
-        _menuAction(() => _showMemberProfileSheet(avatarMemberId));
-      };
-    } else {
-      openProfile = null;
-    }
-    final preview = m.plaintext.trim();
-    // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长（+ 音频文件的
-    // 文件名一行），可点按播放（老板要求 2026-09-13）；文件消息**复用消息流那张
-    // 文件名片**（图标 + 文件名 + 尺寸，老板 2026-09-27），整块可点打开。
-    // 其余类型沿用单行文本（空正文显示类型占位）。
-    final Widget bubbleContent;
-    switch (m.env.type) {
-      case 'voice':
-      case 'audio':
-        bubbleContent =
-            _buildAudioBar(m, waveformWidth: 88, foreground: _mediaForegroundOnBubble);
-        break;
-      case 'image':
-        bubbleContent = _buildImageThumb(m, size: 48);
-        break;
-      case 'video':
-        bubbleContent = _buildVideoThumb(m, size: 48);
-        break;
-      case 'system':
-        // 通话记录：明文为空，内容在 meta 里——复用消息流那条的渲染
-        bubbleContent = _buildSystemHint(m);
-        break;
-      case 'file':
-        // 与音频条同一套：直接用消息流那张**文件名片**（图标 + 文件名 + 尺寸），
-        // 整块可点 = 用系统应用打开（老板 2026-09-27）。不再自己拼一个"图标 + 文件名"
-        // 的只读行——那样既跟气泡长得不一样，点了也没反应。
-        bubbleContent = _buildFileCard(m, foreground: _mediaForegroundOnBubble);
-        break;
-      default:
-        bubbleContent = Text(
-          preview.isEmpty ? m.env.type : preview,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          // 预览条背景色已清空（老板 2026-09-15 试用效果：去掉浅灰底，只留气泡本身）。
-          // 弹窗始终跟随浅色主题，不随 gradient 气泡风格变白。
-          color: Colors.transparent,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            key: const ValueKey('messagePreviewRow'), // 测试断言对齐用（项目惯例）
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment:
-                mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-            children: [
-              if (!mine) ...[
-                _MessageAvatar(
-                    memberId: avatarMemberId,
-                    server: effectiveServer,
-                    api: widget.api,
-                    // 点别人的头像 = 开他的资料页（老板 2026-10-20）
-                    openFullscreenOnTap: false,
-                    onTap: openProfile),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    // 与消息流一致：按发言人性别配色（男天蓝 / 女品牌粉）
-                    color: _bubbleColor(mine: mine),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DefaultTextStyle.merge(
-                    style: TextStyle(
-                      color: _uiStyle == 'gradient' ? Colors.white : null,
-                      fontSize: 14,
-                    ),
-                    child: bubbleContent,
-                  ),
-                ),
-              ),
-              if (mine) ...[
-                const SizedBox(width: 8),
-                // 点我的头像 = 开「我的资料」弹层（老板 2026-10-20）
-                _MessageAvatar(
-                    memberId: avatarMemberId,
-                    server: effectiveServer,
-                    api: widget.api,
-                    openFullscreenOnTap: false,
-                    onTap: openProfile),
-              ],
-            ],
-          ),
-        ),
-        // 预览条底部的淡灰分隔线（老板 2026-09-15：底色清空后用线与菜单项分层）
-        const Divider(height: 1, thickness: 0.5, color: Color(0x14000000)),
-      ],
+  /// 自绘图标版（[_buildMessageActionCard] 的泛化）：[iconWidget] 自带显式
+  /// color 时不吃 IconTheme（如 [TranscribeIcon]），由调用方直接给橘黄。
+  Widget _buildMessageActionCardWidget({
+    required Widget iconWidget,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+  }) {
+    return _MessageActionCardTile(
+      iconWidget: iconWidget,
+      label: label,
+      onTap: onTap,
+      destructive: destructive,
     );
   }
 
@@ -7483,38 +7631,93 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  // ---------- 语音：点击麦克风切提示态 → 长按提示态录音条录音 → 松手预览（试听/取消）→ 发送 ----------
+  // ---------- 语音：点输入盒内合并图标切提示态 → 长按提示态录音条录音 → 松手预览（试听/取消）→ 发送 ----------
 
-  /// 语音入口按钮点击：文字态=切提示态；提示/预览态=回文字态；录音中无操作。
+  /// 输入盒内合并图标（麦克风+文档，Vocie transcription 同款自制图标）点击：
+  /// 文字态 ↔ 语音态互换（老板 2026-10-25）：
+  /// - 文字态且无保留录音 → 进**提示态**（不自动开录；长按录音条才开始录）；
+  /// - 文字态且有保留录音 → 直接回该录音的**预览态**（可直接用，见下方注释）；
+  /// - 录音中 → 停录并**保留**已录内容，回键盘（文字）态；
+  /// - 预览态 → 回键盘态，录音仍保留（再点本图标可直接用，或点 X 删除）。
   void _onVoiceEntryTap() {
+    // 首次录音的授权弹窗等待期间再点 = 作废本次启动（等价于旧的松手，
+    // 见 _startVoice / _stopVoice 里 _voiceStarting 的处理）
+    if (_voiceStarting) {
+      unawaited(_stopVoice());
+      return;
+    }
     if (_inputMode == _InputMode.text) {
       FocusManager.instance.primaryFocus?.unfocus();
-      setState(() => _inputMode = _InputMode.hint);
+      if (_recordingPath != null) {
+        // 已保留的录音（录音中/预览态切回键盘时留下的）：直接回预览态，
+        // 波形冻结、可试听/发送/X 删除——不用重新录（老板 2026-10-25）
+        setState(() => _inputMode = _InputMode.preview);
+      } else {
+        setState(() => _inputMode = _InputMode.hint);
+      }
     } else if (_inputMode == _InputMode.hint) {
       setState(() => _inputMode = _InputMode.text);
+    } else if (_inputMode == _InputMode.recording) {
+      // 录音中切回键盘：停录但保留内容
+      unawaited(_stopVoice(backToTextInput: true));
     } else if (_inputMode == _InputMode.preview) {
-      // 键盘键=放弃录音回文字输入（与发送键一致）；X 键才回录音等待态
-      unawaited(_cancelVoice(backToTextInput: true));
+      // 预览态切回键盘：录音保留（再点本图标可直接用）；X 键才删除回提示态
+      setState(() => _inputMode = _InputMode.text);
     }
-    // recording：手势在录音条上，入口按钮不可达，无操作
   }
 
-  /// 语音入口按钮图标：文字态=麦克风；提示/预览态=键盘；录音中=红色麦克风。
-  IconData _voiceEntryIcon() {
-    switch (_inputMode) {
-      case _InputMode.text:
-        return Icons.mic_none;
-      case _InputMode.hint:
-      case _InputMode.preview:
-        return Icons.keyboard_alt_outlined;
-      case _InputMode.recording:
-        return Icons.mic;
+  /// 合并图标颜色：**两态**（老板 2026-10-26：不再用青绿提示「语音模式里还
+  /// 留着一条录音」）——文字态=默认图标色，语音态（提示/录音中/预览）=标准青绿。
+  ///
+  /// 保留提示原先用 colorScheme.primary——fromSeed 派生的深蓝近黑，与默认灰
+  /// 难分辨（老板 2026-10-25）；随后老板要求提示态图标与「长按开始录音」文字
+  /// 一并统一青绿，即整个语音态都是标准青绿。
+  Color _inputModeToggleColor() {
+    if (_inputMode != _InputMode.text) {
+      return Colors.green;
     }
+    return Theme.of(context).colorScheme.onSurfaceVariant; // 与邻居 IconButton 默认色一致
+  }
+
+  /// 输入盒外观（老板 2026-10-25 合并图标入盒后的盒体）：**四态共用同一个
+  /// 外框**——尺寸/弧度/位置不变（弧度 [_kInputBoxCornerRadius]，左端半圆与合并
+  /// 图标的圆形热区贴齐）；描边四态统一用文字态的细描边（主题 enabledBorder
+  /// 浅粉）——旧实现语音态用灰/绿描边，与同色系底色几乎看不见，盒角与圆按钮
+  /// 分不出来（老板 2026-10-25 反馈）。聚焦加粗只发生在文字态（语音态输入框
+  /// 已失焦，恒为细描边）；描边画在盒内侧，外尺寸不随宽窄变化。
+  BoxDecoration _inputBoxDecoration() {
+    final theme = Theme.of(context).inputDecorationTheme;
+    final enabled = theme.enabledBorder ?? theme.border;
+    final side = _inputMode == _InputMode.text && _inputFocusNode.hasFocus
+        ? (theme.focusedBorder ?? enabled)
+        : enabled;
+    final border = side is OutlineInputBorder
+        ? Border.all(color: side.borderSide.color, width: side.borderSide.width)
+        : null;
+    final Color background;
+    if (_inputMode == _InputMode.recording) {
+      background = Colors.green.shade50; // 录音中：旧录音条的绿底
+    } else if (_inputMode == _InputMode.text) {
+      // 白底（老板 2026-10-25）：默认 transparent 会透出页面淡粉背景，
+      // 与语音态录音条的底色观感不一致
+      background = Colors.white;
+    } else {
+      background = Colors.grey.shade100; // 提示/预览态：旧录音条的灰底
+    }
+    return BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(_kInputBoxCornerRadius),
+      border: border,
+    );
   }
 
   Future<void> _startVoice() async {
-    // 预览态（刚录完、波形已冻结）不再开录：此时长按波形图/录音条什么也不做，
-    // 避免误触从头重录、冲掉刚录好的那条。只有前面的播放键和后面的 X 可点；
+    // 已在启动中（hasPermission / recorder.start 的 await 期间）：直接返回，
+    // 不重入——点按开录后连点两下，第二次会再启一次录音器（二次 start 抛错，
+    // 弹「录音启动失败」）。入口图标那条链路由 _onVoiceEntryTap 自己守卫。
+    if (_voiceStarting) return;
+    // 录音中/预览态（刚录完、波形已冻结）不再开录：此时长按波形图/录音条什么也不做，
+    // 避免误触从头重录、冲掉刚录好的那条。只有播放键、X、发送键和合并图标可点；
     // 点 X（_cancelVoice）回到等待录音的提示态，就又能长按开录了
     // （老板要求 2026-09-13）。
     if (_inputMode == _InputMode.recording || _inputMode == _InputMode.preview) {
@@ -7524,7 +7727,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     FocusManager.instance.primaryFocus?.unfocus();
     _voiceStarting = true;
     try {
-      // 重新录音（预览态再长按）：先清掉上一次未发送的临时文件
+      // 重新录音（提示态再长按）：先清掉上一次未发送的临时文件
       final old = _recordingPath;
       if (old != null) {
         final of = File(old);
@@ -7536,6 +7739,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (_playingMessageId != null) _playingMessageId = null;
       if (_audioStartedMessageId != null) _audioStartedMessageId = null;
       await _player?.stop();
+      // 清扫孤儿临时录音：录音中 app 被杀（热重启/闪退）会留下没人停的
+      // einz_voice_*.wav——上次那条 data=0 的断录文件就是这样泄漏的，之后
+      // 每次进聊天页自动补转写都崩。此刻必然没有录音在跑（上面 inputMode
+      // 守卫），tmp 里所有前缀匹配的文件都是残骸，直接删。
+      try {
+        final tmp = Directory.systemTemp;
+        await for (final e in tmp.list()) {
+          if (e is File &&
+              e.path.contains('einz_voice_') &&
+              e.path.endsWith('.wav') &&
+              e.path != old) {
+            await e.delete().catchError((_) => e);
+          }
+        }
+      } catch (_) {
+        // 清扫失败不影响开录
+      }
       final recorder = (_recorder ??= AudioRecorder());
       // 安卓端 start() 不会自动申请 RECORD_AUDIO 运行时权限（manifest 静态声明
       // 不够，Android 6.0+ 需动态授权），必须先 hasPermission() 显式申请，
@@ -7547,10 +7767,40 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
       }
-      final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await recorder.start(const RecordConfig(), path: path);
-      // 上面 hasPermission() 等待授权弹窗期间用户可能已松手（_voiceStarting 已被
-      // _stopVoice 清掉）：此时录制已开但无人会再去停它，直接停掉并丢弃本次启动
+      // macOS 录音前把默认麦克风锁到整数 PCM 格式（2026-10-25 老板 iMac 实测修复）：
+      // iMac 重启后内置麦克风 HAL 默认 Float32，AVCaptureAudioFileOutput 的 WAV
+      // 写入链断（AudioFileCreateWithURL fmt? / startRecording -11805）→ 0 字节
+      // 文件 + 振幅流全静音 →「不出现波形图」+ 松手弹「录音内容为空」。Air 的
+      // 麦克风默认即整数 PCM，故同版本 debug 包在 Air 上一直能录。原生侧见
+      // macos/Runner/MainFlutterWindow.swift lockInputDeviceToIntegerPcm。
+      // 预锁失败（设备被独占等）不阻塞录音，行为同修复前。
+      if (Platform.isMacOS) {
+        try {
+          await const MethodChannel('einz.audio.input').invokeMethod(
+            'ensureIntegerFormat',
+            {'sampleRate': 16000, 'channels': 1},
+          );
+        } catch (_) {
+          // 忽略：预锁是尽力而为
+        }
+      }
+      // 16kHz 单声道 WAV（20261009_voiceTranscript.zhcn.md §8/§14-2，老板 2026-10-10 拍板）：
+      // 本地转写（sherpa readWave）只吃 PCM wav——m4a 无法转写；体积代价
+      // 60s≈1.9MB 可接受。旧版 m4a 语音消息照常播放（AAC 解码走系统），
+      // 只是转写入口会提示"旧格式不支持转写"。
+      final path =
+          '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.wav';
+      await recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      // 上面 hasPermission() 等待授权弹窗期间用户可能已松手/又点入口取消
+      // （_voiceStarting 已被 _stopVoice 清掉）：此时录制已开但无人会再去停它，
+      // 直接停掉并丢弃本次启动
       if (!_voiceStarting) {
         await recorder.stop();
         return;
@@ -7581,16 +7831,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_recordSeconds >= 60) _stopVoice();
       });
     } catch (e) {
+      // 启动失败也要清「启动中」标记（在 mounted 检查之前——它是状态不是 UI）：
+      // 否则上面的重入守卫会把之后每一次开录都挡掉
+      _voiceStarting = false;
       if (!mounted) return;
       _notice(context, AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'));
     }
   }
 
-  /// 松手 / 60s 到点：停录音 → 文件有效进预览态（不自动发送），空录音直接取消回输入框。
-  Future<void> _stopVoice() async {
+  /// 松手 / 点合并图标 / 60s 到点：停录音 → 文件有效进预览态（不自动发送）；
+  /// [backToTextInput]=true（录音中点合并图标切回键盘）→ 回文字态但**保留**录音
+  /// 内容，之后点合并图标可直接回预览态用；空录音直接取消回输入框。
+  Future<void> _stopVoice({bool backToTextInput = false}) async {
     if (_inputMode != _InputMode.recording) {
-      // 录音尚未真正开始（首次授权弹窗期间已松手）：只标记「本次启动作废」，
-      // _startVoice 在 recorder.start() 完成后看到标记会自行停掉并丢弃。
+      // 录音尚未真正开始（首次授权弹窗期间已松手/又点了入口）：只标记
+      // 「本次启动作废」，_startVoice 在 recorder.start() 完成后看到标记
+      // 会自行停掉并丢弃。
       _voiceStarting = false;
       return;
     }
@@ -7604,13 +7860,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       var ok = false;
       if (path != null) {
         final f = File(path);
-        ok = await f.exists() && await f.length() > 0;
+        // 只查「文件存在且 >0」不够：iOS 录音器空录/断录也会产出几 KB 的
+        // 头文件（JUNK/FLLR 填充块、data 块 0 字节），发出去对端转写即
+        // 触发 sherpa 原生除零 SIGFPE（2026-10-23「进聊天页必崩」的源头）。
+        // 必须验到 data 块确有音频字节才算有效录音。
+        ok = await f.exists() &&
+            await f.length() > 0 &&
+            VoiceTranscriptService.hasAudioData(path);
+        // macOS 录音器（AVCaptureAudioFileOutput）把标准 PCM16 录音写成
+        // WAVE_FORMAT_EXTENSIBLE 容器（2026-10-23 实测）：sherpa 本地转写
+        // 明确不支持该容器——落库加密前规范化为标准 PCM16 头，附件、转写、
+        // 播放三路同一形态（数据一个采样点不动）。
+        if (ok) VoiceTranscriptService.normalizeWavFile(path);
       }
       if (!mounted) return;
       // 空录音（权限被系统拒后仍可能走到这里）不再静默回文字态，给明确反馈
       if (!ok) _notice(context, AppLocalizations.of(context)!.chatPageVoiceEmpty);
       setState(() {
-        _inputMode = ok ? _InputMode.preview : _InputMode.text;
+        _inputMode = ok
+            ? (backToTextInput ? _InputMode.text : _InputMode.preview)
+            : _InputMode.text;
         if (!ok) _recordingPath = null;
       });
     } catch (e) {
@@ -7644,10 +7913,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
       await _sendAttachmentOptimistic(
         fileBytes: await f.readAsBytes(),
-        fileName: 'voice.m4a',
+        fileName: 'voice.wav',
         type: 'voice',
         caption: caption,
-        meta: {kMetaAudioDurationSeconds: _recordSeconds},
+        meta: {
+          kMetaAudioDurationSeconds: _recordSeconds,
+          // 旧客户端忽略未知 meta 键（payload.meta 设计就是向前兼容）；
+          // 新客户端据此把 voice 附件扩展名收敛为 wav（见 _voiceExtOf）
+          kMetaVoiceContainerWav: true,
+        },
       );
       await f.delete().catchError((_) => f);
       if (!mounted) return;
@@ -7666,16 +7940,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 预览态取消：删临时文件。默认回到**等待录音的提示态**（再长按即可重录，
-  /// 老板要求 2026-09-13）；[backToTextInput]=true 时回文字输入框（点键盘键/发送）。
-  Future<void> _cancelVoice({bool backToTextInput = false}) async {
+  /// 预览态取消（X 图标）：删临时文件，回到**等待录音的提示态**（再长按即可
+  /// 重录，老板要求 2026-09-13；单点入口图标则回文字输入框）。
+  Future<void> _cancelVoice() async {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
     _previewPlaying = false;
     await _player?.stop();
     if (!mounted) return;
     setState(() {
-      _inputMode = backToTextInput ? _InputMode.text : _InputMode.hint;
+      _inputMode = _InputMode.hint;
       _recordingPath = null;
       _recordSeconds = 0; // 提示态是干净的起点，不该留着上一次的秒数
       _voiceSamples.clear();
@@ -7686,6 +7960,140 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 预览态长按波形图（老板 2026-10-25）：**按 Mode 路由**（与气泡消息转写
+  /// 同口径，老板 2026-10-25 要求）——本地方式先把模型备好（未就绪 → 弹准备
+  /// 对话框；安装/探活出错 → 弹层内显示错误，不走通知条）；服务端方式不需要
+  /// 本机模型，直接弹层（服务端未启用的话进去再按既定语义回落本地、现场备
+  /// 模型）。转写执行器见 [_transcribePreviewAudio]，弹层见
+  /// [_PreviewTranscribeSheet]（关层后未轮到的转写会跳过，见 cancelled 旗标）。
+  Future<void> _transcribePreviewRecording() async {
+    final path = _recordingPath;
+    if (path == null || _inputMode != _InputMode.preview) return;
+    // 准备阶段的错误（null=无错）：用户取消也走这条路（error 仍为 null，见
+    // _prepareVoiceModel 约定）——取消是用户本意，不出弹层也不出通知
+    String? prepError;
+    // 仅**本地方式**需要 upfront 备模型；服务端方式进弹层再走服务端（未启用
+    // 才回落本地、现场备模型——见 _transcribePreviewAudio）
+    if (_voiceTranscriptEngine != 'server') {
+      try {
+        if (!await VoiceTranscriptModel.isReady()) {
+          final prep = await _prepareVoiceModel();
+          if (!prep.ok) {
+            prepError = prep.error;
+            if (prepError == null || !mounted) return; // 用户取消：到此为止
+          }
+        }
+      } catch (e) {
+        // isReady() 探活本身出错（极少见）：同安装失败口径，进弹层显示
+        prepError = '$e';
+      }
+    }
+    // 准备期间用户可能已切走（取消录音/切回文字/重录）：路径失效就不再弹层
+    if (!mounted || _inputMode != _InputMode.preview || _recordingPath != path) {
+      return;
+    }
+    // 关层旗标（Cancel/点层外/下滑三条路都算）：showModalBottomSheet 的 future
+    // 在退场动画结束后才完成——这之前轮到转写的话照跑（结果照样因
+    // mounted=false 丢弃，见 _PreviewTranscribeSheet._transcribe）；之后轮到的
+    // 由 transcribeFile 的 cancelled 检查跳过不跑（别白占 isolate）。
+    // Apply 也会走到这里置位，但那时转写早已跑完，无副作用。
+    var sheetDismissed = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      // 长转写文本可撑高：弹层限高内部滚动（见 _PreviewTranscribeSheet）
+      isScrollControlled: true,
+      builder: (_) => _PreviewTranscribeSheet(
+        transcribe: _transcribePreviewAudio,
+        path: path,
+        prepError: prepError,
+        cancelled: () => sheetDismissed,
+        engine: _voiceTranscriptEngine,
+        onApply: _applyPreviewTranscript,
+      ),
+    );
+    sheetDismissed = true;
+  }
+
+  /// 预览态录音的转写执行器（按 Mode 路由，老板 2026-10-25：预览态长按转写
+  /// 与气泡消息转写同口径）：
+  /// - `server` → 服务端 whisper（[_transcribePreviewViaServer]）；未启用
+  ///   （disabled，notice 已出）→ 按 §15.1 ③ 既定回落语义落穿本地；
+  /// - `local` → 本机 sherpa（[VoiceTranscriptService.transcribeFile]，串行
+  ///   队列；本地方式开弹层前已备好模型，这里只在服务端回落时才现场备）。
+  /// 取消/失败抛错，由弹层内容区显示（转写链路的失败信息统一进弹层）。
+  Future<(String, String)> _transcribePreviewAudio(String path,
+      {bool Function()? cancelled}) async {
+    if (_voiceTranscriptEngine == 'server') {
+      final r = await _transcribePreviewViaServer(path);
+      if (r.outcome == _ServerTranscriptOutcome.done) return (r.text, '');
+      if (r.outcome == _ServerTranscriptOutcome.failed) {
+        throw StateError(r.error);
+      }
+      // disabled：notice 已出，落穿到本地（既定回落语义）
+    }
+    if (!await VoiceTranscriptModel.isReady()) {
+      final prep = await _prepareVoiceModel();
+      if (!prep.ok) throw StateError(prep.error ?? 'cancelled');
+    }
+    final transcriber = _transcriber ??= VoiceTranscriptService(_voiceDb);
+    return transcriber.transcribeFile(path, cancelled: cancelled);
+  }
+
+  /// 预览态录音的**服务端**转写（老板 2026-10-25：预览态长按转写遵 Mode
+  /// 设置）：本地 wav 明文归一化后 `POST /transcriptions`，服务端 whisper.cpp
+  /// 即转即删。**不落库、无 messageId**——录音还没成为消息，转写表里没有它的
+  /// 位置；结果直接回给弹层显示（与消息路径的 done/failed 行无关）。
+  ///
+  /// 返回 (outcome, text, error)：done=成功（text=转写文本）；failed=失败
+  /// （error=服务端错误原话，调用方抛进弹层显示）；disabled=服务端未启用
+  /// （503 TRANSCRIBE_DISABLED，notice 已出，调用方按既定语义回落本地）。
+  Future<({_ServerTranscriptOutcome outcome, String text, String error})>
+      _transcribePreviewViaServer(String path) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      // 上送前归一化（与消息路径同口径；_stopVoice 已规范化过，幂等快路径）
+      final wav = VoiceTranscriptService.normalizeWavBytes(
+          await File(path).readAsBytes());
+      final r = await _withAuth(
+          (t) => (widget.api ?? ApiClient(effectiveServer)).transcribeWav(
+                wav: wav,
+                token: t,
+              ));
+      return (outcome: _ServerTranscriptOutcome.done, text: r.text, error: '');
+    } catch (e) {
+      if (e is ApiException && e.code == 'TRANSCRIBE_DISABLED') {
+        if (mounted) {
+          _notice(context, l10n.voiceTranscriptServerDisabled);
+        }
+        return (outcome: _ServerTranscriptOutcome.disabled, text: '', error: '');
+      }
+      return (outcome: _ServerTranscriptOutcome.failed, text: '', error: '$e');
+    }
+  }
+
+  /// 转写对话框 Apply（老板 2026-10-25）：把转写文字追加到输入框现有文字的
+  /// 最后（原有文字非空时以一个空格分隔），切回文字输入态，并**清除原录音**
+  /// （删临时文件、清波形/秒数——录音内容已转成文字落进输入框，不再保留；
+  /// 老板 2026-10-25 定）。图标随之回到默认色（无保留录音）。
+  Future<void> _applyPreviewTranscript(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isNotEmpty) {
+      final old = _input.text;
+      final merged = old.isEmpty ? trimmed : '$old $trimmed';
+      _setInputValue(merged, merged.length);
+    }
+    final path = _recordingPath;
+    setState(() {
+      _inputMode = _InputMode.text;
+      _recordingPath = null;
+      _recordSeconds = 0;
+      _voiceSamples.clear();
+    });
+    if (path != null) {
+      final f = File(path);
+      if (await f.exists()) await f.delete().catchError((_) => f);
+    }
+  }
   /// 预览态试听：点播放/暂停切换（与消息播放互斥）。
   Future<void> _playVoicePreview() async {
     final path = _recordingPath;
@@ -7712,81 +8120,246 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 最近 [n] 个波形采样（录音中滚动窗口，预览态冻结尾部）。
-  List<double> _voiceLastSamples(int n) =>
-      _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
+  /// 语音态输入区**内容**：三态共用同一套白胶囊外壳（[_voiceCapsule]），只是
+  /// 填的东西不同——提示态=「点按或长按开始录音」；录音中=停止提示+实时波形+
+  /// 读秒；预览态=播放键+波形（可试听/长按转写）+盒外关闭钮。
+  ///
+  /// 圆角盒/底色/描边由输入盒 Container 统一给出（见 [_inputBoxDecoration]），
+  /// 合并图标也在盒内左侧原位；本方法只填盒内右侧，高度由外层 Positioned.fill
+  /// 铺满（与文字输入框同高）。
+  ///
+  /// **手势挂在胶囊上**、不再挂外层整条（老板 2026-10-26）：遮罩轮廓与胶囊像素
+  /// 级重合，不会出现「胶囊外还有一圈能点/能变色」的边。
+  Widget _buildVoiceBarContent() {
+    if (_inputMode == _InputMode.recording) return _buildRecordingBar();
+    if (_inputMode == _InputMode.preview) return _buildPreviewBar();
+    return _buildHintBar();
+  }
 
-  /// 录音条（覆盖在文字输入框上）：提示态=「长按开始录音」文字（无波形）；
-  /// 录音中=实时波形+计时；预览态=冻结波形+试听/取消。
-  /// 由外部 Stack 给定与输入框完全一致的行高（移除固定高度，随约束填充）。
-  Widget _buildVoiceBar() {
-    final recording = _inputMode == _InputMode.recording;
-    final preview = _inputMode == _InputMode.preview;
-    // 录音上限 60s：左侧直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
-    final elapsed = _recordSeconds.toString().padLeft(2, '0');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: recording ? Colors.green.shade50 : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: recording ? Colors.green.shade200 : Colors.grey.shade300),
+  /// 白胶囊外壳（三态共用）：高 = 盒高-2px（上下各留 1px，避免盖住盒的 1px
+  /// 描边）、半径 = 半高（两端标准半圆）、白底从盒底色里浮出。
+  ///
+  /// 传了 [onTap] / 长按回调时，胶囊自身就是交互层：遮罩用 app 标准浅色面档
+  /// 10%/14%（白底浮在灰/绿盒上，默认 5% 与盒底色几乎同色，悬浮时分不清）。
+  /// 调用方负责把它放进 Row 的 Expanded——宽度铺满、高度松到 46（Row 默认
+  /// 交叉轴 center，不会把它拉成盒高）。
+  Widget _voiceCapsule({
+    required Widget child,
+    EdgeInsets padding = EdgeInsets.zero,
+    GestureTapCallback? onTap,
+    GestureLongPressStartCallback? onLongPressStart,
+    GestureLongPressEndCallback? onLongPressEnd,
+  }) {
+    const height = _kVoiceCapsuleHeight;
+    final radius = BorderRadius.circular(height / 2);
+    Widget body = Padding(padding: padding, child: child);
+    if (onTap != null || onLongPressStart != null || onLongPressEnd != null) {
+      body = Clickable(
+        // opaque：胶囊整块参与命中（波形 CustomPaint 自身不吸收命中，
+        // deferToChild 包裸图形收不到手势）
+        behavior: HitTestBehavior.opaque,
+        // 遮罩半径=胶囊半径：悬浮/按压变色不溢形、与白底像素级重合
+        borderRadius: radius,
+        hoverAlpha: 0.10,
+        pressAlpha: 0.14,
+        onTap: onTap,
+        onLongPressStart: onLongPressStart,
+        onLongPressEnd: onLongPressEnd,
+        child: body,
+      );
+    }
+    return SizedBox(
+      height: height,
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: radius),
+        child: body,
       ),
-      child: recording
-          ? Row(
+    );
+  }
+
+  /// 录音中：停止提示 + 实时波形 + 读秒（整条可点停，也可长按后松手停）。
+  /// 停止提示放**左**、读秒放**右**（老板 2026-10-26）：原先停止钮在最右，与
+  /// 预览态关闭钮（X）同位置——连点两下停录，第二下会落到刚出现的 X 上，把刚
+  /// 录好的音频删掉；换位后右端是不可点的秒数，落点最多是播放区（无害）。
+  Widget _buildRecordingBar() {
+    // 录音上限 60s：直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
+    final elapsed = _recordSeconds.toString().padLeft(2, '0');
+    return Row(
+      children: [
+        Expanded(
+          child: _voiceCapsule(
+            padding: const EdgeInsets.only(left: 6, right: 14),
+            onTap: () => unawaited(_stopVoice()),
+            onLongPressStart: (_) => _startVoice(),
+            onLongPressEnd: (_) => _stopVoice(),
+            child: Row(
               children: [
+                // 停止图标只是提示：整条都能点停，故不挂 onPressed——内层挂
+                // InkWell 会赢手势竞技场，把胶囊的按压变色顶成圆形水波纹
+                // （与预览态播放图标同一处理）。绿色与播放/停止图标同族，
+                // 区别于预览态的灰色删除钮 X。
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(Icons.stop_circle, size: 22, color: Colors.green),
+                ),
+                const SizedBox(width: 4),
+                // 与预览态共用同一个渲染器（[_VoiceWaveform]，条宽 3/间距 2/高
+                // 28）：录音中取最新的一段从左往右排（slidingWindow）——两态
+                // 几何完全一致，切换时不会有尺寸跳变（长录音进预览会把整段
+                // 包络压进同一宽度，形状按语义变，不是渲染差异）。没有播放
+                // 进度，深浅两色都传绿——整条同色。
+                Expanded(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    return _VoiceWaveform(
+                      playing: false,
+                      durationSeconds: _recordSeconds,
+                      samples: _voiceSamples,
+                      slidingWindow: true,
+                      width: constraints.maxWidth,
+                      activeColor: Colors.green,
+                      inactiveColor: Colors.green,
+                    );
+                  }),
+                ),
+                const SizedBox(width: 10),
                 Text(elapsed,
                     style: const TextStyle(
-                        color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _WaveformBars(
-                        samples: _voiceLastSamples(40), color: Colors.green)),
+                        color: Colors.green,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
               ],
-            )
-          : preview
-              ? Row(
-                  children: [
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 22,
-                      icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
-                          color: Theme.of(context).colorScheme.primary),
-                      onPressed: _playVoicePreview,
-                    ),
-                    Expanded(
-                      child: LayoutBuilder(builder: (context, constraints) {
-                        // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
-                        // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
-                        return _VoiceWaveform(
-                          playing: _previewPlaying,
-                          durationSeconds: _recordSeconds,
-                          samples: _voiceSamples,
-                          width: constraints.maxWidth,
-                          activeColor: Theme.of(context).colorScheme.primary,
-                          inactiveColor: Colors.grey.shade400,
-                        );
-                      }),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 22,
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                      onPressed: _cancelVoice,
-                    ),
-                  ],
-                )
-              : Row(
-                  // 提示态：文字说明版录音条（无波形），长按开始录音
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.mic, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 6),
-                    Text(
-                      AppLocalizations.of(context)!.chatPageLongPressToRecord,
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                    ),
-                  ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 预览态：播放胶囊（点=播放/停止、长按=即时转写）+ 盒外关闭钮。
+  /// 关闭钮留在胶囊外——删除是破坏性操作，不该混进「点哪都播放」的范围。
+  Widget _buildPreviewBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: _voiceCapsule(
+            padding: const EdgeInsets.only(left: 2, right: 8),
+            onTap: _playVoicePreview,
+            onLongPressStart: (_) => unawaited(_transcribePreviewRecording()),
+            child: Row(
+              children: [
+                // 播放/停止图标：纯图标不单独挂 onPressed——点击统一由胶囊
+                // 处理（内层挂 InkWell 会赢手势竞技场，反馈不统一）
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(
+                    _previewPlaying ? Icons.stop_circle : Icons.play_circle,
+                    size: 22,
+                    // 青绿=录音同款色（老板 2026-10-25）
+                    color: Colors.green,
+                  ),
                 ),
+                Expanded(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    // 波形按播放进度从左往右高亮（与气泡里的语音波形一致，
+                    // 老板 2026-09-13）：active=shade700 深青绿（已播+进度
+                    // 竖线）、inactive=shade200 浅青绿（未播静态）。
+                    // 波形上叠「长按转文字」提示（老板 2026-10-26）：落在波形
+                    // **上方**（不要压在中间），11px 淡青绿；**播放时淡出**
+                    // （200ms easeInOut）——播放时波形自己在「说话」，提示不抢
+                    // 注意力，停止/播完淡回。IgnorePointer 不吃手势，点播/长按
+                    // 仍归胶囊统一处理。
+                    //
+                    // 布局（老板 2026-10-26 收口）：Stack 撑满胶囊内高，波形
+                    // Center 垂直居中、文字 Align(topCenter) 贴顶。此前是
+                    // 「Padding 下移 2px + Transform 上移 12px」把文字画到 Stack
+                    // 边界外——靠 Stack「布局没溢出就不裁剪」侥幸成立，真出现
+                    // 布局溢出时文字会整块消失。现在位置由布局决定，没有负偏移。
+                    return SizedBox(
+                      height: _kVoiceCapsuleHeight,
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: _VoiceWaveform(
+                              playing: _previewPlaying,
+                              durationSeconds: _recordSeconds,
+                              samples: _voiceSamples,
+                              width: constraints.maxWidth,
+                              activeColor: Colors.green.shade700,
+                              inactiveColor: Colors.green.shade200,
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: IgnorePointer(
+                              child: AnimatedOpacity(
+                                opacity: _previewPlaying ? 0 : 1,
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeInOut,
+                                child: Text(
+                                  AppLocalizations.of(context)!
+                                      .chatPageLongPressToTranscribe,
+                                  style: TextStyle(
+                                    // 淡青绿=波形未播静态同款 shade200
+                                    color: Colors.green.shade200,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        // 关闭键在胶囊外：删除是破坏性操作，不该混进「点哪都播放」的范围
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          iconSize: 22,
+          splashRadius: 17, // 纯圆内切 34 按钮，不溢出成椭圆
+          icon: const Icon(Icons.close, color: Colors.grey),
+          onPressed: _cancelVoice,
+        ),
+        // 右侧 12 内距留在预览态（关闭钮不贴盒右沿）；提示/录音态的胶囊铺满
+        // 整个可点区，内距在各自内容里
+        const SizedBox(width: 12),
+      ],
+    );
+  }
+
+  /// 提示态：白胶囊 + 「点按或长按开始录音」（点按即开录，不必按住最长 60s）。
+  /// 胶囊铺满整个可点区（左起合并图标右缘、右到盒右沿），可点范围一眼可见
+  /// ——此前是裸文字，能点哪儿全靠猜。
+  Widget _buildHintBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: _voiceCapsule(
+            onTap: () => unawaited(_startVoice()),
+            onLongPressStart: (_) => _startVoice(),
+            onLongPressEnd: (_) => _stopVoice(),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.mic, size: 16, color: Colors.green),
+                  const SizedBox(width: 6),
+                  Text(
+                    AppLocalizations.of(context)!.chatPageLongPressToRecord,
+                    style: const TextStyle(color: Colors.green, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -7822,7 +8395,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _playingMessageId = m.env.messageId;
         _audioStartedMessageId = null; // 旧波形进度先复位
       });
-      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+      final ext = _voiceExtOf(m);
       // 与图片/视频一致走 [_attachmentBytes]：发送端优先用**本地密文**解密——
       // 上传还在传（没拿到 server_sequence）时文件本来就在本机，点了就该能播
       // （老板 2026-09-15）；此前这里直连 fetchAttachment 走网络 → 落"音频播放失败"
@@ -7881,6 +8454,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
+          // 无标题行、无关闭钮（老板 2026-10-27，与长按消息菜单统一）：两处
+          // 都靠「点弹层外」关闭，本弹层另有下滑关闭；关闭圆钮只留在设置类
+          // 弹层（我的通道/阅后即焚等），动作菜单不放。
           child: _buildActionCardGrid([
             // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
             if (_hasCameraCapture) ...[
@@ -8517,9 +9093,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 是否"留存"模式（附件明文长期留在本机）。
   bool get _storeAttachments => _attachmentStorage == 'stored';
 
-  /// 附件在长期目录里的扩展名（语音固定 m4a，其余按正文后缀）。
-  String _attachmentExtOf(HistoryMessage m) =>
-      m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+  /// 附件在长期目录里的扩展名（语音按 meta 收敛 wav/m4a，其余按正文后缀）。
+  String _attachmentExtOf(HistoryMessage m) => _voiceExtOf(m);
+
+  /// 语音（voice）附件扩展名：新录音带 `kMetaVoiceContainerWav` → wav；
+  /// 旧消息（无此键）→ m4a。非语音消息按明文后缀。转写/播放/留存目录
+  /// 四处共用此口径，避免新旧消息扩展名错配。
+  String _voiceExtOf(HistoryMessage m) {
+    if (m.env.type != 'voice') return _extOf(m.plaintext);
+    return m.meta?[kMetaVoiceContainerWav] == true ? 'wav' : 'm4a';
+  }
 
   /// 本机留存的明文副本（stored 模式且文件仍在）→ 直接读；否则 null。
   Future<File?> _storedFile(HistoryMessage m) async {
@@ -8547,6 +9130,103 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       } catch (_) {
         // 单个失败不影响其它（网络抖动/元数据未就绪）
       }
+    }
+    // 语音消息：明文已落盘 → 入本地转写队列（纯本地派生，无网络流量；
+    // 幂等——已有当前模型版本的有效转写会被服务跳过）
+    _enqueueVoiceTranscripts(msgs);
+  }
+
+  /// 语音/音频消息转写入队（§9）：明文音频走解密缓存的确定性路径（stored 模式
+  /// 长期目录 / 否则临时缓存），密文 sha256 取附件元数据（音频变化 → stale）。
+  /// 服务未就绪（如桌面未配模型）时 lazy 构造，行会落 `unavailable` 供手动入口。
+  ///
+  /// **自动转写开关（老板 2026-10-23 重构）**：关闭时（默认）本方法直接返回——
+  /// 什么都不自动做，用户经长按菜单「转写」逐条询问后执行（见
+  /// [_transcribeVoiceMessage]；省流量/上传）。开启时按**转写方式**路由：
+  /// `server` → 自动走上送（§15.2「全部语音自动转写仅在用户显式选择后生效」——
+  /// 显式选择即勾了自动 + 方式选服务端）；`local` → 自动走本地。
+  void _enqueueVoiceTranscripts(List<HistoryMessage> msgs) {
+    final voices = msgs
+        .where((m) =>
+            !m.deleted &&
+            m.attachment != null &&
+            // 仅语音消息入队（老板 2026-10-26：音频文件很可能不是语音/超 60s，
+            // 不做转写——自动、菜单、提示全不给，见 _voiceTranscriptEligible）。
+            // 旧 m4a 语音由 UI 明确提示"不支持转写"；音频文件一律不入队。
+            m.env.type == 'voice')
+        .toList();
+    if (voices.isEmpty) return;
+    if (!_voiceTranscriptAuto) return;
+    final serverAuto = _voiceTranscriptEngine == 'server';
+    unawaited(() async {
+      try {
+        for (final m in voices) {
+          // 逐条 try：单条失败（网络抖动/文件缺失）不影响其余消息
+          try {
+            if (serverAuto) {
+              await _autoServerVoiceTranscript(m);
+            } else {
+              await _enqueueLocalVoiceTranscript(m);
+            }
+          } catch (_) {
+            // 纯增强功能：单条失败静默
+          }
+        }
+        _updateAudioPlayback(() {}); // 状态变化 → 气泡下方转写区刷新
+      } catch (_) {
+        // 兜底（理论不可达）：不影响消息流
+      }
+    }());
+  }
+
+  /// 本地模型转写入队（自动路径与 server 回落、手动本机路径共用）：明文走解密
+  /// 缓存的确定性路径；service 内部串行 + 幂等（当前模型版本的有效 done 行不重算，
+  /// 模型未就绪落 `unavailable` 供手动入口）。
+  ///
+  /// [clearExisting]：先清旧行再入队——手动重转用（enqueue 对 done 幂等跳过，
+  /// failed/stale 行也要重算）；自动路径不用（service 自己判幂等）。
+  Future<void> _enqueueLocalVoiceTranscript(HistoryMessage m,
+      {bool clearExisting = false}) async {
+    if (clearExisting) {
+      await (_voiceDb.delete(_voiceDb.localVoiceTranscripts)
+            ..where((tbl) => tbl.messageId.equals(m.env.messageId)))
+          .go();
+    }
+    final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
+    final ext = _voiceExtOf(m);
+    // 明文缓存：stored 模式长期目录已由 _autoStore 落盘；否则确保缓存存在
+    final file = (_storeAttachments
+            ? await AttachmentStore.ensure(
+                widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m))
+            : null) ??
+        await MediaCache.ensure(
+            widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m));
+    t.enqueue(
+      messageId: m.env.messageId,
+      plainPath: file.path,
+      cipherSha256: (m.attachment!['sha256'] as String?) ?? '',
+    );
+  }
+
+  /// server 模式的**自动**转写（手动重转不走这——它无条件重转）：
+  /// - 旧 m4a 不上送：服务端只吃 PCM16 wav（PROTOCOL.md §6.3），上传必 400；
+  /// - 幂等：已有 done/pending 行不重转——防首屏历史页把旧语音全量上送（撞
+  ///   per-IP 10 次/小时限流桶），也防实时刷新重复触发；failed/stale/
+  ///   unavailable 才转；
+  /// - 服务端未启用（TRANSCRIBE_DISABLED）→ 回落本地模型（§15.1 ③既定回落
+  ///   语义；说明 notice 由 _serverVoiceTranscribe 出）。
+  Future<void> _autoServerVoiceTranscript(HistoryMessage m) async {
+    if (_voiceExtOf(m) != 'wav') return;
+    final existing = await (_voiceDb.select(_voiceDb.localVoiceTranscripts)
+          ..where((t) => t.messageId.equals(m.env.messageId)))
+        .getSingleOrNull();
+    if (existing != null &&
+        (existing.status == 'done' || existing.status == 'pending')) {
+      return;
+    }
+    final outcome = await _serverVoiceTranscribe(m);
+    if (outcome == _ServerTranscriptOutcome.disabled) {
+      await _enqueueLocalVoiceTranscript(m);
     }
   }
 
@@ -8800,7 +9480,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
-        return _buildAudioBar(m, foreground: _mediaForegroundOnBubble);
+        // inlineTranscribeEntry：手动模式（自动转写关）下，气泡里还没有转写行时
+        // 显示行内「转写」入口（老板 2026-10-23）；自动模式下转写无感发生，不需要。
+        return _buildAudioBar(m,
+            foreground: _mediaForegroundOnBubble,
+            inlineTranscribeEntry: !_voiceTranscriptAuto);
       case 'image':
         return _buildImage(m);
       case 'video':
@@ -8865,8 +9549,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 音频条：播放键 + 固定波形图 + 时长（录音只写秒数 `25s`，上限 60s；音频文件
   /// 用 h/m/s，零的部分省略）。音频文件**多一行文件名**，与波形左对齐（老板
-  /// 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；**整块**可点（含
-  /// 时长、文件名），不必非点中播放键（老板 2026-09-27）。
+  /// 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；**播放区整块**可点
+  /// （含时长、文件名），不必非点中播放键（老板 2026-09-27）；下方的转写区**不在**
+  /// 播放点击范围内，自带半透明面板底色与播放区区分（老板 2026-10-23）。
   ///
   /// 消息流气泡、长按菜单预览行、输入栏引用条、气泡里的引用块**共用这一个 widget**
   /// （老板 2026-09-27：这几处要一个样）。
@@ -8874,19 +9559,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   靠 ambient 主题必然有一处看不见（已踩过：菜单里图标变黑）。
   /// - [tappable] 为 false 时不挂整块点击：**气泡引用块的单击是"跳到原消息"**，不能
   ///   被"点哪都播放"抢掉；播放键本身仍可点（内层 IconButton 照旧）。
+  /// - [inlineTranscribeEntry]：仅消息流气泡传 true——手动模式下尚无转写行时在
+  ///   转写区显示行内「转写」入口（见 [_buildVoiceTranscriptLine]）。
   ///
   /// 外层监听播放状态版本：菜单在独立路由、页面 setState 重建不到它。
   Widget _buildAudioBar(
       HistoryMessage m,
       {double waveformWidth = 120,
       required Color foreground,
-      bool tappable = true}) {
+      bool tappable = true,
+      bool inlineTranscribeEntry = false}) {
     return ValueListenableBuilder<int>(
       valueListenable: _audioPlaybackVersion,
       builder: (context, _, child) => _buildAudioBarBody(m,
           waveformWidth: waveformWidth,
           foreground: foreground,
-          tappable: tappable),
+          tappable: tappable,
+          inlineTranscribeEntry: inlineTranscribeEntry),
     );
   }
 
@@ -8894,7 +9583,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       HistoryMessage m,
       {required double waveformWidth,
       required Color foreground,
-      required bool tappable}) {
+      required bool tappable,
+      bool inlineTranscribeEntry = false}) {
     // 附件元数据缺失（sync 竞态漏拉）：波形条是"假"的（按 messageId 画的装饰），
     // 会误导成可播放——改显示统一的「不可用·重试」行（2026-10-09）
     if (m.attachment == null) return _attachmentUnusable(m);
@@ -8936,65 +9626,449 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ],
     );
-    final Widget body;
-    if (isVoice) {
-      body = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [playButton, waveformRow],
-      );
-    } else {
-      // 音频文件：播放键独占左列，右边一列两行（老板 2026-09-27）——上行波形+时长、
-      // 下行文件名。**文件名与波形左对齐**靠这个"左列/右列"结构天然保证，不用
-      // 量播放键宽度再去凑缩进（之前那版第二行贴着气泡左边缘，跟播放键不齐）。
-      // 乐符图标已按老板要求删掉：文件名本身就是"这是一首歌"的最好说明。
-      body = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          playButton,
-          // Flexible 包住右列：它是这个 Row 里唯一的 flex 子项 → 拿到**有界**宽度
-          // （父给的上限减去播放键），里面那行文件名才会按 ellipsis 截断。
-          // 少了这一层，右列变成非 flex 子项、宽度**无界**，长歌名直接撑破气泡
-          // （老板 2026-09-27 实测四处都破）。
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                waveformRow,
-                // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
-                Row(
+    // 播放胶囊只包播放区（播放键+波形+时长[+文件名]，老板 2026-10-23：点转写区
+    // 不再触发播放）；转写行在外面，自带面板底色与独立点击语义（重试/行内入口）。
+    final Widget playArea = isVoice
+        ? Row(mainAxisSize: MainAxisSize.min, children: [playButton, waveformRow])
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              playButton,
+              // Flexible 包住右列：它是这个 Row 里唯一的 flex 子项 → 拿到**有界**宽度
+              // （父给的上限减去播放键），里面那行文件名才会按 ellipsis 截断。
+              // 少了这一层，右列变成非 flex 子项、宽度**无界**，长歌名直接撑破气泡
+              // （老板 2026-09-27 实测四处都破）。
+              Flexible(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    waveformRow,
+                    // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-    // 气泡引用块（[tappable] = false）：不挂整块点击，把单击让给外层的"跳到原消息"。
-    if (!tappable) return body;
-    // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长、文件名都在范围里
-    // （老板 2026-09-27，与图片"点消息本体就是看大图"对齐）。播放键保留（它仍能点）。
-    // behavior=opaque：否则容器自身不参与命中测试，只有子控件占的那几块能点——
-    // 播放键与波形之间的空隙、两行之间的空隙都会漏掉（文件卡片同理）。
-    return Clickable(
-      onTap: () => _playAudioMessage(m),
-      behavior: HitTestBehavior.opaque,
-      child: body,
+              ),
+            ],
+          );
+    final Widget playAreaTappable = tappable
+        ? Clickable(
+            // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长都在范围里
+            // （老板 2026-09-27）。behavior=opaque：否则容器自身不参与命中测试，
+            // 只有子控件占的那几块能点——播放键与波形之间的空隙会漏掉（文件卡片同理）。
+            onTap: () => _playAudioMessage(m),
+            behavior: HitTestBehavior.opaque,
+            child: playArea,
+          )
+        : playArea;
+    final Widget body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        playAreaTappable,
+        // 语音消息：波形行下方挂本地转写行（aimemo/20261009_voiceTranscript.zhcn.md §10——
+        // 仅消息流气泡有；纯音频文件消息挂 wav 转写行，非 wav 不占位）
+        // 手动模式（自动转写关）且还没有任何转写行时，转写行位置显示「图标+转写」
+        // 的行内入口（老板 2026-10-23）：点击直接按当前方式发起转写，入队后被
+        // pending/done 行顶替。转写行只在消息流气泡挂（inlineTranscribeEntry
+        // 由调用点控制），引用块/菜单预览的点击语义不同，不给。
+        _buildVoiceTranscriptLine(m,
+            manualEntry: isVoice && inlineTranscribeEntry),
+      ],
     );
+    return body;
   }
 
   /// 录音时长：只用秒（25s；录音上限 60s，老板要求 2026-09-13）。
   String _formatVoiceDuration(int totalSeconds) => '${totalSeconds}s';
+
+  /// 转写用的本地库：与页面其他数据同源（测试注入 [ChatPage.db]，生产用 shared）。
+  LocalDatabase get _voiceDb => widget.db ?? LocalDatabase.shared;
+
+  /// 语音气泡下方的本地转写行（aimemo/20261009_voiceTranscript.zhcn.md §10）：
+  /// - done → 转写文本（最多 3 行，可读性优先）；
+  /// - pending → 「转写中…」占位；
+  /// - failed / stale → 可点的「重新转写」入口（不露错误堆栈）；
+  /// - unavailable → 可点的「手动转写」入口（模型未就绪，点了也不报错）；
+  /// - **无行（还没入队/手动模式下尚未转写）**→ [manualEntry] 为 true 时显示
+  ///   「图标+转写」行内入口（老板 2026-10-23）：手动模式下没有行就没有任何
+  ///   可点的东西，用户得长按进菜单才能转写，太深；行内入口点击直接按当前
+  ///   方式发起转写，入队后被 pending/done 行顶替。图标跟随当前转写方式
+  ///   （云=服务端 / 芯片=本机），与各行首图标同一语义；
+  /// - 无行且 [manualEntry] 为 false（引用块/菜单预览/自动模式）→ 不占位。
+  /// - 所有状态行首都带来源图标（云=服务端 whisper / 芯片=本地 sense-voice）；
+  /// - 行样式**不随气泡前景色**（黑灰定色，见 builder 内注释）。
+  Widget _buildVoiceTranscriptLine(HistoryMessage m,
+      {bool manualEntry = false}) {
+    if (m.attachment == null) return const SizedBox.shrink();
+    // watch 单行：转写完成/状态变化时此行自动重建（细粒度刷新，不牵动整个消息列表）
+    return StreamBuilder<LocalVoiceTranscript?>(
+      stream: (_voiceDb.select(
+            _voiceDb.localVoiceTranscripts,
+          )
+                ..where((t) => t.messageId.equals(m.env.messageId)))
+              .watchSingleOrNull(),
+      builder: (context, snap) {
+        final t = snap.data;
+        // 转写区样式（老板 2026-10-23 定稿）：不用面板底色——半透明块与引用块
+        // 观感太像；改为**黑灰字体**（#3A3A3A），在渐变深气泡的彩色底上靠明度
+        // 反差区分（白色系=播放区，深灰=转写区），素雅浅气泡上也自然可读。
+        // app 只有浅色模式（main.dart 无 darkTheme），无需再分主题。
+        const transcriptColor = Color(0xFF3A3A3A);
+        final l10n = AppLocalizations.of(context)!;
+        const style = TextStyle(fontSize: 13, color: transcriptColor);
+        // 图标与文字的对齐（老板 2026-10-23）：图标放进 Text.rich 的 WidgetSpan
+        // （PlaceholderAlignment.middle）——对齐**所在行文字的垂直中线**：
+        // 单行即上下居中；多行（转写最多 3 行）图标钉在第一行、与首行文字居中。
+        // 之前是 Row + crossAxisAlignment.start，图标顶到行框顶部，对 13px 文字
+        // 视觉偏上（「排列不整齐」的来源）。
+        // 左缩进 8px（老板 2026-10-24）：与播放键图标左缘对齐——播放键是
+        // IconButton（compact 40px 盒、24px 图标居中 → 图标左缘距内容左边 8px），
+        // 转写行原先从 0 起排，向左突出 8px。
+        Widget line(String iconModelId, String text, {TextStyle? textStyle}) =>
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: _voiceTranscriptSourceIcon(
+                          iconModelId, transcriptColor),
+                    ),
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: SizedBox(width: 4),
+                    ),
+                    TextSpan(text: text, style: textStyle ?? style),
+                  ],
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            );
+        if (t == null) {
+          // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
+          // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
+          // 文案用「点按转写文字」（voiceTranscriptManual，老板 2026-10-23）——
+          // 比「转写」多一步动作提示；长按菜单卡片仍用短文案 voiceTranscriptMenuTranscribe。
+          // 不加下划线（老板 2026-10-23）：这不是 URL 链接，实质是按钮，点击反馈
+          // 由 Clickable 自带。
+          if (!manualEntry) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Clickable(
+              onTap: () => _transcribeVoiceMessage(m),
+              child: line(
+                _voiceTranscriptEngine == 'server'
+                    ? 'whisper-server'
+                    : 'sense-voice-small',
+                l10n.voiceTranscriptManual,
+                textStyle: style.copyWith(
+                    color: transcriptColor.withValues(alpha: 0.7)),
+              ),
+            ),
+          );
+        }
+        switch (t.status) {
+          case 'done':
+            if (t.transcript.trim().isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: line(t.modelId, t.transcript.trim()),
+            );
+          case 'pending':
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: line(t.modelId, l10n.voiceTranscribing),
+            );
+          case 'failed':
+          case 'stale':
+          case 'unavailable':
+            // 行首同样带来源图标（老板 2026-10-23）：失败行的 modelId 在写入时
+            // 就已落定（本地失败=sense-voice-small，服务端失败=whisper-server），
+            // 与 done/pending 同一判断，点按重试不改变来源语义。
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Clickable(
+                onTap: () => _transcribeVoiceMessage(m),
+                child: line(
+                  t.modelId,
+                  t.status == 'failed'
+                      ? l10n.voiceTranscriptRetry
+                      : t.status == 'stale'
+                          ? l10n.voiceTranscriptStale
+                          : l10n.voiceTranscriptManual,
+                  // 同上：按钮不是链接，不加下划线
+                  textStyle: style.copyWith(
+                      color: transcriptColor.withValues(alpha: 0.7)),
+                ),
+              ),
+            );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  /// 转写来源图标（老板 2026-10-23）：转写文字前标明是谁转的——云=服务端
+  /// whisper 转写（modelId='whisper-server'，明文音频出过本机），芯片=本地
+  /// sense-voice 模型转写。本地刻意不用齿轮：设置入口已是齿轮
+  /// （Icons.settings_outlined，见本文件更多设置行），会撞语义；芯片取
+  /// 「本机算力」的意境，与云成一对手。所有行状态都用它（done/pending/
+  /// failed/stale/unavailable）——失败行的 modelId 写入时已落定，见
+  /// [_buildVoiceTranscriptLine]。
+  Widget _voiceTranscriptSourceIcon(String modelId, Color foreground) => Icon(
+        modelId == 'whisper-server' ? Icons.cloud_outlined : Icons.memory,
+        size: 14,
+        color: foreground.withValues(alpha: 0.85),
+      );
+
+  /// 模型准备（§11，模型 ~228MB 随包分发）：进度对话框（百分比+MB），可取消。
+  /// 正常发布构建 = 从包内资产拷进应用目录；dev 构建没跑 fetchVoiceModel.sh
+  /// 时 ensureInstalled 自动回落下载，同一对话框不感知差异。
+  /// 返回 true=模型就绪；false=用户取消或准备失败（失败已 notice 说明）。
+  /// 用户在窗内点「设置转写方式」链接也算取消（返回 false/null）——紧接着
+  /// 会打开转写设置弹层（见方法尾部）。
+  Future<({bool ok, String? error})> _prepareVoiceModel() async {
+    final l10n = AppLocalizations.of(context)!;
+    var cancelled = false;
+    var received = 0;
+    // 点了「设置转写方式」链接：关窗后转开设置弹层（安装已取消，与点 Cancel
+    // 同路——cancelled 旗标会让 ensureInstalled 在下一个检查点中止，不会
+    // 与设置里 Apply 触发的下一轮安装并发）
+    var openSettings = false;
+    // 安装失败的错误文本（null=没出错/用户主动取消）：呈现方式交给调用方——
+    // 消息气泡路径走顶部通知条；预览态转写路径在底部弹层内显示（老板
+    // 2026-10-25：转写链路的失败信息统一进弹层，不再放通知条）。
+    String? error;
+    final total = VoiceTranscriptModel.totalBytes;
+    // ⚠️ 任务必须**只在 builder 首次执行时启动一次**：进度回调 setState 会让
+    // StatefulBuilder 的 builder 整体重跑——启动语句若直接写在 builder 里，
+    // 每次重建都会再起一个 ensureInstalled（239MB 拷贝/下载并发炸开：进度
+    // 瞬间 100% 后彻底卡死，多个 pop(true) 重入 Navigator 触发红屏断言
+    // `!_debugLocked`，并发 ByteData 内存暴涨把 macOS 顶成黑屏）。
+    // 2026-10-12 真机实测踩坑（Android 红屏 + macOS 黑屏），改动前先读这段。
+    var started = false;
+    // 对话框只允许被 pop 一次：用户点 Cancel 时 route 进入退场动画但仍在导航栈里
+    // （ctx.mounted 仍为 true），随后 ensureInstalled 抛 _Cancelled，catch 里若
+    // 再 pop 就是双重 pop——把底下聊天页一起弹掉，黑屏（2026-10-24 真机实测）。
+    // 三路出口（完成/失败取消/用户取消）共用旗标，谁先到谁关窗。
+    var dismissed = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
+        if (!started) {
+          started = true;
+          // 进度对话框打开即开跑；失败把错误顶到 SnackBar 并关窗
+          unawaited(() async {
+            try {
+              await VoiceTranscriptModel.ensureInstalled(
+                onProgress: (rec, _) {
+                  if (ctx.mounted) setState(() => received = rec);
+                },
+                cancelled: () => cancelled,
+              );
+              if (!dismissed && ctx.mounted) {
+                dismissed = true;
+                Navigator.of(ctx).pop(true);
+              }
+            } catch (e) {
+              if (!dismissed && ctx.mounted) {
+                dismissed = true;
+                Navigator.of(ctx).pop(false);
+              }
+              // 用户主动取消（_Cancelled）不是失败：error 留 null，否则会
+              // 露出 "Instance of '_Cancelled'" 这种内部异常名；真失败记下文本，
+              // 由调用方决定通知条还是弹层显示
+              if (!cancelled) error = '$e';
+            }
+          }());
+        }
+        final pct = total == 0 ? 0 : (received * 100 / total).clamp(0, 100);
+        return AlertDialog(
+          title: Text(l10n.voiceTranscriptPreparing),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: total == 0 ? null : received / total),
+              const SizedBox(height: 8),
+              Text(
+                  '${(received / 1048576).toStringAsFixed(1)} / '
+                  '${(total / 1048576).toStringAsFixed(0)} MB  ·  ${pct.toStringAsFixed(0)}%',
+                  style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [
+            // 「设置转写方式」链接（老板 2026-10-25）：下载中途改主意——取消
+            // 本次安装关窗，转开转写设置弹层（改方式/时机）。与 Cancel 钮同路
+            // （cancelled + dismissed 旗标），防双重 pop。
+            TextButton(
+              onPressed: () {
+                cancelled = true;
+                openSettings = true;
+                if (!dismissed) {
+                  dismissed = true;
+                  Navigator.of(ctx).pop(false);
+                }
+              },
+              child: Text(l10n.voiceTranscriptSettingsLink),
+            ),
+            TextButton(
+              onPressed: () {
+                cancelled = true;
+                // 与异步三路共用 dismissed：用户先关窗，随后 _Cancelled 的
+                // catch 看到旗标已置位便不再 pop（防双重 pop 黑屏）
+                if (!dismissed) {
+                  dismissed = true;
+                  Navigator.of(ctx).pop(false);
+                }
+              },
+              child: Text(l10n.cancel),
+            ),
+          ],
+        );
+      }),
+    );
+    // 点了「设置转写方式」：关窗后打开转写设置弹层。本方法随后返回
+    // false/null（=用户取消），调用方静默收尾——设置里 Apply 本地方式会
+    // 再走本方法开新一轮安装，链路自洽。
+    if (openSettings && mounted) {
+      await _showVoiceTranscriptPicker();
+    }
+    return (ok: ok ?? false, error: error);
+  }
+
+  /// 转写一条消息的总入口（长按菜单「转写」卡 + 行内 failed/stale/unavailable
+  /// 提示共用；自动转写关闭时没有行就没有行内提示，必须从菜单进）：
+  /// - 点了就直接转，不再弹询问框（老板 2026-10-23 要求：手动点 = 已确认）；
+  /// - 旧 m4a 明确提示不支持转写（别"点了没反应"）。
+  Future<void> _transcribeVoiceMessage(HistoryMessage m) async {
+    if (m.attachment == null) return;
+    // 旧格式（m4a）：本地 sherpa 与服务端 whisper 都按 wav 口径——直接说明，不打哑炮
+    if (_voiceExtOf(m) != 'wav') {
+      if (!mounted) return;
+      _notice(context,
+          AppLocalizations.of(context)!.voiceTranscriptLegacyAudio);
+      return;
+    }
+    if (_voiceTranscriptEngine == 'server') {
+      // 服务端未启用（_serverVoiceTranscribe 已出说明 notice）→ 落穿到本地
+      // 路径（§15.1 ③既定回落语义）；done/failed 都已收尾，直接返回。
+      if (await _serverVoiceTranscribe(m) !=
+          _ServerTranscriptOutcome.disabled) {
+        return;
+      }
+    }
+    await _transcribeVoiceLocally(m);
+  }
+
+  /// 本机模型转写一条（方式=local 的手动路径；模型未就绪先弹准备对话框，
+  /// 取消即放弃）。重转 = 清掉旧行再入队（enqueue 对 done 幂等跳过，
+  /// failed/stale 行也要重算）。失败静默——转写是纯增强功能，行留在原状态。
+  Future<void> _transcribeVoiceLocally(HistoryMessage m) async {
+    try {
+      if (!await VoiceTranscriptModel.isReady()) {
+        final prep = await _prepareVoiceModel();
+        // 安装失败的错误由本路径出顶部通知条（_prepareVoiceModel 不再弹通知，
+        // 呈现方式交给调用方）；用户取消（error=null）静默返回
+        if (prep.error != null && mounted) {
+          _notice(context, AppLocalizations.of(context)!
+              .voiceTranscriptPrepareFailed(prep.error!));
+        }
+        if (!prep.ok || !mounted) return;
+      }
+      await _enqueueLocalVoiceTranscript(m, clearExisting: true);
+      _updateAudioPlayback(() {});
+    } catch (_) {
+      // 纯增强功能：失败静默（行留在原状态，下次还能点）
+    }
+  }
+
+  /// 服务端转写路径（方案 D'，PROTOCOL.md §6.3）：本地解密后的 wav 明文
+  /// `POST /transcriptions`，服务端 whisper.cpp 即转即删，文本写本地转写表
+  /// （modelId='whisper-server'，与本地 sense-voice 行共用同一 UI 渲染）。
+  /// 失败置 failed 行（可再点重试），notice 带服务端错误原话。
+  ///
+  /// 返回值见 [_ServerTranscriptOutcome]：手动重转忽略它；自动路径与手动
+  /// 路径在 [disabled]（服务端未启用）时按 §15.1 ③ 既定语义回落本地模型。
+  Future<_ServerTranscriptOutcome> _serverVoiceTranscribe(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messageId = m.env.messageId;
+    final cipherSha256 = (m.attachment!['sha256'] as String?) ?? '';
+    // 先清旧行 + 置 pending（与本地重转同语义），UI 立刻显示"转写中"
+    await (_voiceDb.delete(_voiceDb.localVoiceTranscripts)
+          ..where((tbl) => tbl.messageId.equals(messageId)))
+        .go();
+    await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
+          LocalVoiceTranscriptsCompanion.insert(
+            messageId: messageId,
+            modelId: const Value('whisper-server'),
+            audioSha256: Value(cipherSha256),
+            status: const Value('pending'),
+            updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+          ),
+        );
+    _updateAudioPlayback(() {});
+    try {
+      // 上送前归一化（2026-10-23 补，此前漏了此调用点）：老消息（macOS 录的）
+      // 可能是 WAVE_FORMAT_EXTENSIBLE 容器，服务端旧代码只认 tag=1——转成标准
+      // PCM16 再上传，新旧服务端都无差异（服务端也已改宽，双保险）。
+      final wav = VoiceTranscriptService.normalizeWavBytes(await _attachmentBytes(m));
+      final r = await _withAuth(
+          (t) => (widget.api ?? ApiClient(effectiveServer)).transcribeWav(wav: wav, token: t));
+      await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
+            LocalVoiceTranscriptsCompanion.insert(
+              messageId: messageId,
+              transcript: Value(r.text),
+              modelId: const Value('whisper-server'),
+              audioSha256: Value(cipherSha256),
+              language: const Value(''),
+              status: const Value('done'),
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+            ),
+          );
+      _updateAudioPlayback(() {});
+      return _ServerTranscriptOutcome.done;
+    } catch (e) {
+      // 服务端未启用转写（503 TRANSCRIBE_DISABLED）：不算失败——按 §15.1 ③
+      // 既定回落语义交还调用方改走本地模型。pending 行留给随后的本地入队
+      // 覆写（本地 service 见到非 done 行会照常处理），不落 failed。
+      if (e is ApiException && e.code == 'TRANSCRIBE_DISABLED') {
+        if (mounted) {
+          _notice(context, l10n.voiceTranscriptServerDisabled);
+        }
+        return _ServerTranscriptOutcome.disabled;
+      }
+      await _voiceDb.into(_voiceDb.localVoiceTranscripts).insertOnConflictUpdate(
+            LocalVoiceTranscriptsCompanion.insert(
+              messageId: messageId,
+              modelId: const Value('whisper-server'),
+              audioSha256: Value(cipherSha256),
+              status: const Value('failed'),
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+            ),
+          );
+      if (mounted) {
+        _notice(context, l10n.voiceTranscriptServerFailed('$e'));
+      }
+      _updateAudioPlayback(() {});
+      return _ServerTranscriptOutcome.failed;
+    }
+  }
 
   /// 音频文件时长：h/m/s，为零的部分不显示（如 3s、1m 15s、2h 5s）。
   String _formatHmsDuration(int totalSeconds) {
@@ -9176,9 +10250,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Tooltip(
-              message: l10n.aboutPageTitle,
-              child: InkWell(mouseCursor: SystemMouseCursors.click,
+            InkWell(mouseCursor: SystemMouseCursors.click,
                 borderRadius: BorderRadius.circular(10),
                 onTap: _openAboutPage,
                 child: const Padding(
@@ -9187,7 +10259,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: BrandLogo(),
                 ),
               ),
-            ),
             Flexible(child: _brandTitle()),
             // 其它秘境有未读 → 汇总角标（老板 2026-09-26）：不打开「选择秘境」
             // 也能一眼看到"别的秘境来消息了"。
@@ -9207,18 +10278,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (_hasPin)
             IconButton(
               icon: const Icon(Icons.lock_outline),
-              tooltip: l10n.chatPageLockNow,
               onPressed: _lockNow,
             ),
           // 顶栏统一入口：语言/阅后即焚/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
+            // tooltip:'' 压掉 Material 内置默认提示"Show menu/显示菜单"
+            // （老板 2026-10-24：删 tooltip 决策的漏网——不传时框架自动加默认）
+            tooltip: '',
             // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
             // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
             icon: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: const Icon(Icons.menu),
             ),
-            tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               switch (value) {
                 case 'locale':
@@ -9477,11 +10549,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.advancedMenuTitle, style: labelStyle),
                       const Spacer(),
-                      // 危险/警告图标（老板 2026-10-15）：弹层里是改口令/删全部
-                      // 消息/销毁通道这类破坏性操作，入口先给一个警示标识。**菜单里
-                      // 不用红色**——太引人注意，红色留给弹层内部那一行
-                      Icon(Icons.warning_amber_rounded,
-                          size: 18, color: labelStyle.color),
+                      // 危险/警告图标（老板 2026-10-15；2026-10-26 老板改闪电）：
+                      // 弹层里是改口令/删全部消息/销毁通道这类破坏性操作，入口给
+                      // 警示标识。warning 三角在 18px 下感叹号墨迹太小看不清（老板
+                      // 2026-10-26），换 bolt 闪电墨迹大。**菜单里不用红色**——太
+                      // 引人注意，红色留给弹层内部那一行
+                      Icon(Icons.bolt, size: 18, color: labelStyle.color),
                       const SizedBox(width: 2),
                       Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
                     ],
@@ -9622,10 +10695,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 onTap: _showEntranceListSheet,
                                 hoverColor: Colors.black.withValues(alpha: 0.05),
                                 highlightColor: Colors.black.withValues(alpha: 0.08),
-                                child: Tooltip(
-                                  // 桌面端悬停提示：光看图标不一定看得出是"多设备"
-                                  message: l10n.chatPageMenuEntranceList,
-                                  child: SizedBox(
+                                child: SizedBox(
                                     // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
                                     // 状态条上下边缘（与 invite 同源的问题）。
                                     // 边长与呼叫图标同源（kStatusAvatarSize=40）：
@@ -9640,7 +10710,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             .colorScheme
                                             .onSurfaceVariant),
                                   ),
-                                ),
                               ),
                             ),
                             // 与「名字/时间」的间距 6px：加上图标在 32 宽容器里的
@@ -9662,11 +10731,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 与左侧对方大胶囊同款：透明底 + Material/InkWell 水波；
                             // 头像三面贴住胶囊右缘（左侧对方头像贴左缘，镜像对称）。
                             Flexible(
-                              child: Tooltip(
-                                // 桌面端悬停提示（状态条 tooltip 全量补齐，
-                                // 老板 2026-10-10）：整块胶囊一个提示
-                                message: l10n.chatPageMenuMyProfile,
-                                child: Material(
+                              child: Material(
                                   color: Colors.transparent,
                                   shape: const StadiumBorder(),
                                   clipBehavior: Clip.antiAlias,
@@ -9755,7 +10820,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     ),
                                   ),
                                 ),
-                              ),
                             ),
                           ],
                         ),
@@ -9787,6 +10851,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 头像开关打开时才算（配色永远按 member 走）。
                 final senderMemberId =
                     m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
+                // 高亮判定（老板 2026-09-10 跳转 2s / 2026-10-24 长按菜单期间）：
+                // 两者共用橘黄底色；菜单开关走短节奏（180ms，与菜单弹入弹出同步），
+                // 跳转仍走 1.5s 渐变（2026-10-27：菜单 180ms 就弹开，底色若还按
+                // 1.5s 渐变会明显慢半拍）。
+                final bool isMenuTarget = m.env.messageId == _menuTargetMessageId;
+                final bool isHighlighted =
+                    m.env.messageId == _highlightMessageId || isMenuTarget;
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
@@ -9855,13 +10926,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // **吸收**掉长按，见下面那处 GestureDetector。
                         // 墓碑消息仅当可撤回时开菜单（老板 2026-10-10：本地墓碑不
                         // 影响服务端行，未送达的仍可撤）
-                        onLongPress: _messageHasActions(m)
-                            ? () => _showMessageActions(m)
+                        // 用 onLongPressStart（而非 onLongPress）：回调带
+                        // details.globalPosition——**长按点全局坐标**直接当菜单
+                        // 锚点（按点必在气泡内，菜单贴按点弹出即压住气泡，
+                        // 老板 2026-10-24 定稿）。不爬 RenderBox：itemBuilder
+                        // 的 context 挂在 SliverList 层，摸不到气泡（实测）。
+                        onLongPressStart: _messageHasActions(m)
+                            ? (d) => _showMessageActions(m,
+                                anchorGlobal: d.globalPosition)
                             : null,
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
-                          // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变
-                          duration: const Duration(milliseconds: 1500),
+                          // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变。
+                          // 长按菜单期间例外：跟菜单弹出的 180ms 同节奏（2026-10-27）。
+                          duration: Duration(
+                              milliseconds: isMenuTarget ? 180 : 1500),
                           curve: Curves.easeOut,
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -9871,15 +10950,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               maxWidth: MediaQuery.sizeOf(context).width * 0.75),
                           decoration: BoxDecoration(
                             // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）；
-                            // 跳转目标短暂高亮背景改为显眼橘黄 #FF9800（老板要求
+                            // 跳转目标短暂高亮背景改为显眼橘黄（老板要求
                             // 2026-09-10：不撞任何性别气泡色系；只换背景色、尺寸
                             // 不变——边框方案实测闪烁期间气泡尺寸变化，已弃用）
-                            color: m.env.messageId == _highlightMessageId
-                                ? const Color(0xFFFF9800)
+                            color: isHighlighted
+                                ? _kOrangeHighlight
                                 // 群聊一期：group 空间按发送者 member 取哈希色板
                                 // （duo 走原来的性别/槽位规则，一字未改）
                                 : _bubbleColor(mine: mine, senderMemberId: senderMemberId),
                             borderRadius: BorderRadius.circular(12),
+                            // 选中/跳转时加一圈同色柔光（2026-10-27，老板要“更显眼”）：
+                            // 阴影不占布局，不会像边框方案那样改变气泡尺寸。
+                            boxShadow: isHighlighted
+                                ? const [
+                                    BoxShadow(
+                                      color: Color(0x66FF9800),
+                                      blurRadius: 18,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
                           ),
                           child: DefaultTextStyle.merge(
                             // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；
@@ -9904,15 +10994,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   // 搬到气泡左侧、头像下方（见上面那处 SizedBox）。
                                   // 气泡内只留内容本身，读起来更像"对话"。
                                   //
-                                  // 顶栏**吸收长按**：不让它冒泡到外层气泡的长按菜单
-                                  // （老板 2026-10-08：长按气泡任意位置都该开菜单，
-                                  // 唯独顶栏不行——桌面长按顶栏按钮会误开菜单；手机
-                                  // 长按顶栏该出 tooltip，Tooltip 在更内层，手势竞技场
-                                  // 里本来就赢，这里只挡"没有 tooltip 的空白"）。
-                                  // opaque = 整条顶栏矩形都挡，连图标之间的间隙也不漏。
+                                  // 顶栏长按**放开**（老板 2026-10-24 反转 2026-10-08
+                                  // 的决策）：气泡整体（含时间戳顶栏、含引用/拷贝
+                                  // 圆按钮）都能长按出菜单——当初吸收层防的"误开"
+                                  // 正是现在要的一致行为（菜单锚定按点，从顶栏长按
+                                  // 就在时间戳旁打开）。GestureDetector 保留 opaque
+                                  // 命中（Tooltip hover 不受影响）但**不注册任何长按
+                                  // 手势**：竞技场里没有内层 recognizer，长按唯一
+                                  // 由外层气泡赢得 → 全气泡一处语义。
                                   GestureDetector(
                                     behavior: HitTestBehavior.opaque,
-                                    onLongPress: () {},
                                     child: Padding(
                                       padding: const EdgeInsets.only(bottom: 2),
                                       child: Row(
@@ -9926,6 +11017,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           // 不影响消息在服务器与对方的路径——所以状态与
                                           // 点按重发都该照旧可用。
                                           if (mine) ...[
+                                            // **不要包 Flexible**（老板 2026-10-25
+                                            // 二次实测）：有界宽度下
+                                            // Container(alignment:) 的 Align 会填满
+                                            // 剩余空间，小飞机被拉成横跨气泡的
+                                            // 大胶囊。非 flex 子节点拿到的是
+                                            // 无界宽度，Align 收缩包裹 → 尺寸随
+                                            // 内容（飞机=28×28 圆，文字=胶囊）
                                             _buildSendStatusIcon(m),
                                             const SizedBox(width: 4),
                                           ],
@@ -10044,11 +11142,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               // 不跟快捷图标走圆形（老板 2026-10-02）
                                               borderRadius: BorderRadius.circular(12),
                                               clipBehavior: Clip.antiAlias,
-                                              child: Tooltip(
-                                                // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
-                                                // （老板 2026-10-08；此前只有这处没有）
-                                                message: l10n.chatPageActionBurn,
-                                                child: InkWell(
+                                              child: InkWell(
                                                   mouseCursor: SystemMouseCursors.click,
                                                   // 悬浮/点击背景同快捷动作/状态栏图标
                                                   hoverColor:
@@ -10086,7 +11180,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                     ),
                                                   ),
                                                 ),
-                                              ),
                                             ),
                                           ],
                                           // 菜单「...」（老板 2026-10-12）：时间行
@@ -10095,14 +11188,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           //（_messageHasActions：墓碑仅可撤回时给）。
                                           if (_messageHasActions(m)) ...[
                                             const SizedBox(width: 2),
-                                            _bubbleQuickAction(
-                                              m,
-                                              icon: Icons.more_horiz,
-                                              // 「更多操作」：区别于汉堡菜单的
-                                              // chatPageMenuMore（"菜单"），这个
-                                              // 指消息操作菜单（老板 2026-10-12）
-                                              label: l10n.chatPageMsgMoreActions,
-                                              onTap: () => _showMessageActions(m),
+                                            Builder(
+                                              // Builder：锚点要「…」按钮自己的
+                                              // 中心坐标——item 层 context 的
+                                              // RenderBox 不是这个小按钮（同上）。
+                                              builder: (btnCtx) =>
+                                                  _bubbleQuickAction(
+                                                m,
+                                                icon: Icons.more_horiz,
+                                                // 「更多操作」：区别于汉堡菜单的
+                                                // chatPageMenuMore（"菜单"），这个
+                                                // 指消息操作菜单（老板 2026-10-12）
+                                                label: l10n.chatPageMsgMoreActions,
+                                                onTap: () {
+                                                  final btnBox = btnCtx
+                                                      .findRenderObject()
+                                                      as RenderBox?;
+                                                  if (btnBox == null ||
+                                                      !btnBox.attached) {
+                                                    return;
+                                                  }
+                                                  _showMessageActions(m,
+                                                      anchorGlobal: btnBox
+                                                          .localToGlobal(btnBox
+                                                              .size
+                                                              .center(Offset
+                                                                  .zero)));
+                                                },
+                                              ),
                                             ),
                                           ],
                                         ],
@@ -10206,98 +11319,189 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         onPressed: _showAttachmentSheet,
                         icon: const Icon(Icons.add_circle_outline),
                       ),
-                      // 语音入口：点按=切提示态/回文字态；长按=直接开始录音（与长按录音条等价）
-                      Clickable(
-                        onLongPressStart: (_) => _startVoice(),
-                        onLongPressEnd: (_) => _stopVoice(),
-                        child: IconButton(
-                          icon: Icon(_voiceEntryIcon(),
-                              color:
-                                  _inputMode == _InputMode.recording ? Colors.green : null),
-                          onPressed: _onVoiceEntryTap,
-                        ),
-                      ),
+                      // 输入盒（老板 2026-10-25）：麦克风/键盘入口合并成一枚图标，放盒内左侧，
+                      // 右侧是正式输入区（文字框/录音条）。点它=文字态 ↔ 语音态互换（只切模式、
+                      // 不开录）；录音中/预览态点它切回键盘，已录内容保留。
                       Expanded(
-                        // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
-                        // 录音/预览时录音条 Positioned.fill 覆盖其上（与输入框严格同高）
-                        child: Stack(
-                          children: [
-                            // 录音条覆盖时完全隐藏输入框（maintainSize 保持占位高度，
-                            // 行高/按钮位置不变；避免圆角录音条透出输入框边角）
-                            Visibility(
-                              visible: _inputMode == _InputMode.text,
-                              maintainState: true,
-                              maintainSize: true,
-                              maintainAnimation: true,
-                              child: TextField(
-                                controller: _input,
-                                focusNode: _inputFocusNode,
-                                // 桌面端自动聚焦（老板 2026-10-12 粘贴功能配套）：
-                                // Cmd/Ctrl+V 走焦点链分发——新开聊天页若输入框无
-                                // 焦点，页面级 CallbackShortcuts 收不到按键，粘贴
-                                // 会"没反应"（实测五种焦点状态定的方案）。桌面聊天
-                                // 客户端打开会话即聚焦输入框也是惯例（Discord 同款）；
-                                // 移动端不抢焦点（会弹软键盘）。
-                                autofocus: _pasteShortcutSupported,
-                                // 多行输入框：文字到达宽度后自动折行，输入框随之增高，
-                                // 最多 8 行；超过 8 行不再增高，转为内部纵向滚动
-                                // （老板要求 2026-09-13：原先单行 + 横向滚动体验差）。
-                                // 非文字态（录音提示/录音/预览）把隐藏输入框按单行布局，
-                                // 录音条 Positioned.fill 才不会跟着草稿高度撑到 8 行高
-                                // （草稿保留在 controller 里，切回文字态自动恢复增高）
-                                minLines: 1,
-                                maxLines: _inputMode == _InputMode.text ? 8 : 1,
-                                // 多行折行；回车键仍为「发送」（键盘右下角显示「发送」，
-                                // iOS 按系统语言本地化），不插入换行——与微信一致
-                                keyboardType: TextInputType.multiline,
-                                textInputAction: TextInputAction.send,
-                                decoration: InputDecoration(
-                                  hintText: l10n.chatPageInputHint,
-                                  isDense: true,
-                                  // 边框到文字的间距：主题里默认 16/16（那是给
-                                  // 口令、名字这类表单用的，字段少、留白宽好读），
-                                  // 聊天输入框是"反复打字、希望一行多放字"的场景，
-                                  // 左右收到 12（左右各省 4px），垂直同步收到 12——
-                                  // 顺带让输入框高度更贴近两侧按钮（老板 2026-09-26）
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 12),
-                                ),
-                                // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
-                                onSubmitted: (_) {
-                                  _send();
-                                  _inputFocusNode.requestFocus();
-                                },
-                                // 发送后键盘常驻遮挡消息流；点按输入框以外的任意处
-                                // （消息列表/空白/其他控件）收起键盘（老板要求 2026-09-12）。
-                                // 移动端默认不动 focus，需显式 unfocus。
-                                // **桌面端不收起**：桌面没有软键盘要收，且失焦后
-                                // Cmd/Ctrl+V 粘贴快捷键（焦点链上的 CallbackShortcuts）
-                                // 就收不到按键了——点消息列表不该让粘贴失灵
-                                // （老板 2026-10-12 粘贴功能配套）。
-                                onTapOutside: (_) {
-                                  if (!_pasteShortcutSupported) {
-                                    FocusManager.instance.primaryFocus
-                                        ?.unfocus();
-                                  }
-                                },
+                        // ListenableBuilder：文字态盒描边跟随焦点（未聚焦浅粉/聚焦天
+                        // 蓝），即旧 TextField 自带的主题描边——图标入盒后改由输入盒
+                        // 绘制（见 _inputBoxDecoration）。
+                        child: ListenableBuilder(
+                          listenable: _inputFocusNode,
+                          builder: (context, _) => Container(
+                            decoration: _inputBoxDecoration(),
+                            // 整盒不加内距（老板 2026-10-26）：加了内距，Clickable 就只能到内距为止，
+                            // 盒右缘那条带子点不动、也不变色。内距下放到内容（TextField 右 20、录音条
+                            // 内容右 12），视觉不变、命中铺满；左侧不留——图标圆形热区恰好贴盒左边。
+                            child: ClipRRect(
+                              borderRadius:
+                                  BorderRadius.circular(_kInputBoxCornerRadius),
+                              child: Row(
+                                children: [
+                                  // 文字/语音切换合并图标：每次点击切一次状态
+                                  SizedBox(
+                                    width: _kInputModeToggleSize,
+                                    height: _kInputModeToggleSize,
+                                    // 只点按切模式，不挂长按（老板 2026-10-26）：文字态起手要先收键盘再启
+                                    // 录音器，松手常早于真正开录，_startVoice 的 _voiceStarting 竞速会静默
+                                    // 丢弃（体感像「没反应」）。长按开录统一交给右侧录音条。
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
+                                      // 48 热区（即盒左端半圆），不会溢出盒角被
+                                      // ClipRRect 裁成椭圆（老板 2026-10-25）
+                                      splashRadius:
+                                          _kInputModeToggleSize / 2,
+                                      onPressed: _onVoiceEntryTap,
+                                      // 麦+键盘并排（老板 2026-10-25）：右=当前输入模式（更大、压住左侧一小
+                                      // 块），左=点按切过去的目标；两枚 stock 图标排在 48 圆形热区内。
+                                      icon: SizedBox(
+                                        width: 34,
+                                        height: 24,
+                                        // 语音态整体右移 3px（老板 2026-10-26）：mic_none 侧留白大，同几何会显
+                                        // 偏左、贴外面的 +；只平移不改线条大小，溢出落在 48 圆钮的留白里。
+                                        child: Transform.translate(
+                                          offset: Offset(
+                                              _inputMode == _InputMode.text
+                                                  ? 0
+                                                  : 3,
+                                              0),
+                                          child: Stack(
+                                            alignment:
+                                                Alignment.centerLeft,
+                                            children: [
+                                              // 左：切换目标（小）
+                                              Icon(
+                                                _inputMode ==
+                                                        _InputMode.text
+                                                    ? Icons.mic_none
+                                                    : Icons
+                                                        .keyboard_alt_outlined,
+                                                size: 18,
+                                                color:
+                                                    _inputModeToggleColor(),
+                                              ),
+                                              // 右：当前主力（大，压住左元素一小块）
+                                              Positioned(
+                                                left: 12,
+                                                child: Icon(
+                                                  _inputMode ==
+                                                          _InputMode.text
+                                                      ? Icons
+                                                          .keyboard_alt_outlined
+                                                      : Icons.mic_none,
+                                                  size: 21,
+                                                  color:
+                                                      _inputModeToggleColor(),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    // Stack：文字框始终占位（行高恒定，切录音条时按钮不浮动），录音/预览时
+                                    // 录音条 Positioned.fill 覆盖其上；minHeight=48 让命中区与盒高对齐（各平台
+                                    // 字体度量不同也不露窄条），多行草稿时随之长高、不封顶。
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                          minHeight: _kInputModeToggleSize),
+                                      child: Stack(
+                                        // 居中：盒高被撑到 48 时 TextField 仍
+                                        // 垂直居中（旧版 Row center 的效果）
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // 录音条覆盖时完全隐藏输入框（maintainSize
+                                          // 保持占位高度，行高/按钮位置不变；避免圆角
+                                          // 录音条透出输入框边角）
+                                          Visibility(
+                                            visible: _inputMode == _InputMode.text,
+                                            maintainState: true,
+                                            maintainSize: true,
+                                            maintainAnimation: true,
+                                            child: TextField(
+                                              controller: _input,
+                                              focusNode: _inputFocusNode,
+                                              // 桌面端自动聚焦（老板 2026-10-12）：Cmd/Ctrl+V 走焦点链，无焦点时页面级
+                                              // CallbackShortcuts 收不到按键、粘贴「没反应」；移动端不抢焦点（会弹键盘）。
+                                              autofocus: _pasteShortcutSupported,
+                                              // 多行输入框：到达宽度自动折行、最高 8 行，再高转内部滚动（老板
+                                              // 2026-09-13）。非文字态强制单行——否则录音条 Positioned.fill 会跟着
+                                              // 草稿高度撑到 8 行（草稿留在 controller 里，切回文字态自动恢复）。
+                                              minLines: 1,
+                                              maxLines: _inputMode == _InputMode.text
+                                                  ? 8
+                                                  : 1,
+                                              // 多行折行；回车键仍为「发送」（键盘右下角
+                                              // 显示「发送」，iOS 按系统语言本地化），
+                                              // 不插入换行——与微信一致
+                                              keyboardType: TextInputType.multiline,
+                                              textInputAction: TextInputAction.send,
+                                              decoration: InputDecoration(
+                                                hintText: l10n.chatPageInputHint,
+                                                isDense: true,
+                                                // 盒外观（白底/描边/圆角，老板
+                                                // 2026-10-25）由外层输入盒 Container
+                                                // 统一给出（_inputBoxDecoration）——
+                                                // 合并图标与输入框同盒，这里不画
+                                                // 自己的底色边框
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                // 边框到文字的间距：主题里默认 16/16
+                                                // （那是给口令、名字这类表单用的，
+                                                // 字段少、留白宽好读），聊天输入框是
+                                                // "反复打字、希望一行多放字"的场景，
+                                                // 左侧收到 8（合并图标已占位）、右侧 20
+                                                // =旧「盒内距12+框内8」（输入盒本身不再
+                                                // 加内距，见外层 Container 注释），
+                                                // 垂直 12——顺带让输入框高度更贴近两侧
+                                                // 按钮（老板 2026-09-26/2026-10-26）
+                                                contentPadding: const EdgeInsets.only(
+                                                    left: 8,
+                                                    right: 20,
+                                                    top: 12,
+                                                    bottom: 12),
+                                              ),
+                                              // 回车发送后焦点回到输入框（键盘完成动作
+                                              // 默认失焦——补回聚焦）
+                                              onSubmitted: (_) {
+                                                _send();
+                                                _inputFocusNode.requestFocus();
+                                              },
+                                              // 点输入框以外收起键盘（移动端；老板 2026-09-12）。**桌面端不收起**：
+                                              // 失焦后 Cmd/Ctrl+V 的 CallbackShortcuts 收不到按键，粘贴会失灵
+                                              // （2026-10-12 粘贴功能配套）。
+                                              onTapOutside: (_) {
+                                                if (!_pasteShortcutSupported) {
+                                                  FocusManager.instance
+                                                      .primaryFocus
+                                                      ?.unfocus();
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          if (_inputMode != _InputMode.text)
+                                            // 内容自己就是手势层（白胶囊里挂 Clickable）：外层只负责铺满盒高，不再
+                                            // 挂整条命中——否则遮罩 48/r24 比胶囊 46/r23 多出一圈变色。
+                                            Positioned.fill(
+                                              child: _buildVoiceBarContent(),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            if (_inputMode != _InputMode.text)
-                              // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
-                              // 进入录音态后此层不重建，松手能正常触发停止；预览态由
-                              // _startVoice 直接忽略（长按不重录，防误触冲掉刚录好的一条）
-                              Positioned.fill(
-                                child: Clickable(
-                                  onLongPressStart: (_) => _startVoice(),
-                                  onLongPressEnd: (_) => _stopVoice(),
-                                  child: _buildVoiceBar(),
-                                ),
-                              ),
-                          ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发内容）
+                      // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发
+                      // 内容——录音中先松手或点合并图标停录，进预览态后再发）
                       // 纸飞机**朝上**（老板 2026-09-14）——消息流在输入框上方，朝上才
                       // 表达"发进上面的消息流"；Material 的 Icons.send 本身朝右，
                       // 逆时针转 90° 摆正。Transform 不改变占位，按钮布局不变
@@ -10379,6 +11583,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         unawaited(_sendDroppedFiles(detail.files));
       },
       child: page,
+    );
+  }
+}
+
+/// 界面风格预览缩略图（程序化绘制，无需图片资源）——自 ui_style_picker.dart
+/// 迁移（该弹层并入 OptionPickerSheet，老板 2026-10-24）：迷你聊天页示意——
+/// 背景按风格（浅粉纯色 / 粉蓝渐变）+ 一左一右两枚迷你气泡（天蓝=对方、粉=我）。
+class _UiStylePreview extends StatelessWidget {
+  const _UiStylePreview({required this.option});
+
+  final String option;
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = option == 'gradient';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 92,
+        height: 64,
+        decoration: BoxDecoration(
+          gradient: gradient ? kBrandGradient : null,
+          color: gradient ? null : const Color(0xFFFFF5FA),
+        ),
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                width: 34,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3BAFFD).withValues(alpha: 0.30),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+            const Spacer(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 34,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6529C).withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -10472,8 +11729,9 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   bool get _hasPin => widget.hasPin;
   bool _busy = false; // 当前锁屏码校验中（Argon2id）：防连点重复提交
   // 锁屏时长（前台闲置锁与后台锁共用，老板 2026-10-18 定）：对数刻度轴
-  // （30 秒~30 分钟，仿阅后即焚 burn_duration_sheet）。initState 异步读持久化值
-  // 换成轴位置；读回前按默认 30 秒渲染（同 _loadUiStyle 套路）。
+  // （10 秒~30 分钟，仿阅后即焚 burn_duration_sheet；2026-10-24 由 20 秒~20
+  // 分钟改来）。initState 异步读持久化值
+  // 换成轴位置；读回前按默认 1 分钟渲染（同 _loadUiStyle 套路）。
   // _initialSeconds = 打开弹窗时的档位，提交时判"是否真改过"。
   double _axisT = 0.0; // 轴位置 t∈[0,1]（对数刻度）
   int? _initialSeconds;
@@ -10722,9 +11980,10 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     return l10n.lockDurationSecs(seconds);
   }
 
-  /// 轴下的阶段性可点标注（老板 2026-10-18，仿阅后即焚轴）：20 秒（最左）/
-  /// 1 分钟 / 5 分钟 / 20 分钟（最右），点了立刻把轴跳到该点。默认就带一层
-  /// 淡背景色提示可点（与焚毁轴的标注同款：primary 6% 淡底 + InkWell 反馈）。
+  /// 轴下的阶段性可点标注（老板 2026-10-18，仿阅后即焚轴；2026-10-24 范围改
+  /// 10 秒~30 分钟）：10 秒（最左）/ 1 分钟 / 5 分钟 / 30 分钟（最右），点了
+  /// 立刻把轴跳到该点。默认就带一层淡背景色提示可点（与焚毁轴的标注同款：
+  /// primary 6% 淡底 + InkWell 反馈）。
   ///
   /// 标签 x 用与 Slider thumb 完全相同的几何（`trackLeft + t × trackWidth`，
   /// 见 burn_duration_sheet._axisLabels 同款算法），保证对准刻度。
@@ -10914,7 +12173,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
                     icon: Icon(_newPinRevealed
                         ? Icons.visibility
                         : Icons.visibility_off),
-                    tooltip: l10n.chatPagePassphraseRevealTip,
                     onPressed: () {
                       setState(() => _newPinRevealed = !_newPinRevealed);
                       _newPinRevealTimer?.cancel();
@@ -11450,45 +12708,527 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
   }
 }
 
-/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；
-/// 按可用宽度只渲染能放下的条数（取尾部最新采样），窄屏也不会顶出屏幕。
-class _WaveformBars extends StatelessWidget {
-  const _WaveformBars({required this.samples, required this.color});
+/// 语音转写设置弹层（方案 D'，20261009_voiceTranscript.zhcn.md §15.1 ③；2026-10-23
+/// 老板重构：原「本地/服务端/每条询问」三选一拆成两组——「每条询问」不再是
+/// 并列的第三个选项，而是**自动转写关闭时**的行为）。
+///
+/// 结构（仿 PIN 更改弹窗的分组卡片；2026-10-24 两组都改左右方块）：
+/// - 第一组「转写位置」：本机 / 远程 两个方块二选一（选中打勾；芯片/云
+///   前置图标与语音消息气泡里转写来源指示图标同款）；
+/// - 第二组「转写时机」：手动 / 自动 两个方块二选一（选中打勾；手动 =
+///   每条询问——不论方式是本机还是服务端，执行前都会询问；省流量/上传。
+///   自动 = 按上面的方式自动转写）；
+/// - 底部：「应用于本机所有秘境」勾选框 + 提交按钮（单选+提交模式，与附件
+///   存储/墓碑弹层同构——两项都是本设备持久设置，提交前统一确认）。
+class _VoiceTranscriptSheet extends StatefulWidget {
+  const _VoiceTranscriptSheet({
+    required this.engine,
+    required this.auto,
+    required this.onApply,
+    this.scopeAllLabel,
+  });
 
-  final List<double> samples;
-  final Color color;
+  /// 当前转写方式（'local' / 'server'）。
+  final String engine;
+
+  /// 当前自动转写开关。
+  final bool auto;
+
+  /// 「应用于本机所有秘境」标签（null = 单空间，不渲染勾选框）。
+  final String? scopeAllLabel;
+
+  /// 提交回调（弹层自行关闭）。
+  final Future<void> Function(String engine, bool auto,
+      {required bool scopeAll}) onApply;
+
+  @override
+  State<_VoiceTranscriptSheet> createState() => _VoiceTranscriptSheetState();
+}
+
+class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
+  late String _engine;
+  late bool _auto;
+  late bool _scopeAll;
+
+  @override
+  void initState() {
+    super.initState();
+    _engine = widget.engine;
+    _auto = widget.auto;
+    _scopeAll = false; // 每次开弹层都是 false：默认只作用于当前空间（同款弹层惯例）
+  }
+
+  /// 有没有可提交的改动。**勾选态也算改动**——只勾"所有秘境"不改设置同样
+  /// 是有效操作（把当前设置推广到所有空间），必须能提交（同 OptionPickerSheet）。
+  bool get _changed =>
+      _engine != widget.engine || _auto != widget.auto || _scopeAll;
+
+  Future<void> _submit() async {
+    await widget.onApply(_engine, _auto, scopeAll: _scopeAll);
+    if (mounted) Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      const step = 6.0; // 每根条占宽：3px 本体 + 1.5px 边距 ×2
-      final maxBars = (constraints.maxWidth / step).floor();
-      final count = maxBars <= 0 ? 0 : (samples.length < maxBars ? samples.length : maxBars);
-      final shown = count <= 0 ? const <double>[] : samples.sublist(samples.length - count);
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final sample in shown)
-            Container(
-              width: 3,
-              height: 8 + sample * 22,
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(1.5),
+          // 标题**居中**（与其它选项弹层同款：靠左会与下面的选项行分不清层次）；
+          // 右上角关闭圆钮与标题行水平对齐（老板 2026-10-24）——Stack 钉角
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Text(l10n.chatPageMenuVoiceTranscriptAuth,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
+                Positioned(
+                  right: 0,
+                  child: SheetCloseButton(tooltip: l10n.close),
+                ),
+              ],
+            ),
+          ),
+          // 标题下的小备注（outline 淡色，归标题那一组）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+            child: Center(
+              child: Text(
+                l10n.voiceTranscriptAuthNote,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 12, height: 1.4, color: scheme.outline),
               ),
             ),
+          ),
+          // 选项区可滚（两组卡片 + 桌面矮窗时不溢出；标题/勾选框/提交按钮固定）
+          Flexible(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 转写位置：左「本机」右「远程」两个方块二选一（老板
+                    // 2026-10-24：与时机组同款方块布局）。前置图标与语音消息气泡里
+                    // 的转写来源指示图标同款（_voiceTranscriptSourceIcon）：
+                    // 芯片=本机、云=远程。存储层是 _voiceTranscriptEngine，无迁移。
+                    _vtGroup(
+                      title: l10n.voiceTranscriptGroupEngine,
+                      children: [
+                        _vtBlockPair(
+                          left: _vtBlock(
+                            active: _engine == 'local',
+                            onTap: () => setState(() => _engine = 'local'),
+                            label: l10n.voiceTranscriptAuthLocal,
+                            desc: l10n.voiceTranscriptAuthLocalDesc,
+                            icon: Icons.memory,
+                            keyName: 'vtEngineLocal',
+                          ),
+                          right: _vtBlock(
+                            active: _engine == 'server',
+                            onTap: () => setState(() => _engine = 'server'),
+                            label: l10n.voiceTranscriptAuthServer,
+                            desc: l10n.voiceTranscriptAuthServerDesc,
+                            icon: Icons.cloud_outlined,
+                            keyName: 'vtEngineServer',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // 转写时机：左「手动」右「自动」两个方块二选一（老板 2026-10-24：
+                    // 参考空间向导里性别选择的方块按钮）——选中打勾，配色与
+                    // OptionPickerSheet 选项行同款（见 _vtBlock）。存储层
+                    // 仍是同一个 bool（_voiceTranscriptAuto），无迁移。
+                    _vtGroup(
+                      title: l10n.voiceTranscriptTimingLabel,
+                      children: [
+                        _vtBlockPair(
+                          left: _vtBlock(
+                            active: !_auto,
+                            onTap: () => setState(() => _auto = false),
+                            label: l10n.voiceTranscriptAutoOff,
+                            desc: l10n.voiceTranscriptManualModeDesc,
+                            keyName: 'vtTimingManual',
+                          ),
+                          right: _vtBlock(
+                            active: _auto,
+                            onTap: () => setState(() => _auto = true),
+                            label: l10n.voiceTranscriptAutoOn,
+                            desc: l10n.voiceTranscriptAutoModeDesc,
+                            keyName: 'vtTimingAuto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (widget.scopeAllLabel != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: LabeledCheckbox(
+                label: widget.scopeAllLabel!,
+                value: _scopeAll,
+                onChanged: (v) => setState(() => _scopeAll = v),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _changed ? _submit : null,
+                child: Text(l10n.chatPageTombstoneSubmit),
+              ),
+            ),
+          ),
         ],
-      );
-    });
+      ),
+    );
+  }
+
+  /// 分组卡片（白卡 + 淡边，与 PIN 弹窗 _setLockGroup 同款分层）。
+  Widget _vtGroup({String? title, required List<Widget> children}) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(14, title == null ? 14 : 12, 14, 14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// 左右两块等高排布（方式组 + 时机组两组二选一共用）。
+  ///
+  /// IntrinsicHeight 是必须的：Row 在弹层选项区的竖直滚动容器里（高度无上界），
+  /// stretch 会把无限高约束直接传给子块、performLayout 抛
+  /// 「BoxConstraints forces an infinite height」——先按两块内容量出齐高、
+  /// 再拉伸（等大方块的标准写法，2026-10-24 踩坑修复）。
+  Widget _vtBlockPair({required Widget left, required Widget right}) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 12),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
+  /// 单选方块（方式组 + 时机组共用；老板 2026-10-24：布局参考空间向导里
+  /// 性别选择的双卡片）：选中者打勾，未选中淡灰底暗示可点。
+  ///
+  /// 配色与 OptionPickerSheet 的选项行同款（2026-10-24 定稿口径）：选中 =
+  /// 品牌粉 #D6529C 25% 实底；未选中 = 5% 黑；悬浮 10% / 点击 14%。
+  ///
+  /// [icon] 可选前置图标（方式组：芯片=本机 / 云=远程，与语音消息气泡里
+  /// 转写来源指示图标同款，见 [_voiceTranscriptSourceIcon]）。
+  /// [keyName] 供测试按块定位（等高/点选断言）；不传即无 key。
+  Widget _vtBlock({
+    required bool active,
+    required VoidCallback onTap,
+    required String label,
+    required String desc,
+    IconData? icon,
+    String? keyName,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      key: keyName == null ? null : ValueKey(keyName),
+      color: active
+          ? const Color(0xFFD6529C).withValues(alpha: 0.25)
+          : Colors.black.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: Colors.black.withValues(alpha: 0.10),
+        highlightColor: Colors.black.withValues(alpha: 0.14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(label,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                  if (active)
+                    Icon(Icons.check, size: 20, color: scheme.primary),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(desc,
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 预览态录音的即时转写**底部弹层**（老板 2026-10-25；早期是 AlertDialog，
+/// 老板要求改底部弹层）：打开即自动开始转写（[prepError] 非空=准备阶段
+/// 就失败，直接显示错误不开转）——标题「语音转写」+ 右侧当前 Mode 的来源
+/// 图标（芯片=本机 / 云=远程，按 _voiceTranscriptEngine 显示；转写执行由
+/// [transcribe] 按 Mode 路由，与气泡消息同口径），内容区=转写中…（转圈）/
+/// 转写正文/失败信息（失败信息在弹层内显示，不走通知条，老板 2026-10-25）；
+/// 仅转写成功（有文字）时底部才出现 Apply 按钮：把文字交回 [onApply]（追加进
+/// 输入框现有文字末尾、切回文字态、**清除原录音**）。Cancel/下滑/点弹层外
+/// 只关弹层、预览态不动——关层≠停转写：本条若还没轮到就由 [cancelled]
+/// 跳过不跑；已进 isolate/已发出的 POST 照常跑完、结果因 mounted=false
+/// 丢弃（再长按波形可重转）。
+class _PreviewTranscribeSheet extends StatefulWidget {
+  const _PreviewTranscribeSheet({
+    required this.transcribe,
+    required this.path,
+    required this.onApply,
+    this.prepError,
+    required this.cancelled,
+    required this.engine,
+  });
+
+  /// 转写执行器（页面侧按 Mode 路由后注入，见 _transcribePreviewAudio）：
+  /// 本地=service.transcribeFile（与消息转写共用串行队列，不并发抢 CPU）；
+  /// 服务端=POST /transcriptions。取消/失败抛错，由本弹层内容区显示。
+  final Future<(String, String)> Function(String path,
+      {bool Function()? cancelled}) transcribe;
+
+  /// 预览态录音的临时 wav 路径（_stopVoice 时已规范化、已验证有音频数据）。
+  final String path;
+
+  /// Apply 回调（转写文字）。
+  final ValueChanged<String> onApply;
+
+  /// 准备阶段（模型下载/安装/探活）的错误信息；null=准备就绪，开层即转写。
+  final String? prepError;
+
+  /// 取消检查（关层后返回 true）：透传给 [transcribe]——本地队列轮到这条时
+  /// 发现层已关就跳过不跑；已进 isolate/已发出的 POST 拦不住（跑完丢弃）。
+  final bool Function() cancelled;
+
+  /// 当前转写 Mode（'server'=远程云 / 'local'=本机芯片）：标题右侧来源图标
+  /// 按它显示。服务端未启用而回落本机的边缘情况有 notice 说明，图标不翻转。
+  final String engine;
+
+  @override
+  State<_PreviewTranscribeSheet> createState() =>
+      _PreviewTranscribeSheetState();
+}
+
+class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
+  late bool _busy; // 转写中（打开即自动开始）
+  String _text = ''; // 转写结果
+  String? _error; // 失败信息（null=没失败）
+
+  @override
+  void initState() {
+    super.initState();
+    // 准备阶段就失败的：不开转，直接显示错误
+    _busy = widget.prepError == null;
+    _error = widget.prepError;
+    if (_error == null) unawaited(_transcribe());
+  }
+
+  Future<void> _transcribe() async {
+    try {
+      final r = await widget
+          .transcribe(widget.path, cancelled: widget.cancelled);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _text = r.$1.trim();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // Apply 恒在、仅「转写成功且有文字」时可点（老板 2026-10-26）：
+    // 此前是成功后才插入 Apply，会把 Cancel 向右挤——用户本想点 Cancel
+    // 结果手指落到了新出现的 Apply 上。现在只切可点状态，位置/尺寸不变。
+    final canApply = !_busy && _error == null && _text.isNotEmpty;
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题组（老板 2026-10-25）：标题**居中**，转写来源图标紧邻标题
+            // 右手（不再占最右——那里让给右上角关闭圆钮）；关闭圆钮用各弹层
+            // 同款 SheetCloseButton（老板 2026-10-24 式样：圆形淡灰底+关闭
+            // 图标），Stack 钉右上角、标题组仍居中（与阅后即焚/About 等
+            // 弹层同布局）。
+            // 来源图标按当前 Mode 给（芯片=本机 / 云=远程）——预览态转写自
+            // 2026-10-25 起与气泡消息同口径遵 Mode 路由（_transcribePreviewAudio），
+            // 图标与真正执行的引擎一致（服务端未启用而回落本机的边缘情况有
+            // notice 说明，图标不翻转）。约定同气泡转写行来源图标、设置页
+            // 引擎卡片（见 _voiceTranscriptSourceIcon）。
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.voiceTranscriptSheetTitle,
+                            style: theme.textTheme.titleMedium),
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          // 图标含义靠猜不如给文字：桌面悬浮显示「本机/远程」
+                          message: widget.engine == 'server'
+                              ? l10n.voiceTranscriptEngineServerShort
+                              : l10n.voiceTranscriptEngineLocalShort,
+                          child: Icon(
+                            widget.engine == 'server'
+                                ? Icons.cloud_outlined
+                                : Icons.memory,
+                            size: 18,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    child: SheetCloseButton(tooltip: l10n.close),
+                  ),
+                ],
+              ),
+            ),
+            // 内容区：限高+滚动（长转写文本不炸屏）
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _busy
+                      ? Row(
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(l10n.voiceTranscribing),
+                          ],
+                        )
+                      : Text(
+                          _error != null
+                              ? l10n.voiceTranscriptFailed(_error!)
+                              : (_text.isEmpty
+                                  ? l10n.voiceTranscriptNoText
+                                  : _text),
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 按钮行（老板 2026-10-26）：Cancel / Apply **一直并排常驻**、
+            // **等宽等尺寸**（参照 My email alerts 这类系统弹窗的 Cancel/Submit）。
+            // - 此前 Apply 是转写成功后才插入：会凭空出现并把 Cancel 向右挤，
+            //   用户本想点 Cancel 结果落到新出现的 Apply 上（误触）。现在
+            //   Apply 只是置灰不可点（转写中/失败/空结果），位置不变。
+            // - 尺寸统一走 app 既定口径：CancelButton（灰底 96x50、17 号粗体）
+            //   与主题里的 FilledButton 同块头，两枚再各自 Expanded 等分宽度
+            //   ——不会一大一小（旧版是默认 TextButton 40 高 vs FilledButton 50）。
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CancelButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: canApply
+                          ? () {
+                              widget.onApply(_text);
+                              Navigator.of(context).pop();
+                            }
+                          : null,
+                      child: Text(l10n.apply),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 /// 语音波形图（老板要求 2026-09-13）：长方形区域里一排等宽竖条。
 ///
-/// 竖条振幅二选一：[samples] 给了就用真实录音采样（录音条预览态，按 [width]
-/// 重采样成对应的条数）；否则用 [seed]（气泡里的 messageId）确定性生成——
-/// 同一条消息每次进页面形状一致（接收端拿不到对方录音的振幅）。
+/// 竖条振幅二选一：[samples] 给了就用真实录音采样（录音条录音中/预览态，按
+/// [width] 决定条数；[slidingWindow] 决定是取最新一段还是整段重采样）；否则用
+/// [seed]（气泡里的 messageId）确定性生成——同一条消息每次进页面形状一致
+/// （接收端拿不到对方录音的振幅）。
 ///
 /// 播放时按时间比例把已播过的条染成 [activeColor]（阴影从左往右扩散），并在
 /// 进度位置画一根竖线走过去；走完/停止即复原。时长未知时改为循环扫掠的波浪动画。
@@ -11502,6 +13242,7 @@ class _VoiceWaveform extends StatefulWidget {
     this.samples,
     this.seed,
     this.width = 120,
+    this.slidingWindow = false,
   });
 
   final bool playing;
@@ -11511,6 +13252,12 @@ class _VoiceWaveform extends StatefulWidget {
   final List<double>? samples; // 真实振幅采样（非空时优先于 seed）
   final String? seed;
   final double width;
+
+  /// 采样多到放不下时的处理：[false]=整段重采样压进可用宽度（预览态：要看到
+  /// 完整包络）；[true]=只取**最新**的一段、从左往右排（录音中：波形随录音
+  /// 往右滚，不压缩历史）。两态共用同一个渲染器，条宽/间距/圆角完全一致，
+  /// 切换时没有尺寸跳变（老板 2026-10-26）。
+  final bool slidingWindow;
 
   @override
   State<_VoiceWaveform> createState() => _VoiceWaveformState();
@@ -11540,8 +13287,12 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
         oldWidget.durationSeconds != widget.durationSeconds) {
       _sync();
     }
-    if (oldWidget.width != widget.width ||
-        oldWidget.samples?.length != widget.samples?.length) {
+    // 传了采样就每次重算：录音中的 [_voiceSamples] 是**就地追加的同一个 List
+    // 实例**，old/新 widget 拿到的是同一份——比长度永远相等，波形会冻在第一帧。
+    // 条数只有「宽度/5」（≈40），重算可以忽略。
+    if (widget.samples != null ||
+        oldWidget.width != widget.width ||
+        oldWidget.seed != widget.seed) {
       _amplitudes = _resolveAmplitudes();
     }
   }
@@ -11575,10 +13326,18 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
     }
   }
 
-  /// 竖条振幅：有真实采样就重采样到 [_barCount]，否则按 seed 确定性生成。
+  /// 竖条振幅：有真实采样就用真实采样（[slidingWindow] 取最新的一段，否则
+  /// 重采样到 [_barCount]），没有则按 seed 确定性生成。
   List<double> _resolveAmplitudes() {
     final samples = widget.samples;
-    if (samples != null && samples.isNotEmpty) return _resample(samples, _barCount);
+    // 传了采样就只用采样：**空列表也要照空画**（刚开始录音还没采到点，不能
+    // 退回 seed 的伪随机波形，否则一开录就冒出一排假条）
+    if (samples != null) {
+      if (samples.isEmpty) return const <double>[];
+      if (!widget.slidingWindow) return _resample(samples, _barCount);
+      final start = math.max(0, samples.length - _barCount);
+      return samples.sublist(start);
+    }
     return _buildAmplitudes(widget.seed ?? '');
   }
 
@@ -11907,17 +13666,13 @@ Future<void> showMyAvatarFullscreen(
                           children: [
                             if (onSave != null && onApplyAllSpaces != null) ...[
                               // 我的头像：图标圆钮版
-                              Tooltip(
-                                message:
-                                    AppLocalizations.of(ctx)!.chatPageActionSave,
-                                child: IconButton.filled(
+                              IconButton.filled(
                                   onPressed: () {
                                     Navigator.of(ctx).pop();
                                     unawaited(onSave(bytes));
                                   },
                                   icon: const Icon(Icons.save_alt),
                                 ),
-                              ),
                               const SizedBox(width: 8),
                             ],
                             if (onApplyAllSpaces != null)
@@ -11955,6 +13710,354 @@ Future<void> showMyAvatarFullscreen(
           ),
         ),
       ));
+}
+
+/// 消息长按菜单的动作卡片（老板 2026-10-27“更显眼、更生动”）——与「+」附件
+/// 菜单的素色卡片 [_ChatPageState._buildActionCard] 是**两种类型**，各自演化
+/// （两种菜单本身就是两种弹层形态：锚定浮窗 / 底部弹层）。
+///
+/// 视觉：整块铺橘黄淡底（#FF9800 10%）、图案同橘黄——与菜单打开期间被选中的
+/// 橘黄气泡连成一气，视线从消息落到菜单不换色；文字仍用默认深色（浅橘底上
+/// 最清楚，老板 2026-10-27：橘黄的只是“图案”）。destructive 项改走红色系
+/// （消息菜单目前没有标红项，留给将来）。
+/// 手感：按下整卡缩到 0.94、松开弹回（110ms），水波/高亮/悬停都用橘黄调——
+/// 比默认灰色水波更“活”。
+class _MessageActionCardTile extends StatefulWidget {
+  const _MessageActionCardTile({
+    required this.iconWidget,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final Widget iconWidget;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  State<_MessageActionCardTile> createState() => _MessageActionCardTileState();
+}
+
+class _MessageActionCardTileState extends State<_MessageActionCardTile> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent =
+        widget.destructive ? Colors.red.shade400 : _kOrangeHighlight;
+    return Listener(
+      // 只做按压视觉反馈，不参与手势竞争（点按仍由内层 InkWell 处理）。
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: Material(
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            onTap: widget.onTap,
+            splashColor: accent.withValues(alpha: 0.18),
+            highlightColor: accent.withValues(alpha: 0.10),
+            hoverColor: accent.withValues(alpha: 0.06),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconTheme.merge(
+                    data: IconThemeData(color: accent),
+                    child: widget.iconWidget,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.destructive ? accent : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 消息操作菜单的**锚定浮层 route**（老板 2026-10-24）：内容是一个白底圆角卡片，
+/// **紧贴**锚点气泡（[anchor]，全局坐标）：上方放得下放上方、否则下方、**都不够放
+/// 时直接悬浮覆盖在气泡上**（老板指定，微信长链接同款）。水平跟随气泡侧
+/// （[mine] 靠右 / 对方靠左），越界钳回屏内。
+///
+/// 高度不用估算值选边——用 [_MenuPlacement] 两阶段布局：先让菜单按给定宽度做
+/// intrinsic 测量（_buildActionCardGrid 由固定尺寸卡片组成，intrinsic 安全），
+/// 拿到真实高度后精确放置。
+class _MessageActionsPopupRoute extends PopupRoute<String> {
+  _MessageActionsPopupRoute({
+    required this.anchor,
+    required this.screen,
+    required this.menuBuilder,
+  });
+
+  final Rect anchor;
+  final Size screen;
+  final WidgetBuilder menuBuilder;
+
+  @override
+  // 与 app 里所有 showDialog / showModalBottomSheet 的默认 barrier 同款
+  // （Colors.black54，54% 黑）——菜单弹出时聊天页同样变暗，视觉一致
+  // （老板 2026-10-24：原先 20% 太浅，比别的弹层暗得明显不够）。
+  Color? get barrierColor => Colors.black54;
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  String? get barrierLabel => '关闭消息菜单';
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 180);
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    // 淡入走 easeOutCubic；缩放另走 easeOutBack——0.85→1.0 收尾时轻微过冲
+    // （约 1.6%），菜单“弹”一下，比匀速放大生动（老板 2026-10-27）。
+    // 用 drive 而非 CurvedAnimation：后者需手动 dispose，而 buildTransitions
+    // 每帧都会重跑，不在这里造要释放的对象。
+    final fade = animation.drive(CurveTween(curve: Curves.easeOutCubic));
+    // PopupRoute 的 buildTransitions 结果直接进 Overlay（不是 Stack）——
+    // 自己包一层 Stack，Positioned 才有合法宿主（实测：直接 Positioned 抛
+    // ParentData 断言）。
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FadeTransition(
+            opacity: fade,
+            child: _MenuPlacement(
+              anchor: anchor,
+              screen: screen,
+              animation: animation,
+              menuBuilder: menuBuilder,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 菜单的两阶段放置：先在 `Offstage` 里按目标宽度把菜单**真实测高**
+/// （setState 记录），下一帧再按测得高度精确选位（上/下/悬浮）。
+/// 为什么不用 intrinsic 高度一步算：_buildActionCardGrid 内部有 LayoutBuilder
+/// （按可用宽算每行卡数），对它调 getMaxIntrinsicHeight 会抛断言——离屏布局
+/// （Offstage）是最省事的真实测量。
+class _MenuPlacement extends StatefulWidget {
+  const _MenuPlacement({
+    required this.anchor,
+    required this.screen,
+    required this.animation,
+    required this.menuBuilder,
+  });
+
+  final Rect anchor;
+  final Size screen;
+
+  /// route 的原始动画（0→1）：淡入与缩放在这里各自挂不同的曲线，见 build。
+  final Animation<double> animation;
+
+  final WidgetBuilder menuBuilder;
+
+  @override
+  State<_MenuPlacement> createState() => _MenuPlacementState();
+}
+
+class _MenuPlacementState extends State<_MenuPlacement> {
+  double? _menuHeight;
+
+  static const double _gap = 8.0; // 菜单与气泡的间距
+  static const double _edgeMargin = 12.0; // 卡片距屏幕边缘
+  static const double _gridMaxWidth = 96.0 * 4 + 12.0 * 3; // 一行四卡
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = widget.screen;
+    final menuWidth =
+        _gridMaxWidth.clamp(0.0, screen.width - _edgeMargin * 2);
+    final anchor = widget.anchor;
+    // 弹出缩放：0.85→1.0，easeOutBack 收尾过冲一点（“弹”出来的生动感）。
+    final pop = widget.animation.drive(
+      Tween<double>(begin: 0.85, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+    );
+    final menu = Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      elevation: 6,
+      shadowColor: Colors.black38,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: widget.menuBuilder(context),
+      ),
+    );
+
+    // 阶段一：菜单还没量过高 → 离屏测高（同宽度），下一帧回来放置。
+    // 注意：本 widget 处于 buildTransitions 包的 Positioned.fill 的 Stack 里，
+    // 这里**不能再套 Positioned**（ParentData 冲突）——直接返回非定位子节点，
+    // 由 Align 顶到左上角，Offstage 不参与布局占位。
+    final measured = _menuHeight;
+    if (measured == null) {
+      return Align(
+        alignment: Alignment.topLeft,
+        child: Offstage(
+          child: SizedBox(
+            width: menuWidth,
+            child: _MeasureSize(
+              onChange: (size) {
+                // performLayout 里回调 → 不能同步 setState（"Build scheduled
+                // during frame" 断言），推到帧尾。
+                if (!mounted || _menuHeight == size.height) return;
+                scheduleMicrotask(() {
+                  if (mounted && _menuHeight != size.height) {
+                    setState(() => _menuHeight = size.height);
+                  }
+                });
+              },
+              child: menu,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 阶段二：按真实高度选位（老板 2026-10-24 定稿）：以**按点**为锚——锚是
+    // 长按点/按钮中心（必在气泡内），菜单**下边缘（上方开）/上边缘（下方开）
+    // 贴住按点** → 菜单必然压住气泡一部分，其余部分露出橘黄选中高亮（微信同款
+    // "菜单长在消息上"）。上下都放不下时选空间大的一侧，菜单允许被屏幕缘裁掉
+    // 一部分（按点在屏内，露出的部分够用）。
+    final insets = MediaQuery.paddingOf(context);
+    final spaceAbove = anchor.top - insets.top;
+    final spaceBelow = screen.height - insets.bottom - anchor.bottom;
+    // 上方放得下优先上方（微信习惯）；否则下方；都不够选空间大的一侧。
+    final bool above;
+    if (spaceAbove >= measured + _gap) {
+      above = true;
+    } else if (spaceBelow >= measured + _gap) {
+      above = false;
+    } else {
+      above = spaceAbove >= spaceBelow;
+    }
+    // 水平：菜单中心对准按点 x；太靠边时钳回屏内。
+    double left = anchor.center.dx - menuWidth / 2;
+    left = left.clamp(_edgeMargin, math.max(_edgeMargin,
+        screen.width - _edgeMargin - menuWidth));
+    // 垂直：菜单边缘贴按点（_gap 缝里出箭头）。钳回屏内（贴边裁切可接受）。
+    final double top = above
+        ? (anchor.top - _gap - measured)
+            .clamp(_edgeMargin + insets.top, double.infinity)
+        : (anchor.bottom + _gap).clamp(0.0, double.infinity);
+    // 小箭头（老板 2026-10-24，微信同款）：旋转 45° 的正方形，指回按点——
+    // 上方开时贴菜单下边（箭头尖朝下）、下方开时贴上边。水平 = 按点 x 在菜单
+    // 坐标系里的偏移，钳在菜单宽度内（留出箭头半径与 8px 边距）。
+    const arrowSize = 12.0;
+    final double? arrowTop = above ? null : -arrowSize / 2;
+    final double? arrowBottom = above ? -arrowSize / 2 : null;
+    final double arrowLeft = ((anchor.center.dx - left) - arrowSize / 2)
+        .clamp(8.0, math.max(8.0, menuWidth - arrowSize - 8.0));
+    return Stack(
+      children: [
+        Positioned(
+          left: left,
+          top: top,
+          width: menuWidth,
+          child: ScaleTransition(
+            alignment:
+                above ? Alignment.bottomCenter : Alignment.topCenter,
+            scale: pop,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                menu,
+                Positioned(
+                  left: arrowLeft,
+                  top: arrowTop,
+                  bottom: arrowBottom,
+                  child: Transform.rotate(
+                    angle: math.pi / 4,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const RoundedRectangleBorder(),
+                      elevation: 0,
+                      child: SizedBox.square(
+                          dimension: arrowSize,
+                          child: const SizedBox.expand()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 子组件尺寸变化回调（离屏测高用）：包一层 RenderProxyBox，layout 后上报
+/// 子组件真实大小。（全私有，仅本文件 [_MenuPlacementState] 用。）
+class _MeasureSize extends SingleChildRenderObjectWidget {
+  const _MeasureSize({required this.onChange, super.child});
+
+  final ValueChanged<Size> onChange;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _MeasureSizeRenderObject(onChange);
+
+  @override
+  void updateRenderObject(
+      BuildContext context, covariant _MeasureSizeRenderObject renderObject) {
+    renderObject.onChange = onChange;
+  }
+}
+
+class _MeasureSizeRenderObject extends RenderProxyBox {
+  _MeasureSizeRenderObject(this.onChange);
+
+  ValueChanged<Size> onChange;
+  Size? _lastSize;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (child != null && size != _lastSize) {
+      _lastSize = size;
+      onChange(size);
+    }
+  }
 }
 
 class _MessageAvatar extends StatefulWidget {
@@ -12395,7 +14498,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
 /// 既尊重"减少动态效果"的系统偏好，也让 widget 测试里的 `pumpAndSettle` 不会
 /// 被这个常驻动画卡住（常驻动画会让 pumpAndSettle 一直等到超时）。
 class _SendingPlane extends StatefulWidget {
-  const _SendingPlane({this.color, this.size = 11});
+  const _SendingPlane({super.key, this.color, this.size = 11});
 
   final Color? color;
 

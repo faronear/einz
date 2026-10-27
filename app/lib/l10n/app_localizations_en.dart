@@ -296,9 +296,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupCreateCopy => 'Copy invite link';
-
-  @override
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
@@ -341,12 +338,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get setupJoinEntranceLimitReached =>
       'This space has reached the server\'s entrance limit — no new entrance can be opened.';
-
-  @override
-  String get setPinDialogPinLabel => 'New PIN (at least 6 digits)';
-
-  @override
-  String get setPinDialogConfirmLabel => 'Confirm new PIN';
 
   @override
   String get setPinDialogSetPin => 'Apply';
@@ -399,7 +390,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockSubmitChange => 'Change';
 
   @override
-  String get chatPageSetLockDurationLabel => 'Auto-lock after inactivity';
+  String get chatPageSetLockDurationLabel => 'Lock after inactivity';
 
   @override
   String get chatPageSetLockTabChange => 'Change PIN';
@@ -409,12 +400,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String lockDurationSecs(int n) {
-    return '$n sec';
+    return '$n s';
   }
 
   @override
   String lockDurationMin(int n) {
-    return '$n min';
+    return '$n m';
   }
 
   @override
@@ -477,12 +468,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogReinviteFallbackName => 'them';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
-
-  @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy entrance token';
-
-  @override
   String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
@@ -520,9 +505,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuExit => 'Quit app';
 
   @override
-  String get chatPageMenuMore => 'Main menu';
-
-  @override
   String get chatPageMsgMoreActions => 'More actions';
 
   @override
@@ -533,9 +515,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageGroupNameTitle => 'Group name';
-
-  @override
-  String get chatPageGroupNameEditTooltip => 'Change group name';
 
   @override
   String get chatPageGroupNameLabel => 'Name';
@@ -678,7 +657,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMoreSettingsStorage => 'Attachment storage';
 
   @override
-  String get chatPageMoreSettingsTombstone => 'Vanished messages';
+  String get chatPageMoreSettingsTombstone => 'Removed messages';
 
   @override
   String get chatPageAttachmentStorageNote =>
@@ -800,12 +779,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Verification failed, please try again';
 
   @override
-  String get chatPagePassphraseShow => 'Show';
-
-  @override
-  String get chatPagePassphraseHide => 'Hide';
-
-  @override
   String get chatPageMembersInviteNew => 'Invite a new companion';
 
   @override
@@ -828,13 +801,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListNew => 'Add my new entrance';
 
   @override
-  String get chatPageEntranceListRefresh => 'Refresh';
-
-  @override
   String get chatPagePinLabel => 'PIN';
-
-  @override
-  String get chatPageLockNow => 'Lock now';
 
   @override
   String chatPagePinMenuValue(String duration) {
@@ -903,7 +870,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete new messages automatically once read on a countdown';
 
   @override
-  String get chatPageTombstoneHeading => 'Vanished messages';
+  String get chatPageTombstoneHeading => 'Removed messages';
 
   @override
   String get chatPageTombstoneNote =>
@@ -960,10 +927,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRecallFailed => 'Recall failed, try again later';
 
   @override
-  String get chatPageQuotedTombMessage =>
-      '(This message is no longer available)';
-
-  @override
   String get chatPageQuoteGoneNotice =>
       'The quoted message is no longer available';
 
@@ -982,7 +945,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageActionBurn => 'Burn after reading';
+  String get chatPageActionBurn => 'Burn after';
 
   @override
   String get chatPageDeleteConfirmTitle => 'Delete message?';
@@ -1042,18 +1005,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageMsgSent => 'Sent';
-
-  @override
-  String get chatPageMsgSendingTap => 'Sending… tap to verify and resend';
-
-  @override
-  String get chatPageMsgDelivered => 'Delivered';
-
-  @override
-  String get chatPageMsgFailed => 'Send failed, tap to retry';
-
-  @override
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
@@ -1093,7 +1044,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageVoiceEmpty => 'Recording was empty and was discarded.';
 
   @override
-  String get chatPageLongPressToRecord => 'Long press to record';
+  String get chatPageLongPressToRecord => 'Tap or long-press to record';
+
+  @override
+  String get chatPageLongPressToTranscribe => 'Long press to text';
 
   @override
   String get chatPageInputHint => 'Type a message…';
@@ -1108,9 +1062,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachEmoji => 'Emoji';
-
-  @override
-  String get chatPageEmojiKeyboard => 'Keyboard';
 
   @override
   String get chatPageAttachPaste => 'Paste';
@@ -1134,10 +1085,106 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageAttachAnyFile => 'Any file';
 
   @override
-  String get chatPagePlaying => 'Playing…';
+  String get chatPageVoiceLabel => 'Voice';
 
   @override
-  String get chatPageVoiceLabel => 'Voice';
+  String get voiceTranscribing => 'Transcribing…';
+
+  @override
+  String get voiceTranscriptRetry => 'Transcription failed, tap to retry';
+
+  @override
+  String get voiceTranscriptStale => 'Re-transcribe available';
+
+  @override
+  String get voiceTranscriptManual => 'Tap to transcribe';
+
+  @override
+  String get voiceTranscriptLegacyAudio =>
+      'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can';
+
+  @override
+  String voiceTranscriptFailed(String error) {
+    return 'Transcription failed: $error';
+  }
+
+  @override
+  String get voiceTranscriptNoText => 'No speech recognized';
+
+  @override
+  String get voiceTranscriptSheetTitle => 'Voice transcription';
+
+  @override
+  String get voiceTranscriptSettingsLink => 'Settings';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
+  String get chatPageMenuVoiceTranscriptAuth => 'Voice transcription';
+
+  @override
+  String get voiceTranscriptAuthNote => 'how to transcribe voice messages?';
+
+  @override
+  String get voiceTranscriptAuthLocal => 'Local';
+
+  @override
+  String get voiceTranscriptAuthLocalDesc =>
+      'Runs entirely on this device — audio never leaves it';
+
+  @override
+  String get voiceTranscriptAuthServer => 'Remote';
+
+  @override
+  String get voiceTranscriptAuthServerDesc =>
+      'Voice messages are sent to our cloud server, and deleted immediately after transcribing';
+
+  @override
+  String voiceTranscriptServerFailed(String error) {
+    return 'Remote transcription failed: $error';
+  }
+
+  @override
+  String get voiceTranscriptServerDisabled =>
+      'Remote transcription isn\'t enabled — used the local model instead';
+
+  @override
+  String get voiceTranscriptGroupEngine => 'Where to transcribe';
+
+  @override
+  String get voiceTranscriptTimingLabel => 'When to transcribe';
+
+  @override
+  String get voiceTranscriptEngineLocalShort => 'Local';
+
+  @override
+  String get voiceTranscriptEngineServerShort => 'Remote';
+
+  @override
+  String get voiceTranscriptAutoOn => 'Auto';
+
+  @override
+  String get voiceTranscriptAutoOff => 'Manual';
+
+  @override
+  String get voiceTranscriptAutoModeDesc =>
+      'Voice messages are transcribed automatically when they arrive';
+
+  @override
+  String get voiceTranscriptManualModeDesc =>
+      'You manually choose which voice messages to transcribe';
+
+  @override
+  String get voiceTranscriptMenuTranscribe => 'Transcribe';
+
+  @override
+  String get voiceTranscriptPreparing => 'Installing voice model on first use';
+
+  @override
+  String voiceTranscriptPrepareFailed(String error) {
+    return 'Failed to install voice model: $error';
+  }
 
   @override
   String get chatPageAttachmentMetaMissing => 'Attachment metadata missing';
@@ -1191,22 +1238,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String burnUnitDays(int count) {
-    return '${count}d';
+    return '$count d';
   }
 
   @override
   String burnUnitHours(int count) {
-    return '${count}h';
+    return '$count h';
   }
 
   @override
   String burnUnitMinutes(int count) {
-    return '${count}m';
+    return '$count m';
   }
 
   @override
   String burnUnitSeconds(int count) {
-    return '${count}s';
+    return '$count s';
   }
 
   @override
@@ -1322,7 +1369,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases all messages, attachments and credentials of the current entrance, then takes you back to the setup wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!';
+      'Permanently erases the current entrance, and you can\'t visit the current space on this device. This cannot be undone!';
 
   @override
   String resetEntranceNameLabel(String name) {
@@ -1427,14 +1474,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberPending => 'Waiting';
-
-  @override
-  String chatPageStatusOthersOnline(int online, int total) {
-    return '$online/$total';
-  }
-
-  @override
-  String get voiceCallMenuCall => 'Voice call';
 
   @override
   String get voiceCallIncoming => 'Incoming call';

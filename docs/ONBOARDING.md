@@ -52,20 +52,21 @@ B 加入（口令取钥）→ 双端互通对话。
 ```bash
 # ① VPS：拉最新代码 + 重建 server
 ssh 你的VPS
-cd /faronear/only            # ← 你的实际部署目录（下同，按需替换）
+cd /faronear/einz            # ← 你的实际部署目录（下同，按需替换）
 git pull
-cd serverDocker
+cd server/docker
 # 首次部署（或 .env 丢失后重建）：生成备份密钥
-bash serverDocker/env.sh         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
+bash env.sh                       # 脚本在仓库里（.gitignore 不覆盖，git pull 不影响）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 EINZ_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
+# （env.sh 已能自动生成并写入 .env；手动 python 路线是二选一的备选）
 docker compose up -d --build server
 curl -s https://einz.tic.cc/health
 # {"status":"ok","protocol_version":"v2-multiverse","version":"1.0.0","capabilities":["spaces","join-tokens"],...}
 docker compose logs -f server   # 查看日志（启动/建空间/通道登记等事件；Ctrl+C 停止跟踪）
 
 # ② 本机（Mac）：拉最新代码
-cd /Users/Shared/productX/only && git pull
+cd /Users/Shared/productX/einz && git pull
 
 # ③ 可选：清掉旧通道凭证（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
 rm -f ~/.einz/*.json
@@ -87,7 +88,7 @@ TUI 引导会一次完成：生成通道身份 → `POST /spaces` 建空间（�
 本地生成 Space Key → 用口令加密上传密保箱 → 打印邀请链接。
 
 ```bash
-cd /Users/Shared/productX/only/cli
+cd /Users/Shared/productX/einz/cli
 dart run bin/einz_tui.dart --server https://einz.tic.cc \
   --store ~/.einz/a.json
 # 引导流程：
@@ -131,7 +132,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 ## 阶段 3：日常使用（两端）
 
 ```bash
-cd /Users/Shared/productX/only/cli
+cd /Users/Shared/productX/einz/cli
 dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ 下的通道后列出选择
 # 启动探测 /health → 能连 → 直接进 TUI（不询问服务器）；状态栏 ● 在线
 # 输入消息回车即发送（无需子命令）

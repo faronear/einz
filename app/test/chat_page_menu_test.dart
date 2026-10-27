@@ -17,6 +17,7 @@ import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/space_session.dart';
 import 'package:einz/data/vault_session.dart';
+import 'package:einz/data/voice_transcript_settings.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/widgets/burn_duration_sheet.dart';
 import 'package:einz/lock_page.dart';
@@ -723,17 +724,20 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
-    // 时长轴（对数刻度 20 秒~20 分钟，仿阅后即焚）。初始停在默认档 30 秒
-    // （kLockSeconds，持久化里没存过值）；轴下最左标注是「20 秒」
+    // 时长轴（对数刻度 10 秒~30 分钟，仿阅后即焚；2026-10-24 由 20 秒~20 分钟
+    // 改来）。初始停在默认档 1 分钟（kLockSeconds=60，2026-10-27 由 30 秒改来，
+    // 持久化里没存过值）；轴下最左标注是「10 秒」
     expect(find.byType(Slider), findsOneWidget);
-    expect(find.text('30 秒'), findsOneWidget, reason: '标题行当前值=默认档 30 秒');
-    expect(find.text('20 秒'), findsOneWidget, reason: '轴下最左可点标注');
-    // 点轴中点 → t=0.5 → 20×√60≈155s → 吸附到整分钟 180s（3 分钟）
+    // 标题行当前值=默认档 1 分钟；轴下刻度位恰有同档「1 分钟」标注（t(60)），
+    // 共两处
+    expect(find.text('1 分钟'), findsNWidgets(2));
+    expect(find.text('10 秒'), findsOneWidget, reason: '轴下最左可点标注');
+    // 点轴中点 → t=0.5 → 10×√180≈134s → 吸附到整分钟 120s（2 分钟）
     await tester.tap(find.byType(Slider));
     await tester.pumpAndSettle();
     final slider = tester.widget<Slider>(find.byType(Slider));
     expect(slider.value, 0.5, reason: '对数轴中点是 t=0.5');
-    expect(find.text('3 分钟'), findsOneWidget, reason: '标题行当前值应跟随更新');
+    expect(find.text('2 分钟'), findsOneWidget, reason: '标题行当前值应跟随更新');
     // 两空提交：只调时长 → 需验老 PIN（2026-10-19 新规），通过后弹窗关闭、PIN 不动
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
@@ -742,7 +746,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing);
     expect(await AppLockService(db).isSetup, true, reason: '只调时长不清锁');
-    expect(await AppLockService(db).loadLockSeconds(), 180);
+    expect(await AppLockService(db).loadLockSeconds(), 120);
   });
 
   testWidgets('更改弹窗：PIN 和时长都没动就点「更改」→ 红字报没有做任何修改', (WidgetTester tester) async {
@@ -822,9 +826,7 @@ void main() {
     await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
     // 弹窗内只剩一个可编辑名字输入框（性别只读框 2026-10-17 已移到「我的资料」弹层）
-    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
+    // 老板 2026-10-24：弹窗一打开即可编辑，不再有初始只读+编辑按钮的冻结态
     await tester.enterText(
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
         '新名字');
@@ -868,9 +870,7 @@ void main() {
       await tapDeferred(tester, find.textContaining(menuItem));
       // 「我的资料」是弹层：先点名字胶囊进改名弹窗（两段错峰）
       await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
-      // 初始只读：先点「编辑」进可编辑态（只读态不接键盘输入）
-      await tester.tap(find.byIcon(Icons.edit));
-      await tester.pumpAndSettle();
+      // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
       final field = find
           .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
           .first;
@@ -889,8 +889,7 @@ void main() {
     /// （2026-10-02 起当前通道名不再有独立菜单项）。
     Future<String> typeIntoEntrance(String input) async {
       await _openCurrentEntranceRename(tester);
-      await tester.tap(find.byIcon(Icons.edit)); // 初始只读 → 进可编辑态
-      await tester.pumpAndSettle();
+      // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
       final field = find
           .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
           .first;
@@ -914,7 +913,7 @@ void main() {
     expect(entrance.length, kEntranceNameMaxLength, reason: '第 33 个字符应敲不进去');
   });
 
-  testWidgets('改名对话框：点输入框任意位置即进编辑态（不必点编辑图标）', (WidgetTester tester) async {
+  testWidgets('改名对话框：一打开即可编辑（老板 2026-10-24 取消冻结态）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -941,12 +940,8 @@ void main() {
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPageMenuMyProfile));
     await tapDeferred(tester, find.byKey(const ValueKey('myProfileNameRow')));
-    expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
-    // 点名字输入框本身（不是右侧编辑图标）→ 也应切到编辑态
-    await tester.tap(
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first);
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.edit), findsNothing, reason: '点输入框内任意位置后应进入编辑态');
+    // 老板 2026-10-24：不再有初始只读态/编辑按钮——弹窗打开即直接输入
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '冻结态已取消，无编辑按钮');
     await tester.enterText(
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
         '新名字');
@@ -1181,8 +1176,7 @@ void main() {
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first; // 弹窗内只有一个名字输入框（性别框已移入「我的资料」弹层）
-    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
-    await tester.pumpAndSettle();
+    // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
     await tester.enterText(renameField, 'Alice');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -1243,11 +1237,8 @@ void main() {
 
     expect(find.text(_zh.chatPageRenameEntranceTitle), findsOneWidget, reason: '弹窗标题');
     expect(find.text(_zh.chatPageEntranceListThisDevice), findsWidgets, reason: '输入框标签');
-    // 初始只读态有「编辑」按钮；点它就进可编辑态
-    expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
-    await tester.tap(find.byIcon(Icons.edit));
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
+    // 老板 2026-10-24：不再有初始只读态/编辑按钮——弹窗打开即直接输入
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '冻结态已取消，无编辑按钮');
 
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
@@ -1338,8 +1329,7 @@ void main() {
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first;
-    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
-    await tester.pumpAndSettle();
+    // 老板 2026-10-24：弹窗一打开即可编辑，直接输入
     await tester.enterText(dialogField, '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -1371,7 +1361,7 @@ void main() {
     expect(find.text(_zh.chatPageRenameNameTitle), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
   });
 
-  testWidgets('长按菜单预览行对齐：我的消息靠右、对方消息靠左', (WidgetTester tester) async {
+  testWidgets('长按消息：菜单为锚定气泡的浮层（不再有预览行）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1412,35 +1402,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
-    // 长按我的消息 → 弹窗预览行靠右（与消息流一致）
+    // 长按我的消息 → 菜单弹出且**没有预览行**（2026-10-24 改锚定浮层，预览行已删）
     await tester.longPress(find.text('我的消息'));
     await tester.pumpAndSettle();
-    final mineRow =
-        tester.widget<Row>(find.byKey(const ValueKey('messagePreviewRow')));
-    expect(mineRow.mainAxisAlignment, MainAxisAlignment.end,
-        reason: '我的消息预览行应靠右对齐');
     expect(find.text('引用'), findsOneWidget, reason: '菜单应已弹出');
+    expect(find.byKey(const ValueKey('messagePreviewRow')), findsNothing,
+        reason: '锚定浮层不再需要消息预览行');
     // 关闭弹窗（点击遮罩）
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
 
-    // 长按对方消息 → 预览行靠左
+    // 长按对方消息 → 菜单同样弹出（动作卡片共用同一列表）
     await tester.longPress(find.text('对方消息'));
     await tester.pumpAndSettle();
-    final peerRow =
-        tester.widget<Row>(find.byKey(const ValueKey('messagePreviewRow')));
-    expect(peerRow.mainAxisAlignment, MainAxisAlignment.start,
-        reason: '对方消息预览行应靠左对齐');
+    expect(find.text('引用'), findsOneWidget, reason: '对方消息菜单应已弹出');
     // 关闭弹窗，避免测试结束时挂起的 Route
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
   });
 
-  testWidgets('长按语音消息：菜单预览行显示 播放键+波形+时长 且播放键可点', (WidgetTester tester) async {
+  testWidgets('长按语音消息：锚定浮层菜单弹出且含「转写」卡（无预览行）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    // 语音消息：载荷 meta 带 25s 时长（无附件——只测菜单预览行的渲染与可点性）
+    // 语音消息：载荷 meta 带 25s 时长（附件元数据齐全——只测菜单的渲染）
     final voice = await encryptMessage(
       plaintext: encodeMessagePayload('', meta: {kMetaAudioDurationSeconds: 25}),
       spaceKey: spaceKey,
@@ -1481,26 +1466,14 @@ void main() {
 
     expect(find.text('25s'), findsOneWidget, reason: '消息流语音气泡应显示时长');
 
-    // 长按 → 菜单预览行与消息流一致：播放键（+波形）+ 时长
+    // 长按 → 锚定浮层菜单：动作卡片（引用/焚毁/删除/转写…），**没有预览行**——
+    // 消息本体就在旁边，无需重复展示（2026-10-24 老板改版）
     await tester.longPress(find.text('25s'));
     await tester.pumpAndSettle();
-    final previewRow = find.byKey(const ValueKey('messagePreviewRow'));
-    expect(
-      find.descendant(of: previewRow, matching: find.byIcon(Icons.play_circle)),
-      findsOneWidget,
-      reason: '菜单预览行应显示播放键（与消息流一致）',
-    );
-    expect(
-      find.descendant(of: previewRow, matching: find.text('25s')),
-      findsOneWidget,
-      reason: '菜单预览行应显示时长',
-    );
-    expect(find.text('voice'), findsNothing,
-        reason: '语音消息不应退化成类型占位文字');
-    // 播放键真的可点（走 _playAudioMessage：此处无附件 → 提示元数据缺失）
-    final playButton = tester.widget<IconButton>(
-        find.descendant(of: previewRow, matching: find.byType(IconButton)));
-    expect(playButton.onPressed, isNotNull, reason: '预览行播放键应可点按播放');
+    expect(find.text('引用'), findsOneWidget, reason: '菜单应已弹出');
+    expect(find.text('转写'), findsOneWidget, reason: '语音消息菜单应含「转写」卡');
+    expect(find.byKey(const ValueKey('messagePreviewRow')), findsNothing,
+        reason: '锚定浮层不再需要消息预览行');
 
     await tester.tapAt(const Offset(20, 20)); // 关闭弹窗
     await tester.pumpAndSettle();
@@ -2494,6 +2467,92 @@ void main() {
       expect(await BurnAfterSettings(db, spaceId: 'space-demo').load(), 86400);
       expect(await BurnAfterSettings(db, spaceId: 'space-b').load(), 0,
           reason: '不勾选不应扇出到其它空间');
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('语音转写弹层：转写时机为左右方块，点选可提交（stretch 无限高回归）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 顶栏菜单 → 更多设置 → 语音转写（两级 deferred：每级关窗 300ms 后再开下一层）
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMoreSettings));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuVoiceTranscriptAuth));
+
+    // 弹层打开：标题「转写时机」+ 两块（手动/自动）都在——Row 用 stretch 等高，
+    // 曾在竖直滚动区里抛「BoxConstraints forces an infinite height」整个弹层打不开
+    expect(find.text(_zh.voiceTranscriptTimingLabel), findsOneWidget);
+    expect(find.text(_zh.voiceTranscriptAutoOff), findsOneWidget);
+    expect(find.text(_zh.voiceTranscriptAutoOn), findsOneWidget);
+
+    // 方式组：标题 + 芯片（本机）/云（远程）前置图标——与语音消息气泡里
+    // 转写来源指示图标同款（_voiceTranscriptSourceIcon）
+    expect(find.text(_zh.voiceTranscriptGroupEngine), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(BottomSheet), matching: find.byIcon(Icons.memory)),
+        findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(BottomSheet), matching: find.byIcon(Icons.cloud_outlined)),
+        findsOneWidget);
+
+    // 两块等高（IntrinsicHeight 把无界高度收敛成齐高再拉伸）——时机组与
+    // 位置组两对方块都断言（位置组 2026-10-24 同改方块，同一套约束陷阱）
+    final manualHeight =
+        tester.getSize(find.byKey(const ValueKey('vtTimingManual'))).height;
+    final autoHeight =
+        tester.getSize(find.byKey(const ValueKey('vtTimingAuto'))).height;
+    expect(manualHeight, autoHeight, reason: '时机组左右两块应等高');
+    final localHeight =
+        tester.getSize(find.byKey(const ValueKey('vtEngineLocal'))).height;
+    final remoteHeight =
+        tester.getSize(find.byKey(const ValueKey('vtEngineServer'))).height;
+    expect(localHeight, remoteHeight, reason: '位置组左右两块应等高');
+
+    // 默认手动、无改动 → 提交按钮灰；点「自动」块 → 亮起 → 提交落盘
+    final submit = find.widgetWithText(FilledButton, _zh.chatPageTombstoneSubmit);
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+    await tester.tap(find.text(_zh.voiceTranscriptAutoOn));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(submit).onPressed, isNotNull);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      expect(
+          await VoiceTranscriptSettings(db, spaceId: 'space-demo').loadAuto(),
+          isTrue);
+      // 没勾「所有秘境」→ 只写本空间 per-space 键；全局键一个都不许落
+      // （2026-10-24 回归：_ScopedKey.write 曾误写全局裸键，所有空间都生效）
+      for (final globalKey in const [
+        'voice_transcript_engine',
+        'voice_transcript_auto',
+      ]) {
+        final global = await (db.select(db.appState)
+              ..where((s) => s.key.equals(globalKey)))
+            .getSingleOrNull();
+        expect(global, isNull, reason: '不勾范围不许写全局键 $globalKey');
+      }
     });
     expect(tester.takeException(), isNull);
   });

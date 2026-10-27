@@ -277,7 +277,7 @@ void main() {
     expect(find.text('旧设备发的'), findsOneWidget);
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '服务端已收下（seq 有值）→ 单勾');
-    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
+    expect(find.byKey(const ValueKey('sendingPlane')), findsNothing,
         reason: '不该显示成「发送中」——那会诱导用户点重发，进而撞 403 变永久失败');
     expect(find.byIcon(Icons.done_all), findsNothing,
         reason: '还没有对方回执 → 不该显示双勾');
@@ -321,9 +321,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('待确认的一条'), findsOneWidget);
-    final plane = find.byTooltip('发送中，点击验证是否已送达并重发');
+    final plane = find.byKey(const ValueKey('sendingPlane'));
     expect(plane, findsOneWidget, reason: 'pending 应显示可点按的小飞机');
     expect(api.posted, isEmpty, reason: '尚未点按前不该上传');
+
+    // 回归（老板 2026-10-25 二次实测）：调用点曾包 Flexible，有界宽度下
+    // Container(alignment:) 底层的 Align 会填满剩余空间 → 小飞机被拉成横跨
+    // 气泡的大胶囊（左右大片空白）。纯飞机状态钮必须是 28×28 方形热区。
+    final planeMaterialRect = tester.getRect(find
+        .ancestor(of: plane, matching: find.byType(Material))
+        .first);
+    expect(planeMaterialRect.width, planeMaterialRect.height,
+        reason: '纯飞机状态钮必须是正方形热区，不能被拉抻');
+    expect(planeMaterialRect.width, closeTo(28, 0.5),
+        reason: '热区边长 = 时间行控件统一高度 28');
 
     // 点按小飞机 → 用同一封消息重发（服务端幂等）→ 变单勾
     await tester.tap(plane);
@@ -332,7 +343,7 @@ void main() {
     expect(api.posted.length, 1, reason: '点按应触发一次重发');
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '重发成功后应显示单勾（已发送）');
-    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
+    expect(find.byKey(const ValueKey('sendingPlane')), findsNothing,
         reason: '不应再停留在发送中');
   });
 
@@ -375,6 +386,25 @@ void main() {
 
     expect(find.text('点击重发'), findsOneWidget, reason: '失败气泡应有显式文字标签');
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+    // 回归（老板 2026-10-25 实测）：本钮曾被包在 CircleBorder + antiAlias 里，
+    // 内容被裁成直径 28 的圆——英文 "Tap to resend" 只剩中段 "rese"、⚠️
+    // 整个被切掉。带文字的控件必须是胶囊（StadiumBorder）；圆形 clips 只归
+    // 纯图标钮（_bubbleQuickAction）。布局尺寸不受裁切影响，只能查 shape。
+    final failedMaterial = tester.widget<Material>(find
+        .ancestor(of: find.text('点击重发'), matching: find.byType(Material))
+        .first);
+    expect(failedMaterial.shape, isA<StadiumBorder>(),
+        reason: '带文字的失败状态钮必须是胶囊形，不能是圆形裁切');
+
+    // 同回归（老板 2026-10-25）：失败胶囊按内容宽度（文字+⚠️）显示，
+    // 不是横跨气泡（zh「点击重发」+⚠️+padding ≈ 74px）
+    final failedRect = tester.getRect(find
+        .ancestor(of: find.text('点击重发'), matching: find.byType(Material))
+        .first);
+    expect(failedRect.height, closeTo(28, 0.5), reason: '高度 = 时间行控件统一高度');
+    expect(failedRect.width, lessThan(120),
+        reason: '失败胶囊按内容宽度显示，不该被拉抻');
   });
 
   testWidgets('服务端明确拒绝发送 → 顶部提示带「后台：」前缀', (WidgetTester tester) async {
@@ -531,15 +561,23 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsOneWidget,
+    expect(find.byKey(const ValueKey('sendingPlane')), findsOneWidget,
         reason: '网络异常后应停在待确认的小飞机');
 
     // 网络恢复且响应变慢 → 点按后能观察到「加速中…」
     api.failPostMessage = false;
     api.postMessageDelay = const Duration(milliseconds: 60);
-    await tester.tap(find.byTooltip('发送中，点击验证是否已送达并重发'));
+    await tester.tap(find.byKey(const ValueKey('sendingPlane')));
     await tester.pump(const Duration(milliseconds: 10));
     expect(find.text('加速中…'), findsOneWidget, reason: '重发期间应显示进行中文案');
+
+    // 回归（老板 2026-10-25 实测）：带「加速中…」文字时本钮曾被圆形裁切，
+    // 英文 "Speeding up…" 只剩中段 "ing u"。必须是胶囊形。
+    final speedupMaterial = tester.widget<Material>(find
+        .ancestor(of: find.text('加速中…'), matching: find.byType(Material))
+        .first);
+    expect(speedupMaterial.shape, isA<StadiumBorder>(),
+        reason: '带文字的发送中状态钮必须是胶囊形，不能是圆形裁切');
 
     // 完成后 → 单勾，「加速中…」消失
     await tester.pump(const Duration(milliseconds: 300));

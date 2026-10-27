@@ -1,0 +1,10 @@
+# server 镜像构建排除（context = ../server）：仅需 package*.json、tsconfig、src/
+# 敏感项（.env、data/ 用户数据、models/ 466MB）绝不进 context，防止误 COPY 泄漏
+# 与 context 传输浪费
+node_modules/
+dist/
+data/
+models/
+config/
+docker/
+.env

@@ -509,7 +509,7 @@ export function preflightJoin(
       // 新身份：**最小空 slot**。空 = 没有这一行，**或**这一行还是 pending
       // （member_id NULL）。后者是存量库的"伴侣预置位"——v3 起 create 不再预置，
       // 存量 pending 行的语义退化为"未预置名字的空槽"，伴侣拿 invite 链接加入
-      // 就该坐进去（aimemo/groupChatDesign.md「一次性升级步骤」第 4 条）；
+      // 就该坐进去（aimemo/20261003_groupChatDesign.md「一次性升级步骤」第 4 条）；
       // 跳过它的话，存量情侣空间的第二人会落到 slot 2、slot 1 留一个永远填不上
       // 的幽灵行，连带"同性别第二人取青色"（判据 slot=1）也一起失效。
       const rows = getDb()
@@ -746,7 +746,7 @@ export function createJoinToken(
   return { joinToken: t.token, link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token, expiresAt: t.expiresAt };
 }
 
-/** 自愿退群（2026-10-19，aimemo/groupExitDesign.md；老板三项拍板的基础实现）。
+/** 自愿退群（2026-10-19，aimemo/20261019_groupExitDesign.md；老板三项拍板的基础实现）。
  *
  * **身份级离场**（不是"退出一台设备"）：一次退群 = 该 member 身份退出空间——
  *  ① 本身份名下**全部**通道一并注销（retireEntrance 的批量版，无口令：

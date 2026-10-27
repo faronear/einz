@@ -82,7 +82,7 @@ Einz 是一个专门为**两个确定的人**设计的私密通信与共享私�
 | **伴侣身份（member，原 `partner_id`；更早 `person_id`）** | 秘境里的一个槽位身份（slot 0 = 创建者 / 1 = 第二人） | 每个秘境**恰好两个**；同一真人在不同秘境各有一个，**跨秘境不等同** |
 | **登记项（entry，原 `entrance_id`）** | 某安装在某秘境的一次登记：一套密钥对 + 一个身份 | 由 create/join **动态登记**（静态白名单早已废除） |
 | **安装（install，`install_uid`）** | 一台机器上的一份 App/TUI 部署 | 可同时持有**多个**秘境；服务端据此把多行认成同一台机器 |
-| **真人（person）** | 真实的人（产品概念） | **目前没有全局标识**；"一个真人一个 `member_id`"是将来项（见 `renamePlan.zhcn.md`） |
+| **真人（person）** | 真实的人（产品概念） | **目前没有全局标识**；"一个真人一个 `member_id`"是将来项（见 `20260923_renamePlan.zhcn.md`） |
 | Message / Attachment | 消息 / 大文件附件（图/视频/语音） | 密文存储 / 独立加密 blob，消息只存元数据 |
 
 ### 2.2 真人（person）与通道（entrance）分离
@@ -198,7 +198,7 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
   `key.rotation` 广播与 `key_rotation_required`；**归档密钥层一并删除**（`archived_space_keys`
   / `archivedKeys` / "高版本即归档"守卫——无生产者且无存量数据，不背兼容包袱）。
   唯一留下的是 **`key_version` 本身**（信封/AAD 一部分，见 §4.2）+ 按版本取钥的收口。
-- `[搁置]` **密保箱纳入归档密钥**（`aimemo/escrowArchivedKeys.md`）：这是轮换的前置依赖，
+- `[搁置]` **密保箱纳入归档密钥**（`aimemo/20260914_escrowArchivedKeys.md`）：这是轮换的前置依赖，
   随轮换一并搁置；将来恢复轮换时按 `SECURITY.md` §3.5 的清单补齐。
 
 ### 4.5 恢复模型（已决策）
@@ -366,7 +366,7 @@ Repositories（SQLite + File Storage）
 - ⚠️ **以下"数据模型要点"是 v1（静态白名单 / config.json）时期的描述，已被 Multiverse（v2）取代**：
   通道登记改为 create/join 动态写入 `entrances` 表，空间归属走 `space_members`，配置只留
   `maxSpaces` 等服务端参数。**权威来源**：`docs/DATABASE.md`、`docs/PROTOCOL.md`、
-  `aimemo/multiSpaceDesign.zhcn.md`（多空间：per-space 身份 + 服务端侧 `install_uid` 认知）。
+  `aimemo/20260918_multiSpaceDesign.zhcn.md`（多空间：per-space 身份 + 服务端侧 `install_uid` 认知）。
 - **数据模型要点：**（固定两人一空间，`spaces` / `space_members` 表不再需要，由配置文件表达）
 
 ```text
@@ -537,7 +537,7 @@ Internet ──► Caddy（HTTPS/WSS、证书、反代）──► Node.js（SQL
 
 ### 14.2 V2 候选（按需评估）
 
-共享相册、日历、富笔记、位置共享、消息表情回应、贴纸、主题、一人多通道、通道间密钥迁移、搜索、语音/视频通话（WebRTC + STUN/TURN，成熟方案，不自研；**2026-09-18 已出专题方案 `aimemo/voiceCall.zhcn.md`，[待评审]**）、正式电脑端（CLI 加 TUI 升级，或 Flutter 桌面端）。**明确不采用 Web 客户端**（浏览器代码由服务器下发，E2EE 降级）。
+共享相册、日历、富笔记、位置共享、消息表情回应、贴纸、主题、一人多通道、通道间密钥迁移、搜索、语音/视频通话（WebRTC + STUN/TURN，成熟方案，不自研；**2026-09-18 已出专题方案 `aimemo/20260918_voiceCall.zhcn.md`，[待评审]**）、正式电脑端（CLI 加 TUI 升级，或 Flutter 桌面端）。**明确不采用 Web 客户端**（浏览器代码由服务器下发，E2EE 降级）。
 
 ### 14.3 开发阶段（估算）
 
@@ -590,7 +590,7 @@ docs/ARCHITECTURE.md ← 部署与运维（含备份演练）
 - [ ] 已读回执的粒度（sent / delivered / read）与展示方式。
 - [ ] 模型 B（托管恢复）的密钥派生路径细节（仅设计预留，不实现）。
 - [ ] 一人多通道时，新通道加入的"可信通道作保"流程（V2 前再定，§5.3）。
-- [ ] 音视频通话的 WebRTC 方案选型 → **已出专题方案（2026-09-18）：`aimemo/voiceCall.zhcn.md`，状态 [待评审]**；边界已定：只做前台语音通话、不做后台呼入、不做视频、不做桌面端。
+- [ ] 音视频通话的 WebRTC 方案选型 → **已出专题方案（2026-09-18）：`aimemo/20260918_voiceCall.zhcn.md`，状态 [待评审]**；边界已定：只做前台语音通话、不做后台呼入、不做视频、不做桌面端。
 
 ---
 

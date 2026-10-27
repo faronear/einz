@@ -159,7 +159,7 @@ Future<bool> confirmLeaveSpace(
   return true;
 }
 
-/// 「退出群组」——group 空间的**自愿退群**（2026-10-19，aimemo/groupExitDesign.md；
+/// 「退出群组」——group 空间的**自愿退群**（2026-10-19，aimemo/20261019_groupExitDesign.md；
 /// 老板三项拍板：duo 不开放、多设备一并退、顶部通知+名单刷新）。
 ///
 /// 与 [confirmLeaveSpace]（销毁本通道）的本质区别——**身份级离场**：

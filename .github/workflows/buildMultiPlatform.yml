@@ -335,6 +335,9 @@ jobs:
           MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
           MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
           MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER: ${{ secrets.ASC_API_ISSUER }}
+          ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
         run: |
           APP=build/macos/Build/Products/Release/einz.app
           # flutter 可能嵌入本机 profile（CI 上通常没有，防御性删除）。Developer ID
@@ -352,16 +355,56 @@ jobs:
           IDENTITY="Developer ID Application"
           find "$APP/Contents/Frameworks" -name "*.framework" \
             -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
+          # 裸 dylib（voice 分支引入的 sherpa-onnx FFI 插件是 .dylib 不是 .framework）：
+          # 不签/无 secure timestamp 会被公证判 Invalid（run 39878450056 实测：
+          # libsherpa-onnx-c-api.dylib x86_64+arm64 四条 "not signed with a valid
+          # Developer ID certificate" / "does not include a secure timestamp"），
+          # 且 Invalid 时 notarytool submit 也 exit 0，报错被误导到 stapler 的
+          # "CloudKit query ... Record not found"。
+          find "$APP/Contents/Frameworks" -name "*.dylib" \
+            -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
           codesign -f -s "$IDENTITY" --timestamp --options runtime --entitlements "$ENT" "$APP"
           codesign --verify -v --strict "$APP"
-          # 公证凭据存入临时 keychain profile（secrets 不落日志）
-          xcrun notarytool store-credentials notary-ci \
-            --apple-id "$MACOS_NOTARY_APPLE_ID" \
-            --team-id "$MACOS_NOTARY_TEAM_ID" \
-            --password "$MACOS_NOTARY_PASSWORD"
+          # 公证凭据存入临时 keychain profile（secrets 不落日志）。
+          # **优先 ASC API key**（与 iOS 上传同一套 secrets）：免 App 专用密码、
+          # 凭据与 TestFlight 上传同源。注：staple 失败与凭据通道无关——真正
+          # root cause 是 Frameworks 下的裸 dylib 未签名（见上），公证 Accepted
+          # 后 stapler 一次成功（run 39879626235 实测）。缺 ASC secrets 时回退
+          # Apple ID + App 密码方式。
+          mkdir -p ~/private_keys
+          printf '%s' "$ASC_P8_KEY" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          chmod 600 "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          if [[ -n "$ASC_API_KEY_ID" && -n "$ASC_API_ISSUER" ]]; then
+            xcrun notarytool store-credentials notary-ci \
+              --key "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8" \
+              --key-id "$ASC_API_KEY_ID" \
+              --issuer "$ASC_API_ISSUER"
+          else
+            echo "⚠️ 未配 ASC secrets，回退 Apple ID + App 密码公证（staple 可能遇到 Record not found）"
+            xcrun notarytool store-credentials notary-ci \
+              --apple-id "$MACOS_NOTARY_APPLE_ID" \
+              --team-id "$MACOS_NOTARY_TEAM_ID" \
+              --password "$MACOS_NOTARY_PASSWORD"
+          fi
           # zip 必须用 ditto（保留 Frameworks 符号链接，zip 命令会破坏结构导致公证失败）
           ditto -c -k --keepParent --sequesterRsrc "$APP" notary-upload.zip
-          xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait
+          # **必须解析 submit 的 JSON status**：公证被判 Invalid 时 notarytool 也
+          # exit 0（electron/notarize 社区同款坑），只看退出码会一路走到 stapler，
+          # 得到的只是不知所云的 "CloudKit query ... Record not found"——Invalid 的
+          # 公证不发布 ticket，重试多久都查不到（run 39729360308/39875227075/39876828935
+          # 三连败的真相）。status 非 Accepted 当场打 notarytool log 拿 Apple 的拒绝原因。
+          SUBMIT_JSON=$(xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait --output-format json)
+          echo "$SUBMIT_JSON"
+          STATUS=$(printf '%s' "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')
+          SUB_ID=$(printf '%s' "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))')
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "❌ 公证未通过（status=$STATUS）——Apple 拒绝原因："
+            xcrun notarytool log "$SUB_ID" --keychain-profile notary-ci || true
+            exit 1
+          fi
+          # stapler staple：公证 Accepted 后一次即成（run 39879626235 实测）。
+          # 若再遇 "CloudKit query ... Record not found"：那是公证 Invalid 的下游
+          # 症状，真凶看上面 notarytool log 的 issues，不要往 stapler/凭据方向修。
           xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
           spctl -a -vv -t exec "$APP"

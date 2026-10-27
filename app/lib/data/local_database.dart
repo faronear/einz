@@ -18,7 +18,7 @@ part 'local_database.g.dart';
 /// per-space 设置键：`space.<spaceId>.<key>`（多空间：设置按空间隔离）。
 ///
 /// 读取时回退同名旧全局键（v7 之前的设置没有空间维度），故存量用户的设置不会丢，
-/// 见 `aimemo/multiSpaceDesign.zhcn.md` §3.6。
+/// 见 `aimemo/20260918_multiSpaceDesign.zhcn.md` §3.6。
 String spaceScopedKey(String spaceId, String key) => 'space.$spaceId.$key';
 
 /// 本地消息（与 Server messages 同构 + 本地状态）。
@@ -106,7 +106,7 @@ class PeerReceipts extends Table {
   Set<Column> get primaryKey => {spaceId, memberId};
 }
 
-/// 本地已加入的 Space（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.1）。
+/// 本地已加入的 Space（多空间支持，见 `aimemo/20260918_multiSpaceDesign.zhcn.md` §3.1）。
 ///
 /// 定位是「**元数据 + 会话外状态**」：Space Key 只存在于 Vault（PIN 密文包 /
 /// SecureStore 明文包），本表**不存任何密钥**——避免两处真相。
@@ -136,8 +136,40 @@ class AppState extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(
-    tables: [LocalMessages, LocalAttachments, SyncState, Drafts, AppState, PeerReceipts, Spaces])
+/// 语音消息本地转写（纯本地派生表，`aimemo/20261009_voiceTranscript.zhcn.md` §7）。
+///
+/// 定位是**可丢弃缓存**：转写文本 = f(明文音频, ASR 模型)，各端各自转写、
+/// 不进 E2EE 密文、不参与同步、服务端不可见；换模型/换版本后可对同一音频重算。
+/// 随消息**级联删除**（音频被焚毁/删除时转写必须同时消失）。
+/// 不写进备份快照（能从密文音频重算，不把可能不准的文字固化进备份）。
+class LocalVoiceTranscripts extends Table {
+  TextColumn get messageId => text().references(LocalMessages, #messageId)();
+  // 列名用 transcript（drift Table 基类已有 text() 方法，`text` 列名与之冲突）
+  TextColumn get transcript => text().withDefault(const Constant(''))();
+  TextColumn get modelId => text().withDefault(const Constant(''))(); // 如 sense-voice-small
+  // 模型版本/文件哈希——与当前期望不一致 → stale（可重转的开关）
+  TextColumn get modelVersion => text().withDefault(const Constant(''))();
+  // 音频密文 sha256——音频若变化则转写失效（重发/换附件场景）
+  TextColumn get audioSha256 => text().withDefault(const Constant(''))();
+  TextColumn get language => text().withDefault(const Constant(''))(); // 识别到的语言
+  // pending=排队中 | done=完成 | failed=失败(重试耗尽) | stale=模型/音频已变化 | unavailable=模型未就绪
+  TextColumn get status => text().withDefault(const Constant('pending'))();
+  IntColumn get updatedAt => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {messageId};
+}
+
+@DriftDatabase(tables: [
+  LocalMessages,
+  LocalAttachments,
+  SyncState,
+  Drafts,
+  AppState,
+  PeerReceipts,
+  Spaces,
+  LocalVoiceTranscripts,
+])
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(_openConnection());
 
@@ -146,10 +178,14 @@ class LocalDatabase extends _$LocalDatabase {
   /// 调用点一律用 [shared]；测试用 [forTesting] 自带 executor，不受影响。
   static final LocalDatabase shared = LocalDatabase();
 
-  LocalDatabase.forTesting(super.executor) : super();
+  /// 测试用连接：executor 外包一层 [DatabaseConnection]（同 [_openConnection]），
+  /// 保证测试与生产走同一条流store 语义（closeStreamsSynchronously 的缘由见
+  /// [_openConnection] 注释）。
+  LocalDatabase.forTesting(QueryExecutor executor)
+      : super(DatabaseConnection(executor, closeStreamsSynchronously: true));
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -245,6 +281,56 @@ class LocalDatabase extends _$LocalDatabase {
               await m.addColumn(localMessages, localMessages.deletedKind);
             }
           }
+          if (from < 11) {
+            // v11（2026-10-22）：新增 local_voice_transcripts 表（语音消息本地转写，
+            // 纯本地派生缓存——aimemo/20261009_voiceTranscript.zhcn.md §7）。纯新表，无回填。
+            //
+            // **必须占独立版本号**：v10 已随 main 发布过（墓碑来路列），本分支起初把
+            // 新表塞进上面的 from<10 块——已升到 v10 的存量库（生产/dev 都是）再打开
+            // 时 from==10，整段迁移根本不会跑，local_voice_transcripts 不存在，
+            // 语音气泡下方的转写行（drift watch 流）直接报 "no such table"。
+            await m.createTable(localVoiceTranscripts); // CREATE TABLE IF NOT EXISTS
+          }
+          if (from < 12) {
+            // v12（2026-10-24）：转写设置 per-space 化的**存量数据善后**。
+            //
+            // 背景：2026-10-23 重构后 VoiceTranscriptSettings._ScopedKey.write 误写
+            // 裸键（全局 voice_transcript_engine / voice_transcript_auto）而非
+            // scopedKey——不勾「应用于本机所有秘境」的保存也污染了这两个全局键，
+            // 所有空间读到时（per-space 缺失 → 回退全局）都生效（老板 2026-10-24
+            // 实测）。代码已修（写 scopedKey）；本迁移处理已被写脏的存量库：
+            // ① 把全局现值**认领**进每个空间的 per-space 键（INSERT OR IGNORE——
+            //    已有 per-space 值的空间不动，那是 saveAll 清覆盖前的合法状态）；
+            // ② 删除这两个全局键——不删的话此后新建/未配置空间仍会读到污染值。
+            // 删后语义：每个空间各自独立（未配置走默认 local/手动），「所有秘境」
+            // 仍可随时用勾选框重新铺（saveAll 写全局 + 清覆盖，与迁移前同款）。
+            // 旧版单键 voice_transcript_auth（迁移派生源）不属这两键，不受影响。
+            // 键名全是代码内常量（无注入面），与 v7 回填一样直接内联拼 SQL。
+            //
+            // app_state 表可能压根不存在（sqlite3 手工造的落后库：user_version=6
+            // 却只有四张表——迁移测试第一个用例实测，2026-10-24）。没有设置表
+            // 就没有污染可善后，整段跳过；不跳过的话 INSERT 抛 no such table,
+            // 整个迁移失败、库再也打不开。
+            final appStateExists =
+                (await customSelect('PRAGMA table_info(app_state)').get())
+                    .isNotEmpty;
+            if (appStateExists) {
+              for (final settingKey in const [
+                'voice_transcript_engine',
+                'voice_transcript_auto',
+              ]) {
+                await customStatement(
+                  'INSERT OR IGNORE INTO app_state (key, value) '
+                  "SELECT 'space.' || s.space_id || '.$settingKey', a.value "
+                  "FROM spaces s, app_state a WHERE a.key = '$settingKey'",
+                );
+              }
+              await customStatement(
+                "DELETE FROM app_state WHERE key IN "
+                "('voice_transcript_engine', 'voice_transcript_auto')",
+              );
+            }
+          }
         },
       );
 
@@ -254,24 +340,38 @@ class LocalDatabase extends _$LocalDatabase {
     return rows.any((r) => r.read<String>('name') == column);
   }
 
-  static QueryExecutor _openConnection() => driftDatabase(
-        name: 'einz',
-        native: DriftNativeOptions(
-          // dev 运行（npm run app-mac-run-local*）把库挪到 Documents/dev-*/ 下，
-          // 与装机那份正式库互不干扰；不启用时传 null = 用 drift 默认
-          // （getApplicationDocumentsDirectory()），生产路径一个字节都不动。
-          databaseDirectory:
-              devDataDirIsolated ? () => devSubDir(getApplicationDocumentsDirectory) : null,
-          // 锁竞争容错（启动偶发 SqliteException(5) database is locked 根因）：
-          // - journal_mode=WAL：读（SELECT）不再被写阻塞——"while selecting"
-          //   锁错误来源消除；WAL 模式持久化在库文件头，每次连接再设一遍兜底
-          // - busy_timeout=5000：写写竞争等待 5s 而非立即 SQLITE_BUSY（默认 0）
-          // - synchronous=NORMAL：WAL 推荐档位（配 checkpoint 足够安全，写入更快）
-          setup: (db) {
-            db.execute('PRAGMA journal_mode = WAL');
-            db.execute('PRAGMA busy_timeout = 5000');
-            db.execute('PRAGMA synchronous = NORMAL');
-          },
+  /// 连接外包 [DatabaseConnection] 并开 `closeStreamsSynchronously`：
+  /// drift 的 select 流在**最后一个监听者取消**时，默认会起一个 `Timer.run`
+  /// （把缓存流多留一个事件循环迭代，给同一帧内重新订阅的 StreamBuilder 复用）。
+  /// 该定时器在 flutter_test 的 FakeAsync 里没人推进时钟 → 永不触发：
+  ///   1. 测试卸载 widget 树时 `timersPending` 断言炸（"A Timer is still
+  ///      pending even after the widget tree was disposed."）；
+  ///   2. `db.close()` 里 StreamQueryStore.close() 会 await 这个永不完成的
+  ///      timer completer → 整个测试吊死到 10 分钟超时。
+  /// 2026-10-22 语音转写行的 drift 流（_buildVoiceTranscriptLine）首次把流
+  /// 带进 widget 树，两个症状同时踩到（chat_page_menu_test 实测）。
+  /// 全 App 仅此一处 drift 流，同步回收缓存无感知；测试与生产同一语义。
+  static QueryExecutor _openConnection() => DatabaseConnection(
+        driftDatabase(
+          name: 'einz',
+          native: DriftNativeOptions(
+            // dev 运行（npm run app-mac-run-local*）把库挪到 Documents/dev-*/ 下，
+            // 与装机那份正式库互不干扰；不启用时传 null = 用 drift 默认
+            // （getApplicationDocumentsDirectory()），生产路径一个字节都不动。
+            databaseDirectory:
+                devDataDirIsolated ? () => devSubDir(getApplicationDocumentsDirectory) : null,
+            // 锁竞争容错（启动偶发 SqliteException(5) database is locked 根因）：
+            // - journal_mode=WAL：读（SELECT）不再被写阻塞——"while selecting"
+            //   锁错误来源消除；WAL 模式持久化在库文件头，每次连接再设一遍兜底
+            // - busy_timeout=5000：写写竞争等待 5s 而非立即 SQLITE_BUSY（默认 0）
+            // - synchronous=NORMAL：WAL 推荐档位（配 checkpoint 足够安全，写入更快）
+            setup: (db) {
+              db.execute('PRAGMA journal_mode = WAL');
+              db.execute('PRAGMA busy_timeout = 5000');
+              db.execute('PRAGMA synchronous = NORMAL');
+            },
+          ),
         ),
+        closeStreamsSynchronously: true,
       );
 }

@@ -578,12 +578,6 @@ abstract class AppLocalizations {
   /// **'the invite link is from {other} but this app is connected to {current}; they cannot work with each other.'**
   String setupTokenOtherServer(String other, String current);
 
-  /// No description provided for @setupCreateCopy.
-  ///
-  /// In en, this message translates to:
-  /// **'Copy invite link'**
-  String get setupCreateCopy;
-
   /// Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying
   ///
   /// In en, this message translates to:
@@ -655,18 +649,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This space has reached the server\'s entrance limit — no new entrance can be opened.'**
   String get setupJoinEntranceLimitReached;
-
-  /// No description provided for @setPinDialogPinLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'New PIN (at least 6 digits)'**
-  String get setPinDialogPinLabel;
-
-  /// No description provided for @setPinDialogConfirmLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm new PIN'**
-  String get setPinDialogConfirmLabel;
 
   /// No description provided for @setPinDialogSetPin.
   ///
@@ -761,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockDurationLabel.
   ///
   /// In en, this message translates to:
-  /// **'Auto-lock after inactivity'**
+  /// **'Lock after inactivity'**
   String get chatPageSetLockDurationLabel;
 
   /// No description provided for @chatPageSetLockTabChange.
@@ -779,13 +761,13 @@ abstract class AppLocalizations {
   /// No description provided for @lockDurationSecs.
   ///
   /// In en, this message translates to:
-  /// **'{n} sec'**
+  /// **'{n} s'**
   String lockDurationSecs(int n);
 
   /// No description provided for @lockDurationMin.
   ///
   /// In en, this message translates to:
-  /// **'{n} min'**
+  /// **'{n} m'**
   String lockDurationMin(int n);
 
   /// No description provided for @chatPageSetLockOldLabel.
@@ -890,18 +872,6 @@ abstract class AppLocalizations {
   /// **'them'**
   String get chatPageInviteDialogReinviteFallbackName;
 
-  /// No description provided for @chatPageInviteCopyLinkTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Copy invite link'**
-  String get chatPageInviteCopyLinkTooltip;
-
-  /// No description provided for @chatPageInviteCopyCodeTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Copy entrance token'**
-  String get chatPageInviteCopyCodeTooltip;
-
   /// No description provided for @chatPageInviteLinkCopied.
   ///
   /// In en, this message translates to:
@@ -968,12 +938,6 @@ abstract class AppLocalizations {
   /// **'Quit app'**
   String get chatPageMenuExit;
 
-  /// No description provided for @chatPageMenuMore.
-  ///
-  /// In en, this message translates to:
-  /// **'Main menu'**
-  String get chatPageMenuMore;
-
   /// No description provided for @chatPageMsgMoreActions.
   ///
   /// In en, this message translates to:
@@ -997,12 +961,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Group name'**
   String get chatPageGroupNameTitle;
-
-  /// No description provided for @chatPageGroupNameEditTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Change group name'**
-  String get chatPageGroupNameEditTooltip;
 
   /// No description provided for @chatPageGroupNameLabel.
   ///
@@ -1229,7 +1187,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMoreSettingsTombstone.
   ///
   /// In en, this message translates to:
-  /// **'Vanished messages'**
+  /// **'Removed messages'**
   String get chatPageMoreSettingsTombstone;
 
   /// No description provided for @chatPageAttachmentStorageNote.
@@ -1418,18 +1376,6 @@ abstract class AppLocalizations {
   /// **'Verification failed, please try again'**
   String get chatPagePassphraseVerifyFailed;
 
-  /// No description provided for @chatPagePassphraseShow.
-  ///
-  /// In en, this message translates to:
-  /// **'Show'**
-  String get chatPagePassphraseShow;
-
-  /// No description provided for @chatPagePassphraseHide.
-  ///
-  /// In en, this message translates to:
-  /// **'Hide'**
-  String get chatPagePassphraseHide;
-
   /// No description provided for @chatPageMembersInviteNew.
   ///
   /// In en, this message translates to:
@@ -1466,23 +1412,11 @@ abstract class AppLocalizations {
   /// **'Add my new entrance'**
   String get chatPageEntranceListNew;
 
-  /// No description provided for @chatPageEntranceListRefresh.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh'**
-  String get chatPageEntranceListRefresh;
-
   /// No description provided for @chatPagePinLabel.
   ///
   /// In en, this message translates to:
   /// **'PIN'**
   String get chatPagePinLabel;
-
-  /// No description provided for @chatPageLockNow.
-  ///
-  /// In en, this message translates to:
-  /// **'Lock now'**
-  String get chatPageLockNow;
 
   /// No description provided for @chatPagePinMenuValue.
   ///
@@ -1595,7 +1529,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTombstoneHeading.
   ///
   /// In en, this message translates to:
-  /// **'Vanished messages'**
+  /// **'Removed messages'**
   String get chatPageTombstoneHeading;
 
   /// No description provided for @chatPageTombstoneNote.
@@ -1694,12 +1628,6 @@ abstract class AppLocalizations {
   /// **'Recall failed, try again later'**
   String get chatPageRecallFailed;
 
-  /// No description provided for @chatPageQuotedTombMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'(This message is no longer available)'**
-  String get chatPageQuotedTombMessage;
-
   /// No description provided for @chatPageQuoteGoneNotice.
   ///
   /// In en, this message translates to:
@@ -1733,7 +1661,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageActionBurn.
   ///
   /// In en, this message translates to:
-  /// **'Burn after reading'**
+  /// **'Burn after'**
   String get chatPageActionBurn;
 
   /// No description provided for @chatPageDeleteConfirmTitle.
@@ -1795,30 +1723,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send failed: {error}'**
   String chatPageSendFailed(String error);
-
-  /// No description provided for @chatPageMsgSent.
-  ///
-  /// In en, this message translates to:
-  /// **'Sent'**
-  String get chatPageMsgSent;
-
-  /// No description provided for @chatPageMsgSendingTap.
-  ///
-  /// In en, this message translates to:
-  /// **'Sending… tap to verify and resend'**
-  String get chatPageMsgSendingTap;
-
-  /// No description provided for @chatPageMsgDelivered.
-  ///
-  /// In en, this message translates to:
-  /// **'Delivered'**
-  String get chatPageMsgDelivered;
-
-  /// No description provided for @chatPageMsgFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Send failed, tap to retry'**
-  String get chatPageMsgFailed;
 
   /// No description provided for @chatPageMsgFailedTap.
   ///
@@ -1883,8 +1787,14 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageLongPressToRecord.
   ///
   /// In en, this message translates to:
-  /// **'Long press to record'**
+  /// **'Tap or long-press to record'**
   String get chatPageLongPressToRecord;
+
+  /// No description provided for @chatPageLongPressToTranscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Long press to text'**
+  String get chatPageLongPressToTranscribe;
 
   /// No description provided for @chatPageInputHint.
   ///
@@ -1909,12 +1819,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Emoji'**
   String get chatPageAttachEmoji;
-
-  /// No description provided for @chatPageEmojiKeyboard.
-  ///
-  /// In en, this message translates to:
-  /// **'Keyboard'**
-  String get chatPageEmojiKeyboard;
 
   /// No description provided for @chatPageAttachPaste.
   ///
@@ -1958,17 +1862,185 @@ abstract class AppLocalizations {
   /// **'Any file'**
   String get chatPageAttachAnyFile;
 
-  /// No description provided for @chatPagePlaying.
-  ///
-  /// In en, this message translates to:
-  /// **'Playing…'**
-  String get chatPagePlaying;
-
   /// No description provided for @chatPageVoiceLabel.
   ///
   /// In en, this message translates to:
   /// **'Voice'**
   String get chatPageVoiceLabel;
+
+  /// No description provided for @voiceTranscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing…'**
+  String get voiceTranscribing;
+
+  /// No description provided for @voiceTranscriptRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed, tap to retry'**
+  String get voiceTranscriptRetry;
+
+  /// No description provided for @voiceTranscriptStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-transcribe available'**
+  String get voiceTranscriptStale;
+
+  /// No description provided for @voiceTranscriptManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to transcribe'**
+  String get voiceTranscriptManual;
+
+  /// No description provided for @voiceTranscriptLegacyAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can'**
+  String get voiceTranscriptLegacyAudio;
+
+  /// No description provided for @voiceTranscriptFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed: {error}'**
+  String voiceTranscriptFailed(String error);
+
+  /// No description provided for @voiceTranscriptNoText.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech recognized'**
+  String get voiceTranscriptNoText;
+
+  /// No description provided for @voiceTranscriptSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice transcription'**
+  String get voiceTranscriptSheetTitle;
+
+  /// No description provided for @voiceTranscriptSettingsLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get voiceTranscriptSettingsLink;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
+  /// No description provided for @chatPageMenuVoiceTranscriptAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice transcription'**
+  String get chatPageMenuVoiceTranscriptAuth;
+
+  /// No description provided for @voiceTranscriptAuthNote.
+  ///
+  /// In en, this message translates to:
+  /// **'how to transcribe voice messages?'**
+  String get voiceTranscriptAuthNote;
+
+  /// No description provided for @voiceTranscriptAuthLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get voiceTranscriptAuthLocal;
+
+  /// No description provided for @voiceTranscriptAuthLocalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs entirely on this device — audio never leaves it'**
+  String get voiceTranscriptAuthLocalDesc;
+
+  /// No description provided for @voiceTranscriptAuthServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote'**
+  String get voiceTranscriptAuthServer;
+
+  /// No description provided for @voiceTranscriptAuthServerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice messages are sent to our cloud server, and deleted immediately after transcribing'**
+  String get voiceTranscriptAuthServerDesc;
+
+  /// No description provided for @voiceTranscriptServerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote transcription failed: {error}'**
+  String voiceTranscriptServerFailed(String error);
+
+  /// No description provided for @voiceTranscriptServerDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote transcription isn\'t enabled — used the local model instead'**
+  String get voiceTranscriptServerDisabled;
+
+  /// No description provided for @voiceTranscriptGroupEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Where to transcribe'**
+  String get voiceTranscriptGroupEngine;
+
+  /// No description provided for @voiceTranscriptTimingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'When to transcribe'**
+  String get voiceTranscriptTimingLabel;
+
+  /// No description provided for @voiceTranscriptEngineLocalShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get voiceTranscriptEngineLocalShort;
+
+  /// No description provided for @voiceTranscriptEngineServerShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote'**
+  String get voiceTranscriptEngineServerShort;
+
+  /// No description provided for @voiceTranscriptAutoOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get voiceTranscriptAutoOn;
+
+  /// No description provided for @voiceTranscriptAutoOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get voiceTranscriptAutoOff;
+
+  /// No description provided for @voiceTranscriptAutoModeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice messages are transcribed automatically when they arrive'**
+  String get voiceTranscriptAutoModeDesc;
+
+  /// No description provided for @voiceTranscriptManualModeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'You manually choose which voice messages to transcribe'**
+  String get voiceTranscriptManualModeDesc;
+
+  /// No description provided for @voiceTranscriptMenuTranscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe'**
+  String get voiceTranscriptMenuTranscribe;
+
+  /// No description provided for @voiceTranscriptPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing voice model on first use'**
+  String get voiceTranscriptPreparing;
+
+  /// No description provided for @voiceTranscriptPrepareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to install voice model: {error}'**
+  String voiceTranscriptPrepareFailed(String error);
 
   /// No description provided for @chatPageAttachmentMetaMissing.
   ///
@@ -2051,25 +2123,25 @@ abstract class AppLocalizations {
   /// No description provided for @burnUnitDays.
   ///
   /// In en, this message translates to:
-  /// **'{count}d'**
+  /// **'{count} d'**
   String burnUnitDays(int count);
 
   /// No description provided for @burnUnitHours.
   ///
   /// In en, this message translates to:
-  /// **'{count}h'**
+  /// **'{count} h'**
   String burnUnitHours(int count);
 
   /// No description provided for @burnUnitMinutes.
   ///
   /// In en, this message translates to:
-  /// **'{count}m'**
+  /// **'{count} m'**
   String burnUnitMinutes(int count);
 
   /// No description provided for @burnUnitSeconds.
   ///
   /// In en, this message translates to:
-  /// **'{count}s'**
+  /// **'{count} s'**
   String burnUnitSeconds(int count);
 
   /// No description provided for @burnAxisOffLabel.
@@ -2267,7 +2339,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases all messages, attachments and credentials of the current entrance, then takes you back to the setup wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!'**
+  /// **'Permanently erases the current entrance, and you can\'t visit the current space on this device. This cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetEntranceNameLabel.
@@ -2437,18 +2509,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting'**
   String get memberPending;
-
-  /// Group space top bar, right of the member avatars: how many others are online / how many others there are. BOTH numbers exclude me.
-  ///
-  /// In en, this message translates to:
-  /// **'{online}/{total}'**
-  String chatPageStatusOthersOnline(int online, int total);
-
-  /// Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip
-  ///
-  /// In en, this message translates to:
-  /// **'Voice call'**
-  String get voiceCallMenuCall;
 
   /// Voice call UI / 语音通话界面文案
   ///

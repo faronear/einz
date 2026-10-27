@@ -397,13 +397,15 @@ class _SetupPageState extends State<SetupPage> {
         actions: [
           // 右上角菜单：语言切换 + 退出（全丢恢复按老板决策已移除，仅 TUI 保留）
           PopupMenuButton<String>(
+            // tooltip:'' 压掉 Material 内置默认提示"Show menu/显示菜单"
+            // （老板 2026-10-24：删 tooltip 决策的漏网——不传时框架自动加默认）
+            tooltip: '',
             // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
             // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
             icon: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: const Icon(Icons.menu),
             ),
-            tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {
@@ -1587,7 +1589,6 @@ class _SetupPageState extends State<SetupPage> {
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.qr_code_scanner),
-                    tooltip: l10n.setupPageScanInvite,
                     onPressed: _joinTokenVerified ? null : _scanInviteQr,
                   ),
           ),
@@ -2354,7 +2355,6 @@ class _InviteScannerPageState extends State<_InviteScannerPage> {
         title: Text(l10n.setupPageScanInvite),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: l10n.cancel,
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),

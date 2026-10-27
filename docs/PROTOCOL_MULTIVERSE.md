@@ -5,7 +5,7 @@
 > **要求该空间成员会话**——本节 §4.2 的"成员端点 / NOT_A_MEMBER"即此约定；
 > 实现里错误码统一用服务端全局惯例的 `FORBIDDEN`/`UNAUTHORIZED`）
 >
-> 配套：`aimemo/upgradeToMultiverse.md`（总体架构升级计划）、本文聚焦**加入授权闭环**
+> 配套：`aimemo/20260910_upgradeToMultiverse.md`（总体架构升级计划）、本文聚焦**加入授权闭环**
 > （含 join token、Space 定位、密钥分发、错误码），是 Multiverse 多租户的第一阶段协议。
 >
 > v1 单空间协议保持不变，标为 `v1-single-space`；本文标为 `v2-multiverse`。
@@ -15,7 +15,7 @@
 Multiverse 的目标是让一个 Server 承载多个 Space（每个 Space 始终最多两人），客户端
 仍只绑定一个 Space（不需要空间列表/切换器）。本文只覆盖**加入授权**这个
 最小闭环，其余（消息同步租户隔离、附件分目录、推送隔离等）见
-`aimemo/upgradeToMultiverse.md` Phase U1/U2。
+`aimemo/20260910_upgradeToMultiverse.md` Phase U1/U2。
 
 本文定稿的授权模型（与老板 2026-09-10 推敲确认）：
 
@@ -247,7 +247,7 @@ DELETE /spaces/{spaceId}/join-tokens/{tokenHash}
   撤销未用 token（创建者补救手段）。
 
 POST /spaces/{spaceId}/leave
-  **自愿退群**（2026-10-19，aimemo/groupExitDesign.md）：**身份级**离场——不是
+  **自愿退群**（2026-10-19，aimemo/20261019_groupExitDesign.md）：**身份级**离场——不是
   "退出一台设备"。请求体为空 {}；鉴权 = 该空间成员会话。
   事务内（单事务，全部成功或全部不做）：
   ① 批量退役**本人身份名下全部通道**（retireEntrance 的批量版，无口令——自助

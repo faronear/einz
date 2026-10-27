@@ -209,7 +209,7 @@ void main() {
     expect(await db.select(db.spaces).get(), hasLength(1), reason: '空 Vault 不动表');
   });
 
-  test('锁屏时长：默认 30s，保存后读回，越界值钳到范围首尾', () async {
+  test('锁屏时长：默认 1 分钟，保存后读回，越界值钳到范围首尾', () async {
     // 未设置 → 默认 kLockSeconds（前台闲置锁与后台锁共用，老板 2026-10-18）
     expect(await lock.loadLockSeconds(), kLockSeconds);
     // 保存 10 分钟档 → 读回

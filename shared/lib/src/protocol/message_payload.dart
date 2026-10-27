@@ -16,6 +16,12 @@ import 'dart:convert';
 /// 新增 meta 键请在此登记并同步到 docs/PROTOCOL.md 的载荷小节。
 const String kMetaAudioDurationSeconds = 'audioDurationSeconds';
 
+/// meta 键：voice 附件容器为 16kHz 单声道 WAV（布尔，true 才有意义）。
+/// 2026-10-10 起录音改 wav（本地转写 sherpa readWave 只吃 PCM wav）；旧消息
+/// 无此键 = m4a。新客户端据此收敛 voice 附件扩展名（`_voiceExtOf`），旧客户端
+/// 忽略此键（payload.meta 向前兼容约定）。
+const String kMetaVoiceContainerWav = 'voiceContainerWav';
+
 /// meta 键：通话记录（语音通话结束时在聊天流里留的一条 `system` 消息）。
 ///
 /// 通话结果本身**说不清是哪一方的**（"未接"对主叫是没打通、对被叫是没接到），

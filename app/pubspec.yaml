@@ -42,6 +42,11 @@ dependencies:
   einz_shared:
     path: ../shared
 
+  # 语音转写模型下载（voice_transcript_model.dart）：http 拉流 + crypto 边下边算 sha256
+  http: ^1.2.0
+  crypto: ^3.0.0
+  path: ^1.9.0
+
   drift: ^2.34.3
   drift_flutter: ^0.3.1
   sqlite3_flutter_libs: ^0.6.0+eol
@@ -49,6 +54,9 @@ dependencies:
   image_picker: ^1.2.3
   url_launcher: ^6.3.0 # 文本消息里的 URL 自动扫描 + 点击唤起系统浏览器（方案1，老板 2026-09-28）
   record: ^7.1.1
+  # 语音消息本地转写（aimemo/20261009_voiceTranscript.zhcn.md）：sherpa-onnx FFI 离线 ASR，
+  # SenseVoice-Small 模型（不进 git，build 脚本/首次使用时拉取）
+  sherpa_onnx: ^1.13.8
   audioplayers: ^6.8.1
   video_player: ^2.14.0
   file_picker: ^12.1.2
@@ -98,6 +106,16 @@ flutter:
   assets:
     - assets/logo.png
     - assets/spinnerLogo.png
+    # 演示秘境插画（2026-10-24）：2 个卡通头像 + 1 张日出照片，预生成 PNG——
+    # 运行时 toImage 绘制在 Intel iMac（x86_64+Impeller）出全透明空图，
+    # 演示画面必须全设备可靠，见 lib/data/demo_art.dart 头注；
+    # 重新生成：npm run demo-assets，产出的 PNG 随代码提交进库。
+    - assets/demoSpace/
+    # 语音转写模型（sense-voice-small int8 ~239MB + tokens.txt）：**默认不打包**。
+    # VOICE_MODEL=true 时由 scripts/insertVoiceModel.sh 拉取模型并临时注入
+    # `- assets/voice_model/` 声明（命令结束自动还原）；包里没资产时运行时
+    # 走下载兜底，见 VoiceTranscriptModel.ensureInstalled。目录常驻仅 .gitkeep
+    # （保住目录本身，否则注入后的构建会因缺目录失败）。
 
 # sqlite3 原生库：用 sqlite3 包默认的捆绑预编译库（构建时从 GitHub releases
 # 下载并打入 APK）。曾配置 source: system 依赖系统 SQLite，但 Android 系统

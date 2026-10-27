@@ -45,7 +45,13 @@ const GLOBAL_WINDOW_MS = 60 * 1000;
 const DNS_REPORT_MAX = Number(process.env.EINZ_RATELIMIT_DNS_REPORT ?? 10);
 const DNS_REPORT_WINDOW_MS = 60 * 60 * 1000;
 
-export type RateLimitBucket = "spaceCreate" | "auth" | "global" | "dnsReport";
+/** 服务端转写（方案 D'）：每 IP 每小时。一次转写 = 一次 CPU 推理（small 模型
+ *  1 分钟录音约 1-2 分钟推理），必须比其他端点严得多；10 次/小时对"点按转写"
+ *  的真人使用足够宽裕，又把滥用方打满的 CPU 损耗压到可忽略。 */
+const TRANSCRIBE_MAX = Number(process.env.EINZ_RATELIMIT_TRANSCRIBE ?? 10);
+const TRANSCRIBE_WINDOW_MS = 60 * 60 * 1000;
+
+export type RateLimitBucket = "spaceCreate" | "auth" | "global" | "dnsReport" | "transcribe";
 
 function limitOf(bucket: RateLimitBucket): { max: number; windowMs: number } {
   switch (bucket) {
@@ -57,6 +63,8 @@ function limitOf(bucket: RateLimitBucket): { max: number; windowMs: number } {
       return { max: GLOBAL_MAX, windowMs: GLOBAL_WINDOW_MS };
     case "dnsReport":
       return { max: DNS_REPORT_MAX, windowMs: DNS_REPORT_WINDOW_MS };
+    case "transcribe":
+      return { max: TRANSCRIBE_MAX, windowMs: TRANSCRIBE_WINDOW_MS };
   }
 }
 

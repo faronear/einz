@@ -102,7 +102,7 @@ export function getSpace(
   // 自愿退群（2026-10-19）：成员状态下发（'active' | 'left'）。**查询刻意不带
   // status 过滤**——墓碑行（left）保留 member_id/display_name，历史消息的发送者
   // 名字解析（_senderNameOf）才能继续工作；名单/计数/邀请判定由客户端按这个
-  // map 过滤（aimemo/groupExitDesign.md §4.2/§4.3）。
+  // map 过滤（aimemo/20261019_groupExitDesign.md §4.2/§4.3）。
   const memberStatus: Record<string, string> = {};
   const members = getDb()
     .prepare(`SELECT member_id, display_name, gender, slot, status FROM space_members WHERE space_id = ? AND member_id IS NOT NULL`)

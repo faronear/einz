@@ -14,6 +14,7 @@ import '../l10n/app_localizations.dart';
 import '../setup_page.dart';
 import 'pin_prompt.dart';
 import 'scrollable_card_area.dart';
+import 'sheet_close_button.dart';
 
 /// 空间选择结果：选中某个空间，或"去新建/加入一个空间"。
 class SpacePick {
@@ -255,13 +256,23 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」/「界面主题」
-            // /「附件存储」/「阅后即焚」弹层标题的居中与留白口径对齐）
+            // /「附件存储」/「阅后即焚」弹层标题的居中与留白口径对齐）；
+            // 右上角关闭圆钮与标题行水平对齐（老板 2026-10-24）——Stack 钉角
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: Center(
-                child: Text(l10n.spaceListTitle,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 16)),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: Text(l10n.spaceListTitle,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                  Positioned(
+                    right: 0,
+                    child: SheetCloseButton(tooltip: l10n.close),
+                  ),
+                ],
               ),
             ),
             // 标题下备注行（老板 2026-10-06）：式样同「通道列表」/「阅后即焚」弹层

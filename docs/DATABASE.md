@@ -84,7 +84,7 @@ CREATE TABLE space_members (
     gender       TEXT,                     -- male | female
     status       TEXT NOT NULL DEFAULT 'active',  -- active | pending | left
     joined_at    INTEGER,
-    -- 自愿退群墓碑时刻（status='left' 时写；2026-10-19，aimemo/groupExitDesign.md）
+    -- 自愿退群墓碑时刻（status='left' 时写；2026-10-19，aimemo/20261019_groupExitDesign.md）
     left_at      INTEGER,
     PRIMARY KEY (space_id, member_id),
     UNIQUE (space_id, slot)

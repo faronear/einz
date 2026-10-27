@@ -138,7 +138,7 @@
 
 ## wire 字段改名（**2026-09-23 主线；2026-09-24 续改 `partner`→`member`**）
 
-09-23 计划与完整映射表见 **`aimemo/renamePlan.zhcn.md`**。**当前**字段名要点：
+09-23 计划与完整映射表见 **`aimemo/20260923_renamePlan.zhcn.md`**。**当前**字段名要点：
 
 - `device_id` / `device_name` → **`entrance_id` / `entrance_name`**（登记项）；
 - `device_uid` → **`install_uid`**（安装）；
@@ -170,4 +170,4 @@
 （`connection_events` / `entrance_activity`）、在线时间互斥的切换模式、push token
 （同一安装注册的是同一个 APNs token）、以及默认取型号的 `entrance_name`。
 `install_uid` 的作用是把这件事从"概率推断"变成"确定性事实"——它只做**服务端内部认知**，
-不参与授权，也不进任何响应体（见 `aimemo/multiSpaceDesign.zhcn.md` §3.7）。
+不参与授权，也不进任何响应体（见 `aimemo/20260918_multiSpaceDesign.zhcn.md` §3.7）。

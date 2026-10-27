@@ -163,7 +163,6 @@
       }
     }
   },
-  "setupCreateCopy": "Copy invite link",
   "setupPageInitFailed": "Initialization failed, retrying…",
   "@setupPageInitFailed": {
     "description": "Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying"
@@ -189,8 +188,6 @@
     }
   },
   "setupJoinEntranceLimitReached": "This space has reached the server's entrance limit — no new entrance can be opened.",
-  "setPinDialogPinLabel": "New PIN (at least 6 digits)",
-  "setPinDialogConfirmLabel": "Confirm new PIN",
   "setPinDialogSetPin": "Apply",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
@@ -213,10 +210,10 @@
   "chatPageSetLockNewPinLabel": "New PIN or leave blank",
   "chatPageSetLockNewPinLabelNoPin": "New PIN (at least 6 digits)",
   "chatPageSetLockSubmitChange": "Change",
-  "chatPageSetLockDurationLabel": "Auto-lock after inactivity",
+  "chatPageSetLockDurationLabel": "Lock after inactivity",
   "chatPageSetLockTabChange": "Change PIN",
   "chatPageSetLockClearButton": "Clear PIN",
-  "lockDurationSecs": "{n} sec",
+  "lockDurationSecs": "{n} s",
   "@lockDurationSecs": {
     "placeholders": {
       "n": {
@@ -224,7 +221,7 @@
       }
     }
   },
-  "lockDurationMin": "{n} min",
+  "lockDurationMin": "{n} m",
   "@lockDurationMin": {
     "placeholders": {
       "n": {
@@ -270,8 +267,6 @@
       }
     }
   },
-  "chatPageInviteCopyLinkTooltip": "Copy invite link",
-  "chatPageInviteCopyCodeTooltip": "Copy entrance token",
   "chatPageInviteLinkCopied": "Invite link copied",
   "chatPageInviteCodeCopied": "Entrance token copied",
   "chatPageInviteFailed": "Failed to create the entrance token: {error}",
@@ -297,12 +292,10 @@
   },
   "chatPageNameUnset": "Unset",
   "chatPageMenuExit": "Quit app",
-  "chatPageMenuMore": "Main menu",
   "chatPageMsgMoreActions": "More actions",
   "chatPageRenameNameTitle": "My name",
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",
-  "chatPageGroupNameEditTooltip": "Change group name",
   "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
@@ -389,7 +382,7 @@
   "chatPageMenuMoreSettings": "More settings",
   "chatPageMoreSettingsTitle": "More settings",
   "chatPageMoreSettingsStorage": "Attachment storage",
-  "chatPageMoreSettingsTombstone": "Vanished messages",
+  "chatPageMoreSettingsTombstone": "Removed messages",
   "chatPageAttachmentStorageNote": "Where are attachments — images, videos, audio, files — stored?",
   "chatPageAttachmentStorageSecured": "Remote only",
   "chatPageAttachmentStorageSecuredDesc": "Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.",
@@ -476,8 +469,6 @@
   "chatPagePassphraseWrong": "Incorrect passphrase",
   "chatPagePassphraseEmpty": "Enter the shared passphrase",
   "chatPagePassphraseVerifyFailed": "Verification failed, please try again",
-  "chatPagePassphraseShow": "Show",
-  "chatPagePassphraseHide": "Hide",
   "chatPageMembersInviteNew": "Invite a new companion",
   "chatPageMembersFullWithMax": "Space is full ({current}/{max})",
   "@chatPageMembersFullWithMax": {
@@ -494,9 +485,7 @@
   "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your authorized entrances to this space.",
   "chatPageEntranceListThisDevice": "Current entrance name",
   "chatPageEntranceListNew": "Add my new entrance",
-  "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
-  "chatPageLockNow": "Lock now",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
@@ -543,7 +532,7 @@
   },
   "chatPageBurnHeading": "Burn-after-read",
   "chatPageBurnNote": "Delete new messages automatically once read on a countdown",
-  "chatPageTombstoneHeading": "Vanished messages",
+  "chatPageTombstoneHeading": "Removed messages",
   "chatPageTombstoneNote": "How deleted/burned/recalled messages appear?",
   "chatPageTombstoneKeep": "Show metadata",
   "chatPageTombstoneKeepDesc": "Show a time and status bar without content, message flow unbroken",
@@ -567,13 +556,12 @@
   "chatPageRecallConfirmOk": "Recall",
   "chatPageRecallBlocked": "Already delivered, can't recall",
   "chatPageRecallFailed": "Recall failed, try again later",
-  "chatPageQuotedTombMessage": "(This message is no longer available)",
   "chatPageQuoteGoneNotice": "The quoted message is no longer available",
   "chatPageActionQuote": "Quote",
   "chatPageActionSave": "Save",
   "chatPageAttachmentSaved": "Saved.",
   "chatPageFileSaveFailed": "Save failed: {error}",
-  "chatPageActionBurn": "Burn after reading",
+  "chatPageActionBurn": "Burn after",
   "chatPageDeleteConfirmTitle": "Delete message?",
   "chatPageDeleteConfirmMessage": "Removed only on this device (the others aren't affected), and it can't be undone. Delete?",
   "chatPageDeleteCancel": "Cancel",
@@ -612,10 +600,6 @@
       }
     }
   },
-  "chatPageMsgSent": "Sent",
-  "chatPageMsgSendingTap": "Sending… tap to verify and resend",
-  "chatPageMsgDelivered": "Delivered",
-  "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageMsgFailedTap": "Tap to resend",
   "chatPageMsgsUnsent": "Waiting to sync… {count} unsent, will retry when back online",
   "@chatPageMsgsUnsent": {
@@ -647,7 +631,8 @@
   },
   "chatPageVoicePermissionDenied": "Microphone permission denied. Please enable it in system settings.",
   "chatPageVoiceEmpty": "Recording was empty and was discarded.",
-  "chatPageLongPressToRecord": "Long press to record",
+  "chatPageLongPressToRecord": "Tap or long-press to record",
+  "chatPageLongPressToTranscribe": "Long press to text",
   "chatPageInputHint": "Type a message…",
   "chatPageAudioMetaMissing": "Audio metadata missing",
   "chatPageAudioPlayFailed": "Audio playback failed: {error}",
@@ -659,7 +644,6 @@
     }
   },
   "chatPageAttachEmoji": "Emoji",
-  "chatPageEmojiKeyboard": "Keyboard",
   "chatPageAttachPaste": "Paste",
   "chatPageAttachPhoto": "Take photo",
   "chatPageAttachGalleryImage": "Gallery image",
@@ -667,8 +651,57 @@
   "chatPageAttachVideoGallery": "Gallery video",
   "chatPageAttachAudioFile": "Audio file",
   "chatPageAttachAnyFile": "Any file",
-  "chatPagePlaying": "Playing…",
   "chatPageVoiceLabel": "Voice",
+  "voiceTranscribing": "Transcribing…",
+  "voiceTranscriptRetry": "Transcription failed, tap to retry",
+  "voiceTranscriptStale": "Re-transcribe available",
+  "voiceTranscriptManual": "Tap to transcribe",
+  "voiceTranscriptLegacyAudio": "Legacy voice messages (m4a) can't be transcribed — only new recordings can",
+  "voiceTranscriptFailed": "Transcription failed: {error}",
+  "@voiceTranscriptFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceTranscriptNoText": "No speech recognized",
+  "voiceTranscriptSheetTitle": "Voice transcription",
+  "voiceTranscriptSettingsLink": "Settings",
+  "apply": "Apply",
+  "chatPageMenuVoiceTranscriptAuth": "Voice transcription",
+  "voiceTranscriptAuthNote": "how to transcribe voice messages?",
+  "voiceTranscriptAuthLocal": "Local",
+  "voiceTranscriptAuthLocalDesc": "Runs entirely on this device — audio never leaves it",
+  "voiceTranscriptAuthServer": "Remote",
+  "voiceTranscriptAuthServerDesc": "Voice messages are sent to our cloud server, and deleted immediately after transcribing",
+  "voiceTranscriptServerFailed": "Remote transcription failed: {error}",
+  "voiceTranscriptServerDisabled": "Remote transcription isn't enabled — used the local model instead",
+  "voiceTranscriptGroupEngine": "Where to transcribe",
+  "voiceTranscriptTimingLabel": "When to transcribe",
+  "voiceTranscriptEngineLocalShort": "Local",
+  "voiceTranscriptEngineServerShort": "Remote",
+  "voiceTranscriptAutoOn": "Auto",
+  "voiceTranscriptAutoOff": "Manual",
+  "voiceTranscriptAutoModeDesc": "Voice messages are transcribed automatically when they arrive",
+  "voiceTranscriptManualModeDesc": "You manually choose which voice messages to transcribe",
+  "voiceTranscriptMenuTranscribe": "Transcribe",
+  "@voiceTranscriptServerFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceTranscriptPreparing": "Installing voice model on first use",
+  "voiceTranscriptPrepareFailed": "Failed to install voice model: {error}",
+  "@voiceTranscriptPrepareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageAttachmentMetaMissing": "Attachment metadata missing",
   "chatPageAttachmentUnusable": "Attachment unavailable",
   "chatPageAttachmentRetry": "Tap to retry",
@@ -710,7 +743,7 @@
       }
     }
   },
-  "burnUnitDays": "{count}d",
+  "burnUnitDays": "{count} d",
   "@burnUnitDays": {
     "placeholders": {
       "count": {
@@ -718,7 +751,7 @@
       }
     }
   },
-  "burnUnitHours": "{count}h",
+  "burnUnitHours": "{count} h",
   "@burnUnitHours": {
     "placeholders": {
       "count": {
@@ -726,7 +759,7 @@
       }
     }
   },
-  "burnUnitMinutes": "{count}m",
+  "burnUnitMinutes": "{count} m",
   "@burnUnitMinutes": {
     "placeholders": {
       "count": {
@@ -734,7 +767,7 @@
       }
     }
   },
-  "burnUnitSeconds": "{count}s",
+  "burnUnitSeconds": "{count} s",
   "@burnUnitSeconds": {
     "placeholders": {
       "count": {
@@ -815,7 +848,7 @@
     }
   },
   "leaveSpaceTitle": "Destroy this entrance?",
-  "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current entrance, then takes you back to the setup wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!",
+  "leaveSpaceMessage": "Permanently erases the current entrance, and you can't visit the current space on this device. This cannot be undone!",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {
@@ -898,22 +931,6 @@
   "memberPending": "Waiting",
   "@memberPending": {
     "description": "Status word when a member has not joined yet (shared by the space card, space list, and members sheet)"
-  },
-  "chatPageStatusOthersOnline": "{online}/{total}",
-  "@chatPageStatusOthersOnline": {
-    "description": "Group space top bar, right of the member avatars: how many others are online / how many others there are. BOTH numbers exclude me.",
-    "placeholders": {
-      "online": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "voiceCallMenuCall": "Voice call",
-  "@voiceCallMenuCall": {
-    "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
   },
   "voiceCallIncoming": "Incoming call",
   "@voiceCallIncoming": {

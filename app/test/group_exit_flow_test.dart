@@ -1,4 +1,4 @@
-// 自愿退群（2026-10-19，aimemo/groupExitDesign.md）App 侧流程回归：
+// 自愿退群（2026-10-19，aimemo/20261019_groupExitDesign.md）App 侧流程回归：
 //  ① **名单/计数口径**：成员弹层只列在册成员（墓碑不列），退出者不占人数；
 //  ② **完整退群链**：弹层 →「退出群组」红字项 → 确认闸门（群组名）→
 //     leaveSpace 调对空间 → 本地清理 → 导航收尾（仅一个空间 → 回向导）；
@@ -272,9 +272,9 @@ void main() {
 
     // 在册成员在列（**限定在成员弹层内**：状态条头像条 2026-10-20 起也显示
     // 成员名字标签，全局 find.text 会撞成两个——同 group_status_bar_test 口径）
-    final sheet = find.ancestor(
-        of: find.text(_zh.chatPageMembersTitle('group')),
-        matching: find.byType(SingleChildScrollView));
+    // 弹层内容根（2026-10-25 起「只滚成员列表」，外层无
+    // SingleChildScrollView，改用定位 key）
+    final sheet = find.byKey(const ValueKey('membersSheet'));
     expect(find.descendant(of: sheet, matching: find.text('Alice')),
         findsOneWidget);
     expect(find.descendant(of: sheet, matching: find.text('Bob')),

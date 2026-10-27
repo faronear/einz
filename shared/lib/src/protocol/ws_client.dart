@@ -21,7 +21,7 @@ const String kWsTypeReceiptUpdated = 'receipt.updated';
 /// 都要刷新成员名单。
 const String kWsTypeMemberJoined = 'member.joined';
 
-/// 自愿退群（2026-10-19，aimemo/groupExitDesign.md）：某成员**身份级**退出
+/// 自愿退群（2026-10-19，aimemo/20261019_groupExitDesign.md）：某成员**身份级**退出
 /// （其名下全部通道一并注销）。与 member.joined 对偶——人人刷新成员名单，
 /// 客户端另发一条顶部通知（display_name 仅供通知文案，查表仍以 member_id 准）。
 /// 仅 group 空间会有（duo 不开放退群，服务端 409 兜底）。

@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-10-10 语音转写补完：WAV 录音格式 + 模型首次使用下载
+
+**背景：** 语音转写 Phase 1 MVP（2026-10-09 b856c75）落地时留了两个待拍板项：
+§8 录音格式（m4a 无法被 sherpa readWave 直接转写）、§11 模型分发。老板 2026-10-10
+拍板：录音改 WAV；模型首次使用时下载。
+
+**改动（feat/voice-transcript，本次提交）：**
+
+- **录音改 16kHz 单声道 WAV**（§8 方案 1）：`RecordConfig(encoder: AudioEncoder.wav,
+  sampleRate: 16000, numChannels: 1)`；发送文件名 `voice.wav` + meta 加
+  `kMetaVoiceContainerWav=true`（新 meta 键已登记 `docs/PROTOCOL.md` §5.1 与
+  `shared/.../message_payload.dart`）。旧消息无此键 = m4a：播放照常（系统 AAC 解码），
+  手动转写入口点按提示"旧格式不支持转写"（新 l10n 键 ×3 语言），不打哑炮。
+  `_voiceExtOf` 在播放/转写/留存目录/手动入口四处统一扩展名口径，避免新旧错配。
+- **模型下载器** `app/lib/data/voice_transcript_model.dart`（新文件）：SenseVoice-Small
+  int8（model.int8.onnx 239233841B + tokens.txt，sha256 基线 2026-10-10 实测）下载到
+  `<ApplicationSupport>/voice_transcript/<kModelVersion>/`；双源（hf-mirror 优先、
+  huggingface.co 回落）、`.part` Range 断点续传（换源前清 .part 防拼坏）、大小+sha256
+  边下边算、全就绪才写 `.ok`。`VoiceTranscriptService.modelDir` 缺省走
+  `VoiceTranscriptModel.installedDir()`（`modelReady` 随之变 async），显式注入保留给测试。
+- **UI**：`_downloadVoiceModel` 进度对话框（LinearProgress + MB/百分比 + 取消按钮，
+  取消置 cancelled 标志让下载循环及时退出；失败 SnackBar 带错误原文）。
+  手动转写流程：wav 判定 → 模型未就绪则先下载 → 入队。
+
+**验证：** `flutter analyze` 零告警；`shared` 测试 66 过 1 失败（ws_client "连接成功"
+——HEAD 干净基线 worktree 复跑**同样失败**，既有环境抖动，与本改动无关：未动 WS 层）；
+app 迁移测试全过。iOS/macOS Podfile.lock + windows generated_plugins.cmake 更新
+（sherpa_onnx 原生插件注册，2026-10-09 pub 操作遗留未提交）。
+
+**遗留（老板侧）：** 真机验证 wav 录音音质/转写链路 + iOS/Android 原生构建
+（sherpa_onnx 重 FFI 插件首次进真机构建）；SenseVoice vs Paraformer A/B 仍待做。
+---
+
 ## 20261020 口令弹窗改就地验证 + 成员卡性别化反馈色
 
 **（2026-10-20T12:30:56Z / 2026-10-20 20:30）**：老板 2026-10-20 两项。①**重新邀请的口令弹窗改「就地验证」**（老板原话："为何不在口令输入框里面，先等后台验证，出错就当场在口令输入框下面红字报错"）——原来点「确定」弹窗就关，下一步创建码时服务端才验口令，错了只弹一条姗姗来迟的通知条，整条流程被打断重来。现在：确认键文案「确定/OK」→「验证/Verify」；点验证后按钮转圈（禁重复提交）、等后台结果——口令错（服务端 401 `ESCROW_VERIFY_FAILED`）→ 输入框下方红字「口令错误」、弹窗不关、改了能重试；空值 → 就地红字「请输入共享口令」（以前静默当成取消）；网络/限速等其他错误按仓库口径带「后台：」前缀透出服务端原话。**验证即签发**：弹窗里直接走下一步那次 `createJoinToken`（attach+目标+口令，服务端签码前先验口令），通过时拿到的码经新增的 `premadeResult` 参数带进 `_showInviteDialog` 直接展示，不二次创建（否则同码建两遍、审计两条）。`_promptSharedPassphrase` 泛型化（`Future<T?> _promptSharedPassphrase<T>(verify:)`），取消仍恒可点（in-flight 结果靠 ctx.mounted 丢弃）。踩坑：`premadeResult ?? await _withAuth(...)` 的 `??` 右操作数上下文类型会把 T 推断成可空，必须显式 `_withAuth<JoinTokenResult>`。②**群成员卡悬浮/按压变色改按性别走**（老板：男 浅蓝→系统深蓝、女 浅粉→深粉）：新增 `_genderFeedback(gender)` 返回品牌色本体的两档 alpha（hover 0.14 / 按压 0.28）——拿黑叠会发灰、色相跑掉；性别未知回中性黑。测试：member_profile_test 扩到 7 用例（新增：口令弹窗就地验证全流程——空值/错口令红字不关窗、改正后放行且展示 premade 码；成员卡性别反馈色断言）。验证：scripts/testAll.sh app 全绿（analyze 0 + 365 测试）。工作区并行改动（integration_test 截图、package.json）未动。
@@ -21,7 +54,6 @@
 **（2026-10-20T11:17:24Z / 2026-10-20 19:17）**：老板 2026-10-20 三项头像交互改动。①**「我的群组」成员弹层**：成员卡头像点击从「全屏大图」改为开该成员的资料页（与 duo 点对方状态胶囊弹出的资料页同款）；②**消息气泡旁头像**（不论我的/别人的）点击都开个人资料页——我的开「我的资料」弹层，别人的开对方资料页（老板原话"以后我还可以往个人资料页里加东西"，资料页从此是头像点击的统一归宿）；③**群成员卡右侧「重新邀请」按钮删除**（功能收进资料页，资料页性别行右端保留「重新邀请」，需共享口令）。实现：`_showDuoPeerSheet` 泛化为 `_showMemberProfileSheet(String? memberId)`——null=duo 槽位解析（行为逐字不变，duo_peer_sheet_test 全绿即证），非空=群成员/历史发送者（名字/性别从全量成员表解析，墓碑保名）；`_MessageAvatar` 新增 `onTap` 最高优先级覆写（非空时不再按有无图分流——"有图也进资料页"正是本次重点，成员卡/气泡两处头像的 onSaveImage/onReplaceAvatar/onApplyAllSpaces 随之删除，全屏大图只剩资料页内一个入口）；标题按模式分流：duo 仍「我的同伴」，群成员用新键 `chatPageMemberProfileTitle`（「群组同伴」/ Group companion，老板定）；l10n 手写同步后用 `flutter gen-l10n` 校验无 diff。成员卡头像走「先收弹层 + _menuAction 300ms 错峰」再开资料页（与群名行同款 route 交接，防交叉卸载闪红屏）。新增 member_profile_test.dart 3 用例（成员弹层无重新邀请/点头像开资料页且不进全屏/资料页重新邀请→口令链路无异常/气泡旁双头像分流）全绿。**顺带修**：group_exit_flow_test「成员弹层只列在册成员」在 HEAD 上即红（2026-10-20 状态条头像人名标签与成员卡名字撞车，全局 find.text 撞两个）——已用与 group_status_bar_test 相同的"限定弹层内"手法修好；本次未动任何生产逻辑。验证：scripts/testAll.sh app 全绿（analyze 0 + 361 测试通过）。
 
 ---
-
 ## 2026-08-28
 
 ### 架构评审与 productLens 重构（v1.0 → v2.0）
@@ -14265,6 +14297,67 @@ multi_space_pages 12 测试全过。
 品牌名可点（logo 可点开「关于」不变），另一测试的过时注释更正。analyze 0 issue；
 chat_page_menu + multi_space_pages + space_switcher_avatar 46 测试全过。
 
+**（2026-10-12，四十一）**：feat/voice-transcript 嫁接到最新 main（merge-base
+cf2eb0a6，main 领先 88 提交，voice 3 提交）。冲突仅 2 处，均因**双方都占用
+v10**：voice 的 v10 = 新增 local_voice_transcripts 表，main 的 v10 =
+local_messages.deleted_kind 墓碑来路列——两项纯增量、可共存，合并进同一
+`if (from < 10)` 块（v10-a 建表 + v10-b 加列，幂等判存在），schemaVersion
+仍 10；迁移测试两侧断言合并（升到 v10 + 两表/两列俱在）。chat_page.dart
+（main 改 1157 行 vs voice 258 行）、local_database.g.dart、l10n 全套均被
+git 自动合入且语义完整：build_runner 重生成 .g.dart 与合并结果**逐字节
+一致**（生成文件零漂移）；转写 UI（_buildVoiceTranscriptLine /
+_enqueueVoiceTranscripts / 模型下载重试）与 main 新 UI（气泡「...」菜单、
+Recall 单勾限制、双勾进度）经 grep 抽查俱在。flutter pub get 后 lock 零
+漂移（镜像未污染）；app 与 shared 两侧 flutter/dart analyze 均 0 issue。
+转写入口与 main 新菜单的交互 UI 待老板真机自测。
+
+**（2026-10-12，四十二）**：语音转写模型分发从「首次使用下载」改回「**打包进
+产物**」（老板 2026-10-12 拍板，回到 §5 预留方案）。落地：①
+`scripts/fetchVoiceModel.sh`——构建前把 model.int8.onnx(239MB)+tokens.txt
+拉进 `app/assets/voice_model/`，幂等（sha256 过就秒过）、双源 + 3 轮重试、
+连接 20s 快失 / <10KB/s·60s 僵死 abort（国内网络实测：huggingface.co 直连
+必超时，hf-mirror 夜间偏慢，第一版脚本 14 分钟双源皆败后加了这些）；基线
+与 `voice_transcript_model.dart` 的 `_files` 同一份。② pubspec 声明资产目录；
+.gitignore 忽略目录**内容**并 `!.gitkeep`（git 否定规则救不回已排除目录里的
+文件——踩过；gitkeep 保证新克隆不缺目录，否则 pubspec 声明资产直接构建失败）。
+③ `VoiceTranscriptModel.ensureInstalled` 三级解析：已装过（含 10-10 以来
+下载过模型的设备，零迁移）→ 直接用；包内有资产 → 首次转写前拷进
+ApplicationSupport（1MB 分块进度 + 可取消 + 取消清残file + 大小校验）；
+包里没有（dev 没跑 fetch）→ 回落原下载链路。删掉 `downloadedBytes()`（进度
+基线统一 0，顺带消掉旧代码续传基线与拷贝绝对字节混用会跳变的隐患）。④
+chat_page `_downloadVoiceModel`→`_prepareVoiceModel`，l10n 两键换名
+（Downloading→Preparing / DownloadFailed→PrepareFailed）。⑤ 三个构建入口
+（buildIos/buildMacos/npm app-apk-build）先跑 fetch，**失败中断打包**——不
+静默出没有转写功能的包。flutter analyze 0 issue。
+
+**（2026-10-12，四十三）**：修真机红/黑屏 bug（老板 2026-10-12 实测：flutter
+run 后点转写，进度框瞬间 100% 后卡死，Android 红屏断言 navigator.dart
+`!_debugLocked`、macOS 黑屏）。根因：`_prepareVoiceModel` 把
+`unawaited(ensureInstalled…)` 直接写在 StatefulBuilder 的 **builder 里**——
+进度回调 setState 使 builder 整体重跑，每次重建都再起一个 ensureInstalled：
+239MB 拷贝/下载并发炸开（进度瞬间 100% 即多路并发灌的），多个 pop(true)
+重入 Navigator 触发 `_debugLocked` 断言（红屏），并发 ByteData 内存暴涨把
+macOS 顶黑。同型模式全库仅此一处（其余 StatefulBuilder 都在按钮回调里起
+任务）。修法：`started` 旗标保证任务只在 builder 首次执行时启动一次，注释
+写死原因防后人"清理"掉。附带确认：此修复是纯 Dart，**热重启即生效**（不动
+资产/原生）；旧的下载路径同型同险，本次一并修复。**两个后续实证**：① 拷贝落盘增 sha256
+校验（大小对内容烂只有哈希抓得到，防磁盘错误/写一半被 kill）——但已中招设备上的损坏目录
+「大小+.ok」俱全会被 installedDir 误判放行，需手动删一次再重拷：macOS
+`/bin/rm -rf ~/Library/Containers/cc.tic.einz/Data/Library/Application\
+ Support/voice_transcript`；Android `adb shell run-as cc.tic.einz rm -rf
+files/voice_transcript`（Android 的 ApplicationSupport=filesDir，实测
+path_provider_android 2.3.1 源码确认）。② 关于
+「并发写花文件」的推测**被实测推翻**：老板 macOS 上那份并发写出来的
+model.int8.onnx，sha256 与期望值完全一致——多路拷贝写的是同一资产的
+**相同字节、相同偏移**，交错写是幂等的，文件必然完好，无需手动删目录。
+（这也反证他的测试跑的已是新代码：239MB 在一分钟内落盘 = 包内资产
+拷贝，hf-mirror 下载要 8–14 分钟。）③ 路径构成备注（老板按文档路径
+没找到目录）：macOS 上 path_provider_foundation 会给 ApplicationSupport
+**拼上 bundle id**（源码确认，iOS 不拼、Android=filesDir），故模型目录
+实为 `<容器>/Library/Application Support/cc.tic.einz/voice_transcript/`；
+_rootDir 不加 applyDevDataDir 是刻意的——模型是派生缓存，dev/生产共用
+一份比分存两份好（DB/附件才是要隔离的数据）。
+
 **（2026-10-12，四十一）**：服务端 `[req]` 控制台日志每条加时间戳（老板要求）。
 新增 `server/src/reqLog.ts`：`reqTimestamp()`（`2026-10-12 11:23:40` 本地时间，
 pm2 日志跨天滚动所以日期一起给）+ `logReq(message)` 统一打 `[时间戳] [req] 正文`；
@@ -15164,6 +15257,21 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 **（2026-10-18T02:22:17Z / 2026-10-18 10:22）**：修 CI testAll 两例失败：昨日「弹窗按钮体系统一」把清空锁屏码确认弹窗文案改为 l10n「清除锁屏码？」/「清除」，chat_page_menu_test 仍断言旧硬编码「删除锁屏码？」/「确认」→ 改用 _zh.chatPageClearLockTitle / chatPageLockClearConfirm。chat_page_menu_test 全部通过。
 
+**（2026-10-18，二）**：feat/voice-transcript 再次合入最新 main。4 处冲突：
+① package.json——main 把 iOS 模拟器脚本挪到 node_modules/wo_scripts 并统一了
+app-apk-run/app-ios-run（SERVERMODE 自动判 localConfig 是否存在），照单全收，
+仅把 voice 的 fetchVoiceModel.sh 加回 app-apk-build 链（HEAD 侧引用的
+scripts/emu* 实际不在库里，是残留，弃）；② .gitignore——同段落双方各自加注，
+取 main 侧（含防 239MB 误入库说明）；③ chat_page.dart 录音启动——保留 voice
+的 16kHz WAV 配置（转写必需），并入 main 新增的「hasPermission 弹窗期间松手
+→ _stopVoice 只清旗标、start 后看到旗标已清即停录丢弃」防泄漏逻辑（修的是
+_startVoice 末尾漏置 _voiceStarting=false 的问题，两侧都有）；④ worklog——
+两侧日志条目全保留，main 侧补日期前缀。验证：app flutter analyze 0 issue。
+
+**（2026-10-18T02:55:00Z / 2026-10-18 10:55）**：voiceTranscript 设计文档新增 §15「方案 D'：服务端自建 Whisper 转写 [待评审]」——老板 2026-10-18 提出新思路：不打包/不下载 239MB 模型，把用户要求转写的录音明文上送服务端、服务端自建 Whisper 转写后即转即删。老板初步拍板：自建（不走 OpenAI）、本地模型链路暂留、菜单设授权选项（全部自动/单条显性授权 × 本地/后台）。关键设计问题「明文怎么到服务端」评估结论：客户端本地解密后上送明文（老板设想）为最优——零协议改动、暴露面仅运营者自己、不引入第三方；服务器自解密（需托管 space_key）否决，MPC/TEE 复杂度过高。待老板再考虑，未动手。
+
+**（2026-10-18T03:10:00Z / 2026-10-18 11:10）**：voiceTranscript §15 增补「§15.3 发送时双传（密文+明文）[待评审]」——老板提出发送时同时上送密文（保存）与明文（转写用），省一次往返。评估：方向对，本质是把转写从「各端本地各算」变「服务端算一次全体共享」（省 N 端本地 ASR + N 份 239MB 模型，所有端结果一致）；必须条件化——仅「全部自动转写」设置下才随发送带明文，「单条显性授权」保持只传密文、按需走 D' 路径，否则与授权选项自相矛盾。附带架构变化已写明需老板认领：转写结果从本地派生数据变服务端共享产物（space_key 加密落盘）、焚毁三者联动删除。文档未动手实现。
+
 **（2026-10-18T08:20:55Z / 2026-10-18 16:20）**：锁屏时长可调（30 秒~1 小时滚动轴，老板 2026-10-18 定方案二）。背景：老板想在「设置锁屏码」弹窗加滚动轴自定义"离开多久进入锁屏"，但原有「两空提交=清空 PIN」的隐式语义会与"只调时长"撞车（PIN 被误清）。讨论三个方案后老板选定**方案二：无 tab + 显性清除**——两空提交=不改 PIN 只调时长；清空改为弹窗内显性红色「清除锁屏码」按钮（需旧码+二次确认），整类隐式炸弹拆除；滚动轴同时管前台闲置锁与后台回来锁（老板定：两个共用同一值）。实现：① lock_timer.dart 加 `kLockSecondsChoices = [30,60,120,300,600,1800,3600]`，LockTimer.backgroundLockSeconds 改可变；② AppLockService 新增 loadLockSeconds/saveLockSeconds（app_state 明文键 `app_lock.lock_seconds`，越界钳到档位首尾）；③ _SetLockDialog：加档位吸附 Slider（左标签+右当前值 30 秒/5 分钟/1 小时，改时长不需要旧码）、_submit 拆分 changePin 分支（原清空分支搬入新 _clearPin，共用抽出 的 _verifyOldPin）、chatPageSetLockClearHint 文案改写；④ ChatPage._loadLockSeconds 回填 _lockSeconds/_lockTimer 并重排 idle；⑤ ARB 中英新增 5 键（chatPageSetLockDurationLabel/ClearButton + lockDurationSecs/Min/Hour）。测试：chat_page_menu_test 改 2 用例（两空提交不再清空、删除改走显性按钮）+ 新增滚动轴用例（中点=300s 落盘且 PIN 不动，调试发现档位 index 数错：中点 index 3=300s 非 600s）、app_lock_test 新增时长往返/钳位用例；chat_page_menu 43 项、lock 相关 24 项全过，analyze 0。注：本任务从 feat/voice-transcript stash 搬到 main（老板提醒先切分支）。
 
 **（2026-10-18T09:08:56Z / 2026-10-18 17:08）**：锁屏码弹窗标题行改双标签页（老板 2026-10-18）：已设 PIN 时标题换成 SegmentedButton「更换锁屏码 / 清除锁屏码」，取代上一轮的红色文字按钮；更换页=老 PIN/新 PIN/确认/滚动轴（语义不变），清除页=原「清除锁屏码？」警告弹窗内容搬入（警告文案 + 旧码框），主按钮变红底白字「清除」，**去掉二次确认弹窗**（标签页本身即警示；验旧码保留——2026-09-14 安全决策不动）。未设 PIN 弹窗保持原样。切页清红字残留；l10n 新增 chatPageSetLockTabChange，ClearHint 文案「清除用下方按钮」→「上方标签页」。测试：删除用例改标签页流程，chat_page_menu 43 项全过、analyze 0。老板指示：先提交，随后美化标签观感（SegmentedButton 默认样式不好看）。
@@ -15321,6 +15429,32 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 **（2026-10-22T02:05:10Z / 2026-10-22 10:05）**：老板批量文案迭代的评估+落定。老板改动（未提交让我评估）：close companions→selected companions（app 向导/关于、官网 about、ASC 描述）、close friends→selected friends/members（ASC）、encrypted→encrypted and decrypted on device（官网/隐私政策/ASC notes）、Release on approval Manual→Automatic、aboutIntro 英文病句 "Disallow any third party…peek"、中文 亲密伙伴→特选伙伴。**我的评估**：① aboutIntro 英文 "Disallow X peek" 语法崩坏（app_en.arb），必须修——中文「不允许任何第三方…偷看内容」本身没问题，是英文改坏；② 中文「特选伙伴」是餐饮/电商营销腔形容人略生硬，建议「亲密伙伴」；③ 查 ASC 发现版本已 WAITING_FOR_REVIEW 且 releaseType=AFTER_APPROVAL——文档原写「Manual（建议）」才与现实脱节，老板改 Automatic 是对齐现实；④ ASC 文案目前是旧版（我 10-21 同步的那版），在审期间不同步。**老板裁决**：中文保留「亲密伙伴」；不同步 ASC 留待下次升级；英文 aboutIntro 保留原版（仅还原我指的那句）。**落地**：zh 两处文案+官网 about 中文段 特选→亲密（老板对 aboutIntro 中文的「能够偷看」→「不允许…偷看」改动予以保留，语法没问题）；en aboutIntro 病句还原为 "No third party, including Einz itself, can peek at the content"，selected companions 按老板未异议保留。残留检查：Disallow/特选在 app/lib、www、ASC 文档均无残留；analyze 0 问题。**遗留一致性**（已向老板点破）：EN setupEntryHint/aboutIntro/www 用 "selected companions"，ZH 对应处用「亲密伙伴」——中英措辞分工不同，GLOSSARY 本就有「中英故意不同名」先例，老板未反对即按此保留。ASC 文档（appStoreSubmission.zhcn.md）全是老板自己的改动，未代提交。
 
+**（2026-10-22T04:00:52Z / 2026-10-22 12:00）**：方案 D'（服务端自建 Whisper 转写）阶段一+二开工落地（老板拍板：whisper.cpp 引擎 + 按需转写先行、双传后置）。**服务端**：新增 `POST /transcriptions`（`server/src/transcriptions.ts`）——明文 16kHz/16bit/mono wav 经 **stdin 管道**喂 whisper-cli 子进程（`/dev/stdin`，全程内存不落盘，守住 §15.2 隐私承诺），stdout 按时间戳行解析回文本；鉴权走 requireSession、限流新开全站最严桶（per-IP 10 次/小时，EINZ_RATELIMIT_TRANSCRIBE 可调）、音频上限 10MiB（≈5 分钟）；wav 头解析只认 PCM16（时长毫秒算出返回）；未配 `EINZ_WHISPER_BIN`/`EINZ_WHISPER_MODEL` 时 503 `TRANSCRIBE_DISABLED`，`/health` 已启用时下发 `transcribe: true` 供客户端分流；事件日志只记 entrance/耗时/字符数，**不记内容**。server tsc 干净、新增 5 个单测（wav 头解析/stdout 解析/假 runner 主体/无效会话 401/真 spawn 假引擎 + 未配 env 报禁用）全绿，server 全量 7 套件全绿。**协议**：PROTOCOL.md 登记端点（API 一览 + 新 §6.3 + 3 个错误码 TRANSCRIBE_DISABLED/FAILED/TIMEOUT）与即转即删隐私承诺。**客户端**：`VoiceTranscriptSettings`（space-scoped 三选一 local/server/ask，默认 local）挂进「更多设置」弹层（行尾当前值 + OptionPickerSheet 提交式，与附件存储/墓碑同构）；`_retryVoiceTranscript` 按授权分流——local 走原本地模型路径，server/ask 走 `_serverVoiceTranscribe`（ask 先弹授权确认；本地解密 wav → `ApiClient.transcribeWav` 上送 → 结果写 `LocalVoiceTranscripts` 表 modelId='whisper-server'，与 sense-voice 行共用同一 UI 渲染；失败置 failed 可重试，notice 透服务端错误原话）；l10n 三语新增 11 键（授权选项+描述、ask 确认弹窗、服务端失败），gen-l10n 校验无 diff；shared analyze 0、app analyze 0。**部署文档**：`aimemo/whisperDeploy.zhcn.md` 新增（心智模型：二进制+模型+两个环境变量、非 daemon；编译/模型选型表/冒烟/接入/搬迁 checklist/升级流程——老板要亲自掌握以备海外搬迁）。**验证缺口**：真机/VPS 端到端未测（等 whisper.cpp 装上 VPS）。**遗留**：①CI test gate 被两个**存量失败**卡住（chat_page_menu_test「长按语音消息」`!timersPending` +「改口令：旧口令错」连锁）——今天上午的 iOS CI run 39711346513 跑的是合并提交（不含 D' 改动）就已失败，本地全文件跑复现同两例，与 D' 改动无关；曾试测试末尾 pump(10min) 冲刷一次性 Timer，结果 pumpAndSettle 反而挂死（Timer 触发后引入周期帧），已回退，待定位真凶 Timer。②老板工作区并行改动（package.json server-run-docker 重构）未动未提交。
+
+**（2026-10-22T04:12:03Z / 2026-10-22 12:12）**：whisper.cpp 内置进 Docker 镜像（老板问起 Docker 内置做法，直接落地成第二部署路径）。`server/Dockerfile` 新增 `whisper` 编译阶段：clone whisper.cpp → cmake Release 编 whisper-cli → 二进制 + libggml*.so 收拢到 /opt/whisper（`ldd | grep 'not found'` 自检兜底）；runtime 阶段 COPY 进镜像并设 `LD_LIBRARY_PATH=/opt/whisper`。**模型不进镜像**（换档位不重新 build、镜像不撑爆 466MB），compose withcaddy 变体挂 `./data/whisper/models:/opt/whisper/models:ro` + env 指容器内路径——首次部署只差往模型目录放一份 ggml 模型。whisperDeploy.zhcn.md 的「Docker 例外」小节改为两条路（内置镜像=推荐/裸 Node+宿主机）。**验证缺口**：本机 OrbStack 未运行没法预 build，cmake 编译与动态库自检要在 cn1 首次 build 时确认；nocaddy/nocaddy.cftunnel 两个 compose 变体未同步加（cn1 不用就不急）。
+
+**（2026-10-22T04:41:12Z / 2026-10-22 12:41）**：老板确认 OrbStack 起来后补完两项验证+收尾：① 本机 `docker build --target whisper` 成功（clone+cmake 约 90s），`docker run` 容器内跑 `whisper-cli --help` 正常（动态库/LD_LIBRARY_PATH 验证通过）——上一条目里的「验证缺口」已消除；② 老板要求 whisper 配置同步到其余 compose 变体：`docker-compose.nocaddy.yml` 与 `docker-compose.nocaddy.cftunnel.yml` 的 server 服务各加同样的 `EINZ_WHISPER_BIN`/`EINZ_WHISPER_MODEL` env + `./data/whisper/models` 只读卷（与 withcaddy 完全一致），`docker compose config` 两文件校验通过。至此三个变体全部支持内置 whisper，cn1 无论用哪个变体都只差放模型文件。
+
+**（2026-10-23T00:56:57Z / 2026-10-23 08:56）**：macOS CI 公证三连败的完整定位与修复（老板报 voice 分支 iOS 绿 macOS 红）。**过程**：①初判「stapler 查 CloudKit 记录偶发延迟」加重试（run 39875227075）——重试 6×30s 仍 Record not found，证伪；②改走 ASC API key 凭据（run 39876828935）——同样失败，证伪「Apple ID 私有 CloudKit 通道不稳」假设（已向老板道歉性更正：不是 Apple 端问题）；③加公证诊断——**解析 submit 的 JSON status**，Invalid 时当场打 `notarytool log`（run 39878450056）——**真相**：公证被 Apple 判 **Invalid**，`libsherpa-onnx-c-api.dylib`（x86_64+arm64）无 Developer ID 签名且无 secure timestamp。**根因**：voice 分支引入 sherpa-onnx 本地转写后，Frameworks 下出现**裸 dylib**（非 .framework），签名循环只覆盖 `*.framework` 漏掉它；且 notarytool submit 被判 Invalid 时**也 exit 0**（electron/notarize 社区同款坑，PR #173），报错被误导到 stapler 的 "CloudKit query ... Record not found"——Invalid 公证不发布 ticket，重试多久都查不到。**修复**（6628e813）：签名循环扩展到 `*.dylib`；run 39879626235 **全绿**（macos 6m28s，含完整公证+装订出 dist 包）。**清理**（按老板指示）：删 stapler 重试循环与被证伪的注释；保留①submit JSON status 解析 + Invalid 打 log 的诊断（这次 10 分钟抓出真相的关键，防再入坑）②ASC API key 凭据（与 iOS TestFlight 上传同源、免 App 专用密码，Apple ID 方式留作缺 ASC 时的回退）。**教训沉淀**：macOS 公证报 stapler/CloudKit 类错误 ≠ stapler 的锅，第一反应查 notarytool log 的 issues；新增裸 dylib 依赖时 CI 签名循环要同步覆盖。
+
+**（2026-10-22T05:08:41Z / 2026-10-22 13:08）**：testAll 两连败的根因定位+修复（收掉 12:00 条目里「待定位真凶 Timer」的悬案），外加迁移缺表真 bug。**悬案根因**：`chat_page_menu_test`「长按语音消息」`!timersPending` +「改口令」连锁（10 分钟超时吊死）——真凶是 **drift 内部的 `Timer.run`**：`_buildVoiceTranscriptLine` 是本分支新带进 widget 树的**全 App 第一处 drift 流**（`watchSingleOrNull()`）；StreamBuilder 在测试卸载时取消订阅 → drift `StreamQueryStore.markAsClosed` 起一个 Duration.zero 的 Timer（默认把缓存流多留一个事件循环迭代）→ flutter_test 的 FakeAsync 没人推进时钟，定时器永不触发：① `_verifyInvariants` 的 `timersPending` 断言炸；② `addTearDown(db.close())` 里 `StreamQueryStore.close()` 会 `await` 这个永不完成的 timer completer → 整个测试吊死到 10 分钟超时（上一轮试的 pump(10min) 反而挂死正因 Timer 触发后引入周期帧）。**定位手法**：flutter_test binding 在断言前会 debugPrint "Pending timers:" + 创建栈（`_verifyInvariants`），孤立复跑该用例完整落盘即读到 `markAsClosed → QueryStream._onCancelOrPause → _StreamBuilderBaseState._unsubscribe` 栈。**修复**：`local_database.dart` 两个构造路径（生产 `_openConnection` 与 `LocalDatabase.forTesting`）的 executor 外包 `DatabaseConnection(..., closeStreamsSynchronously: true)`——drift 官方为该测试场景准备的开关（connection.dart 注释原话 "useful in test setups that throw exceptions for timers persisting after tests"）；全 App 仅此一处 drift 流，同步回收缓存无感知，测试与生产同语义。**同批修掉的真 bug（迁移缺表）**：`local_voice_transcripts` 原先塞在 `from < 10` 迁移块里，而 v10（deleted_kind）已随 main 发布——**已升到 v10 的存量库再打开时 from==10，整段不跑，新表根本不存在**（语音转写行的 drift 流直接报 no such table）。改法：schemaVersion 10→11，新表独占 `if (from < 11)` 块（createTable 是 IF NOT EXISTS，幂等）；迁移测试期望值同步改 11，并新增「v10 存量库打开 → 补建表并升 v11」回归用例（用当前 schema 造库→DROP 表+版本戳改回 10→重开）。**老板锁屏进不去的排查结论**：**与本分支无关**——锁屏/PIN 校验链路（lock_page/app_lock/vault_session/main）在本分支 diff 里一个字节都没动；且今天 iMac 实测沙盒 `Documents/dev/` 为空、无 einz 进程、dev Keychain 无条目（pid 文件显示今天 11:48 有一次 run 但已结束、dev 库不在）。缺表 bug 只影响「main 构建写过的库」的转写功能，不挡锁屏。请老板确认锁屏页具体现象（红字文案/倒计时/「锁屏码 错误」/无反应）以进一步定位，大概率是记忆中的 PIN 不对或 5 次错误触发了 30 秒锁定。**验证**：`scripts/testAll.sh` 全量（app+shared+cli+server）**全部通过 ✅**（修复前 app 段 2 败：语音用例 + 改口令连锁）；flutter analyze 0 问题；另在 main worktree 孤立复跑该用例 2 秒通过（证明是分支引入、修复有效）。
+
+**（2026-10-22T09:45:00Z / 2026-10-22 17:45）**：老板实测两个问题当日定位修复（commit 33e9976b，feat/voice-transcript）：① **MacBook app 录音全是静音**——根因 `DebugProfile.entitlements` 缺 `com.apple.security.device.audio-input`（Release 2026-10-13 已补、Debug 漏了；沙盒 debug 构建缺它 TCC 静默拒绝，与 2026-09-26 FilePicker 漏声明同款 Debug/Release 差异）；语音备忘录正常佐证是 app 权限而非硬件。② **点转写「转写失败」**——根因转写 isolate 内缺 `sherpa.initBindings()`（包要求每个 isolate 各自初始化；缺了建 recognizer 即抛 "Please initialize sherpa-onnx first"，重试 2 次落 failed）。另把转写触发+气泡转写行扩展到 **wav 音频文件消息**（老板用 wav 文件测试转写的路径；非 wav 不入队不占位）。测试素材：`say` TTS 生成 16kHz 单声道 wav 放老板桌面（einz-voice-test.wav）。会话间隙对账确认：录音已改 16kHz WAV（RecordConfig + kMetaVoiceContainerWav meta，另一 agent 落）、SenseVoice 模型已装本机容器目录（239MB + .ok 标记）。验证：全量 analyze 零告警、迁移/group 测试全过。**待老板操作**：entitlements 变更需完整重建（非热重启），重建后首条语音消息会弹麦克风授权。
+
+
+
+**（2026-10-22T10:06:07Z / 2026-10-22 18:06）**：老板问「git diff 里两个 generated_plugins.cmake 的修改哪来的」——定位结论：**无人手改，是 Flutter 工具链今天 14:43 自动重写的，根因是本机 pub cache 两个包目录被清空**。**修改内容**：`app/linux/flutter/generated_plugins.cmake` 删 `sherpa_onnx_linux`、`app/windows/...` 删 `sherpa_onnx_windows`，均出自 `FLUTTER_FFI_PLUGIN_LIST`——后果是将来编 Linux/Windows 桌面端时不再链 sherpa-onnx 原生库（这两端的本地转写会残），macOS/iOS/Android 不受影响（macOS 走 GeneratedPluginRegistrant.swift，另一套机制）。**谁写的**：老板跑 `npm run app-mac-run`（`flutter run -d macos`）时 pub get 触发的重生成——pub get 会为**所有**已配置桌面平台（linux/macos/windows）重写 generated_plugins.cmake，所以选 -d macos 也会动 linux/windows 文件；证据是 package_config.json、.flutter-plugins-dependencies、两个 cmake 的 mtime 全部=今天 14:43。**根因**：`~/.pub-cache/hosted/pub.dev/` 下 `sherpa_onnx_linux-1.13.8` 与 `sherpa_onnx_windows-1.13.8` 两个目录**是空壳**（0 文件、无 pubspec.yaml，目录 mtime 10-10 11:16）——Flutter 生成插件列表时要读每个插件包的 pubspec.yaml 判平台支持，读不到=无平台声明=**静默丢弃**，不报错。**为何不自愈**：`~/.pub-cache/hosted-hashes/pub.dev/sherpa_onnx_linux-1.13.8.sha256`（22fb91a1…）与 app/pubspec.lock 里的 sha256 一致，pub 认为空目录是合法缓存包，永不重下。**历史 precedent**：同类 corruption 2026-10-10 前后已中招过一次——pub 缓存里 windows_file_picker-1.3.0 缺 pubspec.yaml 致 build_runner 崩（本条上方 13997 行踩坑），当时 `rm -rf` + `flutter pub get` 修复；而 windows_file_picker-1.3.0 **今天又是空目录**——该 corruption 会复发。当前空目录共 3 个：sherpa_onnx_linux-1.13.8、sherpa_onnx_windows-1.13.8、windows_file_picker-1.3.0。**影响面时间线**：sherpa 两包内容约 10-10 丢失，但 10-09 生成、带有 sherpa 行的 cmake 已入库（linux 行今天 12:02 随 0c7ab055 提交，windows 行更早），中间 12 天没有任何构建去读这两个包的 pubspec， corruption 一直隐形，直到今天下午重生成才暴露。**待办**：`rm -rf` 三个空目录 + `cd app && flutter pub get` 重取后两个 cmake 应恢复 sherpa 行（git diff 归零），再提交；修完建议顺手 `find ~/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -empty` 全库排查。 corruption 的物理起因（清理工具/下载中断）无日志可查，属环境复发问题，记入备忘。
+
+
+
+**追记（同日，修复完成，2026-10-22T10:38:56Z / 2026-10-22 18:38）**：pub cache 空壳 corruption 修复完成。删除三个空壳目录后 `flutter pub get`（老板执行，中途先删 windows_file_picker 与两个 sherpa 空壳、重下成功）——`sherpa_onnx_linux-1.13.8`（8 文件）、`sherpa_onnx_windows-1.13.8`（8 文件）、`windows_file_picker-1.3.0`（7 文件）全部恢复且 pubspec.yaml 可读；两个 generated_plugins.cmake 重生成后**与 HEAD 逐字一致**（sherpa 行归位，git diff 归零）；`find ~/.pub-cache/hosted -maxdepth 2 -type d -empty` 全库零空目录。过程中两次小插曲均有记录：① 18:19 左右一次未完成的 pub get（windows_file_picker 下成、两个 sherpa 没下完，package_config.json 未重写）——即再次下载同一个体积大的原生插件包时网络/中断敏感；② 期间分类器（auto 模式的安全预检服务）临时故障约 20 分钟，Bash 全量被挡，只读工具不受影响，恢复后继续。本次提交仅含 worklog（cmmake 无 diff 可提交）。复发监测手段沿用备忘：生成文件出现无法解释的插件行增减 → 先查空目录。
+
+
+
+**（2026-10-23T01:41:08Z / 2026-10-23 09:41）**：老板 macOS debug 测试实例忘了 PIN 进不去 → 先确认架构上无后门（PIN 是唯一本地解密手段，AppLockService Argon2id 加密 Vault 包；兑底路径只有锁屏页 12 词恢复码 `unlockWithRecovery`），随后确认数据位置与隔离机制：debug 与正式版**同一 bundle id（cc.tic.einz）、同一沙盒容器**，`app-mac-run` 传 `einzDevDataDir=dev` + `einzSecurePrefix=einz.secure.dev.` 两个 define 把数据隔到 dev 命名空间——DB/锁包在 `~/Library/Containers/cc.tic.einz/Data/Documents/dev/einz.sqlite`，附件/缓存在 Application Support、Caches 的 dev/ 子目录，Keychain 为文件型（`usesDataProtectionKeychain:false`）`einz.secure.dev.*` 条目（实测 dump-keychain：acct/svce 均为完整 key，同前缀正式版条目互不干扰）。**曾评估换 bundle id（cc.tic.einz.dev）方案并否决**（2026-09-22 已有同类决策）：keychain-access-groups entitlement 依赖 profile、TCC 授权按 id 记忆要重来、deep link/二维码归属歧义、iOS 侧 App ID/profile/APNs 翻倍，且 define 已封装在 npm 脚本里无手工成本。**本次产出**：`scripts/cleanMacDev.sh`（清 dev 目录三处 + dump-keychain 解析 acct/svce 配对逐条 `security delete-generic-password`；带运行中 flutter 实例守卫，pid 文件存活即拒清）+ `app-mac-run` 挂 `CLEAN=true` 环境变量开关（默认 false，`CLEAN=true npm run app-mac-run` = 清后全新启动，种入 demo 秘境）；awk 配对解析用合成 dump 数据验证只命中 dev 前缀、正式版 `einz.secure.*` 不受影响。**提示老板**：清 dev 前先试锁屏页恢复码（12 词），清掉即 dev 实例本地历史全失（服务器加密历史可用 attach 链接+口令回来）。
+
+**更正（2026-10-23）**：上段"试锁屏页恢复码"一句**说错了**——App 锁恢复码/兑底功能已按老板决策彻底删除（`lock_page.dart:20`、`app_lock.dart:454/467` 注释均写明"不再生成 12 词恢复码"，测试注释同）。故 dev 实例忘 PIN **无任何找回路径**，唯一出路 = `CLEAN=true npm run app-mac-run` 清 dev 数据全新启动。已写入记忆防再犯。
+
 **（2026-10-23T00:04:15Z / 2026-10-23 08:04）**：状态条「语音呼叫按钮 ↔ 对方胶囊」间距与我方「通道按钮 ↔ 我的胶囊」对齐（老板 2026-10-23 实测两侧不一致）。根因：`_buildPeerStatus` 的 `pad` 右距恒为 10，尾块（呼叫按钮）无内边距，视觉间距 = 10 + 呼叫图标在 40 容器里的居中余量 10 = 20px；而我方是 SizedBox(6) + 同类居中余量 10 = 16px，右侧明显更紧。改法：`pad` 右距按 `_peerJoined` 分流——已加入（挂呼叫按钮）取 6，与我方严格同距（容器 6=6、视觉 16=16）；未加入（挂「邀请加入」链接）保持 10（+ 链接自带 horizontal 12 = 22，2026-09-26「两侧一样宽」口径不动）；加入状态未知时尾块为 shrink，取值不影响视觉。原 `_isGroup ? 10 : 10` 同值三元随分流条件一并去掉。验证：flutter analyze 0 问题；group_status_bar / duo_peer_sheet / peer_invite_link / chat_page_menu 四组测试全过（无几何断言需改）。微调未 commit。
 
 **（2026-10-23T01:07:31Z / 2026-10-23 09:07）**：锁屏页冻结期间加「忘记锁屏码」恢复路径提示（方案 A，老板 2026-10-23 拍板；前情：忘 PIN 只能卸载重装 + 邀请码 + 共享口令重加入，attach 机制保身份/密保箱保消息，唯一保不住的是通道实例私钥——老板知悉后选择「保持现状 + 把路径讲清楚」，口令重置 PIN 与 per-entrance PIN 两个方案均明确不做）。新增 l10n key `lockPageForgotPinHint`（zh 用老板原话「真的忘了锁屏码？您可以卸载重装，通过邀请码和共享口令重新加入您的秘境。」，en 同义译文），lock_page.dart 里挂在 `if (locked)` 倒计时文案下方——**只在冻结期间出现**：连错 5 次锁定 30 秒正是「用户可能真忘了」的时刻，此刻告知不打断不误导；平时挂着会暗示忘 PIN 有捷径、削弱 PIN 威慑。样式用 onSurfaceVariant 12 号小字（非红色，红色留给倒计时错误态）。测试补 lock_page_test 用例：未冻结不出现 → 置位 locked_until + 推 1 秒 ticker → 倒计时与提示同现、输入框禁用。per-device PIN 方案经评估后维持不变（连锁分析：Vault 级→per-entrance 需改 VaultSession 二元状态机、推翻「切空间免 PIN」、最弱 PIN 拉低整机离线面，收益仅爆炸半径缩小）。
@@ -15331,6 +15465,11 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 
 **（2026-10-23T02:52:00Z / 2026-10-23 10:52）**：TUI 启动时在消息流亮出 store 路径（老板 2026-10-23）。根因：npm 包装脚本（tui-cli）其实已 echo store 路径，但 TUI 首帧清屏（2J/3J）会把它抹掉；直跑 dart run 时压根没有——多 store 场景（--store / STORE 环境变量）无法确认连的是哪个文件。落点：main 里 storePath 定稿后经 _guidanceNotes 加「📁 Store: <路径>」——必须走这个机制，loadHistory 开头会 clear messages，启动类系统消息排在其后才落得下来（与 DNS 污染警报/未识别警告同路）；/reset 的「重新开始」横幅也补上该行。验证：新增 cli/test/store_path_output_check.py（pty 驱动，仿 guide_exit_check.py：新 store + 不可达服务器 → 向导首问出现即证启动流跑完，断言消息流含 📁 Store 整行）实测通过；guide_exit_check.py 回归无影响；cli dart test 28 例全过。另：本会话早前两笔小提交——「Vanished messages」英文改名（b839bffe + 79fffe9b 抽象类注释同步，中文侧本就是「消息留痕」无需动）、忘 PIN 提示加「然后」（98d61c22）、老板手改的 package.json 代提交（d9b0ffbe）。
 
+**（2026-10-23T03:33:48Z / 2026-10-23 11:33）**：{ computer: 'DoomBase', user: 'luk', agent: 'codebuddy' } 语音气泡转写行加来源图标（老板 2026-10-23）：转写文字前标一粒图标表明是谁转的——云 `Icons.cloud_outlined`=服务端 whisper 转写，芯片 `Icons.memory`=本地 sense-voice 模型转写。判定按行的 modelId：'whisper-server' → 云，其余 → 芯片（本地/服务端两条 insert 路径从建行起就带 modelId，pending 态即可判）。挂载范围：done（转写文字）与 pending（「转写中…」）两个内容态——pending 也挂，ask 模式确认后立刻可见正在走哪条路；failed/stale/unavailable 三个可点提示态不挂（非转写内容，且重试可能换来源）。本地图标没采用老板提的齿轮选项：app 设置入口已是 `Icons.settings_outlined` 齿轮（chat_page.dart 更多设置行），撞语义；芯片取「本机算力」意境，与云成对。结构：`Padding > Row(crossAxisAlignment: start) + [图标 14px, SizedBox(4), Flexible>Text(maxLines:3)]`，Flexible 沿用同一气泡内文件名截断的既有模式，长转写不撑破气泡；图标色随气泡前景色 0.85 alpha 与文字同源。验证：flutter analyze 0 问题；观感待老板自测。提交隔离：工作区另有未提交的 worklog「更正」hunk 与他人 .gitignore 改动，本轮只暂存 chat_page.dart 与本条目（update-index 定点暂存），其余原样留在工作区。
+
+**（2026-10-23T04:35:27Z / 2026-10-23 12:35）**：修「iOS 模拟器进聊天页约 1 秒必闪退」（老板 2026-10-23 报告，实测确认）。根因链：容器 tmp 里一条断录的 `einz_voice_1791785232124.wav`——录音中 app 被杀（开发热重启即典型），iOS 录音器留下头已写、`data` 块 **0 字节**的空壳（文件 1.8MB 但 RIFF 声明 4096）；进聊天页 `_enqueueVoiceTranscripts` 自动补转写 → sherpa-onnx 1.13.8 原生层对 0 采样数据**除零 SIGFPE**（崩溃报告 faultingThread 4 帧 SherpaOnnxC，Dart isolate 工作线程 FFI 进入），SIGFPE 杀整个进程、Dart catch 拦不住 → 下次进页重试成死循环。排查走过的弯路：① 模型文件先排除（sha256 与基线逐一比对一致）；② wav 头「采样率 0」初看疑似毒文件，实为解析脚本没跳 JUNK/FLLR 块的误报——sherpa wave-reader.cc（v1.13.8 源码核对）会跳 JUNK，但**不查 data 是否为空**，那才是除零源头。修复三层：① `voice_transcript_service.dart` 新增 `validateWavHeader()`（RIFF/WAVE 标记 + 遍历块链验 data 块存在且非空，RandomAccessFile 增量读不整文件进内存），喂 sherpa 前调用——坏文件抛异常走既有重试耗尽落 `failed`，绝不进原生层；② `chat_page._stopVoice` 空录音判定从「文件 >0」升级为 `VoiceTranscriptService.hasAudioData()`——iOS 空录/断录也产出几 KB 头文件，旧判定会把它送进预览可发送；③ `_startVoice` 开录前清扫 tmp 孤儿 `einz_voice_*.wav`（此刻必有 inputMode 守卫保证无录音在跑）。验证：flutter analyze 0 issue；修复后模拟器实测进聊天页不闪退（老板确认）。iOS 验证时发现 `npm run app-ios-run` 首跑曾超时 300s，改 bash_start 后台跑。提交隔离：工作区另有 boss 未提交的 .gitignore（server/models）与 worklog「更正」hunk，按 hunk 定点暂存只提交本轮文件。
+
+**（2026-10-23T05:45:53Z / 2026-10-23 13:45）**：{ computer: 'DoomBase', user: 'luk', agent: 'codebuddy' } 修「server 模式自动转写仍走本地（芯片图标）」——老板 2026-10-23 iOS 模拟器实测：确认已设为服务端转写，但每次录音发送后自动转写出的文字前都是芯片图标。**根因**：授权模式只有手动重转路径读（_retryVoiceTranscript），自动入队路径 `_enqueueVoiceTranscripts` 恒定调用本地 service——server/ask 设置对自动转写完全无效（手动点按重转才分流）。**修法**（chat_page.dart）：① 自动路径按 `_voiceTranscriptAuth` 路由——server 自动走上送、ask/local 自动走本地。ask 刻意不整条跳过：没有行就没有手动入口（_retryVoiceTranscript 只从 failed/stale/unavailable 行点入），且本地链路零网络零上传，「上传前先问」只发生在手动点按；② server 自动幂等——已有 done/pending 行不重送（防首屏历史页把旧语音全量上送撞 per-IP 10 次/小时限流桶、防实时刷新重复触发），failed/stale/unavailable 才转；旧 m4a 不上送（服务端只吃 PCM16 wav，上传必 400）；③ `_serverVoiceTranscribe` 改返回 `_ServerTranscriptOutcome`（done/failed/disabled），503 `TRANSCRIBE_DISABLED` 不再落 failed 行——按 §15.1 ③ 既定回落语义，**自动与手动两条路都改走本地模型** + 新 l10n 键 `voiceTranscriptServerDisabled` 出说明 notice（补上 settings 文档里写了却一直没实现的「服务端未启用回落 local」；此前该情形会留下水恒 pending 行）；④ 本地入队逻辑抽成 `_enqueueLocalVoiceTranscript` 供两条路共用，逐条 try 防单条失败拖垮整批。**验证**：flutter analyze 0 问题；真机三态（server 模式自动出云图标 / 服务端未启用回落本地 / local 模式不变）待老板自测。aimemo/voiceTranscript.zhcn.md §15.4 同步为落地状态清单。**并发处置**：期间另一 agent 提交 f6bb44bd（wav 头校验修闪退，hunk 隔离干净未卷走我的改动）与其 worklog；工作区出现他人未提交的 app_en.arb 文案改写（Server→In cloud 等 5 处，session 开始时不存在），本轮把三个 l10n 文件临时还原为「HEAD+我的 key」整文件暂存，其 arb 版本已备份 /tmp/en.arb.theirs+mykey.bak，提交后还原工作区，未代提交。
 **（2026-10-23T03:09:35Z / 2026-10-23 11:09）**：TUI store 显示按老板反馈修订（承接 02:52 那笔）。① **已有 store 直接进聊天不再自动输出** 📁 Store——去掉 main 里的 _guidanceNotes 自动注记，改新增 **/store 命令**（helpEntries 补条，输出「📁 Store: <路径>」，与 /switch 配套，多 store 场景随问随答）；② **新 store 向导路径两团消息合并**：📁 Store 行放进身份横幅内部、位于 ---------------- 分隔线**之前**（老板指定位置），横幅整体作为一条系统消息，不再单独刷一条。回归脚本 store_path_output_check.py 扩为双场景并实测通过：新 store（横幅含 📁 且在分隔线前——注意 _render 消息区是**从下往上堆叠**，流序=视觉倒序，断言须按「分隔线 < 📁 < 公钥行」判）；已有 store（复制 demo/store-a.json：启动无自动输出 → 发 /store → 路径出现）。guide_exit_check 与 cli dart test 28 例复跑无影响。另：老板同期又手改 app_en.arb 两处（chatPageTombstoneKeep → Show status、HideDesc 补 leave no trace），未代提交，留待老板发话。
 
 **（2026-10-23T04:05:00Z / 2026-10-23 12:05）**：**TUI 无操作自动锁屏上线**（老板 2026-10-23 拍板五决策点全同意我案，对齐 App）。五个决策点落地：① 默认 30s、可调 20s~20min（/lock <秒>，会话级，重启恢复默认——与 App 的 app_state 持久化不同，TUI 不往 store 里加字段）；② 锁定时空回车=原地重问、Ctrl+C 才退出（启动解锁保持空回车即退——_unlockPin 重构为 _promptUnlock(exitOnEmpty) 双模式共用）；③ 锁定时消息区只渲染锁定点之后的 isSystem 消息（解锁提示/错误），锁定后到达的聊天内容一概不上屏，解锁原样恢复（历史在内存不解散）；④ 抑制条件：问答进行中（pendingGuideCompleter）/忙（processing）/文件浏览器打开——仿 App"弹层盖着重排"；⑤ /lock 手动锁命令（无参立即锁）+ help 条目。看门狗 1s 粒度，_lastActivityAt 由输入循环每次按键刷新（方向键/滚轮都算活动）。另：英文文案按老板意愿定稿——Tombstone messages → Vanished messages（b839bffe 已提交）；老板又补「Show metadata」（替代 Show status，我更赞同：占位显示的是时间+状态=元数据）与 leave no trace，本轮连同 gen-l10n 一起提交。**调试插曲**（值得记住）：pty 回归初版连续误报——wait_for 匹配到旧字符串、提示出现次数被手动锁周期提前满足、帧判定被解锁帧的滚动历史骗过（旧提示词还在可视窗口、MARKER 已滚出）。最终稳健判据=**标题栏身份**（锁定时 _identityHidden 藏身份，解锁帧才有 @dev-a1）。idle_lock_check.py 十场景全过（手动锁/遮蔽/错码/空回车重问/对码恢复/越界拒绝/看门狗 20s 真锁/解锁恢复/重启启动解锁三态），guide_exit/store_path/dart test 28 例复跑无影响。
@@ -15340,3 +15479,438 @@ plutil/PowerShell VersionInfo/strings 各读法均为平台标准机制。CI 下
 **（2026-10-23T06:24:05Z / 2026-10-23 14:24）**：lock_seconds 持久化落地（老板要求与 App 体验一致）。EntranceStore 新增可空 int? lockSeconds 字段（toJson/fromJson 走 'lock_seconds'，旧 store 缺省 null=用默认，无需迁移）；启动时 _idleLockSeconds = (store.lockSeconds ?? 30).clamp(20, 1200)（防手改 store 塞越界值）；/lock <秒> 写入后即存盘（响应改「已记住，重启后仍生效」）；/status 新增「自动锁屏: 无操作 Ns 后锁定」行（可发现性 + 回归断言点）。粒度说明：App 的锁屏时长存 app_state 是设备级，TUI 的 store 是「一个 store=一条通道」，故阈值随通道存——与 TUI 既有粒度一致。回归：idle_lock_check 增两步——设 /lock 45 → 重启 → /status 显示 45s，13 场景全过；guide_exit/store_path/dart test 复跑无影响。
 
 **（2026-10-23T05:56:45Z / 2026-10-23 13:56）**：代提交老板的文案修订批次 + 补落地漏掉的「Show metadata」。① **英文**：chatPageTombstoneKeep 定为 **Show metadata**（老板认同我的建议——占位项显示的是时间+状态=剥掉正文的元数据，比 Show status 覆盖全；此前一轮只提交了老板手改的 Show status，本轮修正），gen-l10n 同步。② **中文统一「清除→清空」**（老板批量改）：startupInitClearData/Title/Message/ClearedRestart、chatPageEntranceRevoked、resetEntranceServerResidualHint 六处。③ **TUI 措辞**（老板改）：解锁提示「输入锁屏码」→「验证锁屏码」（启动/空闲两路）；空回车提示「Ctrl+C 退出」→「Ctrl+C 彻底退出」；「尚未设置共享口令」→「没有共享口令」（含两处注释）；/pin 用法与结果文案改为「清除锁屏码」口径并明示"不再自动锁屏"；/lock 无 PIN 提示「尚未设置」→「没有」。idle_lock_check.py 的提示词常量同步更新（LOCK_PROMPT/STARTUP_PROMPT），十场景复跑全过；guide_exit/store_path/dart test 28 例、app flutter analyze 全量复跑无影响。
+
+**（2026-10-23T07:35:00Z / 2026-10-23 15:35）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：serverDocker/ 融合进 server/
+- 决策背景：本机 `npm run dev` 与 docker compose 两种运行形态共享同一份 data/config/models/.env（老板定）。
+- `git mv serverDocker/* → server/docker/`（compose×4、coturn/、env.sh、Caddyfile.example；.env 与 models/ 为 ignored 文件用 mv 一并搬）。
+- compose 3 个 server 变体：`build.context: ..` + `dockerfile: docker/Dockerfile`；卷改 `../config ../data ../models/whisper`。coturn 变体无需改。
+- `server/package.json` dev script：env-file 改 `./docker/.env`；mailProbe.ts 路径改 `../docker/.env`（脚本自身位置相对）。
+- 根 `.dockerignore` 重写：context 现在是仓库根（服务 cli + server 两个构建），排除 server/data、server/models、server/docker、server/.env 等。
+- `.gitignore`：serverDocker/* 路径全部改 server/docker/*。
+- 文档同步：DEPLOYMENT/ONBOARDING/TURN/updateServer/E2EE/README/whisperDeploy + server 内注释，全部 serverDocker → server/docker；修正 mailProbe 与回滚 checkout 的相对路径。
+- 验证：4 个 compose `docker compose config` 全过；`node --env-file-if-exists=./docker/.env` 能读到密钥变量（未打印值）；env.sh 幂等通过。
+- 注意：VPS 上 /opt/... 旧目录结构需在下次部署时同步 mv；同一时刻只能跑一个实例（共享 SQLite）。
+**（2026-10-23T07:55:00Z / 2026-10-23 15:55）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：修正 compose 的 Dockerfile 路径
+- 老板指出 Dockerfile 仍在 `server/Dockerfile`（未搬进 docker/），compose 里误写 `docker/Dockerfile`。
+- 修正为 `dockerfile: server/Dockerfile`（context 仍是仓库根），3 个 compose 变体同步，config 验证全过。
+**（2026-10-23T08:20:00Z / 2026-10-23 16:20）** { computer: 'mac15', user: 'lukas', agent: 'atomcode' }：Docker 构建方案定为 B（server/.dockerignore + context=..）
+- 勘误两连：①「server 构建需要 shared/」经查为错误推断（src 无 shared import，tsconfig 仅 include src，Dockerfile 只 COPY package/tsconfig/src）；② compose 相对路径以文件所在目录为基准，server/docker/ 下的 `..` 就是 server/，此前写的 `../server` 实指不存在的 server/server。
+- 定案（老板选 B）：compose 3 变体 `context: ..`（=server/）+ `dockerfile: Dockerfile`；新建 `server/.dockerignore`（排除 node_modules/dist/data/models/config/docker/.env）；根 `.dockerignore` 回退为 cli 构建原内容。
+- 验证：4 个 compose config 全过；server/ 下 `docker build --call check` 确认 ignore 加载无警告。
+**（2026-10-23T08:11:56Z / 2026-10-23 16:11）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：复审 serverDocker→server/docker 融合四连 commit（另一 agent 所做），修其中遗留错误 + 落地老板两项新要求
+- 背景：老板发现融合批次连续出错，要求独立复审。复审对象：b957441f（cli Dockerfile 改名）、398fff04（融合）、40497367（Dockerfile 路径"修正"）、a555893f（方案 B）。
+- 查出错误：① 398fff04 写 `dockerfile: docker/Dockerfile`——Dockerfile 从来在 server/Dockerfile，路径不存在；② 40497367 "修正"为 `dockerfile: server/Dockerfile` 但 context 仍是 `..`（=server/）→ 解析成 server/server/Dockerfile，**依然不存在**（修正没修对）；③ .gitignore 把 ignore 规则改成 server/docker/{data,config,models}，但卷实际指向 ../config ../data ../models（server/ 下）——新增 4 条死规则，真实位置靠旧规则兜底未酿成安全事故；④ 文档没跟上：DEPLOYMENT §3.1 目录树还是融合前结构、mkdir -p server/docker/config 建错目录、whisperDeploy 让往 server/docker/models/whisper 放模型（实际 server/models/whisper）；⑤ server-run-docker 的 `rm -fr data/*` 没随 cd server/docker 改，CLEAN=true 静默失效；⑥ cli/Dockerfile.dart-sodium 头部注释还写着 Dockerfile.dev（两处）；⑦ ONBOARDING 在 cd server/docker 后写 `bash server/docker/env.sh`（嵌套路径，跑不通；融合前同错）。
+- 关键教训（实测）：`docker compose config` **不校验 dockerfile 是否存在**（瞎编不存在路径也 exit 0）——前两个 commit 的"config 全过"验证是无效验证；有效验证是 `docker build --check`（本次实测通过）或真 build。
+- 老板两项新要求已落地：A) server/package.json `start`（裸 node/pm2 形态）加 `--env-file-if-exists=${EINZ_ENV_FILE:-./docker/.env}`，与 dev 一致——此前 pm2 跑法丢 EINZ_DB_BACKUP_KEY/SMTP/WHISPER 全部变量；B) Caddyfile.example 从 server/docker/ 移到 server/（docker 与裸 node 两种形态通用），文件头注明两种拷贝/参照方式。
+- 顺手修正：.gitignore 删 4 条死规则；DEPLOYMENT/whisperDeploy/updateServer/ONBOARDING 全部路径对齐新布局（server/config、server/models/whisper、env.sh 调用）；3 个 compose + server/Dockerfile 的 ./config ./models 注释改为 ../config ../models；§3.2 补 cp ../Caddyfile.example Caddyfile 步骤；§3.1 目录树按"Node dev 与 Docker 共用运行根"重写。
+- 验证：4 个 compose config 全过；`docker build --check -f server/Dockerfile server/` 无警告；server/ 下 `node --env-file-if-exists=./docker/.env` 实测读到密钥与 SMTP 变量（未打印值）。
+- 附带发现（未改，待老板定）：root package.json `server-update-remote` 还在调 a7f62f8e 起已合并掉的 `server-run-docker-mirror`（应改 `MIRROR=true npm run server-run-docker` 或类似）；且文档里 VPS 路径 /opt/einz 与 /faronear/einz 混用。
+- 并行改动注意：server/models 是指向 /Users/Shared/productX/einz/server/models 的符号链接（老板 15:53 建，两机同步位；gitignore `server/models` 覆盖，无需处理）。
+**（2026-10-23T09:05:00Z / 2026-10-23 17:05）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：顺手修 server-update-remote + VPS 路径统一 /faronear/einz + .dockerignore 迁进 cli/
+- 老板三项指示：① 顺手改掉上轮 flag 的两处；② VPS 实际路径 /faronear/einz；③ 老板注意到 cli/Dockerfile.dart-sodium 也不依赖 shared/，问 .dockerignore 能否迁到 cli/ 与 Dockerfile 并列。
+- server-update-remote：`npm run server-run-docker-mirror`（a7f62f8e 合并后已不存在）→ `MIRROR=true npm run server-run-docker`——与合并前 mirror 脚本语义一致（三个 --build-arg 镜像源 + coturn + 重建 server）。
+- 路径统一：DEPLOYMENT §9.1 与 updateServer §1 的 `EINZ_ROOT=/opt/einz` → `/faronear/einz`；ONBOARDING 阶段 0 的 `/faronear/only` → `/faronear/einz`。/opt/whisper（whisper 安装位）与 /opt/homebrew（macOS libsodium）未动。
+- .dockerignore 迁移（比老板预想的更彻底）：查证 cli/Dockerfile.dart-sodium **没有任何 COPY**——纯基座镜像（dart:stable + libsodium），连 cli/ 源码都不需要。于是 build context 从仓库根直接收窄为 cli/（dart-docker.sh build_image：`"$ROOT"` → `"$DIR"`），.dockerignore 随之 git mv 到 cli/ 与 Dockerfile 并列，内容只剩 .dart_tool/（43MB 大头：pub 缓存 + TUI dill；运行时挂 /app 用宿主那份）和 build/ 两条。全仓库仅 dart-docker.sh 一处构建该镜像（CI 不建），server 用 server/.dockerignore，互不干扰。
+- 验证：`docker build --check -f cli/Dockerfile.dart-sodium cli/` 通过（context 传输 569B，无警告）；真构建在本机后台跑（doomship 无 dart-sodium 镜像缓存，正在拉 241MB dart:stable，网络 ~40KB/s 较慢；Dockerfile 无 COPY，基座层与本次改动无关）。
+- 遗留未动（无依据不改）：DEPLOYMENT §9.1 的 git remote 写 `git.tic.cc/fon/only`、updateServer 写 `fon/einz`，哪个是真 remote 待老板确认。
+
+**（2026-10-23T09:18:02Z / 2026-10-23 17:18）**：{ computer: 'DoomBase', user: 'luk', agent: 'codebuddy' } **语音转写设置重构为两组 + 「每条询问」补手入口**（老板 2026-10-23 拍板：「每条询问」不该是并列的第三个选项，而是额外开关；默认每条询问省流量；参考 PIN 弹窗分组）。**数据模型**（voice_transcript_settings.dart）：原单键 `voice_transcript_auth`（local/server/ask）拆成 `voice_transcript_engine`（local/server，默认 local）+ `voice_transcript_auto`（bool，**默认 false = 每条询问**）双键；旧键读时迁移（local/server → 自动开保持存量行为；ask → engine=server + 自动关），新键显式写过即以它为准；saveAll 两个键都写全局 + 各自清 per-space 覆盖。**弹层**（chat_page.dart 新 `_VoiceTranscriptSheet`，仿 PIN 弹窗分组卡片）：第一组「转写方式」本机/服务端单选（tint+对勾），第二组「自动转写」勾选行（整行可点，LabeledCheckbox 同款嵌套模式防双触发），底部「应用于本机所有秘境」+ 提交按钮（单选+提交模式，没改动时提交禁用）；菜单行当前值改「方式 · 自动/询问」短标签组合（新增 4 个 short 键）。**路由**：`_enqueueVoiceTranscripts` 开头加 auto 门禁——关（默认）直接 return，什么都不自动；开才按 engine 路由。**手动入口**（`_transcribeVoiceMessage`，长按菜单「转写」卡 + 行内 failed/stale/unavailable 提示共用）：auto 关时先弹询问框——**不论 engine 是本机还是服务端都问**（文案随方式变：服务端=上传隐私说明，本机=首次下载 230MB 模型说明，新增 AskLocal* 两键）；auto 开时不问（选自动=已授权）。询问确认后按 engine 执行；服务端未启用仍回落本地。旧 `_retryVoiceTranscript` 拆成 询问/本地执行 两个 helper，本机执行路径抽 `_transcribeVoiceLocally`（模型未就绪先弹准备对话框）。**长按菜单**：可转写消息（voice 任意容器 + wav 音频文件，与自动入队同口径）新增「转写」卡——auto 关闭时这是唯一入口（没有行就没有行内提示）；旧 m4a 也显示，点了出「不支持」说明。**l10n**：删 voiceTranscriptAuthAsk/AskDesc 两键（选项已不存在），加 10 个新键（GroupEngine/AutoLabel/AutoDesc/Engine*Short/AutoOn/AutoOff/AskLocal*/MenuTranscribe）；zh/en 双语 + gen-l10n。**并发情况**：本任务执行期间另一 agent 提交了 d40e5143（转写文案优化——我此前隔离在工作区里的他们的 en 改写由此转正）、0e3ba49e（gitignore models）、2f1ac41e（合并 origin/main 并推送）；经逐文件核实，我的 7 个文件 diff 相对 HEAD 全是本轮改动、无他人 hunk 混入（合并未动 chat_page.dart，我的 gen-l10n 基于合并后 arb），故本轮直接整文件暂存、无需 hunk 隔离。**验证**：flutter analyze 0 问题（中途修两处编译错：mixin writeSetting 双参、onApply required 命名参数）；真机交互（两组弹层/询问流程/菜单卡）待老板自测。未推送（分支已被并发方推送过，与其 origin/feat/voice-transcript 同步）。
+**（2026-10-23T09:20:00Z / 2026-10-23 17:20）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：only 时代命名清理——git remote 与本地路径全部落到 einz
+- 老板确认：`git.tic.cc/fon/einz` 是正确 remote，`only` 是早期未定名时的临时用名（与本机 `git remote -v` 实际配置一致）。
+- 清理 5 处：DEPLOYMENT §9.1 `git remote add origin .../fon/only` → `fon/einz`；§9.2 本机 push 路径 `/Users/Shared/productX/only` → `/Users/Shared/productX/einz`；ONBOARDING 阶段 0② 与阶段 1、阶段 3 的 `/Users/Shared/productX/only[/cli]` → `einz`（该目录实际存在，server/models 符号链接就指向它）。aimemo 历史记录不改。
+- 老板指示：不要在本机构建 dart-sodium（不拉 dart:stable）——这台 MacBook always 直接跑原生 dart，dart-docker.sh 容器路线是给没装 dart 的机器用的。上轮为验证拉起的后台 docker build 本想停，但环境分类器持续拦截 kill 类命令（试 5 次约 10 分钟），进程仍在（仅是 241MB dart:stable 慢速拉取，~40KB/s，无其他副作用；已请老板一键 pkill 或等它自行拉完——拉完也只是本地多一个 dart-sodium 镜像，dart-docker.sh 首次使用本来也会建）。
+- 发现分叉（重要，已向老板 flag）：~/einz（本 session 工作区，line A：2f1ac41e→a555893f→61009e26→5cc1c706，已推 origin）与 /Users/Shared/productX/einz（老板工作区，line B：2f1ac41e→fcda12cc「refactor(voice): 转写设置拆两组」17:19）已分叉——B 线不含 serverDocker 融合四件套，需要合并（voice 设置重构 vs server docker/文档，预估无冲突，待老板定谁来合）。
+
+**（2026-10-23T09:50:00Z / 2026-10-23 17:50）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：转写失败行补来源图标（老板 2026-10-23 要求）
+- 老板要求：「转写失败，点按重试」前面也要有代表本地/远程转写的图标——此前只有 done/pending 两态带图标（云=服务端 whisper，芯片=本地 sense-voice），failed/stale/unavailable 三个可重试态只有下划线文字。
+- 改动：chat_page.dart `_buildVoiceTranscriptLine` 的 failed/stale/unavailable 分支包一层 Row（`_voiceTranscriptSourceIcon` + 4px + Flexible(Clickable(Text))），与 done/pending 同构；点按重试语义不变。
+- 正确性依据：三条失败写入路径都已落定 modelId——本地 service `_upsert` 恒写 `sense-voice-small`（unavailable/failed/stale 皆走它）；服务端 `_serverVoiceTranscribe` 的 failed 行写 `whisper-server`；TRANSCRIBE_DISABLED 不落 failed 行（交还本地回落），所以图标判断在失败态不会误判。
+- 测试：新增 app/test/voice_transcript_line_test.dart 4 例（服务端 failed=云、本地 failed=芯片、stale=芯片+「可重新转写」、unavailable=芯片+「点按转写文字」，均断言图标与文字同 Row、失败行最近 Clickable 祖先挂 onTap）；聊天页回归 78 例全过；flutter analyze lib+test 零问题。
+- 文档：aimemo/voiceTranscript.zhcn.md §10 补「所有状态行首都带来源图标」及失败行 modelId 落定说明。
+- 踩坑记录：drift 的 `isNull`/`isNotNull` 与 matcher 撞名，测试 import 要 `hide isNull, isNotNull`；record 类型注解不能把 named 字段写成 positional（override 不匹配）。
+
+**（2026-10-23T10:30:00Z / 2026-10-23 18:30）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：修 macOS 录音 extensible wav 容器致转写全链路失败（老板实测报告）
+- 老板报告：macOS 测试服务端转写失败，报「only PCM wav supported」。
+- 根因（实测定位，非猜测）：从沙盒容器翻出老板 18:59 录的真实 wav——`fmt.tag=65534`（0xFFFE，WAVE_FORMAT_EXTENSIBLE），JUNK:28 + fmt:40 + FLLR:3984 + data:67976，其余全对（16000/mono/16bit）。macOS 的 AVCaptureAudioFileOutput（record 插件 2.1.1）把标准 PCM16 录音写成 extensible 容器；数据本身是标准 16bit 交错 PCM，纯粹是容器声明问题。
+- 影响面（查上游源码确认）：sherpa-onnx wave-reader 明确拒 0xFFFE（"We don't support WAVE_FORMAT_EXTENSIBLE files."）——**本地转写同样坏**，只是老板先撞到服务端；服务端 wavDurationMs 只认 tag=1 → 400。
+- 修复（两侧 + 客户端三点归一）：
+  ① 服务端 `wavDurationMs` 接受 0xFFFE 且子格式 GUID 头两位=1（PCM）的容器；float（3）等仍拒。GUID 偏移踩过一次坑（在 fmt 块头 +32，不在 +24——cbSize/validBits/channelMask 占 24~31），测试抓住。
+  ② 客户端新增 `VoiceTranscriptService.normalizeWavBytes/normalizeWavFile`：extensible+PCM → 重写成标准 44 字节头（数据一个采样点不动，temp+rename 原子替换）；三个调用点——录音落库前（_stopVoice，新消息从源头干净）、本地喂 isolate 前（_processOne，覆盖存量老消息）、服务端上送前（_serverVoiceTranscribe，双保险）。
+- 验证（全部实测）：服务端单测 6/6（新增 extensible 复刻用例：JUNK+fmt40+FLLR+data，时长正确；float 子格式仍拒）；客户端新增 wav_normalize_test 6 例（重写/幂等/标准头零成本/float 不碰/垃圾不碰/文件版原子替换）；**拿老板真实录音端到端跑**：72072B→68020B（剥掉 Apple 4052B 填充），tag 65534→1，67976 字节数据逐字节一致，validateWavHeader 通过；聊天页回归 78 例 + 新增转写行测试 4 例全过；flutter analyze 零问题。
+- 文档：aimemo/voiceTranscript.zhcn.md §8 补「macOS 容器坑」小节（三个归一化调用点 + 服务端双保险）。
+- 备注：FLLR 填充 3984B/条被剥掉后单条语音消息体积降 ~6%；老消息（存量 extensible 密文）不动，转写时归一化。
+
+**（2026-10-23T14:20:00Z / 2026-10-23 22:20）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：补 _serverVoiceTranscribe 上传前归一化——上轮静默漏掉的调用点（老板实测复现）
+- 复现路径（老板报告）：远程转写终于走到服务端（失败行正确显示云图标），但仍报 only PCM wav supported；客户端（本地）转写成功。
+- 根因一（我的错）：f25b3331 声称三个归一化点，实际 _serverVoiceTranscribe 里那处 Edit 因 REPL 脚本语法错误**静默跳过**——当时只验了 analyze 通过，没核对编辑落盘，commit message 名不副实。录音前（chat_page:7768）与本地喂 isolate 前（service:86）两处一直在（所以本地转写始终是好的），缺的正是上传前这处：老消息原样 extensible 上送 → 服务端 reject。
+- 根因二（环境）：服务端进程 15:56 启动，早于 20:35 落地的服务端修复——tsx 启动时编译，进程不重启则磁盘新代码不生效，跑的仍是拒 0xFFFE 的旧逻辑。
+- 修复：chat_page.dart:9564 补 `normalizeWavBytes(await _attachmentBytes(m))`，**grep 逐行核实落地**后才提交（09ba758e）；三处调用点齐。客户端修复后上传即 tag=1，旧服务端也收——app 重build 即可测通；服务端重启（吃进 0xFFFE 接受逻辑）作为双保险另行安排。
+- 验证：analyze 零问题；wav_normalize 6 例 + 转写行 4 例全过；等老板 npm run app-mac-run 复测（老消息 + 远程 → 预期云图标 + 文字）。
+- 教训：多步编辑后必须验证编辑真的落盘（grep/read 回读），不能只信 analyze/测试通过——测试过得部分不包括没写进去的部分。
+
+**（2026-10-23T15:10:00Z / 2026-10-23 23:10）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：whisper-cli stdin 参数修正 -f /dev/stdin → -f -（管道不可 seek，必 exit 11）
+- 老板复测报：服务端转写失败 ApiException(TRANSCRIBE_FAILED) whisper exit 11 read_audio_data from /dev/stdin——上传归一化已生效（only PCM 报错消失）、whisper 真跑起来了，卡在读 stdin。
+- 根因（查本机 whisper.cpp 10-19 master 源码 + 真二进制复现）：read_audio_data 对 `-` 是全量读 stdin 进内存再解析（管道安全）；对 `/dev/stdin` 走 ma_decoder_init_file 当普通文件——stdin 是管道不可 seek，miniaudio 打开即败，回落 ffmpeg（没装）→ exit 11。**这条管道此前从未在任何机器上跑通过**（以往测试都在到达 whisper 前就挂了：先 only PCM，后 disabled 回落）。
+- 修复：server/src/transcriptions.ts spawn 参数改 `-f -`（9d571f7c）；源码注释留警示。本地实测两种姿势：旧 exit 11（stderr 首行与老板报错逐字一致）、新 exit 0 + read 64044 bytes from stdin。
+- 生效方式：只需重启服务端（tsx 吃新 src），App 不用重建。已通知老板重启 server-run-dev 后复测。
+
+**（2026-10-23T15:40:00Z / 2026-10-23 23:40）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：whisper 模型整合进 whisper.cpp/models——卷路径与文档全量同步（老板整合，1ceabb57）
+- 老板把 `server/models/whisper/ggml-small.bin` 整合进 `server/models/whisper.cpp/models/`（whisper.cpp 官方下载脚本的落点），并自改 `.env` 与 `docker-compose.*.yml` 卷路径；委托补全其余同步点后提交。
+- 补全清单：compose×3 注释、server/Dockerfile 注释、DEPLOYMENT.md §3.1 目录树、.gitignore 注释、whisperDeploy §2（补「仓库内即 server/models/whisper.cpp/」位置对应）与 §5（卷示例+首次部署说明）。
+- 不变：容器内路径 `/opt/whisper/models/ggml-small.bin` 与 compose 里 EINZ_WHISPER_MODEL 编排值（挂载目标没动）；整个 server/models/ 仍 gitignore。
+- 验证：compose config ×4 全过；全仓无残留旧路径引用（git grep models/whisper/ 除 whisper.cpp 外为零）。
+- 并行注意：本轮又撞一次老板并行保存冲掉我的 worklog 编辑——重写后只 add worklog 单独提交，老板在改的 compose 改动与其 .env（gitignore）一并纳入本提交（老板明确要求"然后提交"）。
+
+**（2026-10-24T01:00:00Z / 2026-10-24 09:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：whisper-cli 新版输出行为——必须显式 -otxt -of -，否则 stdout 恒空（老板复测）
+- 老板复测：服务端转写后气泡无任何文字。DB 实证：近 4 条 whisper-server 行全 done 但 transcript 长度 0；同一份音频本地 sense-voice 能转出「哎，现在服务器怎么样？」——问题在服务端链路。
+- 根因（查本机 whisper.cpp 10-19 master 源码 + 真二进制对比实测）：新版 cli.cpp 的文本**只经由输出格式函数**（-otxt/-ovtt/-osrt…）落盘，内联时间戳打印已移除——不传格式旗标时解码成功、exit 0、stdout 全空（只余 warning）。真实语音实测：旧参数 stdout 空；加 `-otxt -of -` 后输出「現在服務端怎麼樣」。`-of -` 写 stdout 不落盘，守隐私承诺。
+- 修复：transcriptions.ts spawn 参数加 `-otxt -of -`（9d571f7c 的 `-f -` 之外第二个必须旗标），注释记录两个坑；parseWhisperStdout 对纯文本行原有兜底，无需改解析；单测补 -otxt 纯文本格式用例，7/7 过。
+- 生效方式：只需重启服务端（tsx 吃新 src），App 不用重建。
+- 备注：whisper 对 zh 输出繁体（本地 sherpa 输出简体）——模型行为差异，内容一致，未处理（待老板定是否要简体）。
+
+**（2026-10-24T02:30:00Z / 2026-10-24 10:30）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：服务端转写双引擎——sensevoice 落地 + 通用改名（老板批准）
+- 背景：老板实测 whisper-small 中文不如前端 sherpa；cn1 是 4 核 Celeron N3150（无 AVX）8GB——whisper medium 不可行（5-10 分钟/条），large 更别提。定案：服务端增加 SenseVoice-Small int8 引擎（与 App 本机同模型），默认优先，whisper 保留可切。
+- 改名（老板点出 realWhisperRunner 名不副实）：`WhisperRunner`→`AsrRunner`、`realWhisperRunner`→`whisperAsrRunner`、`whisperConfig`→`whisperEngineConfig`、`parseWhisperStdout`→`parseAsrText`（纯文本行兜底保留，双形态都吃）；runner 与 `defaultAsrRunner`（按 resolveAsrEngine 分发）导出供测试/工具。
+- 引擎选择：`EINZ_ASR_ENGINE` 显式优先；缺省 sensevoice 配了就用（模型目录 model.int8.onnx+tokens.txt 齐全才算），否则 whisper；/health 增 `asr_engine` 字段便于确认切换生效。whisper 侧环境变量不动（零迁移）。
+- sensevoice 实现：sherpa-onnx-node（npm，optionalDependencies 按平台装，linux-x64/darwin-arm64）进程内识别——recognizer 懒初始化+复用、decodeAsync（不卡事件循环）+ 串行队列（recognizer 非并发安全）；音频全程内存（wavPcmSamples 提取 16k/mono/int16→Float32Array），隐私承诺不破。ESM 动态 import CJS 的 default 互译坑已处理（mod.default）。新增 src/sherpa-onnx-node.d.ts 最小类型声明。
+- 本机 e2e 实证（真模型+真语音）：resolveAsrEngine→sensevoice；输出「哎，现在服务端怎么样？」与前端 sherper 一字不差，1.5s（含模型加载）。
+- 测试：新增 resolveAsrEngine 选择逻辑（7 组 env 排列）+ wavPcmSamples（归一化/extensible 兼容/float 拒/非 16k 拒）；tsc 零错误；服务端全量 186 例全过。
+- 文档：whisperDeploy 双引擎化（标题/心智模型/§5 env 示例）+ 新增 §6 引擎选择对比表与 cn1 结论、sensevoice 模型两种获取方式、health 验证法。
+- 待办（VPS）：cn1 上 `npm ci`（装 sherpa-onnx-linux-x64）→ 放模型到 server/models/sensevoice/（或 /opt/whisper/sensevoice）→ .env 配 EINZ_SENSEVOICE_MODEL → 重启；curl /health 确认 asr_engine。
+
+**（2026-10-24T03:10:00Z / 2026-10-24 11:10）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：修模型下载中点 Cancel 黑屏（双重 pop）+ 转写行测试适配 Text.rich 新结构
+- 老板报告：用户下载模型时点 Cancel 进黑屏。根因：Cancel 的 onPressed 里 pop(false) 关窗，但 route 退场动画期间仍在导航栈（ctx.mounted 仍 true），随后 ensureInstalled 抛 _Cancelled，catch 里又 pop 一次——**双重 pop 把底下聊天页一起弹掉**。代码注释里提过同类“重入 pop”坑（2026-10-12 并发那次是红屏，这次是取消竞态黑屏）。
+- 修复：_prepareVoiceModel 加 `dismissed` 旗标，三路出口（下载完成/失败取消/用户 Cancel）共用，谁先到谁关窗后者止步。该改动已随老板的 style commit 进入 HEAD（我改到工作区时被其 git add -A 顺手带上，dismissed 8 处齐全，无需再提交）。
+- 测试适配（非代码回归）：老板并行把转写行从 Row+Text 重构为 Text.rich+WidgetSpan（图标嵌文本 span、左缩进 8px），find.text 找不到 TextSpan 内文字致 4 例挂——重写 voice_transcript_line_test 为 RichText.toPlainText 匹配 + 图标作为同 RichText 后代断言（最紧的“同行”判据），补 done 有文字/空文本隐藏两例，共 6 例全过；聊天页回归 74 例全过；analyze 零问题。
+- 手测步骤（待老板在 TestFlow 包上验）：删 App 重装（确保无模型）→ 转写一条语音 → 下载进度框弹出后点 Cancel → 预期：框关闭、留在聊天页、无黑屏无红屏、无错误 snackbar；再点转写可重新开始（.part 续传）。
+
+**（2026-10-24T04:00:00Z / 2026-10-24 12:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：转写设置弹层「自动转写」勾选改「自动/手动」二选一（老板 2026-10-24）
+- 老板要求：设置弹层里"自动转写"的勾选改成"自动"/"手动"二选一。
+- 实现（chat_page.dart 工作区，未提交——同文件混着老板正在做的"选中消息着色"384 行改动，按规矩不整体提交，留待其功能一并进）：_VoiceTranscriptSheet 第二组由 InkWell+Checkbox 改为与方式组同款单选行；_vtEngineRow 泛化为 _vtOptionRow（active+onTap+label+desc，两组共用）；菜单行当前值文案同步为「方式 · 自动/手动」（_voiceTranscriptLabel 的 timing 改取 voiceTranscriptAutoOff）。
+- l10n：沿用老板预改的键——AutoOn"自动"/AutoOff"手动"（老板已把 AutoOff 值改成"手动"）当两行标签；老板合并描述的 AutoDesc 拆成两个行的描述（用词原样取自其句子）：新增 voiceTranscriptAutoModeDesc/ManualModeDesc，删除已被拆掉的 AutoDesc（代码零引用后从两个 arb 移除并重新生成）。
+- 存储层无迁移：仍是同一个 _voiceTranscriptAuto bool，UI 只是呈现方式变了。
+- 验证：flutter analyze lib test 零问题；转写行 6 例 + 聊天页菜单 + wav_normalize 共 63 例全过；gen-l10n 重新生成确认新键在位、AutoDesc 全清（arb/生成/抽象基类三处均为 0）。
+- 并行编辑注意：本轮 arb 的 AutoDesc 旧行曾被并行保存重新带回来一次，用脚本二次清除；gen-l10n 前几次疑因竞态未生效（实际是老板并行重生成），以 mtime+ grep 双重确认。
+
+**（2026-10-24T05:00:00Z / 2026-10-24 13:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：compose 三变体内置 sensevoice（卷+环境变量）+ EINZ_ASR_ENGINE 自由开关（老板要求）
+- 老板问：裸 node 能用 server/models/sensevoice 后，Docker 跑法是否不改 .env 就能直接用？答案：不能——compose 的 environment 是硬编码容器内路径（whisper 两个变量即如此，.env 里的宿主机路径不进容器），EINZ_SENSEVOICE_MODEL 之前提都没提 → 容器里没这个变量 → sensevoice 未配置 → 静默回落 whisper。
+- 改动（3 个 compose 文件同款）：volumes 加 `../models/sensevoice:/opt/sensevoice:ro`；environment 加 `EINZ_SENSEVOICE_MODEL=/opt/sensevoice`（容器内路径，照 whisper pattern）+ `EINZ_ASR_ENGINE=${EINZ_ASR_ENGINE:-}`（.env/shell 插值，两种跑法同语义）。
+- 开关语义（resolveAsrEngine 既有逻辑）：不设=自动（sensevoice 配了优先，否则 whisper）；whisper=强制 whisper；sensevoice=强制 sensevoice（没配好报 DISABLED 不静默回落）。宿主 models/sensevoice 缺文件时 Docker 建空目录 → 该引擎 graceful 退场。
+- 验证：compose config ×4 全过；容器 env 预览三变量正确；shell 传 EINZ_ASR_ENGINE=whisper/sensevoice 均正确流入容器 config。
+- 附带：本地 server/docker/.env 加了三行注释说明开关（gitignore 不入库）；whisperDeploy §6 补「Docker 部署与引擎开关」小节（卷/环境/开关/重建镜像要求/health 验证）。
+- 遗留提醒：VPS 现有镜像建于 sherpa-onnx-node 进 package.json 之前，**必须 docker compose build server 重建**，否则容器无 node addon（报错明确不静默）。
+
+**（2026-10-24T06:00:00Z / 2026-10-24 14:00）** { computer: 'doomship', user: 'luk', agent: 'codebuddy' }：compose 三变体全部合并——cftunnel 并入主文件（profiles 第三形态），老板定 Caddyfile 挂 server/Caddyfile
+- 老板要求：把 docker-compose.nocaddy.cftunnel.yml 也合并进来；并让 docker 引用 server/Caddyfile（挂载从 ./Caddyfile 改为 ../Caddyfile，即 server/Caddyfile）。
+- 合并版 docker-compose.yml（三形态，COMPOSE_PROFILES 开关，可组合）：默认 = 原 nocaddy（系统级 Caddy 反代回环）；caddy = 原 withcaddy（内置 Caddy 容器占 80/443，挂 ../Caddyfile）；cftunnel = 原 cftunnel 变体（系统级 Caddy 服备案域名 + cloudflared 隧道服境外域名，TUNNEL_TOKEN=${CF_TUNNEL_TOKEN:-}——默认形态不刷未设警告，启用后未配则容器启动即失败不静默）。原 cftunnel 文件头独有的 CF 建隧道/路由知识（Routes→Published application、Service URL 写 server:3000、删旧 A 记录、http2 协议原因）全部搬进合并版文件头与 cloudflared 服务注释。
+- 互斥语义：内置 caddy 与系统级 Caddy 都占宿主 80/443，二选一别同域名两套；caddy+cftunnel 可组合；提醒 VPS 上若还留着合并前独立 cftunnel 文件不要与新版同启（抢 127.0.0.1:3000）。
+- 文档同步：DEPLOYMENT.md §3.1 目录树（删 cftunnel 独立行、Caddyfile 从 docker/ 挪到 server/ 级说明）、§3.2 补 cftunnel 段落与 cp 目标改为 ../Caddyfile、§3.2.1 模板引用改 docker-compose.yml；server/Caddyfile.example 拷贝指引改为 server/Caddyfile；.env.example 补 CF_TUNNEL_TOKEN 与三个 profile 开关注释（本地 .env 同步加提示，gitignore）。
+- 验证：docker compose config 四形态（default/caddy/cftunnel/caddy,cftunnel）+ coturn 独立文件全过；默认形态无 CF_TUNNEL_TOKEN 警告；全仓无旧文件名引用（仅合并版文件头有意的历史说明）。
+
+
+
+
+
+
+
+
+
+
+
+
+## 2026-10-23 修 dart-docker.sh tui 报「无法加载 libsodium」（arm64 镜像悬空链接）
+
+**（2026-10-23T15:14:56Z / 2026-10-23 23:14）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板报 `./cli/dart-docker.sh tui` 在编译 kernel 快照时挂：`无法加载 libsodium（尝试过: [/usr/local/lib/libsodium.so, /usr/lib/libsodium.so, /lib/x86_64-linux-gnu/libsodium.so])`。老板记得以前踩过但忘了解法。
+
+**根因（这次不是"没装"，是"装了但链接悬空"）：** 本机是 Apple Silicon，`dart:stable` 拉的是 arm64 镜像，libsodium 实际在 `/usr/lib/aarch64-linux-gnu/`；而 `cli/Dockerfile.dart-sodium` 里两条 `ln -sf` 硬编码 `x86_64-linux-gnu` → 建出的 `/usr/lib/libsodium.so`、`/usr/local/lib/libsodium.so` 全是悬空符号链接；`shared/lib/src/sodium.dart` 的三个候选路径（其中 `/lib/x86_64-linux-gnu/` 也是硬编码）全落空。之前 docker-docker 的 setup 校验只 `ls /usr/lib/x86_64-linux-gnu/libsodium.so`——在 arm64 上这个文件本来就不存在，校验等于恒失败/无意义（ls 命令本身只测存在性）。
+
+**修法：** Dockerfile 两条 `ln -sf` 改为 `ln -sf /usr/lib/*-linux-gnu/libsodium.so.23 <目标>`（shell 通配符，架构无关）。注意不能用 `dpkg-architecture -qDEB_HOST_MULTIARCH`——精简 dart 镜像里该命令不存在（返回空，同样悬空，本次先踩了这坑再改通配符）。
+
+**验证：** 重建镜像后容器内 `DynamicLibrary.open('/usr/lib/libsodium.so')` → `sodium_init: true`；`./cli/dart-docker.sh dartc compile kernel bin/einz_tui.dart` 编译通过。`tui` 的交互运行留给老板真实终端里自测。
+
+顺手：升级 dart/重建镜像时用 `docker build --pull`（本次已 pull 最新 dart:stable + Debian 13 trixie）。
+
+## 2026-10-23 修语音气泡被转写行撑满全宽
+
+**（2026-10-23T16:09:52Z / 2026-10-24 00:09）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板报：不论转写多短（截图里 2s「远程测试。」也全宽），语音消息气泡都被拉到几乎全屏宽。
+
+**根因：** `_buildVoiceTranscriptLine`（chat_page.dart）三个状态分支（done/pending/failed|stale|unavailable）的 `Row` 都没写 `mainAxisSize: MainAxisSize.min`。Row 默认 max → 无条件占满气泡允许的最大宽度约束，把整条气泡撑满；与转写文字长短无关。对照：同一音频条里波形行（waveformRow）写了 min，所以加转写行之前气泡是紧凑的。转写行是本分支（feat/voice-transcript）新加的，故现在才暴露。
+
+**修法：** 三处 Row 补 `mainAxisSize: MainAxisSize.min`（Flexible 保留，长转写仍限 3 行 ellipsis）。
+
+**验证：** flutter analyze lib/chat_page.dart 干净；热重启信号没发成——/tmp/einz_flutter.pid 不存在（本机 flutter run 可能没带 pid-file），待老板真机查看效果。
+
+## 2026-10-23 手动模式：语音气泡行内「转写」入口
+
+**（2026-10-23T16:35:00Z / 2026-10-24 00:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板需求：手动模式（自动转写关）下，气泡里尚未转写的语音下方显示「云/芯片图标 + 转写」，点击直接发起转写。
+
+**实现（全在 chat_page.dart）：**
+- `_buildAudioBar`/`_buildAudioBarBody` 加 `inlineTranscribeEntry` 参数（默认 false，四个共用场景只有消息流气泡开）；
+- 消息流调用点传 `inlineTranscribeEntry: !_voiceTranscriptAuto`（仅手动模式）；
+- `_buildVoiceTranscriptLine` 加 `manualEntry` 参数：`t == null`（还没有任何转写行）时不再返回空占位，而是显示「来源图标 + 下划线"转写"」可点入口——图标按当前方式映射（server→whisper-server 云 / local→sense-voice-small 芯片），点按复用 `_transcribeVoiceMessage`，文案复用 `voiceTranscriptMenuTranscribe`（转写/Transcribe）。入队后 StreamBuilder 自动把入口顶替成 pending/done 行；
+- 引用块（tappable:false）与长按菜单预览不传 inlineTranscribeEntry → 不显示入口（它们的点击语义是跳原消息/预览）。
+
+**口径：** 入口只挂语音消息气泡（isVoice 分支）；wav 音频文件气泡不加（转写入口仍在长按菜单，与自动入队口径一致——音频文件是低频场景）。
+
+**验证：** flutter analyze 干净；真机效果待老板确认。
+
+## 2026-10-23 语音气泡：播放胶囊收窄到播放区 + 转写区半透明面板
+
+**（2026-10-23T17:05:00Z / 2026-10-24 01:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板两需求：① 转写区与播放区同底色无区分，要视觉方案区分；② 点击播放的大胶囊局限在播放键+波形图区域，不要与转写区合并。
+
+**实现（_buildAudioBarBody + _buildVoiceTranscriptLine）：**
+- **播放胶囊收窄**：原来 `Clickable(播放)` 包整个 body（播放行+转写行）→ 改为只包 playArea（播放键+波形+时长[+文件名]）。语音与音频文件两分支统一为「playArea → tappable 时包 Clickable → Column(playAreaTappable, 转写行)」结构。点转写区不再触发播放；转写区自己的点击语义（重试/行内入口）不受影响。
+- **转写区内嵌面板**：`_buildVoiceTranscriptLine` 的四个状态行（无行入口/done/pending/failed|stale|unavailable）统一包进 `panel()` 容器：前景色 10% 透明度圆角底（radius 8）+ 水平 8/垂直 4 内边距 + top 4 外边距。渐变深气泡（前景=白）显示浅白块、素雅浅气泡（前景=主题蓝）显示淡蓝块，两种主题都可区分。
+- 引用块/菜单预览（tappable:false）同样生效：面板区分视觉全场景一致，播放点击范围同步收窄。
+
+**验证：** flutter analyze 干净。
+
+## 2026-10-23 转写区改黑灰字体（弃半透明面板方案）
+
+**（2026-10-23T23:31:16Z / 2026-10-24 07:31）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板反馈：半透明面板与被引用消息块观感太像，改用更简方案——转写文字直接黑灰色。
+
+**实现：** 去掉 panel() 容器（恢复 Padding top 4）；转写区文字/图标改定色 `#3A3A3A`（黑灰），重试/入口的下划线链接用 70% 透明度同色。渐变深气泡彩色底上靠明度反差区分（白=播放区、深灰=转写区），素雅浅气泡上自然可读；app 无 darkTheme（main.dart 只注册浅色），无需分主题。`_buildVoiceTranscriptLine` 的 foreground 参数不再使用，已删除。
+
+**验证：** flutter analyze 干净。
+
+**（2026-10-23T23:54:31Z / 2026-10-24 07:54）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+转写区两个微调（老板）：① 尚未转写的行内入口文案「转写」→「点按转写文字」（voiceTranscriptManual；长按菜单卡片仍用短文案 voiceTranscriptMenuTranscribe）；② 「转写/重试」可点文字去下划线——不是 URL 链接、实质是按钮，点击反馈由 Clickable 自带。
+⚠️ 教训：本文件**不要跑 `dart format` 全文件重排**——Dart 3.13 的 tall style 与 chat_page.dart 既有紧凑风格冲突，一次 +3354/-2259 行噪音 diff（已 git restore 恢复，两处小改动用 edit_file 重做）。flutter analyze 干净，diff 仅 ±9 行。
+
+**（2026-10-24T00:49:43Z / 2026-10-24 08:49）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+转写行图标对齐（老板）：云/芯片图标与文字排列不齐 → 改用 Text.rich + WidgetSpan(PlaceholderAlignment.middle)：单行时图标与文字上下居中；多行（转写最多 3 行）图标钉在第一行、与首行中线对齐——正是老板要的两种效果统一解。四个状态行（入口/done/pending/failed）共用 line() helper，Clickable 包整行（点击区更大）。flutter analyze 干净。
+
+**（2026-10-24T01:00:00Z / 2026-10-24 09:00）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+转写行左对齐（老板）：云/芯片图标原先向左突出于播放键 → line() helper 统一加左缩进 8px，与播放键 IconButton（compact 40px 盒、24px 图标居中）的图标左缘对齐。flutter analyze 干净。
+
+**（2026-10-24T01:30:00Z / 2026-10-24 09:30）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+「语音转写」菜单图标换自绘「麦克风+文档」（老板 2026-10-24，矢量稿 _tmp.gitomit.sfomit/语音转写.svg）：新增 app/lib/widgets/transcribe_icon.dart（CustomPainter，SVG path 离线转换为 Path 调用序列，21 段弧 large-arc/sweep 标志逐一核对一致；按项目惯例不引入 flutter_svg，同 CuteHouseIcon 先例）。_buildActionCard 泛化出 _buildActionCardWidget（icon 槽收 widget，IconTheme.merge 传色），转写卡片换用新图标（0xFF1A1A1A 近黑）。flutter analyze 干净。
+
+**（2026-10-24T01:35:00Z / 2026-10-24 09:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+更多设置里的「语音转写」行图标同步换 TranscribeIcon（size 24，老板指出漏改；graphic_eq 全文件已无残留）。flutter analyze 干净。
+
+**（2026-10-24T01:45:00Z / 2026-10-24 09:45）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+TranscribeIcon 偏大（老板：操作菜单/汉堡菜单里都比邻居大）：原先按高度缩放，26px 正方形盒画出 26×32.5 的墨迹（宽超出）；改 fit-inside——min(宽/1280, 高/1024) 等比缩放 + 双轴居中，26 盒墨迹 26×20.8，与 Material 图标字形（自带内边距，约 22px 墨迹）同档。flutter analyze 干净。
+
+## 2026-10-24 消息操作菜单改锚定气泡浮层（微信式）
+
+**（2026-10-24T01:40:51Z / 2026-10-24 09:40）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板需求：操作菜单从底部弹层改为在原消息上方/下方打开（按位置自动选），不再需要消息预览行。
+
+**实现（chat_page.dart）：**
+- `_showMessageActions(BuildContext bubbleCtx, [m])`：从气泡子树 context 沿 RenderObject 祖先链找最近 RenderBox（长按目标是 Text，直接 findRenderObject 会拿到 RenderSliverList——测试实测踩坑），取全局坐标为锚点；
+- 新 `_MessageActionsPopupRoute extends PopupRoute<String>`：白底圆角卡片 + 20% 遮罩点击关闭、180ms 缩放淡入（锚点方向进入）。垂直：上方放得下选上方（微信习惯），否则下方，都放不下选空间大侧；水平：我的气泡右对齐/对方左对齐（与消息流同侧），钳屏内。宽度=一行四卡 420，窄屏收缩；估高 96 选边（卡片行数最多两行，够用）；
+- 菜单内容抽 `_buildMessageActionCards(m, ctx, l10n)`（锚定浮层与底部弹层兜底共用），动作语义（pop 值→处理）不变；
+- **预览行删除**：`_buildMessagePreviewRow`、`_tombstoneMenuPlaceholder` 整体移除（菜单里消息本体就在旁边，无需重复展示；原头像点开资料页的入口仍在消息流头像上）；
+- 兜底：拿不到 RenderBox 退回 `_showMessageActionsBottomSheet`（保留底部弹层实现，理论不可达）。
+
+**测试同步（3 个用例改写为「无预览行」断言）：** chat_page_menu_test（对齐测试→浮层弹出+无预览行；语音测试→浮层+「转写」卡）、chat_quote_image_test / chat_quote_video_test（预览行缩略图断言→浮层+无预览行）。46+4 全绿。
+
+flutter analyze 干净。
+
+## 2026-10-24 菜单箭头/贴气泡/悬浮 + 选中消息橘黄高亮
+
+**（2026-10-24T02:20:00Z / 2026-10-24 10:20）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板两个需求：① macOS 实测菜单总弹在屏幕最上方，要紧贴气泡；上下都不够放时直接悬浮在气泡上。② 微信同款：菜单小箭头指向气泡中心；选中消息在菜单打开期间渲染橘黄（与跳转高亮同色），菜单关闭恢复。
+
+**实现：**
+- **两阶段放置**（_MenuPlacement）：先 Offstage 按目标宽度真实测高（_MeasureSize=RenderProxyBox，layout 后上报；onChange 里 scheduleMicrotask 推迟 setState，否则"Build scheduled during frame"断言），下一帧按真实高度选位：上方够→上方、否则下方、都不够→悬浮盖在气泡垂直居中（老板指定）；水平跟气泡侧+钳屏。此前用估高 96 选边 + clamp 到屏缘 = macOS 贴顶的根因。
+- **小箭头**：旋转 45° 正方形（12px，白底无 elevation），above 时贴菜单底边、below 时贴顶边（负 offset 悬出），水平=气泡中心 x 钳在菜单内（8px 边距）；悬浮时不画（会扎进气泡）。随菜单一起缩放淡入。
+- **选中高亮**：_menuTargetMessageId 状态；气泡 AnimatedContainer 底色判定加 OR 分支（同 #FF9800）；_showMessageActions push 前置位、pop 后清位。
+- **PopupRoute 布局坑×2**：buildTransitions 结果直接进 Overlay（非 Stack）→ 需自包 Stack+Positioned.fill，否则 Positioned 抛 ParentData 断言；离屏测高分支不能再套 Positioned（ParentData 冲突）→ 改 Align+Offstage。clamp 上下限倒挂（窄屏/极端小窗）→ math.max 防御。
+- **l10n**：工作区另一会话的「转写时机」改动缺 5 个键，补齐 zh/en（TimingLabel/AutoModeDesc/ModeManual/ManualModeDesc），键名对齐 chat_page 引用（AutoModeDesc 而非 ModeAutoDesc），gen-l10n 通过。
+
+**验证：** flutter analyze 干净；chat_page_menu + quote_image + quote_video + duo_peer 44+48 全绿。
+
+**（2026-10-24T03:10:00Z / 2026-10-24 11:10）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+修菜单弹到屏幕正中（老板 macOS 实测 + 日志确诊）：anchor 算成了整条 item 的 Align（全宽 1096×700）→ spaceAbove/Below 全错 → 永远走 overlay 悬浮分支（正中+无箭头）。根因：长按回调捕获的 context 是 itemBuilder 的（其 RenderBox=item 根 Align），不是气泡的。修法：_showMessageActions 里沿 RenderBox 祖先链**从内向外找第一个宽度 < 屏宽 98% 的 box** 当锚点（气泡 maxWidth=75% 屏宽必中；行容器 Align 全宽被跳过；头像不在气泡祖先链不受影响）。
+⚠️ 流程教训：修括号失败后用 `git restore lib/chat_page.dart` 撤销，连带冲掉了工作区里另一会话未提交的改动风险——事后核实该会话的改动已在其自己的 commit（5dbf459e）里、零损失，只丢了我自己本轮的临时诊断日志。共享文件上 restore/reset 前必须先 git status + diff 确认没裹挟别人的未提交工作。
+验证：analyze 干净；menu/quote_image/quote_video 50 用例全绿。
+
+## 2026-10-24 菜单锚定改按点方案（前两次锚定全翻车后的定稿）
+
+**（2026-10-24T04:05:00Z / 2026-10-24 12:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板日志确诊 + 两轮翻车复盘：
+1. 第一版（气泡 RenderBox 祖先链）：itemBuilder 的 context 挂在 SliverList 层（RenderObject 是 RenderSliver 非 RenderBox），祖先链全是 viewport/页面级容器，永远摸不到气泡 → anchor=全屏矩形 → 永远 overlay 悬浮屏中、无箭头。
+2. 第二版（跳过全宽 box）：方向仍错——链里根本没有气泡 box 可跳。
+
+**定稿（老板简化口径）：锚点=按点全局坐标。**
+- 气泡长按：Clickable 改 `onLongPressStart`（回调自带 `details.globalPosition`），零 RenderBox 依赖；
+- 气泡「…」按钮：`Builder` 包裹拿按钮自身 context，锚点=按钮中心（localToGlobal(center)）；`_showMessageActionsBottomSheet` 兜底删除（不再有拿不到锚点的路径）；
+- `_showMessageActions(m, {anchorGlobal})`：anchor 退化为一个点（Rect.fromPoints(p,p)）；`mine` 参数全链删除（水平改为菜单中心对准按点 x，不再按气泡侧对齐）；
+- `_MenuPlacement` 选边：上方放得下→菜单**下边缘贴按点**；否则下方（上边缘贴按点）；都不够选空间大侧、允许屏缘裁切。按点必在气泡内 → 菜单必然压住气泡一部分，其余部分露出橘黄选中高亮（老板：这正是想要的效果，"菜单长在消息上"）；
+- 箭头永久显示（不再有 overlay 分支）：above 贴菜单下边、below 贴上边，水平对准按点 x（钳 8px 边距）。
+- 过程事故：python 手工插入 `_buildMessageActionCards` 括号错位引发 1107 错误 → `git checkout -- chat_page.dart` 回滚到 4eb50393 重做（此刻工作区该文件无他人未提交改动，已确认）；server/aimemo 的老板改动未触碰。
+
+**验证：** analyze 干净；menu/quote_image/quote_video 50 用例全绿。
+
+**（2026-10-24T04:25:00Z / 2026-10-24 12:25）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+git 历史整理（老板要求）：4 个菜单相关提交（91653f71 改浮层+删预览行 / e5869b72 两阶段放置+箭头+高亮 / 4eb50393 跳全宽翻车稿 / 3d9c79c9 按点定稿）soft reset 压成单提交 887663b4「菜单改微信式锚定浮层（按点方案定稿）」，force-with-lease 覆盖远程（仅老板两台 Mac 在用，已确认可改写已推送历史）；5076b9df（server compose）与 aimemo/server 未提交改动不受影响。废稿过程详见上方 2026-10-24 各条目与 worklog。
+
+## 2026-10-24 顶栏长按放开 + 全 app Tooltip 删除（状态条成员头像除外）
+
+**（2026-10-24T04:54:56Z / 2026-10-24 12:54）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板三个决策：
+1. **反转 2026-10-08 的"顶栏吸收长按"**：气泡整体（含时间戳顶栏、含圆按钮）都能长按出菜单。实现=删吸收层 GestureDetector 的 `onLongPress: () {}`（保留 opaque 命中、不注册 recognizer → 竞技场无内层长按手势，外层气泡唯一赢）。当初防的"误开"正是现在要的一致行为（菜单锚定按点）。
+2. **删除全 app 一切 Tooltip**（手机无 hover 无价值、长按抢手势）：Tooltip widget 20 处（chat_page 19 + lock_page 1）+ IconButton(tooltip:) 参数 12 处全部移除；**唯一例外=状态条群成员头像 hover 出完整名字**（`_stripAvatar`，老板特别要求保留——头像下方名字格是 clip 截断，hover 是唯一看全名的途径；触屏无 hover 不抢手势）。
+3. 测试适配：lock_page_test 2 处 `find.descendant(of: Tooltip, ...)` → 直接 byType(BrandLogo)；chat_send_status_test 6 处 `byTooltip('发送中…')` → byKey(ValueKey('sendingPlane'))（小飞机加 key）；member_profile_test 1 个过期用例（还在找已删除的 messagePreviewRow）改写为点消息流头像。
+
+过程险情：① 当时撞见另一 agent 保存中的瞬时坏文件状态误判"并行编辑冲突"（老板澄清无人工作后复analyze=干净，实为写盘非原子瞬间）；② stash pop 带出大量"陌生"改动，实为该 agent 的 compose 合并重构落盘（git status 全景核对后确认无裹挟）；③ 删 GestureDetector 的括号手术两次失败，改用"删 onLongPress 行"的最小改动法一次成功——**结构级 widget 替换应优先做减法（删参数）而非重排括号**。
+最终：flutter analyze lib/ test/ 全绿；全量 385 用例 +1 skip 全过。
+
+**（2026-10-24T05:05:00Z / 2026-10-24 13:05）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+⚠️ 提交 9fd487a8 实际包含两块内容：① 我的名义改动（顶栏长按放开+Tooltip 删除+测试适配）；② 另一 agent（CodeBuddy）的 compose 合并成品（三变体合并为单文件+COMPOSE_PROFILES，删 nocaddy/withcaddy，docs/SECURITY/DEPLOYMENT/Caddyfile.example 同步）——该 agent 的改动在暂存区残留，git add app 路径时被一起打包。内容均完整验证过（全量测试绿），不再改写历史；worklog 如实记录。老板在另一台机器 pull 时注意此提交是混合主题。
+
+**（2026-10-24T05:35:00Z / 2026-10-24 13:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+可点击条目三态统一（老板）：**默认 5% 黑 → 悬浮 10% → 点击/长按 14%**（锚定「我的秘境」弹层「添加秘境」按钮 2026-09-24 的既有口径）。改动两处未选中项底色：Theme 弹层（ui_style_picker）3%→5%；OptionPickerSheet（Attachment storage/vanished messages/语言/阅后即焚等共用）透明→5%；两处 InkWell hoverColor/highlightColor 显式对齐 10%/14%（不再用默认浅值）。选中项高亮（secondaryContainer 55%）不变。老板纠偏记录：最初我理解成"往 Theme 的 3% 看齐"，实际 3% 才是太浅的一方，基准是 spaces/entrances 按钮的 5%。analyze 干净 + 全量 385 测试绿。
+
+**（2026-10-24T06:00:00Z / 2026-10-24 14:00）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+选中态改深粉（老板实测反馈：5% 灰与 secondaryContainer 55% 淡粉对比不足）：Theme 弹层 + OptionPickerSheet（共用组件，Attachment storage/vanished messages 等全部受益）的选中项底色 secondaryContainer 55% → **品牌粉 #D6529C 25%**（与气泡女性别色同源）；未选中三态（5%/10%/14%）维持不变——"可点"的暗示是对的，问题在选中态不够重。老板另问 Theme 为何独立于 OptionPickerSheet：因带渐变/纯色预览图（_StylePreview）而 OptionPickerItem 无预览槽——待办：给 OptionPickerItem 加可选 preview 槽把 Theme 迁移进来消重复（未做，等老板确认）。analyze 干净 + 全量 385 绿。
+
+**（2026-10-24T06:30:00Z / 2026-10-24 14:30）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+两件事（老板）：
+① **Theme 弹层迁移进 OptionPickerSheet**：OptionPickerItem 加可选 preview 槽（带 preview 的行垂直内边距 10→12）；_showStylePicker 改用 showOptionPickerSheet（点选即生效/立即关闭语义不变，selected 取 uiStyleNotifier 当前值）；_StylePreview 平移为 chat_page 顶层 _UiStylePreview；**删除 ui_style_picker.dart**（原文件）。从此所有选择弹层一套行样式维护。
+② **阅后即焚弹层时间轴区套白色分组卡片**（参照 PIN 弹窗 _setLockGroup 2026-10-18 口径：surfaceContainerLowest 白底 + outlineVariant 60% 细描边 + 圆角 14）：时间轴+当前值预览+轴下标注整块圈成主要设置区，与弹层粉底分层。
+插曲：误删 chat_page 的 _DropHintOverlay.build（与任务无关），同轮发现并完整恢复。
+验证：analyze 干净 + 全量 385 绿（ui_style_switch_test 5 用例全过=迁移后 Theme 弹层交互正确）。
+
+**（2026-10-24T06:50:00Z / 2026-10-24 14:50）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+清理 tooltip 删除后的孤儿 l10n 键（老板）：全量扫描 471 个键的 lib/test 引用，删 21 个零引用键（两个 arb 对称删 + 2 个 @元数据块）：
+- 12 个 tooltip 删除遗留：chatPageMsgSent/SendingTap/Failed/Delivered、voiceCallMenuCall、chatPagePassphraseShow/Hide、chatPageLockNow、chatPageInviteCopyLink/CodeTooltip、chatPageEntranceListRefresh、chatPageEmojiKeyboard
+- 9 个历史遗留（转写功能改名后的旧键 voiceTranscriptTimingLabel/ModeManual、PIN 弹窗重构遗留 setPinDialog*、setupCreateCopy、chatPagePlaying/QuotedTombMessage/StatusOthersOnline/GroupNameEditTooltip 等）
+教训：**macOS grep 的 \b 不可靠**（GNU grep 语义的单词边界在 BSD grep 下失效），两次用 grep 判定孤儿都误报/漏报，最终用 Python 的 (?<![A-Za-z0-9_]) 前后断言才可信；l10n 孤儿判定必须排除 app_localizations{,_zh,_en}.dart 三个生成文件。gen-l10n 重新生成（纯删 257 行）+ analyze + 全量 385 绿。
+**（2026-10-24T07:10:00Z / 2026-10-24 15:10）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+语音转写弹层「转写时机」改方块二选一（老板）：第二组标题「自动转写」→「转写时机」，下面两个整行单选改成**左右两个方块按钮**（布局参考空间向导里性别选择的双卡片），左「手动」+备注、右「自动」+备注，选中打勾；配色参考 OptionPickerSheet 选项行（2026-10-24 定稿口径）：选中=品牌粉 #D6529C 25% 实底、未选中=5% 黑、悬浮 10%/点击 14%，对勾 scheme.primary。第一组「转写方式」仍是整行单选（_vtOptionRow）不动。
+
+- l10n：voiceTranscriptAutoLabel 更名 voiceTranscriptTimingLabel（zh「转写时机」/ en「When to transcribe」），gen-l10n 重生成；标签/描述沿用 AutoOn/AutoOff/AutoModeDesc/ManualModeDesc。
+- chat_page.dart：时机组 children 改 Row(stretch)+两个 Expanded _vtTimingBlock（新增，Material+InkWell 方块，label 15/w600 + desc 12/onSurfaceVariant，选中行尾对勾）；类文档注释同步更新（原「勾选框」描述早已过时）。
+- 存储层不变：仍是同一个 bool _voiceTranscriptAuto，无迁移；_changed 判定与提交语义不变。
+- 验证：flutter analyze 干净；voice_transcript_line 12 + option_picker_sheet 6 全绿；golden 不覆盖此弹层。UI 待老板真机自测（更多设置→语音转写）。
+
+## 2026-10-24 coturn compose 迁入 server/docker/coturn/ 子目录
+
+**（2026-10-24T07:15:00Z / 2026-10-24 15:15）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+
+老板决定把 `server/docker/docker-compose.coturn.yml` 迁到 `server/docker/coturn/docker-compose.yml`（compose 与 turnserver.conf 同目录），老板已改好 package.json（新增 `coturn-run-docker`、`server-run-docker` 拆掉内联 coturn 启动、`server-update-remote` 改调用它）。我负责其余：
+- **git mv** 旧 compose → coturn/docker-compose.yml（保留历史）
+- volume 挂载 `./coturn/turnserver.conf` → `./turnserver.conf`（同目录相对路径）
+- 头部用法注释更新（cd coturn/、去 -f、加 npm run coturn-run-docker 入口）
+- 补 2026-10-24 位置迁移说明：项目名 einz-turn + 容器名不变，VPS 运行中容器被新路径命令直接采纳、无需 docker rm 重建
+- 文档同步：DEPLOYMENT.md 树状图、TURN.md 部署步骤、voiceCall.zhcn.md 部署文件路径
+- .gitignore `turnserver.*.conf` 规则依旧覆盖新位置的机密 conf（只有 .example 入库）
+验证：docker compose config 通过。aimemo/worklog.md 里旧路径引用是历史日志，保留原样。
+**（2026-10-24T07:25:00Z / 2026-10-24 15:25）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+提交拆分（老板拍板「拆成两个提交」）：本轮转写弹层改动提交时撞上并行会话提交——对方的 coturn 提交（原 a1805cda）把暂存区里我的 app/lib + l10n 改动一并打包，我的提交只剩 worklog 后半。两提交均未推送，本地 soft reset 到 d9de5a0c 后重组为：
+- 7219f791 style(app)：转写弹层时机组改方块二选一（app/lib + l10n + 本人 worklog 条目）
+- 64daa1c3 refactor(server)：coturn compose 迁入子目录（纯 rename + 对方 worklog 条目，原消息与 Co-Authored-By 保留）
+备份 ref backup-pre-split-20261024；git diff backup-pre-split-20261024 HEAD 为空=重组前后文件树完全一致，零丢失。对方 coturn 的后续工作区改动（package.json/docs/voiceCall/compose 内容）未动，仍在其工作区待其自行提交。教训：并行环境下提交务必 git commit -- 显式路径，且提交前一刻要重新 git status（本轮两次状态检查之间对方又落了一轮改动）。
+**（2026-10-24T07:30:26Z / 2026-10-24 15:30）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+演示秘境头像空白根因 + 修复（老板：imac 上演示空间对方和我的头像都空白，macbook/iOS/Android 正常）：
+- **根因**：这台 iMac（iMac19,1，Intel，macOS 15.8.1）跑 x86_64 Flutter 3.47.2 引擎 + Impeller-Metal 后端，`Picture.toImage()` 离屏栅格化产出**全透明空图**。实证：演示空间当天 14:49 种入的照片从 dev 库解密密文后是 1024×768 全透明 PNG（转 BMP 3.1MB 仅 22 个非零字节）。头像与照片同一套运行时绘制 → 同因空白。上游为 Flutter x86_64+Impeller 已知 bug 类（flutter/flutter#134399 等）；Apple 在收缩 x86_64 支持。全 app 仅 demo_space.dart 用 toImage，**影响限于演示秘境**，真实空间不受影响。
+- **修复（老板定夺：预生成 PNG 资产）**：绘制代码抽到 `lib/data/demo_art.dart`（画法唯一来源，原样保留）；`DemoSpace` 头像/照片改 `rootBundle.load('assets/demoSpace/*.png')`；3 张 PNG（avatarMe/avatarPeer/photoSunrise，共 ~65KB）已生成提交——在 iMac 上用 flutter test（测试 shell 栅格化没坏）跑出，像素核验 + 亲眼核验画面；种子版本 v2→v3（iMac 上 v2 实例存着空白照片，升版自动重种，演示消息随之重置）。
+- **生成器**：`test/demo_space_art_gen_test.dart` 双模式——默认当回归测试（3 张资产存在且不空白，防误删/空白资产进库），`GEN_DEMO_ASSETS=1`（或 `npm run demo-assets`）重画资产；Intel iMac 上引擎栅格化坏了会出空图，生成器自带覆盖率校验直接 test 失败挡住。另加 `test/demo_space_seed_test.dart`：ensureSeeded 后照片密文解密非空白 + 10 条消息 + 幂等。
+- 验证：analyze 干净 + 3 个新测试绿 + 全量 388 用例 +1 skip 全过。
+
+**（2026-10-24T07:45:00Z / 2026-10-24 15:45）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+修复「语音转写弹层打不开」（老板实测上报）：时机组 Row 用了 CrossAxisAlignment.stretch，而它位于弹层的竖直 SingleChildScrollView 里（高度无上界）→ stretch 把无限高约束传给子块，performLayout 抛 BoxConstraints forces an infinite height，整个弹层渲染失败。先用最小复现测试确认根因（stretch Row + 竖直滚动区必抛），再按标准写法修：Row 外包 IntrinsicHeight（先按两块内容量出齐高、再拉伸），恢复等高大方块且不再崩。
+
+- _vtTimingBlock 增加 keyName 形参（两块分别 vtTimingManual / vtTimingAuto），供测试按块定位；
+- chat_page_menu_test 新增回归用例「语音转写弹层：转写时机为左右方块，点选可提交」：菜单→更多设置→语音转写打开弹层、标题/两块在场、两块等高、默认无改动提交灰/点「自动」后亮起并落盘 auto=true。**已验证该用例能抓到旧 bug**（临时拆掉 IntrinsicHeight 即复现 infinite height 红测，随后恢复）；
+- 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量套件后台跑完后确认。
+
+教训：**在可竖直滚动容器里，Row/Column 用 stretch 前必须想清楚 cross 轴是否有界**——stretch 会把「传入约束的上界」直接当紧约束发给子节点，滚动区的无界高就是在这里炸的；等宽等高双卡的标准解是 IntrinsicHeight 包裹。
+
+**（2026-10-24T07:55:00Z / 2026-10-24 15:55）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+消息菜单弹出时聊天页变暗（老板）：_MessageActionsPopupRoute 的 barrierColor 原 20% 黑，比 app 里 36 处 showDialog/showModalBottomSheet 的默认 Colors.black54（54%）浅了快一倍——"没像其他弹层那样变暗"的根因就是它。对齐到 Colors.black54（2327eabb）。barrierDismissible 本就 true，点暗区关闭不变。analyze + 47 个菜单测试绿。提交纪律：本次严格只 add chat_page.dart 一个文件——工作区另有老板/并行的 l10n 改动与 b000310a（转写弹层 IntrinsicHeight，他人工作），均不碰不提交；diff 实证无裹挟。
+**（2026-10-24T08:10:00Z / 2026-10-24 16:10）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+转写弹层「方式组」视觉对齐（老板）：① 组标题「转写方式」→「转写位置」（en Method → Where to transcribe）——与时机组「转写时机」同款四字名词、直指"在哪转写"；② _vtOptionRow 调色对齐 OptionPickerSheet 2026-10-24 定稿口径：选中=品牌粉 #D6529C 25% 实底（原 secondaryContainer 55% 淡粉废弃），**未选中=5% 黑**（原透明——白卡上没有任何"可点"暗示，老板要求补淡灰底），悬浮 10%/点击 14% 显式对齐；③ 两行前置图标与语音消息气泡里的转写来源指示图标同款（_voiceTranscriptSourceIcon）：Local=Icons.memory 芯片、Remote=Icons.cloud_outlined 云，size 20 + onSurfaceVariant（气泡里是 14，设置行按行高放大）。
+
+- l10n：voiceTranscriptGroupEngine zh/en 双改 + gen-l10n；
+- _vtOptionRow 新增 required icon 形参（Row 首位 Icon + 12 间距，其余结构不动）；
+- 回归用例扩展：断言弹层内芯片/云图标各一（scoped 到 BottomSheet）；
+- 验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量后台确认。
+
+**（2026-10-24T08:11:12Z / 2026-10-24 16:11）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+合并 origin 的 7 个提交进本地（老板）：唯一冲突是 worklog.md 尾部（双方各追加条目）→ 双方条目按 UTC 段排序合并，本条置末；合并前工作区未提交的 l10n 改名（voiceTranscriptAutoLabel→voiceTranscriptTimingLabel）经核对与传入内容一致，无丢失。
+
+**（2026-10-24T08:21:00Z / 2026-10-24 16:21）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+补合并 origin 新到的第 8 个提交 966f97ef（转写弹层方式组调色+芯片/云图标，08:10 条目在上）：仍只 worklog.md 冲突（尾部追加），按 UTC 排序解决。至此本地 = origin + 我的 demo 修复，无落后。
+
+**（2026-10-24T08:33:20Z / 2026-10-24 16:33）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }
+英文文案 Vanished messages → **Removed messages**（老板定夺，仅 en 两处值，zh「消息留痕」不动）：老板先提 Dismissed，我给的意见是 ① Vanished 确实该改——vanishing/disappearing messages 在 Signal/WhatsApp/Telegram 里专指阅后即焚，与本设置（已删/焚/撤回消息的显示样式）撞车会误导；② Dismissed 更糟——iOS 语境是「用户划掉通知/关闭弹层」，动作方是读者、语义是忽略非销毁；③ 老板再提 Obsolete（因为 deleted 只是三类成因之一）——语义偏「过时/被取代/不再适用」（软件语境=deprecated），这三类消息不是过时是「没了」；最终伞词取 **Removed**：天然覆盖 deleted/burned/recalled 三类，且是通讯 app 通用占位词（This message was removed），与 note「How deleted/burned/recalled messages appear?」直接呼应。改动：app_en.arb 两处值 + gen-l10n 重生成；键名 chatPageTombstone*/chatPageMoreSettingsTombstone 与 zh 值不动，测试全走 getter 无需改。验证：analyze 干净 + tombstone_display_test 2 用例绿。
+**（2026-10-24T08:40:00Z / 2026-10-24 16:40）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+方式组也改左右方块（老板）：弹层两组从此统一方块布局——「转写位置」左「本机」右「远程」（芯片/云前置图标保留，与气泡指示图标同款）。实现：_vtTimingBlock 泛化为 _vtBlock（加可选 IconData icon 形参，时机组不传），IntrinsicHeight+stretch Row 提为 _vtBlockPair（两组共用），_vtOptionRow 删除（无人引用）。回归用例扩展：位置组两块等高断言（vtEngineLocal/vtEngineServer keys）。
+
+验证：analyze lib+test 干净；chat_page_menu_test 47 全绿；全量 389 + 1 skip 全绿。UI 待老板真机自测（更多设置→语音转写）。
+
+**（2026-10-24T08:20:00Z / 2026-10-24 16:20）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }
+补完崩溃前任务（老板）：① chatPageMenuMore（"主菜单/Main menu"）从两个 arb 删除（汉堡菜单的 PopupMenuButton tooltip 已随删 tooltip 决策移除，文案键成孤儿）；② "Show menu" tooltip 残留根因=PopupMenuButton **不传 tooltip 时框架自动加默认 "Show menu/显示菜单"**（删 tooltip 决策的漏网），三处汉堡菜单（chat_page 9711 / lock_page 156 / setup_page 402）加 `tooltip: ''` 压掉。验证：analyze 干净 + 全量 389 测试绿。提交跨会话恢复：崩溃时改动已在工作区，重启后逐文件核对再提交。
+**（2026-10-24T09:20:00Z / 2026-10-24 17:20）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+修复「语音转写设置对所有空间生效」（老板实测）：根因在 VoiceTranscriptSettings._ScopedKey.write——传裸 key（全局 voice_transcript_engine / voice_transcript_auto）而非 scopedKey，于是**不勾「应用于本机所有秘境」的保存也写进了全局键**，所有空间读到时（per-space 缺失回退全局）都生效。对比 tombstone/attachment 两个设置类（都写 scopedKey）一眼可见。修复=一字：writeSetting(key, → scopedKey,。
+
+**v12 数据迁移（善后被写脏的存量库）**：① 把两个全局键的现值认领进每个空间的 per-space 键（INSERT OR IGNORE——已有 per-space 覆盖的空间不 clobber，那是 saveAll 清覆盖前的合法状态）；② 删除这两个全局键（不删则此后新建/未配置空间仍读到污染值）。效果：老板机器升级后各空间现值不变但彼此独立；从未配置的空间走默认（local/手动）；「所有秘境」勾选框随时可重新铺。踩坑：迁移块直接 INSERT 会在这台机器一类的人造落后库上抛 no such table: app_state（user_version=6 却只有四张表）——加了 PRAGMA table_info 守卫，没有设置表就整段跳过（第一个迁移测试实测抓到）。另一个坑：多层转义两次写错 SQL 字符串，最终按行号用 python 重写才稳——**含引号的 SQL 字符串一律用双引号 Dart 字符串，别用单引号转义**。
+
+测试：新建 test/voice_transcript_settings_test.dart（不勾范围→只写本空间+全局键不落+别空间不受影响；saveAll→写全局+清覆盖+所有空间跟随）；迁移测试加 v12 用例（认领/保全/清全局/旧 auth 键不动）+ 两个存量版本断言 11→12；chat_page_menu_test 转写弹层回归补「全局键不落」断言。验证：analyze lib+test 干净；全量 392 + 1 skip 全绿。
+
+**（2026-10-24T12:35:35Z / 2026-10-24 20:35）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
+「应用于本机所有秘境」勾选框样式优化（07437f29）。共享组件 LabeledCheckbox 卡片化：圆角 12 不再横贯弹层；老板后续拍板**默认无底色**（勾选框本身暗示可点，悬浮 10%/点按 14% 黑才显色）；上方间距 4→8。新增 horizontalInset 参数处理对齐分裂：底部选项弹层默认 12（与选项行同缩进）；AlertDialog（Email alerts/通道名称/My name）传 0——dialog content 左右 24 + 卡片内边距 12 正好对齐输入框。老板指出 burn 弹层勾选框超出上下元素宽度，根因是 burn 主体/按钮用 16 边距而非选项弹层的 12，方案=把 burn 主体白卡与提交按钮 16→12 与 OptionPickerSheet 统一口径（而非给勾选框传 16 特调）。analyze 通过；老板自查视觉，未跑 golden（政策：UI 改动 golden 失配保持红）。
+
+**（2026-10-24T16:30:15Z / 2026-10-25 00:30）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
+时长轴范围调整（42b64c25）。PIN 锁屏轴 20 秒~20 分钟 → 10 秒~30 分钟（lock_timer.dart 常量 + 轴标注）；阅后即焚轴 1 分钟~60 天 → 10 秒~50 天，轴下增加「1 分钟」标注。老板反馈 10 秒~1 分钟在单一对数轴上太挤（仅占 ~8%），改**分段对数**：10 秒~1 分钟占前 25%、1 分钟~50 天占后 75%，段内对数 + 吸附规则不变，标注由 _tFromSeconds 反推自动对位。过程坑：math.pow 返回 num 不能赋给 int/double 声明，需 .toDouble()。中途试过把英文 burnUnit* 键改成 sec/min 风格（老板要求预览与 PIN 轴同款写法），老板看后说改坏了，已 git checkout 撤回 l10n 三个文件——**结论：burn 单位简写 s/m/h/d 保持原样，不再改**。测试：全量 392 过（chat_page_menu_test 锁屏轴断言随新范围更新）。
+**（2026-10-24T10:05:00Z / 2026-10-24 18:05）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+整理空间作用域设置全谱（老板复查「一次 apply-for-all 是否成为未来新空间默认值」）：新建 aimemo/20261024_spaceScopedSettings.zhcn.md——四种方案（A 全局键+清覆盖：转写/附件存储/墓碑，新空间继承；B 本地逐空间扇出：阅后即焚，新空间不继承；C 服务端 API 扇出：邮件通知，本地零键实测确认；D 无空间维度：主题），附 2026-10-24 转写全局键 bug 教训与「要不要统一」待评审项。含代码索引（行号已核对）。
+**（2026-10-24T10:40:00Z / 2026-10-24 18:40）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }
+
+aimemo 特性文档改名对齐 yyyymmdd_<feature> 规范（老板要求）：15 个专题文档按「文档内记载的日期」（与 git 创建日期交叉验证）加日期前缀，git mv 保历史；框架四件套（productLens/projectPlan/userProfile/worklog）不动。全仓引用同步更新（aimemo 各文档互引、docs/ 7 份、app/shared/server 代码注释、build 脚本、pubspec、compose）——旧文件名零残留（python 否定断言验证；worklog.md 历史条目按「追加式日志不改写」原则保留旧名，以本条映射表为准）。
+
+| 旧名 | 新名 |
+|---|---|
+| accountDesign.zhcn.md | 20261019_accountDesign.zhcn.md |
+| appStoreSubmission.zhcn.md | 20261019_appStoreSubmission.zhcn.md |
+| appWizardMultiverse.md | 20260910_appWizardMultiverse.md |
+| escrowArchivedKeys.md | 20260914_escrowArchivedKeys.md |
+| groupChatDesign.md | 20261003_groupChatDesign.md |
+| groupExitDesign.md | 20261019_groupExitDesign.md |
+| multiSpaceDesign.zhcn.md | 20260918_multiSpaceDesign.zhcn.md |
+| renamePlan.zhcn.md | 20260923_renamePlan.zhcn.md |
+| renameReview20260923.md | 20260923_renameReview.md |
+| upgradeToMultiverse.md | 20260910_upgradeToMultiverse.md |
+| voiceCall.zhcn.md | 20260918_voiceCall.zhcn.md |
+| voiceTranscript.zhcn.md | 20261009_voiceTranscript.zhcn.md |
+| whisperDeploy.zhcn.md | 20261022_whisperDeploy.zhcn.md |
+| architectureReview20260915.md | 20260915_architectureReview.md |
+| architectureReview20260915_qwen38.md | 20260915_architectureReviewQwen38.md |
+
+**（2026-10-25T01:19:44Z / 2026-10-25 09:19）** { computer: 'doomship.local', user: 'luk', agent: 'atomcode' }：
+弹层关闭圆钮 + 改名弹窗解冻（2cca0004）。① 新增 SheetCloseButton（圆形淡灰底），接入 12 处底部弹层标题行右上角（OptionPicker/Burn/更多设置/高级安全/邀请/成员/通道列表/附件/我的资料/我的同伴/空间切换/About）；通道列表刷新钮改紧贴标题右侧成组居中、关闭钮独占行最右；附件弹层无标题行，钮单独成行右对齐。② 通道名称/我的名字弹窗取消初始只读冻结态与编辑图标，一打开即可编辑 + autofocus（与群组名称弹窗同款），editing 通知器全部删除。**坑：chat_page.dart 的未提交改动曾整文件丢失**（其余文件的改动都在，stash 为空，原因不明——疑似老板侧操作），按同口径完整重做并全量验证通过。教训：跨多轮的未提交大改动有丢失风险，做完一个特性应尽快提交。测试：ui_style_switch 改断言关闭钮存在可点（推翻 2026-09-15「统一不设关闭钮」旧约定）；entrance_list 对齐参照改 SheetCloseButton 整钮（图标自带 padding 会差 11px）；chat_page_menu 六个旧编辑态用例改直接可编辑。工作区剩 app_zh.arb 两个文件的文案微调（老板自己改的），不代提交。
+**（2026-10-25T01:49:27Z / 2026-10-25 09:49）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }：
+修复聊天时间行发送状态钮「圆形裁切」bug（老板 2026-10-25 截图实测）。现象：failed 状态的「点击重发/Tap to resend」+⚠️、pending 点按后的「加速中…/Speeding up…」+小飞机，被包在 Material(CircleBorder + Clip.antiAlias) 里按 28px 直径圆裁切——英文 "Tap to resend" 只剩中段 "rese"、⚠️ 整个被切掉（老板原话「文字放在一个红色圆里，只显示出一部分」）；点飞机后 "Speeding up…" 只剩 "ing u"。老板点红字后变单勾，证实就是 failed→点击重发链路（chat_page.dart _buildSendStatusIcon）。像素级定位：sips 转 BMP + python 扫描确认红字在气泡中央、外围纯蓝——没有红色背景圆，「红圆」就是圆形 clips 本身。修法：两个分支 CircleBorder → StadiumBorder 胶囊（纯图标场合 28×28 胶囊渲染出来仍是圆，与 _bubbleQuickAction 圆钮视觉一致；带文字时完整显示）；两处文字加 Flexible+ellipsis、调用点 _buildSendStatusIcon 包 Flexible——气泡 maxWidth=屏宽×0.75，窄屏+长焚毁标签时文字收缩而非 RenderFlex 溢出。测试：chat_send_status_test 加两条 StadiumBorder 形状回归断言（裁切是纯视觉、布局尺寸不变，只能查 shape 作探针）；发送状态+聊天气泡相关 7 个测试文件 67 个全过；flutter analyze 无问题。
+**（2026-10-25T02:03:52Z / 2026-10-25 10:03）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }：
+修复上一笔提交（5f550827）引入的拉伸回归（老板 2026-10-25 二次实测截图）。断服务器发消息 → pending 小飞机被拉成横跨气泡的大胶囊、左右大片空白。根因读 flutter SDK flex.dart 确认：RenderFlex 非 flex 子节点拿**无界**宽度（Align 收缩包裹 → 28×28 圆，改动前行为）；flex 子节点（loose）拿 0..剩余空间的**有界**宽度，而 Container(alignment:) 底层 Align 无 widthFactor 时**填满**有界宽度 → 上次为防时间行溢出给调用点包的 Flexible 直接把状态钮拉抻；悬浮时墨水源照出整个大胶囊（截图里的浅蓝大胶囊即此）。修法：撤掉三处 Flexible（调用点 + failed/pending 两处内层 Text），只保留 StadiumBorder 胶囊修复；Container(alignment) 在无界宽度下自然收缩包裹，飞机=28×28 圆、失败=文字内容宽胶囊。时间行溢出风险重新评估：最坏情况（英文 "Tap to resend"+⚠️+时间戳+焚毁胶囊+更多 ≈ 238px）仍小于气泡 maxWidth（屏宽×0.75，320px 屏也有 240px），桌面/手机均不触溢。测试：补两条尺寸回归——纯飞机状态钮 Material 必须 28×28 正方形（width==height）、失败胶囊宽 <120 按内容宽；10 个发送状态测试 + 聊天相关 8 文件 71 个全过；analyze 干净。教训（第二轮）：给 Row 子节点包 Flexible 前必须确认子节点是否含 Align/Container(alignment)——有界约束下会填满拉抻，「防溢出」不能以破坏常规状态为代价。
+**（2026-10-25T02:13:25Z / 2026-10-25 10:13）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }：
+应老板要求把已推送的两个 commit（5f550827 StadiumBorder 修复 + b1ad894a 撤销 Flexible）合并重推：确认仅本分支引用、无他人 pull 后，soft reset 到 9fc1776a 打成单 commit 517389f（终态与 b1ad894a 逐字节一致，git diff 为空验证），force-with-lease 强推 origin/feat/voice-transcript 成功（b1ad894a...517389f）。远程已无那两个 commit；github 远程分支本就不含它们（停在更早的 2cb4933f，当时 github.com 不可达，未触碰）。注意：force push 后旧 commit 在服务端可能滞留至 GC，已 fetch 过的机器需 reset --hard origin/feat/voice-transcript 同步——老板确认无人 pull，未发生。
+
+**（2026-10-25T02:03:20Z / 2026-10-25 10:03）** { computer: 'DoomBase', user: 'luk', agent: 'atomcode' }：聊天输入框白底。老板反馈：语音输入态的录音条（「长按开始录音」）是白底，而文字输入态的输入框是透明的、透出页面淡粉背景，观感不一致。改动（chat_page.dart `_buildInputBar` 的 TextField InputDecoration）：加 `filled: true, fillColor: Colors.white`。`flutter analyze` 通过；改动微小未 commit。
+**（2026-10-25T03:47:00Z / 2026-10-25 11:47）** { computer: 'doomship.local', user: 'luk', agent: 'codebuddy' }：
+群组成员弹层改「只滚中间成员列表」（老板 2026-10-25）。原结构整个弹层包在 SingleChildScrollView 里，高度不够时标题、群名胶囊、邀请、退出跟着一起滚走。改为 app 内既有口径（_showInviteDialog / ScrollableCardArea / 通道列表弹层同款）：SafeArea > Padding > Column(min, key='membersSheet')，标题与群名行固定，成员卡段 Flexible(loose)+Scrollbar+ListView(shrinkWrap) 内部滚（人少贴着内容不撑高、人多吃满剩余高度），邀请/满员卡/退出群组固定底端。测试影响：member_profile_test 与 group_exit_flow_test 原用「标题的 SingleChildScrollView 祖先」定位弹层，外层去掉后失效（6 个测试红）——改用弹层内容根的 ValueKey('membersSheet')；新增布局回归测试：800×360 矮窗 + 7 成员，断言列表 maxScrollExtent>0、邀请/退出不在 ListView 内、拖列表时标题 rect 不变。过程坑：① 大块重排手工缩进漏括号（群名胶囊 Padding、邀请 Material、尾部各一处），靠机械括号配平脚本+analyze 定位修齐——教训：大段 widget 树重排应小步改+每步 analyze；② 480 宽下聊天页自身溢出 15px（既有布局特性，非本次引入），测试窗取 800×360（够矮够宽）。全量 393 测试过、analyze 干净。

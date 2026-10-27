@@ -32,7 +32,7 @@
 | `shared/`     | 纯 Dart 核心（crypto/protocol/sync），CLI 与 App 共用 | 库，不独立运行                                 |
 | `cli/`        | Dart **TUI** 客户端（最完整的客户端实作）             | `dart run bin/einz_tui.dart --store <store> --server <url>` |
 | `app/`        | Flutter 手机客户端（V1 骨架 + 本地库）                | `flutter run`（真机验证待环境）                |
-| `serverDocker/` | Docker Compose + Caddy（生产单机部署）                | `docker compose up -d`                         |
+| `server/docker/` | Docker Compose + Caddy（生产单机部署）                | `docker compose up -d`                         |
 
 ---
 
@@ -90,7 +90,7 @@ Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 
 > 同一文件里的 `maxMembersPerSpace` 控制**单空间成员（身份）数量上限**：`0`=不限、`n`=最多
 > n 个身份（建议 4）。注意**双人秘境恒为 2 人**、与这个值无关（空间类型在创建时选定、不可改，
-> 详见 `aimemo/groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
+> 详见 `aimemo/20261003_groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
 >
 > **冻结闸（2026-10-04，原"强制升级闸"）**：`coldAppVersion` 声明**冻结线**——服务端
 > 当前可用的最低 App 版本，格式 `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，
@@ -183,25 +183,42 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫通道�
 ### 3.1 目录与前置
 
 ```text
-serverDocker/
-├── Caddyfile             # 域名 + TLS 自动签发 + 反代 + WSS 升级
-├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
-├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
-├── config/               # 可选：serverConfig.json（服务端参数，见下；整个目录已 gitignore）
-└── data/                 # 数据卷映射：einz.sqlite.db + files/ + avatars/ + backups/
+server/
+├── Caddyfile.example     # Caddy 模板（docker / 裸 node 两种形态通用）：docker 部署（内置
+│                         #   Caddy 形态）拷贝为上一级目录的 Caddyfile 后改域名——compose 的
+│                         #   caddy 服务挂的是 ../Caddyfile；裸 node 部署照它改系统级 Caddyfile
+├── config/               # 可选：serverConfig.json（服务端参数，见下；gitignore，不入库）
+├── data/                 # 运行数据：einz.sqlite.db + files/ + avatars/ + backups/（gitignore）
+├── models/whisper.cpp/  # whisper.cpp 源码 + 构建 + 模型（models/ 子目录放 ggml；
+│                         #   整个目录 gitignore；Docker 部署只需把模型放进 models/ 子目录走卷）
+└── docker/               # Docker Compose 部署（卷指回 ../config ../data ../models/whisper.cpp/models——
+    ├── docker-compose.yml            # 主 compose（2026-10-24 合并版）：默认只起 server，
+    │                                #   由系统级 Caddy 反代 127.0.0.1:3000；.env 里加
+    │                                #   COMPOSE_PROFILES=caddy 则同起内置 Caddy 容器（80/443）；
+    │                                #   COMPOSE_PROFILES=cftunnel 则同起 cloudflared
+    │                                #   （中国双入口：系统级 Caddy 服备案域名 + 隧道服境外域名）
+    ├── env.sh              # 生成 .env（EINZ_DB_BACKUP_KEY 等；.env gitignore，pull 不覆盖）
+    ├── coturn/             # TURN 独立 compose + 配置（项目名 einz-turn，可单独启停）
+    │   ├── docker-compose.yml        #   host 网络；`npm run coturn-run-docker` 在此启动
+    │   └── turnserver.conf.example   #   cp 成 turnserver.conf 填密码/realm/external-ip
+    └── .env                # 本地化密钥/配置（gitignore）
 ```
+
+> **Node dev 与 Docker 共用同一份运行根**（老板 2026-10-23 定）：`config/` `data/`
+> `models/` 都在 `server/` 下，`npm run dev` 与 `docker compose` 跑的是同一份数据/
+> 配置/模型——同一时刻只能跑一个实例（共享同一个 SQLite）。
 
 > ⚠️ **头像目录必须挂在卷上**：server 的默认路径是容器内 `/app/data/avatars`，
 > **不在任何卷里**——每次 `docker compose up -d --build server` 重建容器都会清空，
 > 表现是所有人的头像同时消失（2026-09-26 实测踩到）。compose 里必须有：
-> `EINZ_AVATARS=/data/avatars`（`docker-compose.*.yml` 模板已加；VPS 上的
-> `docker-compose.yml` 是部署时从模板拷贝的、不入库，**升级时要手动补这一行**）。
+> `EINZ_AVATARS=/data/avatars`（`docker-compose.yml` 已加；早期部署若从旧模板拷贝
+> 过 `docker-compose.yml` 到 VPS、不入库，**升级时要手动补这一行**）。
 ```
 ```
 
 前置：一台 VPS（域名 DNS 指向它，开放 80/443）、Docker + Compose。
 
-**服务端配置（可选）**：`serverDocker/config/serverConfig.json` 会被挂到容器
+**服务端配置（可选）**：`server/config/serverConfig.json` 会被挂到容器
 `/config/`，由 `EINZ_CONFIG` 指向。字段：`maxSpaces`（新空间数量上限）、
 `maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`coldAppVersion`（冻结
 > 线，当前可用最低版本）/ `hotAppVersion`（当前正热用版本）/ `appDownloadUrl`（升级窗口下载按钮
@@ -210,45 +227,57 @@ serverDocker/
 > "配置热加载"）；文件不存在时服务端照常启动（走默认值）。示例：
 
 ```bash
-mkdir -p serverDocker/config
-echo '{"maxSpaces": 1}' > serverDocker/config/serverConfig.json
+mkdir -p server/config
+echo '{"maxSpaces": 1}' > server/config/serverConfig.json
 ```
 
 > **容器内数据文件路径以 `EINZ_DB` 为准**（compose 里 `/data/einz.sqlite.db`，指向挂载卷）。
 > 既然设了 `EINZ_DB`，它优先于 `dataStore`——所以生产不需要、也不应该用 `dataStore` 改路径，
 > 免得库落到卷外、重建容器即丢。`dataStore` 是给本机开发用的（见 §2.2）。
 
-> 本机开发（非 Docker）同理：放 `server/config/serverConfig.json`（同名字段、
-> 同样不入 git，见 §2.2）——两种形态都是"config/ 目录 + serverConfig.json"，
-> 只是部署时由 `EINZ_CONFIG` 指到容器里的 `/config/`。
+> Docker 与 `npm run dev` 读的是**同一个** `server/config/serverConfig.json`（compose 卷
+> `../config:/config`）——改一处两端生效，不必维护两份。
 
 ### 3.2 部署步骤
 
 ```bash
-# 1) 改域名：serverDocker/Caddyfile 中 private.example.com → 你的域名
+cd server/docker
 
-# 3) 备份密钥：生成 32 字节 base64 密钥（npm run backup 需要，见 §5）
+# 1) 备份密钥：生成 32 字节 base64 密钥（npm run backup 需要，见 §5）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
 # 记下输出，写入服务器环境（例如 docker-compose.yml 或 .env，勿入库）
+# （或跑 bash env.sh 自动写进 .env，见 docs/ONBOARDING.md 阶段 0）
 
-# 4) 起服务
-cd serverDocker
+# 2) 起服务（默认形态：只起 server，系统级 Caddy 反代 127.0.0.1:3000）
 EINZ_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
-docker compose ps                       # 两个服务均 healthy/running
+docker compose ps                       # server  healthy/running
 ```
 
 > 说明：`docker-compose.yml` 已预置 `EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}` 注入
-> （由 compose 自动读取 `serverDocker/.env` 提供，.env 已在 .gitignore、不入库）。
+> （由 compose 自动读取 `server/docker/.env` 提供，.env 已在 .gitignore、不入库）。
 > 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
+
+**要内置 Caddy 容器做总入口**（不用系统级 Caddy）：额外两步——在 .env 里加
+`COMPOSE_PROFILES=caddy`，并 `cp ../Caddyfile.example ../Caddyfile` 后把
+`private.example.com` 改成真实域名，再 `docker compose up -d`（caddy 占 80/443，
+server 改走容器网络；127.0.0.1:3000 仍会在回环暴露便于排障）。两种入口二选一，
+**别给同一个域名同时配两套**。
+
+**中国双入口（境外域名无备案，走 CF 隧道）**：在 .env 里加
+`COMPOSE_PROFILES=cftunnel`，并配一行 `CF_TUNNEL_TOKEN=<CF 控制台建的隧道 token>`
+（建隧道与 Published application 路由的详细步骤见 `docker-compose.yml` 文件头）。
+此形态下系统级 Caddy 继续服备案域名（回环反代），cloudflared 容器只出站连 CF、
+不开入站端口，境外域名由 CF 边缘终止 TLS 后经隧道转到 `server:3000`。
+`caddy` 与 `cftunnel` 可组合（`COMPOSE_PROFILES=caddy,cftunnel`）。
 
 #### 3.2.1 邮件通知（可选，不配 = 关闭）
 
 没进应用商店 → 没有后台推送，所以服务端给离线的一方**发一封邮件**把他拉回来
-（`docs/PROTOCOL.md` §7.5）。凭据同样走 `serverDocker/.env`（compose `docker-compose.*.yml`
-模板已预置注入，部署时拷贝到服务器上的 `docker-compose.yml` 记得带上这几行）：
+（`docs/PROTOCOL.md` §7.5）。凭据同样走 `server/docker/.env`（`docker-compose.yml`
+已预置注入，部署时拷贝到服务器上的 `docker-compose.yml` 记得带上这几行）：
 
 ```bash
-# serverDocker/.env（服务器本机，不入库）
+# server/docker/.env（服务器本机，不入库）
 EINZ_SMTP_HOST=smtp.email.<region>.oci.oraclecloud.com   # 甲骨文 Email Delivery
 EINZ_SMTP_PORT=587                                        # 587=STARTTLS；465 时加 EINZ_SMTP_SECURE=1
 EINZ_SMTP_USER=ocid1.user.oc1..aaaa…                      # 控制台生成的 SMTP 凭据用户名
@@ -259,10 +288,10 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
 - **缺任一变量 → 功能整体关闭**（聊天照常，只是不发信），`PUT /notify/email` 返回
   `503 MAIL_DISABLED`。区别于 `EINZ_DB_BACKUP_KEY`：那个缺失是**拒绝执行**，这个是**静默降级**。
 - **本机开发（`npm run dev`）不用手写命令行**：dev 脚本已带
-  `node --env-file-if-exists=${EINZ_ENV_FILE:-../serverDocker/.env}`（相对 `server/`），
-  自动加载同一个 `serverDocker/.env`；命令行上的值**优先于**文件里的（想临时换一组值就
+  `node --env-file-if-exists=${EINZ_ENV_FILE:-./docker/.env}`（相对 `server/`），
+  自动加载同一个 `server/docker/.env`；命令行上的值**优先于**文件里的（想临时换一组值就
   写在命令行上）。
-  （`mail:probe` 的路径是 `../../serverDocker/.env`，因为它是按**脚本自身位置**
+  （`mail:probe` 的路径是 `../docker/.env`，因为它是按**脚本自身位置**
   `server/scripts/` 算的——两个写法指向同一个文件。）
   不想把密码放进工作区（这个目录是两机同步的），就把文件放到工作区外面再指过去：
   ```bash
@@ -281,7 +310,7 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
 - 验出网（`EINZ_PROBE_TO` 给一个自己的邮箱，会真的发出一封测试信）：
   ```bash
   cd server
-  EINZ_PROBE_TO=you@example.com npm run mail:probe   # 自动读 serverDocker/.env（按脚本位置算）
+  EINZ_PROBE_TO=you@example.com npm run mail:probe   # 自动读 server/docker/.env（按脚本位置算）
   ```
   在**本机**验也可以——把那 5 个变量直接写在命令行上（命令行优先于 .env），
   或 `EINZ_ENV_FILE=某个文件路径 npm run mail:probe`。本机验的是**凭据与投递**
@@ -451,7 +480,8 @@ python3 -c "import json;print(open('server/config/serverConfig.json').read())"  
 docker compose up -d
 ```
 
-- **别删配置**：`server/config/serverConfig.json`（Docker 为 `serverDocker/config/`）在
+- **别删配置**：`server/config/serverConfig.json`（Docker 与裸 node 共用这一份，卷挂
+  `../config:/config`）在
   `data/` 之外，保留；顺手确认 `maxSpaces` / `maxEntrancesPerSpace` 已按预期设好
   （两者都是 `0` = 不限，等于对公网敞开）。
 - 清完 `data/files/` 从第一天起就是**纯 per-space 结构**（`files/<space_id>/<前两位>/<id>`）。
@@ -505,7 +535,7 @@ docker compose up -d
 | 撤销后通道仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                    |
 | 备份命令拒绝执行                       | 未设置`EINZ_DB_BACKUP_KEY`                                | 设置 base64 32B 密钥（§3.2/§5.1）                           |
 | **docker 构建挂在 `RUN npm ci`**       | 大陆构建机跨境拉 GitHub（better-sqlite3 预编译包）与 nodejs.org（Node 头文件）双双超时——**这网络是一阵好一阵坏，先重试** | 重试；仍不行就一次性切镜像（不必改文件）：<br>`sudo docker compose build --build-arg NPM_MIRROR=https://registry.npmmirror.com --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 server && sudo docker compose up -d server`<br>再不行：本机构建后 `docker save \| ssh cn1 docker load` |
-| 邮件通知"未启用"                       | `serverDocker/.env` 少变量，或服务器上那份**不入库**的 `docker-compose.yml` 没补那 5 行 | §3.2.1；`docker compose exec server sh -c 'env \| grep EINZ_SMTP'` 看有没有 |
+| 邮件通知"未启用"                       | `server/docker/.env` 少变量，或服务器上那份**不入库**的 `docker-compose.yml` 没补那 5 行 | §3.2.1；`docker compose exec server sh -c 'env \| grep EINZ_SMTP'` 看有没有 |
 
 ---
 
@@ -527,32 +557,32 @@ docker compose up -d
 
 ### 9.1 代码传输：git pull（主推）——VPS 一次性初始化
 
-> 前置：VPS 已装 git；本地化文件（`serverDocker/.env`、`server/data/`、`*.db`）
-> 均已被仓库 .gitignore 忽略，git 操作不会触碰——**唯一例外是 `serverDocker/Caddyfile`**
+> 前置：VPS 已装 git；本地化文件（`server/docker/.env`、`server/data/`、`*.db`）
+> 均已被仓库 .gitignore 忽略，git 操作不会触碰——**唯一例外是 `server/docker/Caddyfile`**
 > （仓库内为占位域名 `private.example.com`，VPS 部署时已 sed 为真实域名），需标记
 > `assume-unchanged` 防 pull 覆盖。
 
 ```bash
-# VPS 一次性（把现有部署目录转换为 git 工作树；server/ serverDocker/ 等
+# VPS 一次性（把现有部署目录转换为 git 工作树；server/ 等
 # 会被仓库版本对齐覆盖，data/ .env 等本地数据不受影响）
-export EINZ_ROOT=/opt/einz
+export EINZ_ROOT=/faronear/einz
 cd $EINZ_ROOT
 git init
-git remote add origin https://git.tic.cc/fon/only
+git remote add origin https://git.tic.cc/fon/einz
 git fetch origin
 git checkout -b main origin/main
-git update-index --assume-unchanged serverDocker/Caddyfile   # Caddyfile 保留 VPS 域名，pull 不覆盖
+git update-index --assume-unchanged server/docker/Caddyfile   # Caddyfile 保留 VPS 域名，pull 不覆盖
 git status --short                                          # 应只显示本地未跟踪项（data/ .env 等）
 ```
 
 > 说明：`git checkout -b main origin/main` 会把仓库代码写入工作树并覆盖同名旧文件
-> （server/、serverDocker/ 等对齐到仓库版本）；本地数据文件因 .gitignore 而保持不动。
+> （server/、server/docker/ 等对齐到仓库版本）；本地数据文件因 .gitignore 而保持不动。
 
 ### 9.2 每次更新：本机 push → VPS pull → 重建 server 容器
 
 ```bash
 # 本机（macOS/Linux）：新代码提交并推送到远程仓库
-cd /Users/Shared/productX/only
+cd /Users/Shared/productX/einz
 git push origin main
 ```
 
@@ -560,12 +590,12 @@ git push origin main
 # VPS：拉取 → 重建 server 容器（server 代码进镜像，必须 --build）
 cd $EINZ_ROOT
 git pull --ff-only
-cd serverDocker
+cd server/docker
 docker compose up -d --build server
 docker compose ps                                       # 确认 server 重新 running/healthy
 ```
 
-> Caddy 容器与 `serverDocker/.env`（备份密钥、域名等）无需改动。
+> Caddy 容器与 `server/docker/.env`（备份密钥、域名等）无需改动。
 
 ### 9.3 验证新端点
 
@@ -592,4 +622,4 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
 | 通道在册状态             | 无需改动（既有通道与会话不受影响）                                                                                                                         |
 | Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖）                                                                                                 |
 | App 侧                   | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                             |
-| 回滚                     | `cd $EINZ_ROOT && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ serverDocker/ shared/` → 重新 `docker compose up -d --build server` |
+| 回滚                     | `cd $EINZ_ROOT && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ shared/` → 重新 `docker compose up -d --build server` |

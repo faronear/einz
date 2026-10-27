@@ -3,7 +3,7 @@
 > **为什么需要**：跨网（一台 4G、一台 WiFi；或跨运营商）时 P2P 打洞失败率很高。
 > 2026-09-26 实测：同 WiFi 双机能通，**跨网无 TURN 打不通**，部署 coturn 后打通。
 > 所以 TURN 是**必需**，不是可选优化。
-> 方案背景：`aimemo/voiceCall.zhcn.md` §3 / Phase C。
+> 方案背景：`aimemo/20260918_voiceCall.zhcn.md` §3 / Phase C。
 
 ---
 
@@ -18,24 +18,28 @@ TURN 只是把 **UDP 包原样转发**，媒体是 DTLS-SRTP 端到端加密，T
 ## 1. 部署（国内机 `einz.yuanjinx.com`）
 
 ```bash
-cd <仓库>/serverDocker
-cp coturn/turnserver.example.conf coturn/turnserver.conf
+cd <仓库>/server/docker/coturn
+cp turnserver.conf.example turnserver.conf
 # 改三处：user= 的密码、realm、external-ip（云主机有公网网卡就不用填）
 #   生成密码：openssl rand -hex 16
 
-docker compose -f docker-compose.coturn.yml up -d
-docker compose -f docker-compose.coturn.yml logs -f
+docker compose up -d          # 或仓库根 `npm run coturn-run-docker`
+docker compose logs -f
 ```
+
+> compose 文件在 `server/docker/coturn/docker-compose.yml`（2026-10-24 从
+> `server/docker/docker-compose.coturn.yml` 迁入子目录，与 turnserver.conf 同目录，
+> 独立项目名 `einz-turn` 不变）。
 
 用 **host 网络**：TURN 要用 49152–65535 这一大段 UDP 端口，且需要真实公网 IP；
 走 docker 桥接 + 端口映射既麻烦又容易在 `external-ip` 上踩坑。
 
 ### 必须放行的端口（最容易漏）
 
-| 端口        | 协议           | 用途                  |
-| ----------- | -------------- | --------------------- |
-| 3478        | UDP **和** TCP | STUN + TURN 信令/分配 |
-| 49152–65535 | UDP            | 媒体中继              |
+| 端口 | 协议 | 用途 |
+| ---- | ---- | ---- |
+| 3478 | UDP **和** TCP | STUN + TURN 信令/分配 |
+| 49152–65535 | UDP | 媒体中继 |
 
 **只开 3478 不够**——`nc -vz -u host 3478` 通了不代表能用；中继端口段不通的话，
 表现仍是「一直正在接通…最后连接失败」。
@@ -70,7 +74,7 @@ flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist 
 
 > TURN 凭据下发到客户端是 WebRTC 常态，**藏不住也不必藏**：客户端要用就得拿到。
 > 防滥用靠 coturn 的配额（`user-quota` / `max-bps`）与拒绝中继到私有网段
-> （见 `turnserver.example.conf` 的 `denied-peer-ip`），不是靠保密。
+> （见 `turnserver.conf.example` 的 `denied-peer-ip`），不是靠保密。
 
 ---
 
@@ -85,8 +89,8 @@ flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist 
 
 ## 4. 排障
 
-| 现象                         | 多半是                                                |
-| ---------------------------- | ----------------------------------------------------- |
-| 同 WiFi 通、跨网不通         | 没带 TURN（构建时漏 dart-define），或中继端口段没放行 |
-| 一直「正在接通…」30 秒后失败 | 同上；或 coturn 容器没起来（`docker compose ps`）     |
-| 通了但单向无声               | 音频路由问题，不是 TURN                               |
+| 现象 | 多半是 |
+| ---- | ------ |
+| 同 WiFi 通、跨网不通 | 没带 TURN（构建时漏 dart-define），或中继端口段没放行 |
+| 一直「正在接通…」30 秒后失败 | 同上；或 coturn 容器没起来（`docker compose ps`） |
+| 通了但单向无声 | 音频路由问题，不是 TURN |

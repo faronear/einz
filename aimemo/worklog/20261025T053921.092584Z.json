@@ -1,0 +1,22 @@
+{
+  "utc": "20261025T053921.092584Z",
+  "time": "2026-10-25 13:39+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "worklog 规范切换并首条验证",
+      "detail": [
+        "新规范（AGENTS.md 2026-10-25 版）落为本项目第一条 worklog 目录条目：aimemo/worklog/ 扁平目录、每条一个 .json 文件、UTC 微秒文件名",
+        "本条目文件 20261025T053921.092584Z.json 即为格式自验：多行美化 JSON、notes 数组、detail 支持字符串数组",
+        "发现 AGENTS.md 示例代码块字段名（datetime/computer/info）与正文规范（utc/time/host/os/agent/notes）不一致，按正文执行，示例待同步 sysconfig"
+      ]
+    },
+    {
+      "brief": "存量 worklog.md 不迁移",
+      "detail": "旧单文件 aimemo/worklog.md（约 1.6 万行）保留原样只读，此后新条目一律走 worklog/ 目录"
+    }
+  ]
+}

@@ -27,7 +27,7 @@ mkdir -p "$OUT_DIR"
 
 # 时间戳版本 yymmddhhmm：每次打包自动生成、天然唯一（pubspec 的 version 只在
 # 发版时更新，不适合做日常产物标识）；旧产物不删除，可并排对比
-STAMP="$(date +%y%m%d%H%M)"
+STAMP="$(date -u +%y%m%d%H%M)"
 
 # 架构：产物只在对应架构上运行（arm64 ↔ 苹果 M 系/ARM 云主机；x64 ↔ Intel/AMD）
 ARCH="$(uname -m)"

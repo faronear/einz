@@ -151,13 +151,15 @@ class _LockPageState extends State<LockPage> {
   /// 当前值靠右，标签用 onSurfaceVariant 淡色）。
   Widget _buildMenu(AppLocalizations l10n) {
     return PopupMenuButton<String>(
+      // tooltip:'' 压掉 Material 内置默认提示"Show menu/显示菜单"
+      // （老板 2026-10-24：删 tooltip 决策的漏网——不传时框架自动加默认）
+      tooltip: '',
       // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
       // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
       icon: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: const Icon(Icons.menu),
       ),
-      tooltip: l10n.chatPageMenuMore,
       onSelected: (value) {
         // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言崩溃）
         Future<void>.delayed(const Duration(milliseconds: 300), () {
@@ -253,9 +255,7 @@ class _LockPageState extends State<LockPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Tooltip(
-          message: l10n.chatPageMenuAbout,
-          child: InkWell(
+        InkWell(
             mouseCursor: SystemMouseCursors.click,
             borderRadius: BorderRadius.circular(10),
             onTap: _openAboutPage,
@@ -265,7 +265,6 @@ class _LockPageState extends State<LockPage> {
               child: BrandLogo(),
             ),
           ),
-        ),
         const SizedBox(width: 10),
         Flexible(
           child: Text(l10n.lockPageTitle,

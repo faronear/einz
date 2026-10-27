@@ -446,6 +446,35 @@ class ApiClient {
     });
   }
 
+  /// 服务端转写（方案 D'，PROTOCOL.md §6.3）：本地解密后的 16kHz/16bit/mono
+  /// wav 明文上送，服务端 whisper.cpp 内存里过一遍即丢（不落盘），返回文本。
+  /// 不走 _withRetry——转写是 CPU 重操作，失败重试会给服务端翻倍压力，且
+  /// 上层有本地转写表兜底（用户可再点一次）。
+  Future<({String text, int audioMs})> transcribeWav({
+    required Uint8List wav,
+    required String token,
+    String language = 'zh',
+  }) async {
+    final client = _client;
+    try {
+      final req = await _openRequest('POST', '$baseUrl${Api.transcriptions}');
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      req.headers.set('x-audio-language', language);
+      req.headers.contentType = ContentType.binary;
+      req.contentLength = wav.length;
+      req.add(wav);
+      final res = await req.close().timeout(const Duration(minutes: 3));
+      final text = await res.transform(utf8.decoder).join().timeout(const Duration(minutes: 3));
+      if (res.statusCode >= 400) {
+        throw _errorFrom(res.statusCode, text);
+      }
+      final json = jsonDecode(text) as Map<String, dynamic>;
+      return (text: json['text'] as String? ?? '', audioMs: json['audio_ms'] as int? ?? 0);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   /// 下载附件密文 blob（PROTOCOL.md §6.2）。
   Future<Uint8List> getAttachment(String attachmentId, String token) {
     return _withRetry(() async {
@@ -536,7 +565,7 @@ class ApiClient {
     await _post(Api.entranceRetire, {}, token: token);
   }
 
-  /// **自愿退群**（POST /spaces/{id}/leave，2026-10-19，aimemo/groupExitDesign.md）：
+  /// **自愿退群**（POST /spaces/{id}/leave，2026-10-19，aimemo/20261019_groupExitDesign.md）：
   /// 身份级离场——本人身份名下**全部**通道一并注销，成员行转墓碑（名字保留供
   /// 历史消息解析），本机数据由调用方随后清理。
   ///

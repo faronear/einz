@@ -27,6 +27,25 @@ void main() {
       expect(decoded.meta?[kMetaAudioDurationSeconds], 25);
     });
 
+    test('meta 往返：voiceContainerWav（新录音 = wav，旧消息缺键 = m4a）', () {
+      final payload = encodeMessagePayload(
+        '语音',
+        meta: {kMetaAudioDurationSeconds: 12, kMetaVoiceContainerWav: true},
+      );
+      expect(jsonDecode(payload)['meta'], {
+        'audioDurationSeconds': 12,
+        'voiceContainerWav': true,
+      });
+      final decoded = decodeMessagePayload(payload);
+      expect(decoded.meta?[kMetaVoiceContainerWav], true);
+
+      // 旧消息无此键：客户端据此判 m4a（扩展名收敛口径见 app _voiceExtOf）
+      final legacy = decodeMessagePayload(
+        encodeMessagePayload('语音', meta: {kMetaAudioDurationSeconds: 8}),
+      );
+      expect(legacy.meta?[kMetaVoiceContainerWav], isNull);
+    });
+
     test('带引用 + meta 一起也能取回', () {
       final payload = encodeMessagePayload(
         '好的',

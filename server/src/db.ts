@@ -157,7 +157,7 @@ export function openDb(path?: string): Database.Database {
       status       TEXT NOT NULL DEFAULT 'active',
       -- 伴侣预置行未加入 → joined_at 为 NULL，激活时写入
       joined_at    INTEGER,
-      -- 自愿退群墓碑时刻（status='left' 时写；aimemo/groupExitDesign.md）。
+      -- 自愿退群墓碑时刻（status='left' 时写；aimemo/20261019_groupExitDesign.md）。
       -- 墓碑行保留 member_id/display_name/gender（历史消息名字解析依赖），
       -- slot 让位给新成员（见 spaces.leaveSpace）。
       left_at      INTEGER,

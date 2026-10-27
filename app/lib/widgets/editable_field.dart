@@ -108,7 +108,6 @@ class _EditableFieldState extends State<EditableField> {
         suffixIcon: _editing
             ? widget.editableSuffix
             : IconButton(
-                tooltip: widget.editIconTooltip,
                 icon: const Icon(Icons.edit, size: 18),
                 visualDensity: VisualDensity.compact,
                 onPressed: _enterEditing,

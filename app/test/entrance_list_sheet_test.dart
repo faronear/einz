@@ -20,6 +20,7 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/space_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
+import 'package:einz/widgets/sheet_close_button.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'real_async_settle.dart';
 
@@ -471,11 +472,11 @@ void main() {
     // M3 modal bottom sheet 把内容限在 640（窗口再宽也不长），减左右各 16 = 608。
     expect(cardOf(tester, 'iPhone').width, 608,
         reason: '卡片应占满弹层内容区宽度，不再卡在一行 3 张的边长');
-    // 每张卡都铺满内容宽度：右缘应对齐刷新按钮的右缘
-    // （刷新按钮与卡片是同层 Padding 的两个兄弟 → 它的右缘 = 内容区右缘）
-    final contentRight = tester
-        .getRect(find.ancestor(of: sheetRefresh(), matching: find.byType(IconButton)))
-        .right;
+    // 每张卡都铺满内容宽度：右缘应对齐关闭钮的右缘
+    // （关闭钮钉在标题行最右——2026-10-24 起——与卡片是同层 Padding 的兄弟
+    // → 它的右缘 = 内容区右缘；按 SheetCloseButton 整钮定位，图标带 padding
+    // 内缩，不用图标本身）
+    final contentRight = tester.getRect(find.byType(SheetCloseButton)).right;
     expect(cardOf(tester, 'MacBook').right, closeTo(contentRight, 3),
         reason: '一行 3 张应铺满弹层内容宽度（最多差向下取整的那 2px）');
     // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：名字后带编辑胶囊、不蒙版

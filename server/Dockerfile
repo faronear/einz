@@ -35,6 +35,26 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npx tsc
 
+# ── whisper.cpp 编译阶段（方案 D'，2026-10-22）────────────────────────────────
+# 二进制烤进镜像、模型走卷（compose 挂 ../models/whisper.cpp/models——模型放在
+# whisper.cpp 源码树的 models/ 子目录，即其官方下载脚本的落点；与用户数据 ../data
+# 分开）。模型不进镜像：
+# 换模型档位不必重新 build，镜像体积也不被 466MB 模型撑爆。whisper 是 CLI 子进程
+# （server 每次 spawn 用完即退），不是 daemon，无需 entrypoint 改动。
+# GF_WHISPER_CPP_REV 可锁版本（默认 main）；大陆构建机拉 GitHub 慢时可加 --build-arg 代理。
+FROM node:22-slim AS whisper
+ARG GF_WHISPER_CPP_REV=master
+RUN apt-get update && apt-get install -y --no-install-recommends git cmake build-essential ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch ${GF_WHISPER_CPP_REV} https://github.com/ggml-org/whisper.cpp /whisper.cpp
+RUN cmake -S /whisper.cpp -B /whisper.cpp/build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build /whisper.cpp/build -j"$(nproc)" --target whisper-cli
+# 产物收拢：二进制 + 它依赖的 libggml*.so（动态库在同一 build 树里，整个搬走省得猜路径）
+RUN mkdir -p /opt/whisper \
+    && cp /whisper.cpp/build/bin/whisper-cli /opt/whisper/ \
+    && find /whisper.cpp/build -name 'libggml*.so*' -exec cp {} /opt/whisper/ \; \
+    && ldd /opt/whisper/whisper-cli | grep 'not found' && exit 1 || true
+
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
@@ -52,5 +72,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+# whisper.cpp（方案 D'）：二进制 + libggml*.so 进镜像；模型不进镜像（compose 卷挂
+# /opt/whisper/models）。LD_LIBRARY_PATH 让 spawn 出的 whisper-cli 找到同目录动态库。
+COPY --from=whisper /opt/whisper /opt/whisper
+ENV LD_LIBRARY_PATH=/opt/whisper
 EXPOSE 3000
 CMD ["node", "dist/app.js"]

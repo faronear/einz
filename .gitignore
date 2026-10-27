@@ -112,8 +112,11 @@ build/
 *.db-wal
 *.db-shm
 server/data/
-serverDocker/data/
-serverDocker/config/serverConfig.json
+# 模型目录（固定二进制资产，非用户数据；不进 data/ 用户数据目录——老板
+# 2026-10-22 定；whisper.cpp 的源码/构建/模型都在 models/whisper.cpp/ 下，
+# 模型文件在其 models/ 子目录（whisper.cpp 官方下载脚本的落点）；
+# 整个目录 466MB+ 绝不可入库）
+server/models
 
 # --- 密钥与配置（禁止提交） ---
 .env
@@ -143,8 +146,6 @@ turnserver.*.conf
 # 模型由 scripts/fetchVoiceModel.sh 在构建前拉取，随 App 打包分发；
 # 忽略目录**内容**而非目录本身（git 否定规则救不回已排除目录里的文件），
 # 保住 .gitkeep——否则新克隆缺目录，pubspec 声明资产会直接构建失败
-# （"unable to find directory entry"）。与 feat/voice-transcript 逐字一致，
-# 两分支合并时同内容相加不冲突。本分支（feat/linux）同样要防：
-# 工作区里这 239MB 是 voice 分支带过来的，一条 git add -A 就会进历史。
+# （"unable to find directory entry"）。
 app/assets/voice_model/*
 !app/assets/voice_model/.gitkeep

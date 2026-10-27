@@ -1,0 +1,54 @@
+{
+  "utc": "20261025T084613.721679Z",
+  "time": "2026-10-25 16:46+08:00",
+  "host": "doomship",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "聊天输入台：麦克风/键盘两按钮合并为盒内一枚切换图标（老板 2026-10-25 要求）",
+      "detail": [
+        "图标用「语音转写」同款自制图标 widgets/transcribe_icon.dart（麦克风+文档），放进输入盒内部、正式输入区左侧（44x44 热区）；盒外只剩「+」和发送键",
+        "文字区与录音条同盒：白底盒（文字态）↔ 灰底盒（提示/预览态）↔ 绿底盒（录音中），图标原位始终可点"
+      ]
+    },
+    {
+      "brief": "交互模型（经老板当日反馈修正后定稿）",
+      "detail": [
+        "保留四态 text/hint/recording/preview 与「长按录音条开录、松手停」手势——第一版曾把提示态废除、改成进语音态即自动开录，老板反馈「改得太多了」后回退",
+        "点合并图标：文字态（无保留录音）→ 提示态（不自动开录）；提示态 → 文字态；录音中 → 停录并保留内容回键盘；预览态 → 回键盘且录音保留",
+        "文字态（有保留录音）点图标 → 直接回预览态，可试听/发送，不必重录",
+        "X 删除录音 → 回提示态（等待长按录音条或单点图标回文字）",
+        "60s 上限自动停 → 预览态；发送键仅文字态发文字、预览态发录音",
+        "合并图标不再挂长按（老板明确不再需要长按麦克风图标激发录音）；长按只挂在录音条上"
+      ]
+    },
+    {
+      "brief": "实现要点（app/lib/chat_page.dart）",
+      "detail": [
+        "_onVoiceEntryTap 重写（原文字态/提示态/预览态/录音中四分支 + 保留录音特例）；_voiceEntryIcon 删除，新增 _inputModeToggleColor（录音中=绿；文字态有保留录音=primary 提示；其余=onSurfaceVariant，与邻居 IconButton 默认色一致，查过 Flutter 源码）",
+        "_stopVoice 加 backToTextInput 参数：true=停录后回文字态但保留 _recordingPath/_voiceSamples（再点图标可直接回预览态）；_cancelVoice 恒回提示态",
+        "_buildVoiceBar 改纯内容 _buildVoiceBarContent（提示态/录音中/预览态三分支）；圆角盒/底色/描边外壳上移到输入盒 Container：_inputBoxDecoration 按模式给外观（文字态描边取自主题 inputDecorationTheme，聚焦天蓝/未聚焦浅粉，ListenableBuilder 监听 _inputFocusNode；提示/预览=灰底、录音中=绿底，半径 20 同旧录音条）",
+        "输入盒结构：Expanded>ListenableBuilder>Container(decoration)>Row[44x44 合并图标][Stack(Visibility(TextField 无边框无底色)/Positioned.fill(Clickable 长按+录音条内容))]；TextField 的 filled/border 移除（InputBorder.none×3），contentPadding 左右 12→8",
+        "首次录音授权弹窗等待期间再点图标=作废本次启动（_voiceStarting 路径，等价于旧的松手）",
+        "提示态文案 chatPageLongPressToRecord 保留（第一版曾删，随交互回退一并恢复）"
+      ]
+    },
+    {
+      "brief": "l10n：gen-l10n 顺带同步 arb 既有未提交文案改动",
+      "detail": [
+        "工作区 arb 里原有一批未提交的转写文案改写（voiceTranscriptAuthLocalDesc/Preparing 等，en+zh，非本次所改），flutter gen-l10n 按「arb 为源」一并同步进生成文件；这些改动保留原样，待老板验收时一并过目"
+      ]
+    },
+    {
+      "brief": "验证与遗留",
+      "detail": [
+        "flutter analyze 无 issue；chat_page_menu(47)+emoji_insert(1)+ui_style_switch(5)+chat_paste+quote×2 共 67 个 widget 测试全过；全量 flutter test 后台在跑",
+        "测试无直接依赖语音入口图标者（emoji_insert 点的 keyboard_alt_outlined 是表情面板自带键盘键，不受影响）",
+        "golden 默认跳过且图不入库，未重新出图",
+        "未 git commit（老板明确要求先验收）"
+      ]
+    }
+  ]
+}
