@@ -31,5 +31,9 @@
     "@types/ws": "^8.5.12",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "optionalDependencies": {
+    "sherpa-onnx-darwin-x64": "^2.0.0",
+    "sherpa-onnx-linux-x64": "^2.0.0"
   }
 }
