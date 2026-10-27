@@ -1,0 +1,30 @@
+{
+  "utc": "20261027T155424.000000Z",
+  "time": "2026-10-27 23:54+08:00",
+  "host": "mac15",
+  "os": "MacOS",
+  "user": "lukas",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "cn1 运维约定 + sensevoice 切换细节（承接 wl…135512）",
+      "detail": [
+        "运维规范与老板确认：手动调试/更新一律 adot 身份（严禁 root 跑 npm start——会留 root 属主 data 文件致 systemd 服务 SQLITE_READONLY）；root 只留 apt/systemctl。全 root 或混用方案都被否，维持 unit User=adot。",
+        "ASR 切 sensevoice：/health 原显示 whisper，根因 .env 里 EINZ_SENSEVOICE_MODEL=models/sensevoice 是改名前旧路径（models → models.nogit），路径不匹配被判未配置而回落 whisper；改 models.nogit/sensevoice 后 asr_engine=sensevoice。whisper 配置留作后备。",
+        "docker compose build 在 cn1（N3150）跑近 1h 未完，确认裸 Node 路线跑通后 kill -9 终止。公网验证 https://einz.yuanjinx.com/health 200（168ms）。",
+        "server/docker/.env 属主仍是 root（老板 root 部署所建），改动需 sudo；data/ 已 chown 归 adot。"
+      ]
+    },
+    {
+      "brief": "iOS 上架：ASC 年龄分级问卷卡点定位与 API 补答",
+      "detail": [
+        "提审报 \"You must respond to the required age ratings questions\"。根因：Apple 增量往 ageRatingDeclaration 追加新必答题（本次是 socialMedia / ageAssurance），追加后全 app 分级回「待回应」，拦新提交——即使几天前刚填过且已算出 4+（appStoreAgeRating=FOUR_PLUS 一直还在）。",
+        "老板提供了凭据文件 _simsim.nogit.nosf/apikey-apple.simsim.js（appStoreConnectApi.keyid=333XP37M8H + issuerId；p8 在 ~/private_keys/AuthKey_333XP37M8H.p8）。",
+        "JWT 大坑：必须带 aud='appstoreconnect-v1'，否则一律 401 NOT_AUTHORIZED（网上多数示例代码不写 aud）。",
+        "问卷主体早答过（UGC/messagingAndChat=Yes、暴力色情赌博全 NONE），本次只补 socialMedia=false（邀请制封闭私聊/群聊，无公开发现/关注/信息流，非社交媒体）。ageAssurance 事后确认老板已答 false。",
+        "工具留档：scripts/ascAgeRating.mjs（show 查问卷并标 null 必答项 / patch 字段=值 补答），凭据约定与 aud 坑已写进注释；scripts/node_modules 装 jose（被全局 ignore）。",
+        "验证：node scripts/ascAgeRating.mjs 显示 30 字段仅剩 4 个条件性 null（韩分级号/儿童分区等，einz 用不上）；版本 1.0 已 WAITING_FOR_REVIEW，分级 FOUR_PLUS。老板已确认提审通过。"
+      ]
+    }
+  ]
+}
