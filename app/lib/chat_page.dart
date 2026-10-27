@@ -6925,13 +6925,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _messageHasActions(HistoryMessage m) => !m.deleted;
 
   /// 是否可转写（长按菜单「转写」卡的显示条件；与自动入队 filter 同口径）：
-  /// 语音消息（任意容器）+ wav 音频文件。mp3/m4a 等音乐文件不显示（ sherpa
-  /// 与服务端都只吃 PCM16 wav，入了队也只会产出 failed 行）。
+  /// **仅语音消息**（任意容器）。音频文件消息不给（老板 2026-10-26：音频很
+  /// 可能不是语音、也可能超 60s——不自动转写、无提示、菜单无转写项）；此前
+  /// wav 音频文件也给转写，sherpa 与服务端虽只吃 PCM16 wav，但语义上文件类
+  /// 消息不该进语音转写。
   bool _voiceTranscriptEligible(HistoryMessage m) =>
-      m.attachment != null &&
-      (m.env.type == 'voice' ||
-          (m.env.type == 'audio' &&
-              _extOf(m.plaintext).toLowerCase() == 'wav'));
+      m.attachment != null && m.env.type == 'voice';
 
   /// 「撤回」可见条件（**仅未墓碑消息**——墓碑已不给菜单，见
   /// [_messageHasActions]）：自己消息 + 以下其一——
@@ -9107,12 +9106,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         .where((m) =>
             !m.deleted &&
             m.attachment != null &&
-            // 语音消息全部入队（旧 m4a 由 UI 明确提示"不支持转写"）；音频文件
-            // 只在容器本身是 wav 时入队——sherpa readWave 只吃 PCM wav，
-            // mp3/m4a 音乐文件入队只会产出 failed 行（纯噪音）
-            (m.env.type == 'voice' ||
-                (m.env.type == 'audio' &&
-                    _extOf(m.plaintext).toLowerCase() == 'wav')))
+            // 仅语音消息入队（老板 2026-10-26：音频文件很可能不是语音/超 60s，
+            // 不做转写——自动、菜单、提示全不给，见 _voiceTranscriptEligible）。
+            // 旧 m4a 语音由 UI 明确提示"不支持转写"；音频文件一律不入队。
+            m.env.type == 'voice')
         .toList();
     if (voices.isEmpty) return;
     if (!_voiceTranscriptAuto) return;
