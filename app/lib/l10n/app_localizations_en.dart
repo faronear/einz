@@ -945,7 +945,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageActionBurn => 'Burn after reading';
+  String get chatPageActionBurn => 'Burn after';
 
   @override
   String get chatPageDeleteConfirmTitle => 'Delete message?';
@@ -1131,14 +1131,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAuthLocalDesc =>
-      'Runs entirely on this device — your audio never leaves it.';
+      'Runs entirely on this device — audio never leaves it';
 
   @override
   String get voiceTranscriptAuthServer => 'Remote';
 
   @override
   String get voiceTranscriptAuthServerDesc =>
-      'Voice messages are sent to our cloud server, and deleted immediately after transcribing.';
+      'Voice messages are sent to our cloud server, and deleted immediately after transcribing';
 
   @override
   String voiceTranscriptServerFailed(String error) {
@@ -1169,11 +1169,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceTranscriptAutoModeDesc =>
-      'Voice messages are transcribed automatically.';
+      'Voice messages are transcribed automatically when they arrive';
 
   @override
   String get voiceTranscriptManualModeDesc =>
-      'Select voice messages of yourself to transcribe.';
+      'You manually choose which voice messages to transcribe';
 
   @override
   String get voiceTranscriptMenuTranscribe => 'Transcribe';

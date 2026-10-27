@@ -1661,7 +1661,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageActionBurn.
   ///
   /// In en, this message translates to:
-  /// **'Burn after reading'**
+  /// **'Burn after'**
   String get chatPageActionBurn;
 
   /// No description provided for @chatPageDeleteConfirmTitle.
@@ -1949,7 +1949,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthLocalDesc.
   ///
   /// In en, this message translates to:
-  /// **'Runs entirely on this device — your audio never leaves it.'**
+  /// **'Runs entirely on this device — audio never leaves it'**
   String get voiceTranscriptAuthLocalDesc;
 
   /// No description provided for @voiceTranscriptAuthServer.
@@ -1961,7 +1961,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAuthServerDesc.
   ///
   /// In en, this message translates to:
-  /// **'Voice messages are sent to our cloud server, and deleted immediately after transcribing.'**
+  /// **'Voice messages are sent to our cloud server, and deleted immediately after transcribing'**
   String get voiceTranscriptAuthServerDesc;
 
   /// No description provided for @voiceTranscriptServerFailed.
@@ -2015,13 +2015,13 @@ abstract class AppLocalizations {
   /// No description provided for @voiceTranscriptAutoModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Voice messages are transcribed automatically.'**
+  /// **'Voice messages are transcribed automatically when they arrive'**
   String get voiceTranscriptAutoModeDesc;
 
   /// No description provided for @voiceTranscriptManualModeDesc.
   ///
   /// In en, this message translates to:
-  /// **'Select voice messages of yourself to transcribe.'**
+  /// **'You manually choose which voice messages to transcribe'**
   String get voiceTranscriptManualModeDesc;
 
   /// No description provided for @voiceTranscriptMenuTranscribe.

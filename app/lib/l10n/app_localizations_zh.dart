@@ -887,7 +887,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageActionBurn => '阅后即焚';
+  String get chatPageActionBurn => '延时即焚';
 
   @override
   String get chatPageDeleteConfirmTitle => '删除消息？';
@@ -1069,13 +1069,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAuthLocal => '本机转写';
 
   @override
-  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写，数据不离开本机。';
+  String get voiceTranscriptAuthLocalDesc => '在本机上直接转写，数据不离开本机';
 
   @override
   String get voiceTranscriptAuthServer => '远程转写';
 
   @override
-  String get voiceTranscriptAuthServerDesc => '把原始录音发送给远程服务器，完成转写后将立即删除。';
+  String get voiceTranscriptAuthServerDesc => '把原始录音发送给远程服务器，完成转写后将立即删除';
 
   @override
   String voiceTranscriptServerFailed(String error) {
@@ -1104,10 +1104,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptAutoOff => '手动';
 
   @override
-  String get voiceTranscriptAutoModeDesc => '每次收到语音消息就自动转写。';
+  String get voiceTranscriptAutoModeDesc => '每次收到语音消息就自动转写';
 
   @override
-  String get voiceTranscriptManualModeDesc => '手动选择一个语音消息进行转写。';
+  String get voiceTranscriptManualModeDesc => '你自己手动选择语音消息进行转写';
 
   @override
   String get voiceTranscriptMenuTranscribe => '转写';
