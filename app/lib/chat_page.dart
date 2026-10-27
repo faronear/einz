@@ -8071,38 +8071,57 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final preview = _inputMode == _InputMode.preview;
     // 录音上限 60s：左侧直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
     final elapsed = _recordSeconds.toString().padLeft(2, '0');
+    // 胶囊几何（预览态播放胶囊 / 提示态白胶囊同款，老板 2026-10-26）：高度=
+    // 盒高-2px（上下各留 1px，48 真贴边会把盒的 1px 描边盖断，2x 渲染对比过）、
+    // 半径=半高（两端标准半圆）。
+    final capsuleHeight = _kInputModeToggleSize - 2;
+    final capsuleRadius = BorderRadius.circular(capsuleHeight / 2);
     if (recording) {
-      return Row(
-        children: [
-          Text(elapsed,
-              style: const TextStyle(
-                  color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 10),
-          Expanded(
-              child: _WaveformBars(
-                  samples: _voiceLastSamples(40), color: Colors.green)),
-          const SizedBox(width: 4),
-          // 停止钮（老板 2026-10-26 免提模式）：点按开录的用户不必一直
-          // 按着——点此停止=长按模式里的松手（停录进预览态、录音保留）。
-          // 位置与预览态关闭钮同位（盒内最右）；绿色 stop_circle 与播放/停止
-          // 图标同族（区别于预览态灰色删除钮 X）。长按开录的用户同样可用
-          // （不必死等松手时机）；60s 上限到点也会自动停进预览态。
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 22,
-            splashRadius: 17, // 纯圆内切 34 按钮，不溢出成椭圆
-            icon: const Icon(Icons.stop_circle, color: Colors.green),
-            onPressed: () => unawaited(_stopVoice()),
+      // 白胶囊（老板 2026-10-26）：与提示态/预览态同款——46 高、半圆端，
+      // 铺满整个可点区（左贴合并图标右缘、右贴盒右沿），点哪停哪的反馈就有
+      // 实体承载。绿盒只作为胶囊外的一圈底色。
+      return SizedBox(
+        height: capsuleHeight,
+        child: DecoratedBox(
+          decoration:
+              BoxDecoration(color: Colors.white, borderRadius: capsuleRadius),
+          // 内距加在胶囊内部（不是盒/命中区）：文字与停止图标不贴半圆边
+          child: Padding(
+            padding: const EdgeInsets.only(left: 6, right: 14),
+            child: Row(
+              children: [
+                // 停止**提示**（老板 2026-10-26）：录音态整条都可点停（见录音条
+                // 那个 Clickable 的 onTap），这里只放个绿色 stop_circle 当视觉
+                // 提示——不再单独挂 onPressed：内层若挂 InkWell，点它时内层赢
+                // 手势竞技场，外层录音条的按压变色被圆形水波纹顶掉（与预览态
+                // 播放图标的处理一致）。
+                // **放左边、读秒放右边**（老板 2026-10-26 第二轮）：原先停止钮
+                // 在最右，正好和预览态的关闭钮（X）同位置——连点两下停录，第二
+                // 下就落到刚出现的 X 上，把刚录好的音频删了。换位后右端是不可
+                // 点的秒数，落点最多是预览胶囊的播放区（无害）。绿色与播放/停止
+                // 图标同族（区别于预览态灰色删除钮 X）。60s 上限到点也会自动停。
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(Icons.stop_circle, size: 22, color: Colors.green),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                    child: _WaveformBars(
+                        samples: _voiceLastSamples(40),
+                        color: Colors.green)),
+                const SizedBox(width: 10),
+                Text(elapsed,
+                    style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
           ),
-        ],
+        ),
       );
     }
     if (preview) {
-      // 胶囊高度 = 盒高 - 2px、半径 = 半高（老板 2026-10-26：胶囊上下贴边）。
-      // 48 真贴边会把盒子的 1px 描边盖断（白色填充压在描边线上），留 1px
-      // 后视觉上同样贴边、盒轮廓完整（2x 渲染对比过 48 vs 46）。
-      final capsuleHeight = _kInputModeToggleSize - 2;
-      final capsuleRadius = BorderRadius.circular(capsuleHeight / 2);
       return Row(
         children: [
           // 播放胶囊（老板 2026-10-25）：播放键+波形进同一个白底胶囊——点胶囊
@@ -8228,19 +8247,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             icon: const Icon(Icons.close, color: Colors.grey),
             onPressed: _cancelVoice,
           ),
+          // 右侧 12 内距留在预览态（关闭钮不贴盒右沿）；提示/录音态的白胶囊
+          // 则铺满整个命中区——各态自己的内距放在内容里，不在外层 Padding，
+          // 这样白胶囊与 Clickable 的可点/悬浮变色区域完全重合
+          // （老板 2026-10-26）。
+          const SizedBox(width: 12),
         ],
       );
     }
-    // 提示态：文字说明版录音条（无波形），长按开始录音。麦克风小图标与
-    // 文案用语音态标准青绿（老板 2026-10-25：与合并图标、录音态同色系）
+    // 提示态：文字说明版录音条（无波形），点按/长按开始录音。麦克风小图标与
+    // 文案用语音态标准青绿（老板 2026-10-25：与合并图标、录音态同色系）。
+    // 白底胶囊（老板 2026-10-26）：与预览态播放胶囊同款——46 高、半圆端，
+    // 从灰盒底里浮出；把「可点即录」的区域给出实体感（此前是裸文字，可点
+    // 范围全靠猜）。文字仍居中；胶囊**铺满整个可点区**（左起合并图标右缘、
+    // 右到盒右沿）——与 Clickable 的悬浮/按压变色区域完全重合，不存在
+    // 「胶囊外还有 12px 能点/能变色」的弯月缝（老板 2026-10-26 验收）。
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.mic, size: 16, color: Colors.green),
-        const SizedBox(width: 6),
-        Text(
-          AppLocalizations.of(context)!.chatPageLongPressToRecord,
-          style: const TextStyle(color: Colors.green, fontSize: 13),
+        Expanded(
+          child: SizedBox(
+            height: capsuleHeight,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: capsuleRadius,
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.mic, size: 16, color: Colors.green),
+                    const SizedBox(width: 6),
+                    Text(
+                      AppLocalizations.of(context)!.chatPageLongPressToRecord,
+                      style:
+                          const TextStyle(color: Colors.green, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -11224,86 +11271,79 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   SizedBox(
                                   width: _kInputModeToggleSize,
                                   height: _kInputModeToggleSize,
-                                  // 语音态下图标也并入长按区（老板 2026-10-25：
-                                  // 整盒读作一个四角弧形按钮——长按从麦键图标到
-                                  // 录音条都算）。文字态长按=直接进语音态开录
-                                  // （老板 2026-10-26）：不必先点切模式、再长按
-                                  // 录音条两步；点按仍是切模式。_startVoice 自带
-                                  // 收键盘+切 recording，无需先切提示态。
-                                  child: Clickable(
-                                    behavior: HitTestBehavior.opaque,
-                                    cursor: _inputMode == _InputMode.hint
-                                        ? SystemMouseCursors.click
-                                        : null,
-                                    onLongPressStart: (_) =>
-                                        unawaited(_startVoice()),
-                                    onLongPressEnd: (_) =>
-                                        unawaited(_stopVoice()),
-                                    child: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
-                                      // 48 热区（即盒左端半圆），不会溢出盒角被
-                                      // ClipRRect 裁成椭圆（老板 2026-10-25）
-                                      splashRadius:
-                                          _kInputModeToggleSize / 2,
-                                      onPressed: _onVoiceEntryTap,
-                                      // 麦+键盘并排（老板 2026-10-25 定稿，
-                                      // 取代自绘双元素图标）：两枚 Flutter 默认
-                                      // 图标（mic_none / keyboard_alt_outlined，
-                                      // 即合并前那两个入口图标）排在原有 48 圆形
-                                      // 热区内。**右侧=当前有效输入模式**（文字态
-                                      // 键盘在右紧挨文字区、语音态麦克风在右）且
-                                      // 更大，压住左侧元素一小块表示主力；左侧=
-                                      // 点按切过去的目标（老板 2026-10-25：两图标
-                                      // 放大、靠拢成一个整体，右大左小有主次）。
-                                      icon: SizedBox(
-                                        width: 34,
-                                        height: 24,
-                                        // 语音态整体右移 3px（老板 2026-10-26）：
-                                        // mic_none 字形左右侧留白大，同样的几何在
-                                        // 语音态（键盘在左+麦克风在右）会显得偏左、
-                                        // 靠近外面+号；右移后两种模式的线条都落在
-                                        // 圆钮同一右偏区域（文字态键盘贴近文字输入
-                                        // 的那份和谐感）。**只平移、不改线条区域
-                                        // 大小**；溢出 34 盒的 3px 落在 48 圆钮的
-                                        // 留白里，无裁切无视觉影响。
-                                        child: Transform.translate(
-                                          offset: Offset(
-                                              _inputMode == _InputMode.text
-                                                  ? 0
-                                                  : 3,
-                                              0),
-                                          child: Stack(
-                                            alignment:
-                                                Alignment.centerLeft,
-                                            children: [
-                                              // 左：切换目标（小）
-                                              Icon(
+                                  // **只点按切模式，不再挂长按**（老板
+                                  // 2026-10-26 决定 C，撤回 c87cb1cd 的
+                                  // 「文字态长按组合图标直接开录」）：文字态
+                                  // 起手要先收键盘再启录音器，松手常常早于真
+                                  // 正开录，_startVoice 的 _voiceStarting 竞速
+                                  // 会静默丢弃这次启动（无录音条、无提示），
+                                  // 体感像「长按没反应」。长按开录统一交给
+                                  // 右侧录音条（提示/录音态整条都可点可长按），
+                                  // 图标这里只负责切换输入模式。
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    // 水波纹/悬浮高亮半径=热区半径：圆形恰好内切
+                                    // 48 热区（即盒左端半圆），不会溢出盒角被
+                                    // ClipRRect 裁成椭圆（老板 2026-10-25）
+                                    splashRadius:
+                                        _kInputModeToggleSize / 2,
+                                    onPressed: _onVoiceEntryTap,
+                                    // 麦+键盘并排（老板 2026-10-25 定稿，
+                                    // 取代自绘双元素图标）：两枚 Flutter 默认
+                                    // 图标（mic_none / keyboard_alt_outlined，
+                                    // 即合并前那两个入口图标）排在原有 48 圆形
+                                    // 热区内。**右侧=当前有效输入模式**（文字态
+                                    // 键盘在右紧挨文字区、语音态麦克风在右）且
+                                    // 更大，压住左侧元素一小块表示主力；左侧=
+                                    // 点按切过去的目标（老板 2026-10-25：两图标
+                                    // 放大、靠拢成一个整体，右大左小有主次）。
+                                    icon: SizedBox(
+                                      width: 34,
+                                      height: 24,
+                                      // 语音态整体右移 3px（老板 2026-10-26）：
+                                      // mic_none 字形左右侧留白大，同样的几何在
+                                      // 语音态（键盘在左+麦克风在右）会显得偏左、
+                                      // 靠近外面+号；右移后两种模式的线条都落在
+                                      // 圆钮同一右偏区域（文字态键盘贴近文字输入
+                                      // 的那份和谐感）。**只平移、不改线条区域
+                                      // 大小**；溢出 34 盒的 3px 落在 48 圆钮的
+                                      // 留白里，无裁切无视觉影响。
+                                      child: Transform.translate(
+                                        offset: Offset(
+                                            _inputMode == _InputMode.text
+                                                ? 0
+                                                : 3,
+                                            0),
+                                        child: Stack(
+                                          alignment:
+                                              Alignment.centerLeft,
+                                          children: [
+                                            // 左：切换目标（小）
+                                            Icon(
+                                              _inputMode ==
+                                                      _InputMode.text
+                                                  ? Icons.mic_none
+                                                  : Icons
+                                                      .keyboard_alt_outlined,
+                                              size: 18,
+                                              color:
+                                                  _inputModeToggleColor(),
+                                            ),
+                                            // 右：当前主力（大，压住左元素一小块）
+                                            Positioned(
+                                              left: 12,
+                                              child: Icon(
                                                 _inputMode ==
                                                         _InputMode.text
-                                                    ? Icons.mic_none
-                                                    : Icons
-                                                        .keyboard_alt_outlined,
-                                                size: 18,
+                                                    ? Icons
+                                                        .keyboard_alt_outlined
+                                                    : Icons.mic_none,
+                                                size: 21,
                                                 color:
                                                     _inputModeToggleColor(),
                                               ),
-                                              // 右：当前主力（大，压住左元素一小块）
-                                              Positioned(
-                                                left: 12,
-                                                child: Icon(
-                                                  _inputMode ==
-                                                          _InputMode.text
-                                                      ? Icons
-                                                          .keyboard_alt_outlined
-                                                      : Icons.mic_none,
-                                                  size: 21,
-                                                  color:
-                                                      _inputModeToggleColor(),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -11427,48 +11467,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               // 整盒热区（老板 2026-10-25）
                                               behavior:
                                                   HitTestBehavior.opaque,
-                                              // 提示态整条都是长按目标：桌面悬浮
-                                              // 出手型（老板 2026-10-25）；录音/预览
-                                              // 态保持默认箭头（预览态波形另有手型）
+                                              // 可点/长按的区域都出手型（老板
+                                              // 2026-10-25/26）：提示态=开录、录音态
+                                              // =停录；预览态此层不交互（波形胶囊
+                                              // 自己管播放），保持默认箭头
                                               cursor: _inputMode ==
-                                                      _InputMode.hint
-                                                  ? SystemMouseCursors.click
-                                                  : null,
+                                                      _InputMode.preview
+                                                  ? null
+                                                  : SystemMouseCursors.click,
                                               // 遮罩形状=两端半圆的药丸（老板
                                               // 2026-10-26）：此前遮罩是矩形，只有
                                               // 右端被盒角裁成半圆、左端直角切口，
                                               // 方头看着突兀。半径=半盒高→左右两端
-                                              // 都是标准半圆。只在提示态可见
-                                              // （录音/预览态本层无 onTap→无遮罩）。
+                                              // 都是标准半圆。提示态（开录）与录音
+                                              // 态（停录）都可见；预览态本层无
+                                              // onTap，非交互态不出遮罩。
                                               borderRadius: BorderRadius.circular(
                                                   _kInputModeToggleSize / 2),
-                                              // 提示态**点按**也开始录音（老板
-                                              // 2026-10-26 免提模式）：长按最长要按
-                                              // 60 秒（拇指疲劳/桌面按住鼠标），点按
-                                              // 开录后右侧停止钮收尾（见
-                                              // _buildVoiceBarContent 录音态），停止
-                                              // =长按模式里的松手。仅提示态挂——
-                                              // 录音/预览态点按无意义（_startVoice
-                                              // 有守卫），挂了只会让光标变手型骗人。
-                                              // 与长按共存不冲突：快点快松=点按开录，
-                                              // 按住不放=长按开录松手即停。
-                                              onTap: _inputMode ==
-                                                      _InputMode.hint
+                                              // 悬浮/按压浓度用 app 标准浅色面档
+                                              // 10%/14%（老板 2026-10-26）：白胶囊上
+                                              // 5% 只有 #F2F2F2，与灰盒 #F5F5F5
+                                              // （提示态）/ 淡绿盒（录音态）几乎同色，
+                                              // 悬浮时分不清胶囊有没有被按下。与预览
+                                              // 胶囊（内层 Clickable）同档——三种胶囊
+                                              // 的默认/悬浮/按压观感一致。
+                                              hoverAlpha: 0.10,
+                                              pressAlpha: 0.14,
+                                              // 点按（老板 2026-10-26 免提模式）：
+                                              // 提示态=开始录音（长按最长要按 60 秒，
+                                              // 拇指疲劳/桌面按住鼠标）；录音态=
+                                              // 停止录音（**整条都是停止区**，右侧
+                                              // 那个 stop_circle 只是提示图标）——
+                                              // 停=长按模式里的松手。与长按共存不
+                                              // 冲突：快点快松=点按，按住不放=长按
+                                              // 开录、松手即停。预览态不挂（波形胶囊
+                                              // 自己管播放，外层挂了会与内层抢手势）。
+                                              onTap: _inputMode == _InputMode.hint
                                                   ? () => unawaited(
                                                       _startVoice())
-                                                  : null,
+                                                  : (_inputMode ==
+                                                          _InputMode
+                                                              .recording
+                                                      ? () => unawaited(
+                                                          _stopVoice())
+                                                      : null),
                                               onLongPressStart: (_) =>
                                                   _startVoice(),
                                               onLongPressEnd: (_) =>
                                                   _stopVoice(),
-                                              // 内容右缩 12（命中区本身铺满到盒右
-                                              // 沿——内距加在内容上而不是盒上，见
-                                              // 外层 Container 注释）
-                                              child: Padding(
-                                                padding: const EdgeInsets.only(
-                                                    right: 12),
-                                                child: _buildVoiceBarContent(),
-                                              ),
+                                              // 内容铺满命中区（内距由各态内容自己
+                                              // 在胶囊内部处理——提示/录音态的白色
+                                              // 胶囊因此与可点/悬浮区完全重合，见
+                                              // _buildVoiceBarContent）
+                                              child: _buildVoiceBarContent(),
                                             ),
                                           ),
                                         ],
@@ -13078,7 +13129,9 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // 有文字才出 Apply：转写中/失败/空结果一律不出现 Apply 按钮
+    // Apply 恒在、仅「转写成功且有文字」时可点（老板 2026-10-26）：
+    // 此前是成功后才插入 Apply，会把 Cancel 向右挤——用户本想点 Cancel
+    // 结果手指落到了新出现的 Apply 上。现在只切可点状态，位置/尺寸不变。
     final canApply = !_busy && _error == null && _text.isNotEmpty;
     final theme = Theme.of(context);
     return SafeArea(
@@ -13164,26 +13217,35 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            // 按钮行：Cancel 恒在；Apply 仅转写成功时出现（右对齐）
+            // 按钮行（老板 2026-10-26）：Cancel / Apply **一直并排常驻**、
+            // **等宽等尺寸**（参照 My email alerts 这类系统弹窗的 Cancel/Submit）。
+            // - 此前 Apply 是转写成功后才插入：会凭空出现并把 Cancel 向右挤，
+            //   用户本想点 Cancel 结果落到新出现的 Apply 上（误触）。现在
+            //   Apply 只是置灰不可点（转写中/失败/空结果），位置不变。
+            // - 尺寸统一走 app 既定口径：CancelButton（灰底 96x50、17 号粗体）
+            //   与主题里的 FilledButton 同块头，两枚再各自 Expanded 等分宽度
+            //   ——不会一大一小（旧版是默认 TextButton 40 高 vs FilledButton 50）。
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(l10n.cancel),
+                  Expanded(
+                    child: CancelButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   ),
-                  if (canApply) ...[
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () {
-                        widget.onApply(_text);
-                        Navigator.of(context).pop();
-                      },
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: canApply
+                          ? () {
+                              widget.onApply(_text);
+                              Navigator.of(context).pop();
+                            }
+                          : null,
                       child: Text(l10n.apply),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
