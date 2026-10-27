@@ -1,0 +1,22 @@
+{
+  "utc": "20261027T135512.000000Z",
+  "time": "2026-10-27 21:55+08:00",
+  "host": "mac15",
+  "os": "MacOS",
+  "user": "lukas",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "cn1 生产 server 切换为裸 Node systemd 服务",
+      "detail": [
+        "新增 server/einz-server.service（User=adot，ExecStart=/home/adot/.nvm/versions/node/v22.23.2/bin/npm start，WorkingDirectory=/faronear/einz/server，Restart=on-failure，日志进 journald）。",
+        "新增 scripts/updateServerRemoteBare.sh + package.json 的 server-update-remote-bare：git pull → npm ci → npm run build → systemctl restart → /health 探活；ssh.sh 在 ~/sysconfig/ 不在仓库，脚本用绝对路径调用。",
+        "部署踩坑：老板用 root 部署导致 server/data/ 及 sqlite db/wal 全是 root 属主，systemd 以 adot 跑时撞 SQLITE_READONLY 循环重启；chown -R adot:adot data/ 后恢复。教训：严禁 root 跑 server / npm start，统一 adot。",
+        "ASR 切 sensevoice：/health 原显示 whisper，根因是 .env 里 EINZ_SENSEVOICE_MODEL=models/sensevoice 指向旧路径（models 已全局改名 models.nogit），路径不匹配被判未配置而回落 whisper；改为 models.nogit/sensevoice 后 /health 显示 asr_engine=sensevoice。",
+        "docker compose build 在 cn1（N3150 无 AVX）跑了近 1 小时未完，老板确认后 kill -9 终止，改用裸 Node 路线。",
+        "验证：本机 curl https://einz.yuanjinx.com/health → 200，Caddy → systemd 服务链路通；公网域名 einz.yuanjinx.com（only.tic.cc 已废弃）。",
+        "遗留：server/docker/.env 属主 root（改动需 sudo）；whisper 配置留作后备未删；待老板 app 实测验收后 commit 代码改动。"
+      ]
+    }
+  ]
+}
