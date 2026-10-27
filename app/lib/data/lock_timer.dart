@@ -4,7 +4,7 @@
 /// 共用同一阈值。默认 [kLockSeconds]；用户可在「设置锁屏码」弹窗的时长轴上
 /// 自选（对数刻度 30 秒~30 分钟，持久化在 AppLockService 的 app_state，见
 /// loadLockSeconds / saveLockSeconds），chat_page 加载后回填这两处。
-const int kLockSeconds = 30;
+const int kLockSeconds = 60;
 
 /// 可调锁屏时长范围（秒）：10 秒 ~ 30 分钟（老板 2026-10-24 定，由 20 秒~20 分钟
 /// 改来）。弹窗里的时长轴仿阅后即焚（burn_duration_sheet）：对数刻度、

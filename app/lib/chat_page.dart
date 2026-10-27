@@ -1023,7 +1023,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadTombstoneDisplay(); // 墓碑消息显示模式（更多设置里可改）
     _loadVoiceTranscriptSettings(); // 语音转写设置（方式+自动，方案 D'，更多设置里可改）
     _refreshPinStatus();
-    _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 30s；两个计时器共用）
+    _loadLockSeconds(); // 恢复用户自选的锁屏时长（默认 1 分钟；两个计时器共用）
     // 前台无操作锁屏：一次性 Timer，每次交互重排到"现在+阈值"（见 _armIdleLock）。
     // 交互信号由 build 根的 Listener（点/滑）+ 滚动通知（滚轮）+ 输入框监听（打字）
     // 喂给 _armIdleLock；解锁/关弹层 pop 回聊天时由 push Future（_pushLockOverlay）
@@ -3075,7 +3075,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _armIdleLock();
   }
 
-  /// 恢复用户自选的锁屏时长（「设置锁屏码」弹窗的滚动轴写入；默认 30s）。
+  /// 恢复用户自选的锁屏时长（「设置锁屏码」弹窗的滚动轴写入；默认 1 分钟）。
   /// 前台闲置锁与后台锁共用同一阈值：回填 [_lockSeconds]（idle Timer 下次重排生效）
   /// 与 [_lockTimer.backgroundLockSeconds]（回前台判定即时生效），并重排 idle。
   Future<void> _loadLockSeconds() async {
@@ -11668,7 +11668,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   // 锁屏时长（前台闲置锁与后台锁共用，老板 2026-10-18 定）：对数刻度轴
   // （10 秒~30 分钟，仿阅后即焚 burn_duration_sheet；2026-10-24 由 20 秒~20
   // 分钟改来）。initState 异步读持久化值
-  // 换成轴位置；读回前按默认 30 秒渲染（同 _loadUiStyle 套路）。
+  // 换成轴位置；读回前按默认 1 分钟渲染（同 _loadUiStyle 套路）。
   // _initialSeconds = 打开弹窗时的档位，提交时判"是否真改过"。
   double _axisT = 0.0; // 轴位置 t∈[0,1]（对数刻度）
   int? _initialSeconds;

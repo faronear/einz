@@ -725,10 +725,12 @@ void main() {
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
     // 时长轴（对数刻度 10 秒~30 分钟，仿阅后即焚；2026-10-24 由 20 秒~20 分钟
-    // 改来）。初始停在默认档 30 秒（kLockSeconds，持久化里没存过值）；
-    // 轴下最左标注是「10 秒」
+    // 改来）。初始停在默认档 1 分钟（kLockSeconds=60，2026-10-27 由 30 秒改来，
+    // 持久化里没存过值）；轴下最左标注是「10 秒」
     expect(find.byType(Slider), findsOneWidget);
-    expect(find.text('30 秒'), findsOneWidget, reason: '标题行当前值=默认档 30 秒');
+    // 标题行当前值=默认档 1 分钟；轴下刻度位恰有同档「1 分钟」标注（t(60)），
+    // 共两处
+    expect(find.text('1 分钟'), findsNWidgets(2));
     expect(find.text('10 秒'), findsOneWidget, reason: '轴下最左可点标注');
     // 点轴中点 → t=0.5 → 10×√180≈134s → 吸附到整分钟 120s（2 分钟）
     await tester.tap(find.byType(Slider));
