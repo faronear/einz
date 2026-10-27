@@ -8064,10 +8064,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 最近 [n] 个波形采样（录音中滚动窗口，预览态冻结尾部）。
-  List<double> _voiceLastSamples(int n) =>
-      _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
-
   /// 语音态输入区**内容**：三态共用同一套白胶囊外壳（[_voiceCapsule]），只是
   /// 填的东西不同——提示态=「点按或长按开始录音」；录音中=停止提示+实时波形+
   /// 读秒；预览态=播放键+波形（可试听/长按转写）+盒外关闭钮。
@@ -8151,10 +8147,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: Icon(Icons.stop_circle, size: 22, color: Colors.green),
                 ),
                 const SizedBox(width: 4),
+                // 与预览态共用同一个渲染器（[_VoiceWaveform]，条宽 3/间距 2/高
+                // 28）：录音中取最新的一段从左往右排（slidingWindow）——两态
+                // 几何完全一致，切换时不会有尺寸跳变（长录音进预览会把整段
+                // 包络压进同一宽度，形状按语义变，不是渲染差异）。没有播放
+                // 进度，深浅两色都传绿——整条同色。
                 Expanded(
-                    child: _WaveformBars(
-                        samples: _voiceLastSamples(40),
-                        color: Colors.green)),
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    return _VoiceWaveform(
+                      playing: false,
+                      durationSeconds: _recordSeconds,
+                      samples: _voiceSamples,
+                      slidingWindow: true,
+                      width: constraints.maxWidth,
+                      activeColor: Colors.green,
+                      inactiveColor: Colors.green,
+                    );
+                  }),
+                ),
                 const SizedBox(width: 10),
                 Text(elapsed,
                     style: const TextStyle(
@@ -13196,45 +13206,12 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
   }
 }
 
-/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；
-/// 按可用宽度只渲染能放下的条数（取尾部最新采样），窄屏也不会顶出屏幕。
-class _WaveformBars extends StatelessWidget {
-  const _WaveformBars({required this.samples, required this.color});
-
-  final List<double> samples;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      const step = 6.0; // 每根条占宽：3px 本体 + 1.5px 边距 ×2
-      final maxBars = (constraints.maxWidth / step).floor();
-      final count = maxBars <= 0 ? 0 : (samples.length < maxBars ? samples.length : maxBars);
-      final shown = count <= 0 ? const <double>[] : samples.sublist(samples.length - count);
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          for (final sample in shown)
-            Container(
-              width: 3,
-              height: 8 + sample * 22,
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(1.5),
-              ),
-            ),
-        ],
-      );
-    });
-  }
-}
-
 /// 语音波形图（老板要求 2026-09-13）：长方形区域里一排等宽竖条。
 ///
-/// 竖条振幅二选一：[samples] 给了就用真实录音采样（录音条预览态，按 [width]
-/// 重采样成对应的条数）；否则用 [seed]（气泡里的 messageId）确定性生成——
-/// 同一条消息每次进页面形状一致（接收端拿不到对方录音的振幅）。
+/// 竖条振幅二选一：[samples] 给了就用真实录音采样（录音条录音中/预览态，按
+/// [width] 决定条数；[slidingWindow] 决定是取最新一段还是整段重采样）；否则用
+/// [seed]（气泡里的 messageId）确定性生成——同一条消息每次进页面形状一致
+/// （接收端拿不到对方录音的振幅）。
 ///
 /// 播放时按时间比例把已播过的条染成 [activeColor]（阴影从左往右扩散），并在
 /// 进度位置画一根竖线走过去；走完/停止即复原。时长未知时改为循环扫掠的波浪动画。
@@ -13248,6 +13225,7 @@ class _VoiceWaveform extends StatefulWidget {
     this.samples,
     this.seed,
     this.width = 120,
+    this.slidingWindow = false,
   });
 
   final bool playing;
@@ -13257,6 +13235,12 @@ class _VoiceWaveform extends StatefulWidget {
   final List<double>? samples; // 真实振幅采样（非空时优先于 seed）
   final String? seed;
   final double width;
+
+  /// 采样多到放不下时的处理：[false]=整段重采样压进可用宽度（预览态：要看到
+  /// 完整包络）；[true]=只取**最新**的一段、从左往右排（录音中：波形随录音
+  /// 往右滚，不压缩历史）。两态共用同一个渲染器，条宽/间距/圆角完全一致，
+  /// 切换时没有尺寸跳变（老板 2026-10-26）。
+  final bool slidingWindow;
 
   @override
   State<_VoiceWaveform> createState() => _VoiceWaveformState();
@@ -13286,8 +13270,12 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
         oldWidget.durationSeconds != widget.durationSeconds) {
       _sync();
     }
-    if (oldWidget.width != widget.width ||
-        oldWidget.samples?.length != widget.samples?.length) {
+    // 传了采样就每次重算：录音中的 [_voiceSamples] 是**就地追加的同一个 List
+    // 实例**，old/新 widget 拿到的是同一份——比长度永远相等，波形会冻在第一帧。
+    // 条数只有「宽度/5」（≈40），重算可以忽略。
+    if (widget.samples != null ||
+        oldWidget.width != widget.width ||
+        oldWidget.seed != widget.seed) {
       _amplitudes = _resolveAmplitudes();
     }
   }
@@ -13321,10 +13309,18 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
     }
   }
 
-  /// 竖条振幅：有真实采样就重采样到 [_barCount]，否则按 seed 确定性生成。
+  /// 竖条振幅：有真实采样就用真实采样（[slidingWindow] 取最新的一段，否则
+  /// 重采样到 [_barCount]），没有则按 seed 确定性生成。
   List<double> _resolveAmplitudes() {
     final samples = widget.samples;
-    if (samples != null && samples.isNotEmpty) return _resample(samples, _barCount);
+    // 传了采样就只用采样：**空列表也要照空画**（刚开始录音还没采到点，不能
+    // 退回 seed 的伪随机波形，否则一开录就冒出一排假条）
+    if (samples != null) {
+      if (samples.isEmpty) return const <double>[];
+      if (!widget.slidingWindow) return _resample(samples, _barCount);
+      final start = math.max(0, samples.length - _barCount);
+      return samples.sublist(start);
+    }
     return _buildAmplitudes(widget.seed ?? '');
   }
 
