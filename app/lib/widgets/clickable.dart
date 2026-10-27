@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 /// 有的地方是手型、有的不是，鼠标移过去要靠"猜这里能不能点"（老板 2026-09-26：
 /// "全局可单击的东西都应该变手型，全局统一"）。
 ///
-/// 用法：把裸 `GestureDetector` 换成 `Clickable`，参数同名透传。**单击/双击/右键**
-/// 任一存在时光标变手型；**只有长按**的（如消息气泡长按弹菜单）光标保持默认箭头
+/// 用法：把裸 `GestureDetector` 换成 `Clickable`，参数同名透传。**有 [onTap]**
+/// 时光标变手型；**只有长按**的（如消息气泡长按弹菜单）光标保持默认箭头
 /// ——长按没有"点"的语义，全部手型会让气泡与真正可单击的引用块/链接分不清
 /// （老板 2026-09-28：仅在能单击的对象上显示手型）。
 ///
@@ -22,12 +22,8 @@ class Clickable extends StatefulWidget {
   const Clickable({
     super.key,
     this.onTap,
-    this.onDoubleTap,
-    this.onLongPress,
     this.onLongPressStart,
     this.onLongPressEnd,
-    this.onLongPressUp,
-    this.onSecondaryTap,
     this.behavior = HitTestBehavior.deferToChild,
     this.overlayColor,
     this.borderRadius,
@@ -39,12 +35,8 @@ class Clickable extends StatefulWidget {
   });
 
   final VoidCallback? onTap;
-  final VoidCallback? onDoubleTap;
-  final VoidCallback? onLongPress;
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
-  final VoidCallback? onLongPressUp;
-  final VoidCallback? onSecondaryTap;
   final HitTestBehavior behavior;
 
   /// 遮罩色基色（默认黑；深底场景传白色，透明度按悬浮/按压档自动套）。
@@ -88,10 +80,7 @@ class _ClickableState extends State<Clickable> {
   // 手型/反馈只认**单击类**手势（tap/doubleTap/secondaryTap）：纯长按的（消息
   // 气泡菜单）保持默认箭头、无反馈，把手型留给真正"一点就有动作"的对象
   // （老板 2026-09-28）
-  bool get _interactive =>
-      widget.onTap != null ||
-      widget.onDoubleTap != null ||
-      widget.onSecondaryTap != null;
+  bool get _interactive => widget.onTap != null;
 
   static const double _defaultHoverAlpha = 0.05; // 悬浮：淡色遮罩（默认档）
   static const double _defaultPressAlpha = 0.10; // 按压/长按：深色遮罩（默认档）
@@ -108,13 +97,8 @@ class _ClickableState extends State<Clickable> {
         // 显式要求出手型的例外（输入台录音条/波形）传 [cursor] 覆盖
         cursor: widget.cursor ?? MouseCursor.defer,
         child: GestureDetector(
-          onTap: widget.onTap,
-          onDoubleTap: widget.onDoubleTap,
-          onLongPress: widget.onLongPress,
           onLongPressStart: widget.onLongPressStart,
           onLongPressEnd: widget.onLongPressEnd,
-          onLongPressUp: widget.onLongPressUp,
-          onSecondaryTap: widget.onSecondaryTap,
           behavior: widget.behavior,
           child: child,
         ),
@@ -130,14 +114,10 @@ class _ClickableState extends State<Clickable> {
       }),
       child: GestureDetector(
         onTap: widget.onTap,
-        onDoubleTap: widget.onDoubleTap,
-        onSecondaryTap: widget.onSecondaryTap,
-        // 长按相关手势也挂在这里（维持原有语义）；按压深色遮罩用 onTapDown 感知，
-        // 手机长按与桌面单击都能看到
-        onLongPress: widget.onLongPress,
+        // 长按相关手势也挂在这里（可点区域同时支持长按/松手，如录音条）；
+        // 按压深色遮罩用 onTapDown 感知，手机长按与桌面单击都能看到
         onLongPressStart: widget.onLongPressStart,
         onLongPressEnd: widget.onLongPressEnd,
-        onLongPressUp: widget.onLongPressUp,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),

@@ -7656,6 +7656,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _startVoice() async {
+    // 已在启动中（hasPermission / recorder.start 的 await 期间）：直接返回，
+    // 不重入——点按开录后连点两下，第二次会再启一次录音器（二次 start 抛错，
+    // 弹「录音启动失败」）。入口图标那条链路由 _onVoiceEntryTap 自己守卫。
+    if (_voiceStarting) return;
     // 录音中/预览态（刚录完、波形已冻结）不再开录：此时长按波形图/录音条什么也不做，
     // 避免误触从头重录、冲掉刚录好的那条。只有播放键、X、发送键和合并图标可点；
     // 点 X（_cancelVoice）回到等待录音的提示态，就又能长按开录了
@@ -7771,6 +7775,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_recordSeconds >= 60) _stopVoice();
       });
     } catch (e) {
+      // 启动失败也要清「启动中」标记（在 mounted 检查之前——它是状态不是 UI）：
+      // 否则上面的重入守卫会把之后每一次开录都挡掉
+      _voiceStarting = false;
       if (!mounted) return;
       _notice(context, AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'));
     }
@@ -8061,45 +8068,84 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   List<double> _voiceLastSamples(int n) =>
       _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
 
-  /// 语音态输入区**内容**（提示态=「长按开始录音」文字；录音中=实时波形+计时；
-  /// 预览态=冻结波形+试听/取消）：圆角盒/底色/描边等外壳由输入盒 Container 按模式
-  /// 统一给出（见 build 内输入栏的 _inputBoxDecoration），合并图标也在盒内左侧原位
-  /// 可点；本方法只填盒内右侧内容。高度由外部 Stack 约束（与文字输入框一致，
-  /// 随草稿行数变）。
+  /// 语音态输入区**内容**：三态共用同一套白胶囊外壳（[_voiceCapsule]），只是
+  /// 填的东西不同——提示态=「点按或长按开始录音」；录音中=停止提示+实时波形+
+  /// 读秒；预览态=播放键+波形（可试听/长按转写）+盒外关闭钮。
+  ///
+  /// 圆角盒/底色/描边由输入盒 Container 统一给出（见 [_inputBoxDecoration]），
+  /// 合并图标也在盒内左侧原位；本方法只填盒内右侧，高度由外层 Positioned.fill
+  /// 铺满（与文字输入框同高）。
+  ///
+  /// **手势挂在胶囊上**、不再挂外层整条（老板 2026-10-26）：遮罩轮廓与胶囊像素
+  /// 级重合，不会出现「胶囊外还有一圈能点/能变色」的边。
   Widget _buildVoiceBarContent() {
-    final recording = _inputMode == _InputMode.recording;
-    final preview = _inputMode == _InputMode.preview;
-    // 录音上限 60s：左侧直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
+    if (_inputMode == _InputMode.recording) return _buildRecordingBar();
+    if (_inputMode == _InputMode.preview) return _buildPreviewBar();
+    return _buildHintBar();
+  }
+
+  /// 白胶囊外壳（三态共用）：高 = 盒高-2px（上下各留 1px，避免盖住盒的 1px
+  /// 描边）、半径 = 半高（两端标准半圆）、白底从盒底色里浮出。
+  ///
+  /// 传了 [onTap] / 长按回调时，胶囊自身就是交互层：遮罩用 app 标准浅色面档
+  /// 10%/14%（白底浮在灰/绿盒上，默认 5% 与盒底色几乎同色，悬浮时分不清）。
+  /// 调用方负责把它放进 Row 的 Expanded——宽度铺满、高度松到 46（Row 默认
+  /// 交叉轴 center，不会把它拉成盒高）。
+  Widget _voiceCapsule({
+    required Widget child,
+    EdgeInsets padding = EdgeInsets.zero,
+    GestureTapCallback? onTap,
+    GestureLongPressStartCallback? onLongPressStart,
+    GestureLongPressEndCallback? onLongPressEnd,
+  }) {
+    final height = _kInputModeToggleSize - 2;
+    final radius = BorderRadius.circular(height / 2);
+    Widget body = Padding(padding: padding, child: child);
+    if (onTap != null || onLongPressStart != null || onLongPressEnd != null) {
+      body = Clickable(
+        // opaque：胶囊整块参与命中（波形 CustomPaint 自身不吸收命中，
+        // deferToChild 包裸图形收不到手势）
+        behavior: HitTestBehavior.opaque,
+        // 遮罩半径=胶囊半径：悬浮/按压变色不溢形、与白底像素级重合
+        borderRadius: radius,
+        hoverAlpha: 0.10,
+        pressAlpha: 0.14,
+        onTap: onTap,
+        onLongPressStart: onLongPressStart,
+        onLongPressEnd: onLongPressEnd,
+        child: body,
+      );
+    }
+    return SizedBox(
+      height: height,
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: radius),
+        child: body,
+      ),
+    );
+  }
+
+  /// 录音中：停止提示 + 实时波形 + 读秒（整条可点停，也可长按后松手停）。
+  /// 停止提示放**左**、读秒放**右**（老板 2026-10-26）：原先停止钮在最右，与
+  /// 预览态关闭钮（X）同位置——连点两下停录，第二下会落到刚出现的 X 上，把刚
+  /// 录好的音频删掉；换位后右端是不可点的秒数，落点最多是播放区（无害）。
+  Widget _buildRecordingBar() {
+    // 录音上限 60s：直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
     final elapsed = _recordSeconds.toString().padLeft(2, '0');
-    // 胶囊几何（预览态播放胶囊 / 提示态白胶囊同款，老板 2026-10-26）：高度=
-    // 盒高-2px（上下各留 1px，48 真贴边会把盒的 1px 描边盖断，2x 渲染对比过）、
-    // 半径=半高（两端标准半圆）。
-    final capsuleHeight = _kInputModeToggleSize - 2;
-    final capsuleRadius = BorderRadius.circular(capsuleHeight / 2);
-    if (recording) {
-      // 白胶囊（老板 2026-10-26）：与提示态/预览态同款——46 高、半圆端，
-      // 铺满整个可点区（左贴合并图标右缘、右贴盒右沿），点哪停哪的反馈就有
-      // 实体承载。绿盒只作为胶囊外的一圈底色。
-      return SizedBox(
-        height: capsuleHeight,
-        child: DecoratedBox(
-          decoration:
-              BoxDecoration(color: Colors.white, borderRadius: capsuleRadius),
-          // 内距加在胶囊内部（不是盒/命中区）：文字与停止图标不贴半圆边
-          child: Padding(
+    return Row(
+      children: [
+        Expanded(
+          child: _voiceCapsule(
             padding: const EdgeInsets.only(left: 6, right: 14),
+            onTap: () => unawaited(_stopVoice()),
+            onLongPressStart: (_) => _startVoice(),
+            onLongPressEnd: (_) => _stopVoice(),
             child: Row(
               children: [
-                // 停止**提示**（老板 2026-10-26）：录音态整条都可点停（见录音条
-                // 那个 Clickable 的 onTap），这里只放个绿色 stop_circle 当视觉
-                // 提示——不再单独挂 onPressed：内层若挂 InkWell，点它时内层赢
-                // 手势竞技场，外层录音条的按压变色被圆形水波纹顶掉（与预览态
-                // 播放图标的处理一致）。
-                // **放左边、读秒放右边**（老板 2026-10-26 第二轮）：原先停止钮
-                // 在最右，正好和预览态的关闭钮（X）同位置——连点两下停录，第二
-                // 下就落到刚出现的 X 上，把刚录好的音频删了。换位后右端是不可
-                // 点的秒数，落点最多是预览胶囊的播放区（无害）。绿色与播放/停止
-                // 图标同族（区别于预览态灰色删除钮 X）。60s 上限到点也会自动停。
+                // 停止图标只是提示：整条都能点停，故不挂 onPressed——内层挂
+                // InkWell 会赢手势竞技场，把胶囊的按压变色顶成圆形水波纹
+                // （与预览态播放图标同一处理）。绿色与播放/停止图标同族，
+                // 区别于预览态的灰色删除钮 X。
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 6),
                   child: Icon(Icons.stop_circle, size: 22, color: Colors.green),
@@ -8119,172 +8165,125 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
         ),
-      );
-    }
-    if (preview) {
-      return Row(
-        children: [
-          // 播放胶囊（老板 2026-10-25）：播放键+波形进同一个白底胶囊——点胶囊
-          // 任意处=播放/停止（与气泡音频条一致：波形区域单击也能播，不必非点
-          // 中播放键），长按=即时转写；胶囊从预览盒的灰底里浮出，Clickable 给
-          // 悬浮淡色/按压深色变色（遮罩圆角跟随胶囊轮廓）。
-          Expanded(
-            child: SizedBox(
-              height: capsuleHeight,
-              child: Clickable(
-                // opaque：胶囊整块参与命中（波形 CustomPaint 自身不吸收命中，
-                // 实测 deferToChild 包裸图形收不到手势）
-                behavior: HitTestBehavior.opaque,
-                // 遮罩半径=半高：胶囊两端标准半圆，悬浮/按压变色不溢形
-                borderRadius: capsuleRadius,
-                // 悬浮/按压浓度用 app 标准浅色面档 10%/14%（老板
-                // 2026-10-26）：默认 5% 叠白底与外围灰预览盒几乎同色，
-                // 悬浮时胶囊"溶进"盒里看不出可点；10%/14% 与淡灰按钮、
-                // 选项行 InkWell（hoverColor/highlightColor）同档
-                hoverAlpha: 0.10,
-                pressAlpha: 0.14,
-                onTap: _playVoicePreview,
-                onLongPressStart: (_) =>
-                    unawaited(_transcribePreviewRecording()),
-                child: Container(
-                  padding: const EdgeInsets.only(left: 2, right: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: capsuleRadius,
-                  ),
-                  child: Row(
-                    children: [
-                      // 播放/停止图标：纯图标不单独挂 onPressed——点击统一由
-                      // 胶囊处理。若内层挂 InkWell，点它时内层赢手势竞技场，
-                      // 胶囊的按压变色会被它的圆形水波纹顶掉，反馈不统一。
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Icon(
-                          _previewPlaying
-                              ? Icons.stop_circle
-                              : Icons.play_circle,
-                          size: 22,
-                          // 青绿=录音同款色（老板 2026-10-25）
-                          color: Colors.green,
-                        ),
-                      ),
-                      Expanded(
-                        child: LayoutBuilder(builder: (context, constraints) {
-                          // 试听：波形按进度从左往右高亮（与气泡里的语音波形
-                          // 一致，老板要求 2026-09-13）——用本次真实振幅采样，
-                          // 宽度撑满可用区。青绿双色（老板 2026-10-25 三轮
-                          // 定稿）：active=shade700 深青绿（已播+进度竖线）、
-                          // inactive=shade200 浅青绿（未播静态）。
-                          // 波形上叠「长按转写」提示（老板 2026-10-26）：
-                          // 录音条没有空间，提示落在波形图**上方**（同提示态
-                          // 「长按开始录音」样式；老板明确不要压在波形中间）。
-                          // **播放时淡出**（2026-10-26 加，AnimatedOpacity
-                          // 200ms easeInOut，停止/播完淡回）——播放时波形自己
-                          // 在"说话"，提示不抢注意力；静态时常显（这不是气泡
-                          // 消息）。文字绿色同「长按开始录音」（老板
-                          // 2026-10-26），11px。IgnorePointer 不吃手势，
-                          // 点播/长按仍归外层 Clickable 统一处理。
-                          return Stack(
-                            // 文字上移出正中：压在波形中线会被波形糊住
-                            alignment: Alignment.topCenter,
-                            children: [
-                              _VoiceWaveform(
-                                playing: _previewPlaying,
-                                durationSeconds: _recordSeconds,
-                                samples: _voiceSamples,
-                                width: constraints.maxWidth,
-                                activeColor: Colors.green.shade700,
-                                inactiveColor: Colors.green.shade200,
-                              ),
-                              Padding(
-                                // topCenter 顶到边太贴，下移 2px 落在波形
-                                // 上半区；再往上 12px 用 Transform（EdgeInsets
-                                // 不许负值；3+4+5px 累进，老板 2026-10-26）
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Transform.translate(
-                                  offset: const Offset(0, -12),
-                                  child: IgnorePointer(
-                                    // 播放时淡出（200ms easeInOut）：静态
-                                    // 常显、播放隐去、播完淡回。opacity 0
-                                    // 仍占位（Stack 覆盖层，无布局位移）
-                                    child: AnimatedOpacity(
-                                      opacity: _previewPlaying ? 0 : 1,
-                                      duration:
-                                          const Duration(milliseconds: 200),
-                                      curve: Curves.easeInOut,
-                                      child: Text(
-                                        AppLocalizations.of(context)!
-                                            .chatPageLongPressToTranscribe,
-                                        style: TextStyle(
-                                          // 淡青绿=波形未播静态同款 shade200
-                                          // （老板 2026-10-26：与波形淡色一致）
-                                          color: Colors.green.shade200,
-                                          // 11px（老板 2026-10-26：再小一号）
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // 关闭键在胶囊外：删除是破坏性操作，不该混进「点哪都播放」的范围
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 22,
-            splashRadius: 17, // 纯圆内切 34 按钮，不溢出成椭圆
-            icon: const Icon(Icons.close, color: Colors.grey),
-            onPressed: _cancelVoice,
-          ),
-          // 右侧 12 内距留在预览态（关闭钮不贴盒右沿）；提示/录音态的白胶囊
-          // 则铺满整个命中区——各态自己的内距放在内容里，不在外层 Padding，
-          // 这样白胶囊与 Clickable 的可点/悬浮变色区域完全重合
-          // （老板 2026-10-26）。
-          const SizedBox(width: 12),
-        ],
-      );
-    }
-    // 提示态：文字说明版录音条（无波形），点按/长按开始录音。麦克风小图标与
-    // 文案用语音态标准青绿（老板 2026-10-25：与合并图标、录音态同色系）。
-    // 白底胶囊（老板 2026-10-26）：与预览态播放胶囊同款——46 高、半圆端，
-    // 从灰盒底里浮出；把「可点即录」的区域给出实体感（此前是裸文字，可点
-    // 范围全靠猜）。文字仍居中；胶囊**铺满整个可点区**（左起合并图标右缘、
-    // 右到盒右沿）——与 Clickable 的悬浮/按压变色区域完全重合，不存在
-    // 「胶囊外还有 12px 能点/能变色」的弯月缝（老板 2026-10-26 验收）。
+      ],
+    );
+  }
+
+  /// 预览态：播放胶囊（点=播放/停止、长按=即时转写）+ 盒外关闭钮。
+  /// 关闭钮留在胶囊外——删除是破坏性操作，不该混进「点哪都播放」的范围。
+  Widget _buildPreviewBar() {
     return Row(
       children: [
         Expanded(
-          child: SizedBox(
-            height: capsuleHeight,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: capsuleRadius,
-              ),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.mic, size: 16, color: Colors.green),
-                    const SizedBox(width: 6),
-                    Text(
-                      AppLocalizations.of(context)!.chatPageLongPressToRecord,
-                      style:
-                          const TextStyle(color: Colors.green, fontSize: 13),
-                    ),
-                  ],
+          child: _voiceCapsule(
+            padding: const EdgeInsets.only(left: 2, right: 8),
+            onTap: _playVoicePreview,
+            onLongPressStart: (_) => unawaited(_transcribePreviewRecording()),
+            child: Row(
+              children: [
+                // 播放/停止图标：纯图标不单独挂 onPressed——点击统一由胶囊
+                // 处理（内层挂 InkWell 会赢手势竞技场，反馈不统一）
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(
+                    _previewPlaying ? Icons.stop_circle : Icons.play_circle,
+                    size: 22,
+                    // 青绿=录音同款色（老板 2026-10-25）
+                    color: Colors.green,
+                  ),
                 ),
+                Expanded(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    // 波形按播放进度从左往右高亮（与气泡里的语音波形一致，
+                    // 老板 2026-09-13）：active=shade700 深青绿（已播+进度
+                    // 竖线）、inactive=shade200 浅青绿（未播静态）。
+                    // 波形上叠「长按转文字」提示（老板 2026-10-26）：落在波形
+                    // **上方**（不要压在中间），11px 淡青绿；**播放时淡出**
+                    // （200ms easeInOut）——播放时波形自己在「说话」，提示不抢
+                    // 注意力，停止/播完淡回。IgnorePointer 不吃手势，点播/长按
+                    // 仍归胶囊统一处理。
+                    return Stack(
+                      alignment: Alignment.topCenter,
+                      children: [
+                        _VoiceWaveform(
+                          playing: _previewPlaying,
+                          durationSeconds: _recordSeconds,
+                          samples: _voiceSamples,
+                          width: constraints.maxWidth,
+                          activeColor: Colors.green.shade700,
+                          inactiveColor: Colors.green.shade200,
+                        ),
+                        // 文字抬到波形上方：topCenter 顶到边太贴，先下移 2px
+                        // 再上移 12px（EdgeInsets 不许负值）
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Transform.translate(
+                            offset: const Offset(0, -12),
+                            child: IgnorePointer(
+                              child: AnimatedOpacity(
+                                opacity: _previewPlaying ? 0 : 1,
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeInOut,
+                                child: Text(
+                                  AppLocalizations.of(context)!
+                                      .chatPageLongPressToTranscribe,
+                                  style: TextStyle(
+                                    // 淡青绿=波形未播静态同款 shade200
+                                    color: Colors.green.shade200,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        // 关闭键在胶囊外：删除是破坏性操作，不该混进「点哪都播放」的范围
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          iconSize: 22,
+          splashRadius: 17, // 纯圆内切 34 按钮，不溢出成椭圆
+          icon: const Icon(Icons.close, color: Colors.grey),
+          onPressed: _cancelVoice,
+        ),
+        // 右侧 12 内距留在预览态（关闭钮不贴盒右沿）；提示/录音态的胶囊铺满
+        // 整个可点区，内距在各自内容里
+        const SizedBox(width: 12),
+      ],
+    );
+  }
+
+  /// 提示态：白胶囊 + 「点按或长按开始录音」（点按即开录，不必按住最长 60s）。
+  /// 胶囊铺满整个可点区（左起合并图标右缘、右到盒右沿），可点范围一眼可见
+  /// ——此前是裸文字，能点哪儿全靠猜。
+  Widget _buildHintBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: _voiceCapsule(
+            onTap: () => unawaited(_startVoice()),
+            onLongPressStart: (_) => _startVoice(),
+            onLongPressEnd: (_) => _stopVoice(),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.mic, size: 16, color: Colors.green),
+                  const SizedBox(width: 6),
+                  Text(
+                    AppLocalizations.of(context)!.chatPageLongPressToRecord,
+                    style: const TextStyle(color: Colors.green, fontSize: 13),
+                  ),
+                ],
               ),
             ),
           ),
@@ -11455,72 +11454,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           ),
                                         ),
                                         if (_inputMode != _InputMode.text)
-                                          // 长按手势挂在常驻的 Clickable 上：提示态
-                                          // 长按开始录音，进入录音态后此层不重建，松手
-                                          // 能正常触发停止；预览态由 _startVoice 直接
-                                          // 忽略（长按不重录，防误触冲掉刚录好的一条）
+                                          // 内容自己就是手势层（白胶囊里挂
+                                          // Clickable，见 _voiceCapsule）——外层
+                                          // 只负责铺满盒高，不再挂整条命中区：那样
+                                          // 遮罩是 48/r24、胶囊是 46/r23，悬浮时
+                                          // 胶囊外会多出一圈变色（老板 2026-10-26）
                                           Positioned.fill(
-                                            child: Clickable(
-                                              // opaque：整条（含没有可命中子项的空白
-                                              // 区）都是长按区——与左侧麦键图标的
-                                              // Clickable 拼成「从图标到关闭按钮」的
-                                              // 整盒热区（老板 2026-10-25）
-                                              behavior:
-                                                  HitTestBehavior.opaque,
-                                              // 可点/长按的区域都出手型（老板
-                                              // 2026-10-25/26）：提示态=开录、录音态
-                                              // =停录；预览态此层不交互（波形胶囊
-                                              // 自己管播放），保持默认箭头
-                                              cursor: _inputMode ==
-                                                      _InputMode.preview
-                                                  ? null
-                                                  : SystemMouseCursors.click,
-                                              // 遮罩形状=两端半圆的药丸（老板
-                                              // 2026-10-26）：此前遮罩是矩形，只有
-                                              // 右端被盒角裁成半圆、左端直角切口，
-                                              // 方头看着突兀。半径=半盒高→左右两端
-                                              // 都是标准半圆。提示态（开录）与录音
-                                              // 态（停录）都可见；预览态本层无
-                                              // onTap，非交互态不出遮罩。
-                                              borderRadius: BorderRadius.circular(
-                                                  _kInputModeToggleSize / 2),
-                                              // 悬浮/按压浓度用 app 标准浅色面档
-                                              // 10%/14%（老板 2026-10-26）：白胶囊上
-                                              // 5% 只有 #F2F2F2，与灰盒 #F5F5F5
-                                              // （提示态）/ 淡绿盒（录音态）几乎同色，
-                                              // 悬浮时分不清胶囊有没有被按下。与预览
-                                              // 胶囊（内层 Clickable）同档——三种胶囊
-                                              // 的默认/悬浮/按压观感一致。
-                                              hoverAlpha: 0.10,
-                                              pressAlpha: 0.14,
-                                              // 点按（老板 2026-10-26 免提模式）：
-                                              // 提示态=开始录音（长按最长要按 60 秒，
-                                              // 拇指疲劳/桌面按住鼠标）；录音态=
-                                              // 停止录音（**整条都是停止区**，右侧
-                                              // 那个 stop_circle 只是提示图标）——
-                                              // 停=长按模式里的松手。与长按共存不
-                                              // 冲突：快点快松=点按，按住不放=长按
-                                              // 开录、松手即停。预览态不挂（波形胶囊
-                                              // 自己管播放，外层挂了会与内层抢手势）。
-                                              onTap: _inputMode == _InputMode.hint
-                                                  ? () => unawaited(
-                                                      _startVoice())
-                                                  : (_inputMode ==
-                                                          _InputMode
-                                                              .recording
-                                                      ? () => unawaited(
-                                                          _stopVoice())
-                                                      : null),
-                                              onLongPressStart: (_) =>
-                                                  _startVoice(),
-                                              onLongPressEnd: (_) =>
-                                                  _stopVoice(),
-                                              // 内容铺满命中区（内距由各态内容自己
-                                              // 在胶囊内部处理——提示/录音态的白色
-                                              // 胶囊因此与可点/悬浮区完全重合，见
-                                              // _buildVoiceBarContent）
-                                              child: _buildVoiceBarContent(),
-                                            ),
+                                            child: _buildVoiceBarContent(),
                                           ),
                                         ],
                                       ),
