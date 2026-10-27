@@ -1,0 +1,22 @@
+{
+  "utc": "20261027T091641.000000Z",
+  "time": "2026-10-27 17:16+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "修 CI 红：锁屏默认 30s→60s 后，4 个锁相关用例仍按 30s 写死",
+      "detail": [
+        "现象：老板推到 GitHub 后 CI 报错；沙箱网络对 GitHub 全 403，拿不到 Actions 日志，改在本地复现同一条命令（scripts/testAll.sh all）。",
+        "本地复现（flutter test 全量）：+389 -4，失败的 4 条全与锁屏阈值有关：lock_timer_test 两条（后台 30s 判锁、clear 后重新计时）、lock_background_resume_test 两条（真睡 31s 跨阈值）。",
+        "根因：kLockSeconds 由 30 改 60（2026-10-27），这两个测试文件仍按 30s 写死；此前只更新了 chat_page_menu_test 的时长轴用例。",
+        "修法：lock_timer_test 改用 kLockSeconds 表达式（阈值-1 / 阈值 / 阈值+1）；lock_background_resume_test 在 setUp 后 saveLockSeconds(kLockMinSeconds=10) 并真睡 11s（比默认 60s 省时，仍是同一判定路径），三条用例统一短阈值。",
+        "另修 chat_page_menu_test 两处 formatBurnDuration(30) → formatBurnDuration(kLockSeconds)（PIN 菜单行「已设置 · 时长」随默认值变）。",
+        "验证：本地 flutter test 全量 +393 ~1 通过；app/shared/cli analyze 全部无问题；server npm test 通过。",
+        "教训：改阈值类默认值后，grep 测试里的字面数字（30/31）而不是只改记忆里那条用例；真实等待型测试尽量绑最短档，别绑默认档。"
+      ]
+    }
+  ]
+}

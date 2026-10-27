@@ -15,6 +15,7 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/lock_timer.dart';
 import 'package:einz/data/space_session.dart';
 import 'package:einz/data/vault_session.dart';
 import 'package:einz/data/voice_transcript_settings.dart';
@@ -648,7 +649,7 @@ void main() {
     // 阅后即焚一致。本用例没存过 lock_seconds → 默认档 30 秒）。菜单还开着时断言，
     // 点 PIN 标签就进弹窗、菜单关闭了
     expect(
-      find.text(_zh.chatPagePinMenuValue(formatBurnDuration(30, _zh))),
+      find.text(_zh.chatPagePinMenuValue(formatBurnDuration(kLockSeconds, _zh))),
       findsOneWidget,
       reason: 'PIN 菜单行右侧应带当前锁屏时长',
     );
@@ -682,7 +683,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     expect(
-      find.text(_zh.chatPagePinMenuValue(formatBurnDuration(30, _zh))),
+      find.text(_zh.chatPagePinMenuValue(formatBurnDuration(kLockSeconds, _zh))),
       findsNothing,
       reason: '清空后菜单项应只显示「锁屏码」，不带「已设置 · 时长」尾缀',
     );

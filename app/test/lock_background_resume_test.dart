@@ -1,4 +1,5 @@
-// 回归：设 PIN 后「切后台超 30s → 回前台」必须弹覆盖锁屏。
+// 回归：设 PIN 后「切后台超过锁屏阈值 → 回前台」必须弹覆盖锁屏。
+// 阈值取最短档 kLockMinSeconds（10s）——验证判定逻辑即可，不必真等默认的 60s。
 //
 // 背景（老板 2026-10-17 实测 bug）：原实现 `inactive` 也会 `recordBackgrounded`，
 // 而 iOS 回前台序列 `paused → inactive → resumed` 里 `inactive` 会触发一次，
@@ -6,7 +7,7 @@
 // 修复后只认 `paused`。
 //
 // 注意：`LockTimer` 读真实 `DateTime.now()`，widget 测试的假时钟推不动它，
-// 所以这条用例必须 `runAsync` 真睡 31s 才能复现（约 +31s 测试耗时）。
+// 所以这条用例必须 `runAsync` 真睡「阈值+1 秒」才能复现（+11s 测试耗时）。
 import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/lock_timer.dart';
 import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
@@ -31,7 +33,7 @@ void main() {
   });
 
   testWidgets(
-      '设 PIN + 切后台超 30s 回前台 → 弹覆盖锁屏（inactive 覆写计时 bug 回归）',
+      '设 PIN + 切后台超阈值回前台 → 弹覆盖锁屏（inactive 覆写计时 bug 回归）',
       (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -46,6 +48,8 @@ void main() {
     );
     await lock.savePlain(plain);
     await lock.setPin('123456', payload: plain);
+    // 最短阈值（10s）：验证判定逻辑，不必真等默认的 60s
+    await lock.saveLockSeconds(kLockMinSeconds);
     expect(await lock.isSetup, true); // 确认锁包已就位（_hasPin 的来源）
 
     await tester.pumpWidget(MaterialApp(
@@ -67,7 +71,7 @@ void main() {
     expect(find.byType(LockPage), findsNothing);
 
     // 真实生命周期序列：进后台（inactive→hidden→paused，Flutter 3.13 起出向
-    // 是这个顺序）→ 真睡 31s 跨阈值 → 回前台（inactive→resumed）。关键：
+    // 是这个顺序）→ 真睡「阈值+1 秒」跨阈值 → 回前台（inactive→resumed）。关键：
     // 回程的 `inactive` 不可再把后台时刻覆写成"刚回来" → 否则不锁。
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
@@ -76,7 +80,8 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump();
     await tester.runAsync(
-        () => Future<void>.delayed(const Duration(seconds: 31)));
+        () => Future<void>.delayed(
+            const Duration(seconds: kLockMinSeconds + 1)));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     await tester.pump();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -90,7 +95,7 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 3)));
 
   testWidgets(
-      'app 切换器路径（只到 inactive 不到 paused）超 30s → 回来也要锁',
+      'app 切换器路径（只到 inactive 不到 paused）超阈值 → 回来也要锁',
       (tester) async {
     // 覆盖路径：iOS app 切换器/通知下拉只发 inactive，永远不会到 paused。
     // 只认 paused 的实现会漏掉这条路径（评审 2026-10-17）。
@@ -106,6 +111,8 @@ void main() {
     );
     await lock.savePlain(plain);
     await lock.setPin('123456', payload: plain);
+    // 最短阈值（10s）：验证判定逻辑，不必真等默认的 60s
+    await lock.saveLockSeconds(kLockMinSeconds);
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -128,7 +135,8 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
     await tester.runAsync(
-        () => Future<void>.delayed(const Duration(seconds: 31)));
+        () => Future<void>.delayed(
+            const Duration(seconds: kLockMinSeconds + 1)));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
 
@@ -153,6 +161,8 @@ void main() {
     );
     await lock.savePlain(plain);
     await lock.setPin('123456', payload: plain);
+    // 最短阈值（10s）：验证判定逻辑，不必真等默认的 60s
+    await lock.saveLockSeconds(kLockMinSeconds);
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -171,7 +181,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300));
 
-    // 完整出向序列 + 只离开 5s 回来（<30s）→ 不应锁
+    // 完整出向序列 + 只离开 5s 回来（< 阈值 10s）→ 不应锁
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
