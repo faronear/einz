@@ -174,6 +174,10 @@ const double _kInputBoxCornerRadius = 24;
 /// 输入盒内合并图标的圆形热区边长：直径=盒高=盒左端半圆的直径，保证圆边贴齐。
 const double _kInputModeToggleSize = _kInputBoxCornerRadius * 2;
 
+/// 语音条白胶囊高度（提示/录音/预览三态共用）：盒高减 2px——上下各留 1px，
+/// 让输入盒自己的 1px 描边不被白色填充盖断（老板 2026-10-26 验收）。
+const double _kVoiceCapsuleHeight = _kInputModeToggleSize - 2;
+
 /// 气泡时间行里各小控件的**统一高度**（老板 2026-10-08）：引用/拷贝/保存的圆钮，
 /// 以及「沙漏+时长」胶囊——三者的背景高度必须一样（此前沙漏那块的文字把胶囊撑得
 /// 比圆钮高一截）。28 = 16 图标 + 上下各 6（2026-10-09 老板要求加大：原 20×20
@@ -8094,7 +8098,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     GestureLongPressStartCallback? onLongPressStart,
     GestureLongPressEndCallback? onLongPressEnd,
   }) {
-    final height = _kInputModeToggleSize - 2;
+    const height = _kVoiceCapsuleHeight;
     final radius = BorderRadius.circular(height / 2);
     Widget body = Padding(padding: padding, child: child);
     if (onTap != null || onLongPressStart != null || onLongPressEnd != null) {
@@ -8212,23 +8216,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     // （200ms easeInOut）——播放时波形自己在「说话」，提示不抢
                     // 注意力，停止/播完淡回。IgnorePointer 不吃手势，点播/长按
                     // 仍归胶囊统一处理。
-                    return Stack(
-                      alignment: Alignment.topCenter,
-                      children: [
-                        _VoiceWaveform(
-                          playing: _previewPlaying,
-                          durationSeconds: _recordSeconds,
-                          samples: _voiceSamples,
-                          width: constraints.maxWidth,
-                          activeColor: Colors.green.shade700,
-                          inactiveColor: Colors.green.shade200,
-                        ),
-                        // 文字抬到波形上方：topCenter 顶到边太贴，先下移 2px
-                        // 再上移 12px（EdgeInsets 不许负值）
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Transform.translate(
-                            offset: const Offset(0, -12),
+                    //
+                    // 布局（老板 2026-10-26 收口）：Stack 撑满胶囊内高，波形
+                    // Center 垂直居中、文字 Align(topCenter) 贴顶。此前是
+                    // 「Padding 下移 2px + Transform 上移 12px」把文字画到 Stack
+                    // 边界外——靠 Stack「布局没溢出就不裁剪」侥幸成立，真出现
+                    // 布局溢出时文字会整块消失。现在位置由布局决定，没有负偏移。
+                    return SizedBox(
+                      height: _kVoiceCapsuleHeight,
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: _VoiceWaveform(
+                              playing: _previewPlaying,
+                              durationSeconds: _recordSeconds,
+                              samples: _voiceSamples,
+                              width: constraints.maxWidth,
+                              activeColor: Colors.green.shade700,
+                              inactiveColor: Colors.green.shade200,
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.topCenter,
                             child: IgnorePointer(
                               child: AnimatedOpacity(
                                 opacity: _previewPlaying ? 0 : 1,
@@ -8247,8 +8256,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   }),
                 ),
