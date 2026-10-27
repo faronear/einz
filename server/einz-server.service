@@ -1,0 +1,37 @@
+# einz-server 裸 Node systemd unit（部署到 cn1: /etc/systemd/system/einz-server.service）
+#
+# 部署：
+#   scp server/einz-server.service adot@cn1:/tmp/
+#   ssh cn1 'sudo mv /tmp/einz-server.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now einz-server'
+#
+# 注意：node 走 nvm（~adot/.nvm/...），不用 /usr/bin/node。ExecStart 直接指向 npm。
+# 更新代码后：sudo systemctl restart einz-server
+
+[Unit]
+Description=Einz Server (bare Node production)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=adot
+Group=adot
+WorkingDirectory=/faronear/einz/server
+# npm start 内部读取 EINZ_ENV_FILE（默认 ./docker/.env）
+ExecStart=/home/adot/.nvm/versions/node/v22.23.2/bin/npm start
+Restart=on-failure
+RestartSec=5
+# 日志走 journald：journalctl -u einz-server -f
+StandardOutput=journal
+StandardError=journal
+
+# 优雅关闭：给 ws 连接与 SQLite WAL 落盘留时间
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# 环境保险（npm start 已处理 .env，这里只补 PATH 让 npm 找得到 node）
+Environment=PATH=/home/adot/.nvm/versions/node/v22.23.2/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
