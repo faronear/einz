@@ -12981,44 +12981,52 @@ class _VoiceTranscriptSheetState extends State<_VoiceTranscriptSheet> {
     String? keyName,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      key: keyName == null ? null : ValueKey(keyName),
-      color: active
-          ? const Color(0xFFD6529C).withValues(alpha: 0.25)
-          : Colors.black.withValues(alpha: 0.05),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
+    return AnimatedScale(
+      // 选中态放大 4%（老板 2026-10-28）：只做绘制变换、不动布局，所以两块的
+      // 等高关系与命中区都不变；切换时一胀一缩，视线自然跟到新选中的那块。
+      // 12px 的卡间距足够吃掉这点溢出（每边约 6-7px），不会压到邻居。
+      scale: active ? 1.04 : 1.0,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      child: Material(
+        key: keyName == null ? null : ValueKey(keyName),
+        color: active
+            ? const Color(0xFFD6529C).withValues(alpha: 0.25)
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        hoverColor: Colors.black.withValues(alpha: 0.10),
-        highlightColor: Colors.black.withValues(alpha: 0.14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 10, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-                    const SizedBox(width: 8),
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: BorderRadius.circular(12),
+          hoverColor: Colors.black.withValues(alpha: 0.10),
+          highlightColor: Colors.black.withValues(alpha: 0.14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 10, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(label,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                    ),
+                    if (active)
+                      Icon(Icons.check, size: 20, color: scheme.primary),
                   ],
-                  Expanded(
-                    child: Text(label,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600)),
-                  ),
-                  if (active)
-                    Icon(Icons.check, size: 20, color: scheme.primary),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(desc,
-                  style:
-                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-            ],
+                ),
+                const SizedBox(height: 3),
+                Text(desc,
+                    style:
+                        TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+              ],
+            ),
           ),
         ),
       ),
