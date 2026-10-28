@@ -7074,9 +7074,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             onTap: () => Navigator.of(ctx).pop('save'),
           ),
         // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）；
-        // 图标与顶栏/汉堡菜单同族用沙漏（2026-10-28），不用时钟
+        // 图标与顶栏/汉堡菜单同族用沙漏（2026-10-28），不用时钟。菜单里必须用
+        // 静态沙漏——翻转动画会让测试的 pumpAndSettle 永不稳定（CI 2026-10-28）
         _buildMessageActionCardWidget(
-          iconWidget: const _BurnHourglass(burned: false, size: 26),
+          iconWidget: const Icon(Icons.hourglass_top, size: 26),
           label: l10n.chatPageActionBurn,
           onTap: () => Navigator.of(ctx).pop('burn'),
         ),
