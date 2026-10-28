@@ -2474,6 +2474,12 @@ abstract class AppLocalizations {
   /// **'This group has no name yet. Type “{word}” to confirm'**
   String exitGroupConfirmWordHint(String word);
 
+  /// No description provided for @exitGroupConfirmWord.
+  ///
+  /// In en, this message translates to:
+  /// **'LEAVE'**
+  String get exitGroupConfirmWord;
+
   /// No description provided for @exitGroupConfirmWordMismatch.
   ///
   /// In en, this message translates to:

@@ -859,6 +859,7 @@
       }
     }
   },
+  "exitGroupConfirmWord": "退群",
   "exitGroupConfirmWordMismatch": "请输入正确的确认词",
   "exitGroupFailed": "退出失败，仍留在群组中",
   "exitGroupMenuItem": "退出群组",

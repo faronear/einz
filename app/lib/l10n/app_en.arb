@@ -907,6 +907,7 @@
       }
     }
   },
+  "exitGroupConfirmWord": "LEAVE",
   "exitGroupConfirmWordMismatch": "Enter the correct confirmation word",
   "exitGroupFailed": "Couldn't leave the group — you're still in it",
   "exitGroupMenuItem": "Leave group",

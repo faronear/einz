@@ -327,7 +327,7 @@ void main() {
     // 提示必须是"确认词"口径，且 expected 与提示一致——否则用户无法通过
     // （老板 2026-10-19 实测：原来写"请输入群组名称「重置」"，而重置不是群名）
     expect(
-        find.text(_zh.exitGroupConfirmWordHint(_zh.resetEntranceConfirmWord)),
+        find.text(_zh.exitGroupConfirmWordHint(_zh.exitGroupConfirmWord)),
         findsOneWidget);
     // 输错 → 确认词口径的红字（不是"请输入正确的群组名称"）
     await tester.enterText(_dialogField, '测试群');
@@ -338,7 +338,7 @@ void main() {
         reason: '输错时报确认词口径的红字');
     expect(find.byType(ChatPage), findsOneWidget, reason: '闸门没过 → 留在群里');
     // 输对（固定确认词）→ 通过，走完整退群链
-    await tester.enterText(_dialogField, _zh.resetEntranceConfirmWord);
+    await tester.enterText(_dialogField, _zh.exitGroupConfirmWord);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, _zh.exitGroupConfirm));
     await _settleUntilWizard(tester);

@@ -1452,6 +1452,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get exitGroupConfirmWord => 'LEAVE';
+
+  @override
   String get exitGroupConfirmWordMismatch =>
       'Enter the correct confirmation word';
 

@@ -1377,6 +1377,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get exitGroupConfirmWord => '退群';
+
+  @override
   String get exitGroupConfirmWordMismatch => '请输入正确的确认词';
 
   @override

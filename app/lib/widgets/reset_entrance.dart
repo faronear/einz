@@ -46,13 +46,19 @@ Future<bool> _confirmDestructive(
   required String entranceName,
   required bool hasPin,
   required ConfirmDialogCopy copy,
+
+  /// 名字缺失时要求用户照抄的固定词。缺省沿用「销毁本通道」的
+  /// [AppLocalizations.resetEntranceConfirmWord]（重置/RESET）；退群传自己的
+  /// 「退群/LEAVE」——两类操作语义不同，确认词不该共用（老板 2026-10-28）。
+  String? fallbackConfirmWord,
 }) async {
   if (!context.mounted) return false;
   // 通道名取不到（本地快照与服务端都问不出来）时退一步：改让用户打一个固定确认词。
   // 不可用性优先——本地快照缺 entranceName 的旧装机不该因此永远清不掉。
   final l10n = AppLocalizations.of(context)!;
-  final expected =
-      entranceName.trim().isEmpty ? l10n.resetEntranceConfirmWord : entranceName.trim();
+  final expected = entranceName.trim().isEmpty
+      ? (fallbackConfirmWord ?? l10n.resetEntranceConfirmWord)
+      : entranceName.trim();
   final ok = await showDialog<bool>(
     context: context,
     // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
@@ -192,10 +198,13 @@ Future<bool> confirmExitGroup(
   // 群名，用户不知道该输什么（老板 2026-10-19 实测）。
   final name = groupName.trim();
   final hasName = name.isNotEmpty;
-  final confirmWord = l10n.resetEntranceConfirmWord;
+  // 退群的固定确认词是「退群/LEAVE」，不是销毁通道那套「重置/RESET」
+  // （老板 2026-10-28：动作不同，确认词也该不同）。
+  final confirmWord = l10n.exitGroupConfirmWord;
   final ok = await _confirmDestructive(
     context,
     db: database,
+    fallbackConfirmWord: confirmWord,
     // 群名仅本机存储（服务端没有空间名字段），所以这里只能用它
     entranceName: groupName,
     hasPin: hasPin,

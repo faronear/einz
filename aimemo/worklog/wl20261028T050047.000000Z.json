@@ -1,0 +1,20 @@
+{
+  "utc": "20261028T050047.000000Z",
+  "time": "2026-10-28 13:00+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "退群确认词改「退群/LEAVE」，不再借用重置",
+      "detail": [
+        "老板 2026-10-28：退出群组的默认确认词不该是「重置/RESET」——动作语义不同。",
+        "机制：_confirmDestructive 新增可选 fallbackConfirmWord（缺省仍是 resetEntranceConfirmWord），confirmExitGroup 传新键 exitGroupConfirmWord；「销毁本通道」保持「重置/RESET」不变。",
+        "文案：zh「退群」/ en「LEAVE」；群名未设置时提示变为「群组还没有命名。请输入“退群”以确认」。",
+        "同步改 group_exit_flow_test 的期望值并重新 gen-l10n。",
+        "验证：flutter analyze 无问题；group_exit_flow_test 4 条全过。"
+      ]
+    }
+  ]
+}
