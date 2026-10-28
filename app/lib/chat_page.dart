@@ -6050,8 +6050,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _notice(
       context,
       picked.seconds == 0
-          ? l10n.chatPageBurnOff
-          : l10n.chatPageBurnWillDelete(_burnOptionLabel(picked.seconds, l10n)),
+          ? l10n.chatPageBurnAllOff
+          : l10n.chatPageBurnAllAfter(_burnOptionLabel(picked.seconds, l10n)),
     );
   }
 
@@ -6092,8 +6092,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _notice(
       context,
       seconds == 0
-          ? l10n.chatPageBurnOff
-          : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n)),
+          ? l10n.chatPageBurnOneOff
+          : l10n.chatPageBurnOneAfter(_burnOptionLabel(seconds, l10n)),
     );
   }
 

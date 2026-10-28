@@ -539,10 +539,19 @@
   "chatPageTombstoneHide": "Hide completely",
   "chatPageTombstoneHideDesc": "Disappear from the message flow entirely, leave no trace",
   "chatPageTombstoneSubmit": "Apply",
-  "chatPageBurnOff": "Burn-after-read is disabled on this message",
   "chatPageBurnFailed": "Failed to set burn-after-read",
-  "chatPageBurnWillDelete": "New messages auto-delete after {duration}",
-  "@chatPageBurnWillDelete": {
+  "chatPageBurnAllOff": "Burn-after-read is disabled for new messages",
+  "chatPageBurnAllAfter": "New messages will disappear after {duration}",
+  "chatPageBurnOneOff": "Burn-after is disabled on this message",
+  "chatPageBurnOneAfter": "This message will disappear after {duration}",
+  "@chatPageBurnOneAfter": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatPageBurnAllAfter": {
     "placeholders": {
       "duration": {
         "type": "String"

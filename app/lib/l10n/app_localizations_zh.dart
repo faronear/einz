@@ -838,14 +838,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTombstoneSubmit => '启用';
 
   @override
-  String get chatPageBurnOff => '已对这一个消息取消了阅后即焚';
+  String get chatPageBurnFailed => '设置失败阅后即焚';
 
   @override
-  String get chatPageBurnFailed => '设置阅后即焚失败';
+  String get chatPageBurnAllOff => '已关闭阅后即焚，新消息将不再自动消失';
 
   @override
-  String chatPageBurnWillDelete(String duration) {
-    return '新的消息将在 $duration 后自动删除';
+  String chatPageBurnAllAfter(String duration) {
+    return '新的消息将在 $duration 后消失';
+  }
+
+  @override
+  String get chatPageBurnOneOff => '已取消这个消息的延时即焚';
+
+  @override
+  String chatPageBurnOneAfter(String duration) {
+    return '这个消息将在 $duration 后消失';
   }
 
   @override

@@ -1568,23 +1568,35 @@ abstract class AppLocalizations {
   /// **'Apply'**
   String get chatPageTombstoneSubmit;
 
-  /// No description provided for @chatPageBurnOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Burn-after-read is disabled on this message'**
-  String get chatPageBurnOff;
-
   /// No description provided for @chatPageBurnFailed.
   ///
   /// In en, this message translates to:
   /// **'Failed to set burn-after-read'**
   String get chatPageBurnFailed;
 
-  /// No description provided for @chatPageBurnWillDelete.
+  /// No description provided for @chatPageBurnAllOff.
   ///
   /// In en, this message translates to:
-  /// **'New messages auto-delete after {duration}'**
-  String chatPageBurnWillDelete(String duration);
+  /// **'Burn-after-read is disabled for new messages'**
+  String get chatPageBurnAllOff;
+
+  /// No description provided for @chatPageBurnAllAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'New messages will disappear after {duration}'**
+  String chatPageBurnAllAfter(String duration);
+
+  /// No description provided for @chatPageBurnOneOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Burn-after is disabled on this message'**
+  String get chatPageBurnOneOff;
+
+  /// No description provided for @chatPageBurnOneAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'This message will disappear after {duration}'**
+  String chatPageBurnOneAfter(String duration);
 
   /// No description provided for @chatPageActionDelete.
   ///
