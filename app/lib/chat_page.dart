@@ -9750,7 +9750,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 左缩进 8px（老板 2026-10-24）：与播放键图标左缘对齐——播放键是
         // IconButton（compact 40px 盒、24px 图标居中 → 图标左缘距内容左边 8px），
         // 转写行原先从 0 起排，向左突出 8px。
-        Widget line(String iconModelId, String text, {TextStyle? textStyle}) =>
+        Widget line(String iconModelId, String text) =>
             Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Text.rich(
@@ -9765,7 +9765,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       alignment: PlaceholderAlignment.middle,
                       child: SizedBox(width: 4),
                     ),
-                    TextSpan(text: text, style: textStyle ?? style),
+                    TextSpan(text: text, style: style),
                   ],
                 ),
                 maxLines: 3,
@@ -9773,27 +9773,75 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 style: style,
               ),
             );
+        // 动作行（还没转写 / 失败 / 可重转）：药丸底 + 加粗 + 末尾 ›（老板
+        // 2026-10-28）。为什么不用下划线：下划线读作"链接"，而且细线在长列表里
+        // 扫不出来；药丸是**块**——一屏语音里哪些还要处理一眼可见（老板的原话：
+        // 许多语音消息里找不出"还需要转写"的那几条）。已完成/转写中仍是纯文字
+        // （不加粗），形状与字重两层对比同时成立。
+        // 底色分主题：渐变深气泡用白 22%，浅色气泡用黑 6%——#3A3A3A 文字在
+        // 两种底上都还有足够反差。
+        final actionStyle = style.copyWith(fontWeight: FontWeight.w600);
+        final pillColor = _uiStyle == 'gradient'
+            ? Colors.white.withValues(alpha: 0.22)
+            : Colors.black.withValues(alpha: 0.06);
+        Widget actionLine(String iconModelId, String text) => Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Clickable(
+                onTap: () => _transcribeVoiceMessage(m),
+                // 遮罩跟随药丸轮廓；深底场景用白系遮罩（默认黑在深底上看不出）
+                borderRadius: BorderRadius.circular(999),
+                overlayColor: _uiStyle == 'gradient' ? Colors.white : null,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: pillColor,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: _voiceTranscriptSourceIcon(
+                              iconModelId, transcriptColor),
+                        ),
+                        const WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: SizedBox(width: 4),
+                        ),
+                        TextSpan(text: text, style: actionStyle),
+                        const WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: SizedBox(width: 2),
+                        ),
+                        // 末尾箭头："这里能点"的另一个信号，也让药丸右侧有收口
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Icon(Icons.chevron_right,
+                              size: 15,
+                              color: transcriptColor.withValues(alpha: 0.75)),
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: actionStyle,
+                  ),
+                ),
+              ),
+            );
         if (t == null) {
           // 还没有任何转写行：手动模式下给行内「转写」入口（仅消息流气泡，
           // 由 [_buildAudioBar] 的 inlineTranscribeEntry 传入）。
           // 文案用「点按转写文字」（voiceTranscriptManual，老板 2026-10-23）——
           // 比「转写」多一步动作提示；长按菜单卡片仍用短文案 voiceTranscriptMenuTranscribe。
-          // 不加下划线（老板 2026-10-23）：这不是 URL 链接，实质是按钮，点击反馈
-          // 由 Clickable 自带。
           if (!manualEntry) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Clickable(
-              onTap: () => _transcribeVoiceMessage(m),
-              child: line(
-                _voiceTranscriptEngine == 'server'
-                    ? 'whisper-server'
-                    : 'sense-voice-small',
-                l10n.voiceTranscriptManual,
-                textStyle: style.copyWith(
-                    color: transcriptColor.withValues(alpha: 0.7)),
-              ),
-            ),
+          return actionLine(
+            _voiceTranscriptEngine == 'server'
+                ? 'whisper-server'
+                : 'sense-voice-small',
+            l10n.voiceTranscriptManual,
           );
         }
         switch (t.status) {
@@ -9814,22 +9862,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 行首同样带来源图标（老板 2026-10-23）：失败行的 modelId 在写入时
             // 就已落定（本地失败=sense-voice-small，服务端失败=whisper-server），
             // 与 done/pending 同一判断，点按重试不改变来源语义。
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Clickable(
-                onTap: () => _transcribeVoiceMessage(m),
-                child: line(
-                  t.modelId,
-                  t.status == 'failed'
-                      ? l10n.voiceTranscriptRetry
-                      : t.status == 'stale'
-                          ? l10n.voiceTranscriptStale
-                          : l10n.voiceTranscriptManual,
-                  // 同上：按钮不是链接，不加下划线
-                  textStyle: style.copyWith(
-                      color: transcriptColor.withValues(alpha: 0.7)),
-                ),
-              ),
+            return actionLine(
+              t.modelId,
+              t.status == 'failed'
+                  ? l10n.voiceTranscriptRetry
+                  : t.status == 'stale'
+                      ? l10n.voiceTranscriptStale
+                      : l10n.voiceTranscriptManual,
             );
         }
         return const SizedBox.shrink();
