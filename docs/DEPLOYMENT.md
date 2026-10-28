@@ -32,7 +32,7 @@
 | `shared/`     | 纯 Dart 核心（crypto/protocol/sync），CLI 与 App 共用 | 库，不独立运行                                 |
 | `cli/`        | Dart **TUI** 客户端（最完整的客户端实作）             | `dart run bin/einz_tui.dart --store <store> --server <url>` |
 | `app/`        | Flutter 手机客户端（V1 骨架 + 本地库）                | `flutter run`（真机验证待环境）                |
-| `server/docker/` | Docker Compose + Caddy（生产单机部署）                | `docker compose up -d`                         |
+| `server/docker/` | Docker Compose + Caddy（**备选**，非当前生产，见 §3.2） | `docker compose up -d`                       |
 
 ---
 
@@ -122,7 +122,7 @@ Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 > **数据文件位置（2026-10-07）**：`dataStore` 指定 SQLite 数据文件路径——绝对路径，或
 > **相对 `serverConfig.json` 所在目录**的相对路径（如 `"../data/einz.nosf.sqlite.db"`）。
 > 空/不填 = 内置默认 `server/data/einz.sqlite.db`。**优先级：`EINZ_DB` 环境变量 > `dataStore`
-> > 内置默认**——Docker 生产由 compose 的 `EINZ_DB` 覆盖（见 §3.1），本项主要给"不设 env
+> > 内置默认**——Docker 备选由 compose 的 `EINZ_DB` 覆盖（见 §3.2），本项主要给"不设 env
 > 的场景"（本机开发）一个持久默认值。相对路径以配置文件目录为基准（本机 `server/config/`、
 > 容器 `/config/`），同一串在两处都成立。
 > 典型用途：工作区经 Seafile 多机同步时，把库命名成带 `.nosf.` **中缀**的文件
@@ -178,9 +178,62 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫通道�
 环境变量 `EINZ_TUI_PICKER` 可强制路线：`auto`（默认，如上）、`browser`（一律内置浏览器，
 偏爱键盘或 pty 测试用）、`system`（一律系统窗口，用不了只报错、不落浏览器）。
 
-## 3. 生产部署（Docker Compose + Caddy，单机）
+## 3. 生产部署（裸 Node + systemd + Caddy，单机）
 
-### 3.1 目录与前置
+> **2026-10-28 定：生产从 Docker 容器切到宿主裸 Node**（commit 7776a9c0）。原因不是
+> "容器不好"，是构建路径太贵：大陆构建机跑 `docker compose build` 要跨境拉
+> better-sqlite3 预编译包，再 `git clone` + `cmake` 编译 whisper.cpp（N3150 无 AVX，
+> 实测近 1 小时未完成）。而 whisper 已退居备用（生产用 sensevoice），根本不该待在一次
+> 构建里。Docker 路径保留为备选（§3.2），**同一时刻只能跑一个**（都抢 `127.0.0.1:3000`
+> 和同一个 SQLite 库）。
+
+### 3.1 裸 Node + systemd（当前生产）
+
+**拓扑**：`用户 → Caddy(systemd) → 127.0.0.1:3000（einz-server.service，用户 adot）`
+
+**前置**：Node ≥ 20（走 nvm、装在 adot 名下）、git、系统级 Caddy（照
+`server/Caddyfile.example` 改，`reverse_proxy 127.0.0.1:3000`）。
+
+```bash
+# 0) 代码落地（§9.1）；默认部署根 /faronear/einz
+cd /faronear/einz/server
+
+# 1) 本地化配置：.env 不入库（备份密钥 / SMTP 等）。**仅首次**从模板复制，
+#    已有 .env 千万别覆盖（里面有备份密钥与 SMTP 密码）
+[ -f docker/.env ] || cp docker/env.example docker/.env
+#    EINZ_SERVER_HOST 留空 = 只听 127.0.0.1（生产就该留空，见下方"监听地址"）
+
+# 2) 依赖与编译（npm ci 走 lockfile；缓存热时很快，冷时是唯一可能失败的一步）
+npm ci --prefer-offline
+npm run build
+
+# 3) 装 systemd 服务（unit 在 server/einz-server.service）
+sudo cp einz-server.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now einz-server
+
+# 4) 验证
+systemctl is-active einz-server
+journalctl -u einz-server -n 20     # 期望 "server listening on 127.0.0.1:3000"
+curl -s http://127.0.0.1:3000/health
+```
+
+> ⚠️ **属主必须是 adot**：服务以 `adot` 运行，`server/data/`（含 sqlite 与 `-wal`/`-shm`）
+> 也得属 `adot`。用 root 跑过一次就留下 root 属主的库，之后服务反复重启、日志里是
+> `SQLITE_READONLY` —— `sudo chown -R adot:adot server/data` 即恢复（2026-10-27 实际踩到）。
+> **严禁 root 跑 server / `npm start`。**
+
+> ⚠️ **升级 Node 要同步改 unit**：`ExecStart` 里是 nvm 的绝对路径
+> （`/home/adot/.nvm/versions/node/v22.23.2/bin/npm`），只换 node 不改这里 → systemd 报
+> `203/EXEC`。改完 `sudo systemctl daemon-reload && sudo systemctl restart einz-server`。
+
+> **监听地址（2026-10-28）**：服务端默认只绑 `127.0.0.1`（fail-closed），3000 不直接对外，
+> 公网一律经 Caddy/隧道。空值等于没设（`listen(PORT,'')` 会绑 `::`，全网可见），代码已兜底，
+> 但生产 `.env` 里**别**写 `EINZ_SERVER_HOST=0.0.0.0` 图省事。
+
+**日常更新**：`npm run server-update-remote-bare`（git pull → npm ci → build → restart → /health，见 §9.2）。
+**日志**：`journalctl -u einz-server -f`（journald 自动轮转，不用配 logrotate）。
+
+### 3.2 Docker 备选：目录与前置
 
 ```text
 server/
@@ -240,7 +293,7 @@ echo '{"maxSpaces": 1}' > server/config/serverConfig.json
 > Docker 与 `npm run dev` 读的是**同一个** `server/config/serverConfig.json`（compose 卷
 > `../config:/config`）——改一处两端生效，不必维护两份。
 
-### 3.2 部署步骤
+### 3.3 Docker 备选：部署步骤
 
 ```bash
 cd server/docker
@@ -284,7 +337,7 @@ server 改走容器网络；127.0.0.1:3000 仍会在回环暴露便于排障）�
 不开入站端口，境外域名由 CF 边缘终止 TLS 后经隧道转到 `server:3000`。
 `caddy` 与 `cftunnel` 可组合（`COMPOSE_PROFILES=caddy,cftunnel`）。
 
-#### 3.2.1 邮件通知（可选，不配 = 关闭）
+#### 3.3.1 邮件通知（可选，不配 = 关闭）
 
 没进应用商店 → 没有后台推送，所以服务端给离线的一方**发一封邮件**把他拉回来
 （`docs/PROTOCOL.md` §7.5）。凭据同样走 `server/docker/.env`（`docker-compose.yml`
@@ -337,7 +390,7 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
   Tailscale exit node）；`535` = 用户名或密码错；`553/554` = 发件地址没登记为
   approved sender；到信箱里找不着 = SPF/DKIM 没配对。
 
-### 3.3 验证部署
+### 3.4 验证部署
 
 ```bash
 # 健康检查（免协议版本头）
@@ -355,7 +408,10 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 客户端改用 `--server https://<你的域名>`（TUI）/ 设置页填域名（App）即可远程使用（WS 自动为 `wss://`）。
 
-### 3.4 端口与数据目录
+### 3.5 端口与数据目录
+
+> 裸 Node 下同一批路径相对 `server/`：`data/einz.sqlite.db`、`data/files/`、
+> `data/backups/`、`data/avatars/`。下表给的是 Docker 备选路径的容器内映射。
 
 | 项               | 位置（容器内）           | 说明                                         |
 | ---------------- | ------------------------ | -------------------------------------------- |
@@ -392,7 +448,7 @@ v1 时代那份《一次性配置手册》（静态白名单 config.json + 密�
 ### 5.1 服务器备份 / 恢复（SQLite Backup API + 加密归档）
 
 ```bash
-cd server   # 或 docker compose exec server npm run backup
+cd server   # 裸 Node 直接跑；Docker 备选：docker compose exec server npm run backup
 
 # 备份（需 EINZ_DB_BACKUP_KEY，base64 32B）
 export EINZ_DB_BACKUP_KEY="<部署时生成的密钥>"
@@ -484,14 +540,15 @@ curl -X POST http://127.0.0.1:3000/entrances/dev-b1/revoke \
 
 ```bash
 # 1) 先停服务（避免删库时还有写入）
-docker compose down          # 或停掉 systemd 里的进程
+sudo systemctl stop einz-server      # Docker 备选：docker compose down
 
 # 2) 删数据目录内容（库 + WAL + files/ 附件 + backups/ + avatars/）
-rm -rf server/data/*         # Docker 部署删的是**卷内容**，不是容器
+rm -rf server/data/*         # 裸 Node 直接删宿主目录；Docker 备选删的是卷内容，不是容器
 
 # 3) 启动
 python3 -c "import json;print(open('server/config/serverConfig.json').read())"  # 确认配置还在
-docker compose up -d
+sudo chown -R adot:adot server/data && sudo systemctl start einz-server
+# Docker 备选：docker compose up -d
 ```
 
 - **别删配置**：`server/config/serverConfig.json`（Docker 与裸 node 共用这一份，卷挂
@@ -534,10 +591,17 @@ docker compose up -d
 
 ## 7. 故障排查
 
+> 生产是**裸 Node + systemd**（§3.1）。标 **[Docker 备选]** 的行只适用于备选路径。
+> 看服务端日志一律用 `journalctl -u einz-server -f`（不再有 `docker compose logs`）。
+
 | 症状                                   | 原因                                                      | 处理                                                        |
 | -------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
 | Server 起不来 / 端口占用               | 端口被占或 Node 版本过低（需 ≥20）                        | 换 `PORT=`；`node -v` 确认版本                              |
-| `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.3 验证                                                |
+| `systemctl status` 显示 `203/EXEC`   | unit 里 `ExecStart` 的 nvm 路径失效（升级/换 Node 版本） | 改 `server/einz-server.service` 的 node 绝对路径 → `daemon-reload` → restart |
+| 服务反复重启、日志 `SQLITE_READONLY`  | `server/data/` 里有 root 属主的库（曾用 root 跑过）      | `sudo chown -R adot:adot /faronear/einz/server/data` 后 restart |
+| 域名 502 / 连接被拒                     | 服务只绑了 `127.0.0.1`，Caddy 上游写成了 `localhost`   | Caddyfile 写 `reverse_proxy 127.0.0.1:3000`；`ss -ltnp \| grep 3000` 确认在听 |
+| `npm ci` 卡住或失败                    | 大陆拉官方源（better-sqlite3 预编译在 GitHub、sherpa-onnx 包较大） | 重试一次（`npm run server-update-remote-bare` 已内置 `--prefer-offline` + 一次重试）；仍失败再 `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com npm ci`（**临时**，别写进 lock） |
+| `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.4 验证                                                |
 | CLI 报 libsodium 加载失败              | 未设`LIBSODIUM_PATH`（或 libsodium 装在非标准路径）       | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
 | `/auth` 失败 403 `FORBIDDEN`           | 通道未登记（常见：**服务端库被清空/重置**，或换了新库）    | 客户端只警告、数据不丢；查 entrances 表是否有该 entrance_id。库被重置时用备份恢复库，或让通道重新 `/space join` |
 | `/auth` 失败 403 `ENTRANCE_REVOKED`      | 该通道已被明确撤销（§5.3）                                | 通道端已自毁本地数据，只能重新 `/space join` 入网           |
@@ -547,9 +611,9 @@ docker compose up -d
 | WS 连不上                              | 反代未开 WSS / token 未 URL 编码                          | 检查 Caddy；token 含`+`/`=` 需编码（客户端自动处理）        |
 | `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/einz-build`），产物拷回    |
 | 撤销后通道仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                    |
-| 备份命令拒绝执行                       | 未设置`EINZ_DB_BACKUP_KEY`                                | 设置 base64 32B 密钥（§3.2/§5.1）                           |
-| **docker 构建挂在 `RUN npm ci`**       | 大陆构建机跨境拉 GitHub（better-sqlite3 预编译包）与 nodejs.org（Node 头文件）双双超时——**这网络是一阵好一阵坏，先重试** | 重试；仍不行就一次性切镜像（不必改文件）：<br>`sudo docker compose build --build-arg NPM_MIRROR=https://registry.npmmirror.com --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 server && sudo docker compose up -d server`<br>再不行：本机构建后 `docker save \| ssh cn1 docker load` |
-| 邮件通知"未启用"                       | `server/docker/.env` 少变量，或服务器上那份**不入库**的 `docker-compose.yml` 没补那 5 行 | §3.2.1；`docker compose exec server sh -c 'env \| grep EINZ_SMTP'` 看有没有 |
+| 备份命令拒绝执行                       | 未设置`EINZ_DB_BACKUP_KEY`                                | 设置 base64 32B 密钥（§3.1/§5.1）                           |
+| **[Docker 备选] docker 构建挂在 `RUN npm ci`** | 大陆构建机跨境拉 GitHub（better-sqlite3 预编译包）与 nodejs.org（Node 头文件）双双超时——**这网络是一阵好一阵坏，先重试** | 重试；仍不行就一次性切镜像（不必改文件）：<br>`sudo docker compose build --build-arg NPM_MIRROR=https://registry.npmmirror.com --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 server && sudo docker compose up -d server`<br>再不行：本机构建后 `docker save \| ssh cn1 docker load`（注意镜像 build-arg 只影响元数据解析，tarball 仍按 lock 的 `resolved` 走官方源——所以 lock 只能有一个源，见 `server/.npmrc`） |
+| 邮件通知"未启用"                       | `.env` 少变量（裸 Node 读 `server/docker/.env`；Docker 备选还要看 compose 有没有转发） | 对照 §3.3.1 的 5 个变量；`journalctl -u einz-server \| grep 邮件通知` 看启动时的判定；Docker 备选再 `docker compose exec server sh -c 'env \| grep EINZ_SMTP'` |
 
 ---
 
@@ -592,24 +656,33 @@ git status --short                                          # 应只显示本地
 > 说明：`git checkout -b main origin/main` 会把仓库代码写入工作树并覆盖同名旧文件
 > （server/、server/docker/ 等对齐到仓库版本）；本地数据文件因 .gitignore 而保持不动。
 
-### 9.2 每次更新：本机 push → VPS pull → 重建 server 容器
+### 9.2 每次更新：本机 push → VPS pull → 重启服务
 
 ```bash
 # 本机（macOS/Linux）：新代码提交并推送到远程仓库
-cd /Users/Shared/productX/einz
 git push origin main
 ```
 
 ```bash
-# VPS：拉取 → 重建 server 容器（server 代码进镜像，必须 --build）
-cd $EINZ_ROOT
-git pull --ff-only
-cd server/docker
-docker compose up -d --build server
-docker compose ps                                       # 确认 server 重新 running/healthy
+# 本机一键（推荐）：ssh 到 cn1 跑 git pull → npm ci → build → systemctl restart → /health
+npm run server-update-remote-bare
 ```
 
-> Caddy 容器与 `server/docker/.env`（备份密钥、域名等）无需改动。
+等价手工（脚本内部就是这几步，顺序刻意把 restart 放在最后——中途失败不会把线上打下来）：
+
+```bash
+cd $EINZ_ROOT && git pull --ff-only
+cd server
+npm ci --prefer-offline     # 冷缓存时这是唯一可能失败的一步；失败即中止，旧进程继续服务
+npm run build
+sudo systemctl restart einz-server
+systemctl is-active einz-server
+curl -s -H 'X-Protocol-Version: 3' http://127.0.0.1:3000/health
+```
+
+> `.env`（备份密钥、SMTP 等）与 Caddy 配置无需改动。
+> **[Docker 备选]** 走 `cd server/docker && docker compose up -d --build server`；
+> 注意它与 systemd 服务**不能同时跑**（抢 `127.0.0.1:3000` 与同一个 SQLite 库）。
 
 ### 9.3 验证新端点
 
@@ -636,4 +709,4 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
 | 通道在册状态             | 无需改动（既有通道与会话不受影响）                                                                                                                         |
 | Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖）                                                                                                 |
 | App 侧                   | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                             |
-| 回滚                     | `cd $EINZ_ROOT && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ shared/` → 重新 `docker compose up -d --build server` |
+| 回滚                     | `cd $EINZ_ROOT && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ shared/` → `cd server && npm ci --prefer-offline && npm run build && sudo systemctl restart einz-server`（Docker 备选则重建容器） |

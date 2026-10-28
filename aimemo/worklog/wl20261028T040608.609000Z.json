@@ -1,0 +1,51 @@
+{
+  "utc": "20261028T040608.609000Z",
+  "time": "2026-10-28 12:10+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "评估：生产从 Docker 切裸 Node 是否合理",
+      "detail": [
+        "结论：合理，且理由比\"省构建时间\"更硬——whisper 已退居备用（生产 sensevoice），却还待在 docker build 路径里：npm ci 跨境拉 better-sqlite3 预编译 + git clone whisper.cpp + cmake 编译（N3150 无 AVX，实测近 1 小时未完成）。",
+        "裸 Node + systemd 反而多给：开机自启、Restart=on-failure、journald、以 adot 非 root 运行；部署脚本把 restart 放最后，中途失败不影响线上。",
+        "代价：容器那层\"不可变镜像 / 回滚\"没了（git checkout 等价），但每次部署要全量 npm ci（93MB / 7 个直接依赖），缓存冷时是新的高频失败点。"
+      ]
+    },
+    {
+      "brief": "文档改造：DEPLOYMENT.md 生产路径改为裸 Node",
+      "detail": [
+        "§3 标题改「裸 Node + systemd + Caddy」，新增 3.1（拓扑/前置/步骤/属主坑/Node 升级坑/监听地址），原 Docker 内容降为 §3.2–3.3 并标「备选」；§3.4/§3.5 顺延。",
+        "§7 故障排查加裸 Node 行（203/EXEC、SQLITE_READONLY、502 因 Caddy 写了 localhost、npm ci 卡住），Docker 行加 [Docker 备选] 前缀；§7 顶部说明日志改用 journalctl。",
+        "§9.2 升级改 `npm run server-update-remote-bare` 为主，Docker 为备选；§9.5 回滚同步改；§5.1 备份、§5.5 重置的 docker 命令改为 systemctl 优先。",
+        "§1 仓库角色表与文档头部的\"适用场景\"同步改口径。"
+      ]
+    },
+    {
+      "brief": "部署脚本：离线优先 + 一次重试",
+      "detail": [
+        "scripts/updateServerRemoteBare.sh：npm ci 改 `--prefer-offline`，失败自动重试一次；两次都失败即中止（restart 在最后，旧进程继续服务）。",
+        "去掉 /health 探测里硬编码的 X-Protocol-Version: 3 —— /health 在 assertProtocolVersion 白名单里，不需要该头，硬编码会随协议升版腐烂。",
+        "头部注释记下：不要为绕过失败把 registry 改镜像再 npm install（会污染 lock）。"
+      ]
+    },
+    {
+      "brief": "package-lock.json 统一回官方源",
+      "detail": [
+        "根因：本机 npm 用户配置指向 registry.npmmirror.com，一次普通 npm install 把 9 条 resolved 写成镜像（chokidar / readdirp / sherpa-onnx 全家），与其余 79 条官方源混在一份 lock 里——cn1 的 npm ci 因此隐式依赖镜像可达，且没人知道。",
+        "已把 9 条改回 https://registry.npmjs.org/；新增 server/.npmrc（registry=官方）挡住本机 npm install 再次漂移，注释给出临时救急写法 NPM_CONFIG_REGISTRY=... npm ci。",
+        "注意：npm 项目级 .npmrc 里必须真有一行 registry=，只写注释不会生效（我第一次只写了注释，npm config get registry 仍是镜像）。"
+      ]
+    },
+    {
+      "brief": "验证与限制",
+      "detail": [
+        "验证：docs 结构/交叉引用核对（§3.x 全部指向新区号）；bash -n 语法通过；在 /tmp 副本里 npm ci 成功（58 包 3s，全命中缓存，无 EINTEGRITY）。",
+        "限制：本次沙箱无外网（DNS 被 fake-ip 接管，curl 两个源都 000），官方源可达性未能实测；推理依据是 npmmirror 只是官方代理、版本存在即官方存在。cn1 下次部署（脚本已带重试）是真正的验证点。",
+        "遗留：server/data 与 .env 的属主/位置仍是老状态；备份没有任何定时任务（全仓 grep 无 cron），待定。"
+      ]
+    }
+  ]
+}

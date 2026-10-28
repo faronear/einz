@@ -6,6 +6,8 @@
 #
 # 注意：node 走 nvm（~adot/.nvm/...），不用 /usr/bin/node。ExecStart 直接指向 npm。
 # 更新代码后：sudo systemctl restart einz-server
+# ⚠ 升级/切换 Node 版本必须同步改下面 ExecStart 与 Environment=PATH 里的绝对路径，
+#   否则 systemd 报 203/EXEC（改完 sudo systemctl daemon-reload 再 restart）。
 
 [Unit]
 Description=Einz Server (bare Node production)
