@@ -1,0 +1,22 @@
+{
+  "utc": "20261028T064331.000000Z",
+  "time": "2026-10-28 14:43+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "语音包安装改非模态顶部进度条（Overlay + 百分比 + 两行布局）",
+      "detail": [
+        "老板 2026-10-28：模型可能下载很久，模态对话框会一直挡住操作。改成状态条下方的进度条，与状态胶囊等宽（左右 12），两行：标题+选项 / 进度条+百分比+取消。",
+        "最终形态：挂**根 Overlay**（老板自己拍板 Overlay，而非内联推列表）——贴在状态胶囊下方（top = padding.top + kToolbarHeight + 4 + kNoticeExtraTopBelowStatusBar），非模态，只占自己区域；入场贴顶滑下+淡入 220ms，退场 160ms 反向。",
+        "行为：单实例（_voiceModelPrep 复用同一 future，重复调用不会再出第二条）；「选项」只开转写设置弹层、不打断安装；「取消」立即收起 + 置旗标让 ensureInstalled 在下一检查点中止；完成/取消自动收起；页面 dispose 时主动摘 OverlayEntry（切空间/回向导不残留）。",
+        "进度用 ValueNotifier 驱动（_voiceModelProgress），下载期间不触发整页 setState；百分比定宽 34 + FontFeature.tabularFigures，右侧按钮不抖。",
+        "两行间距 6 → 12：Options 在上行右端、Cancel 在下行右端，老板担心误触（2026-10-28）。",
+        "清理：原 AlertDialog 实现整体删除；上一版为它加的 GrayButton（无其他引用）一并删除。根 Overlay 里加 DefaultTextStyle 兜底，防 MaterialApp 的黄色双下划线样式漏进来（同 top_notice 的坑）。",
+        "验证：flutter analyze 无问题；chat_page_menu_test + voice_transcript_line_test 53 条全过；老板真机确认「完美」。"
+      ]
+    }
+  ]
+}

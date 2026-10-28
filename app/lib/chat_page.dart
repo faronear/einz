@@ -487,6 +487,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 是否自动转写（默认 false = 每条询问：不论本机还是服务端，执行前都会问；
   /// true = 按 [_voiceTranscriptEngine] 自动转写）。
   bool _voiceTranscriptAuto = false;
+
+  // 语音包安装（老板 2026-10-28 非模态进度条）：同一时刻只允许一个任务——
+  // 重复调用复用同一个 future，不再弹出第二个窗/条。
+  Future<({bool ok, String? error})>? _voiceModelPrep;
+  bool _voiceModelPrepCancelled = false;
+  // 进度条挂在**根 Overlay** 上（老板 2026-10-28：不推消息列表）：进度用
+  // ValueNotifier 驱动，下载期间不触发整页 setState。
+  ValueNotifier<double>? _voiceModelProgress;
+  OverlayEntry? _voiceModelBannerEntry;
+  final GlobalKey<_VoiceModelBannerState> _voiceModelBannerKey =
+      GlobalKey<_VoiceModelBannerState>();
+
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
@@ -6164,6 +6176,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _input.dispose();
     _inputFocusNode.dispose();
     _audioPlaybackVersion.dispose();
+    // 安装进度条挂在根 Overlay 上：页面销毁时必须摘掉，否则会留在
+    // 下一条路由上（切空间/回向导都可能发生）。
+    _voiceModelBannerEntry?.remove();
+    _voiceModelBannerEntry = null;
+    _voiceModelProgress?.dispose();
+    _voiceModelProgress = null;
     super.dispose();
   }
 
@@ -9889,121 +9907,98 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         color: foreground.withValues(alpha: 0.85),
       );
 
-  /// 模型准备（§11，模型 ~228MB 随包分发）：进度对话框（百分比+MB），可取消。
-  /// 正常发布构建 = 从包内资产拷进应用目录；dev 构建没跑 fetchVoiceModel.sh
-  /// 时 ensureInstalled 自动回落下载，同一对话框不感知差异。
-  /// 返回 true=模型就绪；false=用户取消或准备失败（失败已 notice 说明）。
-  /// 用户在窗内点「设置转写方式」链接也算取消（返回 false/null）——紧接着
-  /// 会打开转写设置弹层（见方法尾部）。
-  Future<({bool ok, String? error})> _prepareVoiceModel() async {
-    final l10n = AppLocalizations.of(context)!;
-    var cancelled = false;
-    var received = 0;
-    // 点了「设置转写方式」链接：关窗后转开设置弹层（安装已取消，与点 Cancel
-    // 同路——cancelled 旗标会让 ensureInstalled 在下一个检查点中止，不会
-    // 与设置里 Apply 触发的下一轮安装并发）
-    var openSettings = false;
-    // 安装失败的错误文本（null=没出错/用户主动取消）：呈现方式交给调用方——
-    // 消息气泡路径走顶部通知条；预览态转写路径在底部弹层内显示（老板
-    // 2026-10-25：转写链路的失败信息统一进弹层，不再放通知条）。
+  /// 模型准备（§11，模型 ~228MB 随包分发）：**非模态**顶部进度条（老板
+  /// 2026-10-28 改版，原先是模态对话框）。
+  ///
+  /// - 位置/宽度：贴在状态条下方、与状态胶囊左右对齐（margin 12）；
+  /// - 两行：标题 + 「选项」，进度条 + 「取消」；
+  /// - 非模态：显示期间聊天页照常可操作；同一时刻只允许一个安装任务
+  ///   （重复调用复用同一个 future，不会再出第二条）；
+  /// - 「选项」只开转写设置弹层，**不打断**安装；只有「取消」中止；
+  /// - 完成（或取消）即自行收起。
+  /// 返回 ok=true 表示模型就绪；ok=false 表示用户取消或失败（error 非空
+  /// 才是真失败——取消不报错，_Cancelled 是内部异常名不能露给用户）。
+  Future<({bool ok, String? error})> _prepareVoiceModel() {
+    return _voiceModelPrep ??= _runVoiceModelPrep().whenComplete(() {
+      _voiceModelPrep = null;
+    });
+  }
+
+  /// 真正的安装过程（[_prepareVoiceModel] 的单一实例主体）。
+  Future<({bool ok, String? error})> _runVoiceModelPrep() async {
+    _voiceModelPrepCancelled = false;
+    _showVoiceModelBanner();
     String? error;
-    final total = VoiceTranscriptModel.totalBytes;
-    // ⚠️ 任务必须**只在 builder 首次执行时启动一次**：进度回调 setState 会让
-    // StatefulBuilder 的 builder 整体重跑——启动语句若直接写在 builder 里，
-    // 每次重建都会再起一个 ensureInstalled（239MB 拷贝/下载并发炸开：进度
-    // 瞬间 100% 后彻底卡死，多个 pop(true) 重入 Navigator 触发红屏断言
-    // `!_debugLocked`，并发 ByteData 内存暴涨把 macOS 顶成黑屏）。
-    // 2026-10-12 真机实测踩坑（Android 红屏 + macOS 黑屏），改动前先读这段。
-    var started = false;
-    // 对话框只允许被 pop 一次：用户点 Cancel 时 route 进入退场动画但仍在导航栈里
-    // （ctx.mounted 仍为 true），随后 ensureInstalled 抛 _Cancelled，catch 里若
-    // 再 pop 就是双重 pop——把底下聊天页一起弹掉，黑屏（2026-10-24 真机实测）。
-    // 三路出口（完成/失败取消/用户取消）共用旗标，谁先到谁关窗。
-    var dismissed = false;
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
-        if (!started) {
-          started = true;
-          // 进度对话框打开即开跑；失败把错误顶到 SnackBar 并关窗
-          unawaited(() async {
-            try {
-              await VoiceTranscriptModel.ensureInstalled(
-                onProgress: (rec, _) {
-                  if (ctx.mounted) setState(() => received = rec);
-                },
-                cancelled: () => cancelled,
-              );
-              if (!dismissed && ctx.mounted) {
-                dismissed = true;
-                Navigator.of(ctx).pop(true);
-              }
-            } catch (e) {
-              if (!dismissed && ctx.mounted) {
-                dismissed = true;
-                Navigator.of(ctx).pop(false);
-              }
-              // 用户主动取消（_Cancelled）不是失败：error 留 null，否则会
-              // 露出 "Instance of '_Cancelled'" 这种内部异常名；真失败记下文本，
-              // 由调用方决定通知条还是弹层显示
-              if (!cancelled) error = '$e';
-            }
-          }());
-        }
-        final pct = total == 0 ? 0 : (received * 100 / total).clamp(0, 100);
-        return AlertDialog(
-          title: Text(l10n.voiceTranscriptPreparing),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LinearProgressIndicator(value: total == 0 ? null : received / total),
-              const SizedBox(height: 8),
-              Text(
-                  '${(received / 1048576).toStringAsFixed(1)} / '
-                  '${(total / 1048576).toStringAsFixed(0)} MB  ·  ${pct.toStringAsFixed(0)}%',
-                  style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-          actions: [
-            // 「选项」（老板 2026-10-28，原「设置」）：下载中途改主意——取消
-            // 本次安装关窗，转开转写设置弹层（改方式/时机）。与 Cancel 钮同路
-            // （cancelled + dismissed 旗标），防双重 pop。
-            // 两个按钮都走淡灰底（GrayButton / CancelButton）：纯文字太像说明
-            // 文字，有底才看得出"这里能点"（老板 2026-10-28）。
-            GrayButton(
-              label: l10n.voiceTranscriptOptionsLink,
-              onPressed: () {
-                cancelled = true;
-                openSettings = true;
-                if (!dismissed) {
-                  dismissed = true;
-                  Navigator.of(ctx).pop(false);
-                }
-              },
-            ),
-            CancelButton(
-              onPressed: () {
-                cancelled = true;
-                // 与异步三路共用 dismissed：用户先关窗，随后 _Cancelled 的
-                // catch 看到旗标已置位便不再 pop（防双重 pop 黑屏）
-                if (!dismissed) {
-                  dismissed = true;
-                  Navigator.of(ctx).pop(false);
-                }
-              },
-            ),
-          ],
-        );
-      }),
-    );
-    // 点了「设置转写方式」：关窗后打开转写设置弹层。本方法随后返回
-    // false/null（=用户取消），调用方静默收尾——设置里 Apply 本地方式会
-    // 再走本方法开新一轮安装，链路自洽。
-    if (openSettings && mounted) {
-      await _showVoiceTranscriptPicker();
+    try {
+      await VoiceTranscriptModel.ensureInstalled(
+        onProgress: (received, total) {
+          if (!mounted || _voiceModelPrepCancelled) return;
+          _voiceModelProgress?.value =
+              total == 0 ? 0 : (received / total).clamp(0.0, 1.0);
+        },
+        cancelled: () => _voiceModelPrepCancelled,
+      );
+      return (ok: true, error: null);
+    } catch (e) {
+      // 用户主动取消不算失败：_Cancelled 是内部异常名，不该出现在提示里
+      if (!_voiceModelPrepCancelled) error = '$e';
+      return (ok: false, error: error);
+    } finally {
+      _hideVoiceModelBanner();
     }
-    return (ok: ok ?? false, error: error);
+  }
+
+  /// 「取消」：立刻收起进度条，并让 ensureInstalled 在下一个检查点中止。
+  /// 只置旗标、不等安装线程收尾——用户要的是"现在就消失"。
+  void _cancelVoiceModelPrep() {
+    _voiceModelPrepCancelled = true;
+    _hideVoiceModelBanner();
+  }
+
+  /// 插入安装进度条（根 Overlay，单实例）。
+  void _showVoiceModelBanner() {
+    if (_voiceModelBannerEntry != null) return;
+    final l10n = AppLocalizations.of(context)!;
+    final progress = ValueNotifier<double>(0);
+    _voiceModelProgress = progress;
+    final entry = OverlayEntry(
+      builder: (ctx) => DefaultTextStyle(
+        // 根 Overlay 里的文字会继承 MaterialApp 的兜底样式（黄色双下划线），
+        // 与顶部通知同一个坑——入口处先挡住（详见 top_notice.dart 的说明）。
+        style: Theme.of(ctx).textTheme.bodyMedium ?? const TextStyle(),
+        child: _VoiceModelBanner(
+          key: _voiceModelBannerKey,
+          progress: progress,
+          title: l10n.voiceTranscriptPreparing,
+          optionsLabel: l10n.voiceTranscriptOptionsLink,
+          cancelLabel: l10n.cancel,
+          // 只开设置弹层，不打断安装（老板 2026-10-28）
+          onOptions: () => unawaited(_showVoiceTranscriptPicker()),
+          onCancel: _cancelVoiceModelPrep,
+        ),
+      ),
+    );
+    _voiceModelBannerEntry = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
+  }
+
+  /// 收起安装进度条：先播退场动画，再摘 OverlayEntry（无状态时直接摘）。
+  void _hideVoiceModelBanner() {
+    final entry = _voiceModelBannerEntry;
+    if (entry == null) return;
+    _voiceModelBannerEntry = null;
+    void remove() {
+      if (entry.mounted) entry.remove();
+      _voiceModelProgress?.dispose();
+      _voiceModelProgress = null;
+    }
+
+    final bannerState = _voiceModelBannerKey.currentState;
+    if (bannerState == null) {
+      remove();
+    } else {
+      bannerState.dismiss(remove);
+    }
   }
 
   /// 转写一条消息的总入口（长按菜单「转写」卡 + 行内 failed/stale/unavailable
@@ -14765,6 +14760,191 @@ class _HourglassFlipState extends State<_HourglassFlip>
         _controller.value < 0.5 ? Icons.hourglass_top : Icons.hourglass_bottom,
         size: widget.size,
       ),
+    );
+  }
+}
+
+/// 语音包安装进度条（老板 2026-10-28）：挂在**根 Overlay** 上、贴在状态条
+/// 下方（与状态胶囊等宽，左右各 12），非模态——只占自己那块区域，其余操作
+/// 照常；同一时刻只会存在一条（由 [_ChatPageState._showVoiceModelBanner] 保证）。
+class _VoiceModelBanner extends StatefulWidget {
+  const _VoiceModelBanner({
+    super.key,
+    required this.progress,
+    required this.title,
+    required this.optionsLabel,
+    required this.cancelLabel,
+    required this.onOptions,
+    required this.onCancel,
+  });
+
+  final ValueListenable<double> progress;
+  final String title;
+  final String optionsLabel;
+  final String cancelLabel;
+  final VoidCallback onOptions;
+  final VoidCallback onCancel;
+
+  @override
+  State<_VoiceModelBanner> createState() => _VoiceModelBannerState();
+}
+
+class _VoiceModelBannerState extends State<_VoiceModelBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+    reverseDuration: const Duration(milliseconds: 160),
+  );
+  late final Animation<double> _slide = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward(); // 贴顶滑下 + 淡入（与顶部通知条同款入场）
+  }
+
+  /// 收起：播放退场动画后再由调用方移除 OverlayEntry（重复调用只生效一次）。
+  void dismiss(VoidCallback onDone) {
+    if (_closing) return;
+    _closing = true;
+    _controller.reverse().whenComplete(onDone);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      // 与顶部通知条同一竖位：状态胶囊下方（kToolbarHeight + 4 + 46）。
+      top: MediaQuery.paddingOf(context).top +
+          kToolbarHeight +
+          4 +
+          kNoticeExtraTopBelowStatusBar,
+      left: 0,
+      right: 0,
+      child: FadeTransition(
+        opacity: _slide,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, -1),
+            end: Offset.zero,
+          ).animate(_slide),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: _buildCard(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard() {
+    return Container(
+      key: const ValueKey('voiceModelBanner'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF33415A), // 与顶部通知条同色（深蓝灰）
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x3333415A),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  // 普通字体（老板 2026-10-28）：不加粗，别跟状态条抢
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFFFFF5FA)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _button(label: widget.optionsLabel, onTap: widget.onOptions),
+            ],
+          ),
+          // 两行之间留 12：Options 在上行右端、Cancel 在下行右端，贴太近
+          // 容易误触（老板 2026-10-28）。
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: widget.progress,
+                    builder: (_, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 4,
+                      backgroundColor: Colors.white.withValues(alpha: 0.22),
+                      // 品牌粉：深底上比纯白更醒目，也不与状态灯撞色
+                      valueColor:
+                          const AlwaysStoppedAnimation(Color(0xFFD6529C)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 百分比：定宽 + 等宽数字，个位/十位/100% 切换时右侧按钮不跳
+              ValueListenableBuilder<double>(
+                valueListenable: widget.progress,
+                builder: (_, value, _) => SizedBox(
+                  width: 34,
+                  child: Text(
+                    '${(value * 100).clamp(0, 100).round()}%',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color(0xFFFFF5FA).withValues(alpha: 0.85),
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _button(label: widget.cancelLabel, onTap: widget.onCancel),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 条上的小按钮（深底浅字 + 白 12% 底）：选项/取消共用。
+  Widget _button({required String label, required VoidCallback onTap}) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFFFF5FA),
+        backgroundColor: Colors.white.withValues(alpha: 0.12),
+        minimumSize: const Size(0, 26),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        shape: const StadiumBorder(),
+      ),
+      child: Text(label),
     );
   }
 }
