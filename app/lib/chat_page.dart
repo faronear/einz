@@ -13126,7 +13126,7 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
     final theme = Theme.of(context);
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -13142,7 +13142,7 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
             // notice 说明，图标不翻转）。约定同气泡转写行来源图标、设置页
             // 引擎卡片（见 _voiceTranscriptSourceIcon）。
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -13206,7 +13206,7 @@ class _PreviewTranscribeSheetState extends State<_PreviewTranscribeSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             // 按钮行（老板 2026-10-26）：Cancel / Apply **一直并排常驻**、
             // **等宽等尺寸**（参照 My email alerts 这类系统弹窗的 Cancel/Submit）。
             // - 此前 Apply 是转写成功后才插入：会凭空出现并把 Cancel 向右挤，

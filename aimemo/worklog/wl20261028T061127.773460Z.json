@@ -1,0 +1,19 @@
+{
+  "utc": "20261028T061127.773460Z",
+  "time": "2026-10-28 14:11+08:00",
+  "host": "DoomBase",
+  "os": "MacOS 15.8.1",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "预览转写弹层间距调大",
+      "detail": [
+        "老板 2026-10-28：长按波形弹出的语音转写弹层（_PreviewTranscribeSheet）标题、转写结果、按钮之间太近，内容不多不必紧凑。",
+        "改动三处（chat_page.dart）：标题行 padding fromLTRB(16,14,16,5)→(16,18,16,14)；内容区与按钮行之间 SizedBox 12→20；弹层底部 SafeArea 内 Padding bottom 12→16。",
+        "验证：flutter analyze 无问题。纯视觉调整，按惯例未跑测试。",
+        "提交时工作区另有老板未提交的改动（app_zh.arb/app_localizations_zh.dart 消息留痕文案、package.json 新增 server-run-service 等），未混入本提交。"
+      ]
+    }
+  ]
+}
