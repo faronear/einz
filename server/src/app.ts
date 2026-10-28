@@ -81,8 +81,10 @@ import {
 } from './notifier.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
-// EINZ_SERVER_HOST 默认仅回环：生产经 Caddy 反代；开发/测试时设 0.0.0.0 供真机、模拟器(10.0.2.2)直连
-const HOST = process.env.EINZ_SERVER_HOST ?? "127.0.0.1"
+// 监听地址默认仅回环（fail-closed）：生产一律经 Caddy 反代，3000 不直接对外。
+// 开发/测试要真机、安卓模拟器(10.0.2.2)直连时才设 0.0.0.0——注意空值也算没设：
+// listen(PORT, '') 会绑到 ::（全网可见），所以这里用 trim()+|| 而不是 ??，绝不把空串放过去。
+const HOST = process.env.EINZ_SERVER_HOST?.trim() || "127.0.0.1"
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? 'info') !== 'quiet'
 const SERVER_VERSION = '1.0.0'
 // 协议版本（PROTOCOL.md §1）：REST 头 X-Protocol-Version / WS 握手 ?pv=。

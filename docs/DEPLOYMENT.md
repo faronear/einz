@@ -52,7 +52,7 @@ npm run build            # tsc 编译到 dist/
 node dist/app.js         # 默认 :3000；PORT=3000 可指定；数据落在 server/data/
 ```
 
-看到 `[einz] server listening on :3000` 即就绪。`GET /health` 返回
+看到 `[einz] server listening on 127.0.0.1:3000` 即就绪。`GET /health` 返回
 `{ "status": "ok", "protocol_version": "v2-multiverse", "capabilities": [...] }`。
 
 ### 2.2 两台设备接入（TUI）
@@ -255,6 +255,18 @@ EINZ_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
 docker compose ps                       # server  healthy/running
 ```
 
+> **监听地址（2026-10-28）**：服务端默认只绑 `127.0.0.1`（fail-closed），3000 不直接
+> 对外——公网访问一律经 Caddy/隧道。据此各形态的分工是：
+> - **裸 node（当前生产，systemd）**：`.env` 里**不要**设 `EINZ_SERVER_HOST`（留空即回环）；
+> - **Docker**：compose 里**硬编码** `EINZ_SERVER_HOST=0.0.0.0`——容器内绑回环的话，端口发布、
+>   内置 caddy 的 `server:3000`、cloudflared 的 `http://server:3000` 全都连不上（直接 502）。
+>   对外是否暴露由 `ports` 的 `127.0.0.1:` 前缀决定，与容器内绑什么无关；
+> - **本机开发要真机/模拟器直连**：`EINZ_SERVER_HOST=0.0.0.0 npm run dev`（安卓可用
+>   `adb reverse tcp:3000 tcp:3000` 免开端口）。
+>
+> ⚠️ 空值等于没设（`listen(PORT,'')` 会绑到 `::`，全网可见），代码已按此兜底，
+> 但别在生产 `.env` 里写 `EINZ_SERVER_HOST=0.0.0.0` 图省事——那正是要避免的暴露。
+>
 > 说明：`docker-compose.yml` 已预置 `EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}` 注入
 > （由 compose 自动读取 `server/docker/.env` 提供，.env 已在 .gitignore、不入库）。
 > 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。

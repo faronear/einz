@@ -71,6 +71,11 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3000
+      # 容器内必须绑 0.0.0.0：容器里绑 127.0.0.1 只落到容器自己的 lo，
+      # docker 的端口发布、内置 caddy 的 server:3000、cloudflared 的 http://server:3000
+      # 全都打在容器 eth0 上 → 连接被拒 → 502（对外是否暴露**不由这里决定**，
+      # 而由下面 ports 的 127.0.0.1 前缀决定）。app.ts 的默认 127.0.0.1 是给裸 node 用的。
+      - EINZ_SERVER_HOST=0.0.0.0
       # 服务端配置文件（可选）：宿主机 ../config/serverConfig.json（= server/config/）→ 容器 /config/。
       # 文件缺失时服务端按默认值启动（当前唯一字段 maxSpaces：0=不限 / n=上限）。
       - EINZ_CONFIG=/config/serverConfig.json

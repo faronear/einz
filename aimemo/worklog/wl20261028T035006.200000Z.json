@@ -1,0 +1,41 @@
+{
+  "utc": "20261028T035006.200000Z",
+  "time": "2026-10-28 11:50+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "8c76108f 评审：默认绑回环方向对，但 Docker 全链路会断、空值 fail-open",
+      "detail": [
+        "结论：8c76108f（EINZ_SERVER_HOST 默认 127.0.0.1）方向正确——生产已切裸 Node + 宿主 Caddy（7776a9c0），顺带收回 listen(PORT) 绑 :: 的暴露面；但实现有两处硬伤。",
+        "硬伤 1（严重）：compose 的 environment 没转发 EINZ_SERVER_HOST，Dockerfile CMD 是 node dist/app.js（不走 --env-file），env.example 那行进不了容器 → 容器内只绑容器自身 lo，ports 发布、内置 caddy 的 server:3000、cloudflared 的 http://server:3000 全部连接被拒 → 502；而 DEPLOYMENT.md §3 仍以 docker 为生产主路径。",
+        "硬伤 2（中）：?? 不拦空串，实测 listen(0,'') 绑到 ::（全网）——模板留空是最常见写法，等于把 fail-closed 变成 fail-open。",
+        "实测：node v22 --env-file 会剥掉值后的内联注释（#  前有空格），所以 env.example 原写法在裸 node dev 下不会把注释带进值。"
+      ]
+    },
+    {
+      "brief": "修复：保留默认回环，补 compose 硬编码 + 文档",
+      "detail": [
+        "app.ts: HOST = process.env.EINZ_SERVER_HOST?.trim() || '127.0.0.1'（空串/纯空格回落回环）。",
+        "docker-compose.yml: environment 硬编码 EINZ_SERVER_HOST=0.0.0.0，注释说明容器内命名空间与\"对外暴露由 ports 的 127.0.0.1 前缀决定\"。",
+        "env.example: 该键改为留空 + 注释（生产留空=回环；只有裸 node 真机调试才填 0.0.0.0），避免有人把模板拷到生产后被动暴露 3000。",
+        "Caddyfile.example: 注明裸 node 上游写 127.0.0.1、别写 localhost（只绑 IPv4，::1 会 502）。",
+        "DEPLOYMENT.md §2.1 日志行改为 listening on 127.0.0.1:3000；§3.2 增\"监听地址\"分工块（裸 node 留空 / Docker 硬编码 0.0.0.0 / 开发 0.0.0.0 或 adb reverse）。"
+      ]
+    },
+    {
+      "brief": "验证",
+      "detail": [
+        "npx tsc 通过；绑定矩阵实测：unset → 127.0.0.1、空串 → 127.0.0.1、纯空格 → 127.0.0.1、0.0.0.0 → *:port。",
+        "docker compose config 渲染出 EINZ_SERVER_HOST: 0.0.0.0。",
+        "npx tsx test/smoke.test.ts 通过（测试全程连 127.0.0.1，不受影响）。"
+      ]
+    },
+    {
+      "brief": "判断记录：不开 3000 公网",
+      "detail": "老板问\"保持简单让 3000 公网可见有风险吗\"。结论：有，且\"简单\"站不住——生产已是 Caddy + 回环、零改动即最简；开放 3000 反而多一条明文旁路（bearer token 明文过网）、XFF 链首可伪造使限速与审计失效、Host 头无校验可污染邀请链接、免认证 POST /spaces 可被扫描器刷爆单机、源 IP 丧失隐蔽。E2EE 下聊天内容不泄漏，可被利用的是身份冒用与元数据。"
+    }
+  ]
+}

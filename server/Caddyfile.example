@@ -7,6 +7,8 @@
 
 einz.yuanjinx.com einz.cn1.yuanjinx.com einz.farinear.cn einz.bittic.cn {
     # reverse_proxy server:3000 # caddy in docker in the same network with einz server
+    # 裸 node：写 127.0.0.1，**别写 localhost**——服务端只绑 IPv4 回环，
+    # localhost 在双栈机器上会先解析到 ::1，运气不好就 502。
     reverse_proxy 127.0.0.1:3000 # caddy as system service on the host
 
     encode gzip
