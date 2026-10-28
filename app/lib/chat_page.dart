@@ -7170,15 +7170,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 输入栏「+」附件菜单的操作卡片：圆角方形，内含图标与文字；destructive 用
-  /// 红色标示删除等不可逆操作。图标随主题（素色）——消息长按菜单另用橘黄版
-  /// [_buildMessageActionCard]（2026-10-27 起两种菜单分开两种类型）。
-  /// [iconSize] 供字形偏高的图标（如 copy_outlined 竖向占 20/24）单独缩小，
-  /// 与邻居图标光学对齐（2026-10-08）；缺省 26 与原尺寸一致。
+  // ---------- 「+」附件菜单的配色（2026-10-27） ----------
+  // 每个入口按**类型**给不同色相，同类同色（图片=青、视频=靛、音频=紫、
+  // 文件=蓝、表情=琥珀、粘贴=灰蓝）。与「消息菜单统一橘黄」刻意相反：
+  // 橘黄 = "这条消息被选中"；多色 = "这里能创建/发送什么"。两种弹层两种视觉语言。
+  static const Color _attachImageColor = Color(0xFF26A69A);
+  static const Color _attachVideoColor = Color(0xFF3949AB);
+  static const Color _attachAudioColor = Color(0xFF8E24AA);
+  static const Color _attachFileColor = Color(0xFF1E88E5);
+  static const Color _attachEmojiColor = Color(0xFFF9A825);
+  static const Color _attachPasteColor = Color(0xFF546E7A);
+
+  /// 输入栏「+」附件菜单的操作卡片：图标染 [accent]、底铺同色 10%，按下整卡
+  /// 微缩（见 [_AttachmentActionCardTile]）；[destructive] 项强制走红色。
+  /// [iconSize] 供字形偏高的图标单独缩小，与邻居光学对齐（2026-10-08）。
   Widget _buildActionCard({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    required Color accent,
     bool destructive = false,
     double iconSize = 26,
   }) {
@@ -7186,6 +7196,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       iconWidget: Icon(icon, size: iconSize),
       label: label,
       onTap: onTap,
+      accent: accent,
       destructive: destructive,
     );
   }
@@ -7198,36 +7209,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required Widget iconWidget,
     required String label,
     required VoidCallback onTap,
+    required Color accent,
     bool destructive = false,
   }) {
-    final foreground = destructive ? Colors.red.shade400 : null;
-    return Material(
-      color: Colors.black.withValues(alpha: 0.05),
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(mouseCursor: SystemMouseCursors.click,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconTheme.merge(
-                data: IconThemeData(color: foreground),
-                child: iconWidget,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: foreground),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _AttachmentActionCardTile(
+      iconWidget: iconWidget,
+      label: label,
+      onTap: onTap,
+      accent: accent,
+      destructive: destructive,
     );
   }
 
@@ -8457,61 +8447,85 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 无标题行、无关闭钮（老板 2026-10-27，与长按消息菜单统一）：两处
           // 都靠「点弹层外」关闭，本弹层另有下滑关闭；关闭圆钮只留在设置类
           // 弹层（我的通道/阅后即焚等），动作菜单不放。
-          child: _buildActionCardGrid([
-            // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
-            if (_hasCameraCapture) ...[
-              _buildActionCard(
-                icon: Icons.photo_camera,
-                label: l10n.chatPageAttachPhoto,
-                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 顶部拖拽条（2026-10-27）：去掉关闭钮后，这根小横条是「可以下滑
+              // 关闭」的通用暗示（iOS 底部弹层惯例）——比按钮轻，不打断卡片网格。
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
+              _buildActionCardGrid([
+                // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
+                if (_hasCameraCapture) ...[
+                  _buildActionCard(
+                    icon: Icons.photo_camera_rounded,
+                    accent: _attachImageColor,
+                    label: l10n.chatPageAttachPhoto,
+                    onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
+                  ),
+                ],
+                _buildActionCard(
+                  icon: Icons.photo_library_rounded,
+                  accent: _attachImageColor,
+                  label: l10n.chatPageAttachGalleryImage,
+                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.galleryImage),
+                ),
+                if (_hasCameraCapture) ...[
+                  _buildActionCard(
+                    icon: Icons.videocam_rounded,
+                    accent: _attachVideoColor,
+                    label: l10n.chatPageAttachVideoCamera,
+                    onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoCamera),
+                  ),
+                ],
+                _buildActionCard(
+                  icon: Icons.movie_rounded,
+                  accent: _attachVideoColor,
+                  label: l10n.chatPageAttachVideoGallery,
+                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoGallery),
+                ),
+                _buildActionCard(
+                  icon: Icons.music_note_rounded,
+                  accent: _attachAudioColor,
+                  label: l10n.chatPageAttachAudioFile,
+                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.audioFile),
+                ),
+                _buildActionCard(
+                  icon: Icons.insert_drive_file_rounded,
+                  accent: _attachFileColor,
+                  label: l10n.chatPageAttachAnyFile,
+                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
+                ),
+                // 表情符放最后（老板 2026-09-15）：附件优先，表情不是附件
+                _buildActionCard(
+                  icon: Icons.emoji_emotions_rounded,
+                  accent: _attachEmojiColor,
+                  label: l10n.chatPageAttachEmoji,
+                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
+                ),
+                // 「粘贴」排表情符之后——整个网格的末尾（老板 2026-10-12 指定）。
+                // **总显示、不做剪贴板预检**：iOS 上 App 读剪贴板会弹系统"已粘贴"
+                // 横幅，每开一次面板弹一次没人受得了；空了就空了，点了由
+                // _pasteFromClipboard 提示「剪贴板是空的」兜底（老板拍简：接受这个
+                // 代价，换实现简单 + iOS 不被横幅骚扰）。放末尾也不挤常用入口。
+                // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
+                if (_clipboardPasteSupported)
+                  _buildActionCard(
+                    icon: Icons.content_paste_rounded,
+                    accent: _attachPasteColor,
+                    label: l10n.chatPageAttachPaste,
+                    onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
+                  ),
+              ]),
             ],
-            _buildActionCard(
-              icon: Icons.photo_library,
-              label: l10n.chatPageAttachGalleryImage,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.galleryImage),
-            ),
-            if (_hasCameraCapture) ...[
-              _buildActionCard(
-                icon: Icons.videocam,
-                label: l10n.chatPageAttachVideoCamera,
-                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoCamera),
-              ),
-            ],
-            _buildActionCard(
-              icon: Icons.movie,
-              label: l10n.chatPageAttachVideoGallery,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoGallery),
-            ),
-            _buildActionCard(
-              icon: Icons.music_note,
-              label: l10n.chatPageAttachAudioFile,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.audioFile),
-            ),
-            _buildActionCard(
-              icon: Icons.insert_drive_file,
-              label: l10n.chatPageAttachAnyFile,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
-            ),
-            // 表情符放最后（老板 2026-09-15）：附件优先，表情不是附件
-            _buildActionCard(
-              icon: Icons.emoji_emotions_outlined,
-              label: l10n.chatPageAttachEmoji,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
-            ),
-            // 「粘贴」排表情符之后——整个网格的末尾（老板 2026-10-12 指定）。
-            // **总显示、不做剪贴板预检**：iOS 上 App 读剪贴板会弹系统"已粘贴"
-            // 横幅，每开一次面板弹一次没人受得了；空了就空了，点了由
-            // _pasteFromClipboard 提示「剪贴板是空的」兜底（老板拍简：接受这个
-            // 代价，换实现简单 + iOS 不被横幅骚扰）。放末尾也不挤常用入口。
-            // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
-            if (_clipboardPasteSupported)
-              _buildActionCard(
-                icon: Icons.content_paste,
-                label: l10n.chatPageAttachPaste,
-                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
-              ),
-          ]),
+          ),
         ),
       ),
     );
@@ -13710,6 +13724,98 @@ Future<void> showMyAvatarFullscreen(
           ),
         ),
       ));
+}
+
+/// 「+」附件菜单的动作卡片（老板 2026-10-27“更生动鲜明”）——与消息长按菜单的
+/// [_MessageActionCardTile] 是**两种类型**，各自演化：那边统一橘黄（“这条消息被
+/// 选中”），这边按入口类型多色（“这里能创建/发送什么”）。
+///
+/// 视觉：图标染 [accent]、整块铺同色 10% 淡底；文字维持默认深色（浅色底上最
+/// 清楚）。destructive 项强制红色。
+/// 手感：与消息卡片同一套——按下整卡缩到 0.94、松开弹回（110ms），水波/悬停用
+/// 本卡自己的色相。手势语言统一、配色分型，两处切换不会觉得“手感也换了”。
+class _AttachmentActionCardTile extends StatefulWidget {
+  const _AttachmentActionCardTile({
+    required this.iconWidget,
+    required this.label,
+    required this.onTap,
+    required this.accent,
+    this.destructive = false,
+  });
+
+  final Widget iconWidget;
+  final String label;
+  final VoidCallback onTap;
+
+  /// 本入口的类型色（图片/视频/音频/文件/表情/粘贴各一支）。
+  final Color accent;
+
+  final bool destructive;
+
+  @override
+  State<_AttachmentActionCardTile> createState() =>
+      _AttachmentActionCardTileState();
+}
+
+class _AttachmentActionCardTileState extends State<_AttachmentActionCardTile> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent =
+        widget.destructive ? Colors.red.shade400 : widget.accent;
+    return Listener(
+      // 只做按压视觉反馈，不参与手势竞争（点按仍由内层 InkWell 处理）。
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: Material(
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            onTap: widget.onTap,
+            splashColor: accent.withValues(alpha: 0.18),
+            highlightColor: accent.withValues(alpha: 0.10),
+            hoverColor: accent.withValues(alpha: 0.06),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconTheme.merge(
+                    data: IconThemeData(color: accent),
+                    child: widget.iconWidget,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.destructive ? accent : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 消息长按菜单的动作卡片（老板 2026-10-27“更显眼、更生动”）——与「+」附件
