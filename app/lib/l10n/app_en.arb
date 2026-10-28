@@ -610,7 +610,7 @@
     }
   },
   "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.",
-  "chatPageMsgsSyncing": "Waiting to sync… Send/receive temporarily unavailable, local messages only",
+  "chatPageMsgsSyncing": "Waiting to sync… Service temporarily unavailable, local messages only",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
