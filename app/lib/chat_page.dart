@@ -7073,9 +7073,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             label: l10n.chatPageActionSave,
             onTap: () => Navigator.of(ctx).pop('save'),
           ),
-        // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-        _buildMessageActionCard(
-          icon: Icons.timer_outlined,
+        // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）；
+        // 图标与顶栏/汉堡菜单同族用沙漏（2026-10-28），不用时钟
+        _buildMessageActionCardWidget(
+          iconWidget: const _BurnHourglass(burned: false, size: 26),
           label: l10n.chatPageActionBurn,
           onTap: () => Navigator.of(ctx).pop('burn'),
         ),
