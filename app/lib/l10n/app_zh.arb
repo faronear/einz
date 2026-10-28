@@ -629,7 +629,7 @@
   },
   "voiceTranscriptNoText": "未识别到文字",
   "voiceTranscriptSheetTitle": "语音转写",
-  "voiceTranscriptSettingsLink": "设置",
+  "voiceTranscriptOptionsLink": "选项",
   "apply": "应用",
   "chatPageMenuVoiceTranscriptAuth": "语音转写",
   "voiceTranscriptAuthNote": "怎样把语音消息转成文字？",

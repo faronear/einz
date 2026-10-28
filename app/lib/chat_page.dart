@@ -9927,10 +9927,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
-            // 「设置转写方式」链接（老板 2026-10-25）：下载中途改主意——取消
+            // 「选项」（老板 2026-10-28，原「设置」）：下载中途改主意——取消
             // 本次安装关窗，转开转写设置弹层（改方式/时机）。与 Cancel 钮同路
             // （cancelled + dismissed 旗标），防双重 pop。
-            TextButton(
+            // 两个按钮都走淡灰底（GrayButton / CancelButton）：纯文字太像说明
+            // 文字，有底才看得出"这里能点"（老板 2026-10-28）。
+            GrayButton(
+              label: l10n.voiceTranscriptOptionsLink,
               onPressed: () {
                 cancelled = true;
                 openSettings = true;
@@ -9939,9 +9942,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Navigator.of(ctx).pop(false);
                 }
               },
-              child: Text(l10n.voiceTranscriptSettingsLink),
             ),
-            TextButton(
+            CancelButton(
               onPressed: () {
                 cancelled = true;
                 // 与异步三路共用 dismissed：用户先关窗，随后 _Cancelled 的
@@ -9951,7 +9953,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Navigator.of(ctx).pop(false);
                 }
               },
-              child: Text(l10n.cancel),
             ),
           ],
         );

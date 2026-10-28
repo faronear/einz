@@ -1115,7 +1115,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptSheetTitle => 'Voice transcription';
 
   @override
-  String get voiceTranscriptSettingsLink => 'Settings';
+  String get voiceTranscriptOptionsLink => 'Options';
 
   @override
   String get apply => 'Apply';

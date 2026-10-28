@@ -1,0 +1,20 @@
+{
+  "utc": "20261028T050508.000000Z",
+  "time": "2026-10-28 13:05+08:00",
+  "host": "doombase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "语音模型下载弹窗：「设置」改「选项」，两个按钮都加淡灰底",
+      "detail": [
+        "老板 2026-10-28：文字按钮看不出可点，要求两个按钮都有默认背景色；顺带把「设置」改名为「选项/Options」。",
+        "l10n 键 voiceTranscriptSettingsLink → voiceTranscriptOptionsLink（值 设置→选项 / Settings→Options），并 gen-l10n。",
+        "新增通用的 GrayButton（widgets/cancel_button.dart）：与 CancelButton 同一套 grayButtonStyle（淡灰 5% 底、悬浮 10%、按压 14%、96x50、17 号粗体），供弹窗里的次要动作复用；下载弹窗的「选项」用它，「取消」用 CancelButton。",
+        "顺带收益：两个按钮从文字大小变成 96x50 块头，点击区域明显变大。",
+        "验证：flutter analyze 无问题；voice_transcript_line_test + chat_page_menu_test 共 53 条全过。"
+      ]
+    }
+  ]
+}

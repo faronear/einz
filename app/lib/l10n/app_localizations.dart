@@ -1916,11 +1916,11 @@ abstract class AppLocalizations {
   /// **'Voice transcription'**
   String get voiceTranscriptSheetTitle;
 
-  /// No description provided for @voiceTranscriptSettingsLink.
+  /// No description provided for @voiceTranscriptOptionsLink.
   ///
   /// In en, this message translates to:
-  /// **'Settings'**
-  String get voiceTranscriptSettingsLink;
+  /// **'Options'**
+  String get voiceTranscriptOptionsLink;
 
   /// No description provided for @apply.
   ///

@@ -1054,7 +1054,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceTranscriptSheetTitle => '语音转写';
 
   @override
-  String get voiceTranscriptSettingsLink => '设置';
+  String get voiceTranscriptOptionsLink => '选项';
 
   @override
   String get apply => '应用';

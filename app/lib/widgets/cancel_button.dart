@@ -38,6 +38,25 @@ WidgetStateProperty<Color?> _grayOverlay() {
   });
 }
 
+/// 通用淡灰底按钮（与 [CancelButton] 同一套样式，文案/动作自定）：
+/// 用于弹窗里的**次要动作**——低强调，但有底色，一眼看出可点
+/// （老板 2026-10-28：纯文字按钮太像说明文字）。
+class GrayButton extends StatelessWidget {
+  const GrayButton({super.key, required this.label, this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      style: grayButtonStyle().copyWith(overlayColor: _grayOverlay()),
+      onPressed: onPressed,
+      child: Text(label),
+    );
+  }
+}
+
 /// 统一的「取消」按钮（老板 2026-10-18）：淡灰底色，取代此前各弹窗
 /// 有的用边框（OutlinedButton）、有的纯文字无底色的不一致。
 class CancelButton extends StatelessWidget {
