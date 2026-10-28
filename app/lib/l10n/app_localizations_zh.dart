@@ -820,7 +820,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTombstoneHeading => '消息留痕';
 
   @override
-  String get chatPageTombstoneNote => '已删除/已焚毁/已撤回的消息是否显示？';
+  String get chatPageTombstoneNote => '是否显示已删除/已焚毁/已撤回的消息？';
 
   @override
   String get chatPageTombstoneKeep => '占位留痕';
