@@ -1018,7 +1018,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMsgsSyncing =>
-      'Waiting to sync… Send/receive temporarily unavailable, local messages only';
+      'Waiting to sync… Service temporarily unavailable, local messages only';
 
   @override
   String get chatPageMsgResending => 'Resending…';

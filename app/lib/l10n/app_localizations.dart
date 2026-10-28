@@ -1745,7 +1745,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMsgsSyncing.
   ///
   /// In en, this message translates to:
-  /// **'Waiting to sync… Send/receive temporarily unavailable, local messages only'**
+  /// **'Waiting to sync… Service temporarily unavailable, local messages only'**
   String get chatPageMsgsSyncing;
 
   /// No description provided for @chatPageMsgResending.
