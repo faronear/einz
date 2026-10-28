@@ -1,0 +1,18 @@
+{
+  "utc": "20261028T064904.963752Z",
+  "time": "2026-10-28 14:49+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修复 server nodemailer 3 个 moderate 漏洞",
+      "detail": "GitHub Dependabot 报 server/package-lock.json 里 nodemailer 的 addressparser 有 3 个 moderate 漏洞（嵌套注释提前结束把后续内容当收件人 GHSA-8c8m-p3m8-cjg8；引号/注释内 ';' 提前结束地址组把显示文本变收件人 GHSA-m943-m63m-w62w；引号 local-part 内 '>' 提前结束 angle-addr 导致投递到非预期域名 GHSA-85x2-q946-cp5h）。server/ 里 npm audit fix 升级 nodemailer 10.0.13→10.2.1（同大版本小升级，API 无变动），audit 归零"
+    },
+    {
+      "brief": "npmmirror 不支持 npm audit",
+      "detail": "默认 registry 是 npmmirror 时 npm audit 报 404 NOT_IMPLEMENTED，须加 --registry=https://registry.npmjs.org 才能审计；GitHub Dependabot 报漏洞但本地 audit 为 0 时，先怀疑子目录有独立 lockfile（本次根目录 audit 干净、漏洞在 server/）"
+    }
+  ]
+}
