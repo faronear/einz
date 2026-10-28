@@ -9832,7 +9832,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [_buildVoiceTranscriptLine]。
   Widget _voiceTranscriptSourceIcon(String modelId, Color foreground) => Icon(
         modelId == 'whisper-server' ? Icons.cloud_outlined : Icons.memory,
-        size: 14,
+        size: 16,
         color: foreground.withValues(alpha: 0.85),
       );
 

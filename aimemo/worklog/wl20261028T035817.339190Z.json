@@ -1,0 +1,14 @@
+{
+  "utc": "20261028T035817.339190Z",
+  "time": "2026-10-28 11:58:17+08:00",
+  "host": "mac15",
+  "os": "macOS",
+  "user": "lukas",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "气泡转写来源图标加大到 16px",
+      "detail": "老板反馈语音消息气泡里芯片/云图标看着比旁边 13 号转写字体矮。_voiceTranscriptSourceIcon 的 size 14→16（芯片=本机、云=远程同时生效），WidgetSpan middle 对齐不变。设置页引擎卡片只是注释性「同款样式」引用不共用代码，零波及；纯视觉尺寸调整，未跑 analyze/测试"
+    }
+  ]
+}
