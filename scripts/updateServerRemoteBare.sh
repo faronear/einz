@@ -1,7 +1,13 @@
 #!/bin/bash
 # 在 cn1 上裸 Node 更新并重启 einz-server（生产 systemd 服务）
+#
+# 在哪跑：**开发机**（iMac / MacBook）的仓库根目录，不要在 cn1 上跑（脚本内部就 ssh 到 cn1）。
 # 用法：npm run server-update-remote-bare
-# 等价于手工：ssh cn1 'cd /faronear/einz/; git pull; cd server; npm ci; npm run build; sudo systemctl restart einz-server'
+# 等价于手工：ssh adot@cn1 'cd /faronear/einz/; git pull; cd server;
+#   npm ci; npm run build; sudo systemctl restart einz-server'
+#
+# 前提：本机到 adot@cn1 免密（cn1 在 /etc/hosts 指向 Tailscale 地址）；
+#   adot 需免密 sudo，否则最后一步 restart 会停在密码提示。
 #
 # 注意（2026-10-28）：
 #   · npm ci 每次都删 node_modules 重装（7 个直接依赖 / 93MB，含 better-sqlite3 原生
@@ -14,7 +20,7 @@
 
 set -e
 echo "▶ cn1 bare-node update..."
-bash ssh.sh cn1 '
+ssh adot@cn1 '
 set -e
 cd /faronear/einz/
 echo "▶ git pull..."

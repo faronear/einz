@@ -230,7 +230,9 @@ curl -s http://127.0.0.1:3000/health
 > 公网一律经 Caddy/隧道。空值等于没设（`listen(PORT,'')` 会绑 `::`，全网可见），代码已兜底，
 > 但生产 `.env` 里**别**写 `EINZ_SERVER_HOST=0.0.0.0` 图省事。
 
-**日常更新**：`npm run server-update-remote-bare`（git pull → npm ci → build → restart → /health，见 §9.2）。
+**日常更新**：在**开发机**（iMac / MacBook）的仓库根目录跑 `npm run server-update-remote-bare`
+（脚本内部 `ssh adot@cn1`，即 git pull → npm ci → build → restart → /health，见 §9.2）。
+不要在 cn1 上跑它，也不要 `cd server` 后跑（npm 脚本挂在仓库根 `package.json`）。
 **日志**：`journalctl -u einz-server -f`（journald 自动轮转，不用配 logrotate）。
 
 ### 3.2 Docker 备选：目录与前置
@@ -664,7 +666,7 @@ git push origin main
 ```
 
 ```bash
-# 本机一键（推荐）：ssh 到 cn1 跑 git pull → npm ci → build → systemctl restart → /health
+# 开发机上一键（推荐，在仓库根目录）：内部 ssh 到 cn1 跑 git pull → npm ci → build → restart → /health
 npm run server-update-remote-bare
 ```
 

@@ -1,0 +1,20 @@
+{
+  "utc": "20261028T041143.874000Z",
+  "time": "2026-10-28 12:20+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "updateServerRemoteBare.sh 改为直接 ssh adot@cn1",
+      "detail": [
+        "老板问\"这脚本在 iMac 上调用还是要登 cn1\"→ 定位：脚本是**远端执行器**，在开发机仓库根跑，内部 ssh 到 cn1 执行 git pull → npm ci --prefer-offline（失败重试一次）→ build → systemctl restart → /health；restart 在最后，中途失败旧进程继续服务。",
+        "先按 ssh.sh 绝对路径改过一版（0039a056），老板指出 ssh.sh 是他自己的本地脚本、不必依赖 → 已 reset --soft 撤回该提交，改为直接 `ssh adot@cn1`。",
+        "同批修掉根 package.json 里残留的 `ssh.sh cn1` 前缀：dns-report、server-update-remote（后者仍是 docker 时代的更新路径，语义未动，仅换 ssh 前缀）。",
+        "前提记进脚本头：本机到 adot@cn1 免密（cn1 在 /etc/hosts 指 Tailscale 地址 100.100.86.1），adot 需免密 sudo，否则 restart 会停在密码提示。",
+        "验证：bash -n 通过；未对生产执行。"
+      ]
+    }
+  ]
+}
