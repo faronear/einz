@@ -81,6 +81,8 @@ import {
 } from './notifier.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
+// EINZ_SERVER_HOST 默认仅回环：生产经 Caddy 反代；开发/测试时设 0.0.0.0 供真机、模拟器(10.0.2.2)直连
+const HOST = process.env.EINZ_SERVER_HOST ?? "127.0.0.1"
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? 'info') !== 'quiet'
 const SERVER_VERSION = '1.0.0'
 // 协议版本（PROTOCOL.md §1）：REST 头 X-Protocol-Version / WS 握手 ?pv=。
@@ -950,6 +952,7 @@ setInterval(() => {
 // 邮件通知的定时 tick（自身按 SMTP 配置决定是否真的跑，见 notifier.startNotifier）
 startNotifier()
 
-server.listen(PORT, () => {
-  console.log(`[einz] server listening on :${PORT}`)
+// 只绑回环：公网访问一律经 Caddy 反代（einz.yuanjinx.com 等），3000 不直接对外
+server.listen(PORT, HOST, () => {
+  console.log(`[einz] server listening on ${HOST}:${PORT}`)
 })
