@@ -1,0 +1,57 @@
+{
+  "utc": "20261029T055748.000000Z",
+  "time": "2026-10-29 13:57+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "现象",
+      "detail": "老板报告手机版（iOS + Android，均为 GitHub CI 10/28 出包）一拨电话就立刻断掉，两端都打不通。老板怀疑域名问题。"
+    },
+    {
+      "brief": "服务端与域名核验：都正常",
+      "detail": [
+        "DoH 解析：turn.farinear.cn / turn.bittic.cn → 36.154.238.42（cn1）；turn.tic.cc → 129.153.80.126（us2）",
+        "STUN Binding（本机直发 UDP 3478）：两台都有应答",
+        "TURN Allocate（带 einz + 编译期口令，MESSAGE-INTEGRITY）：两台都分配成功，realm 各自不同——凭证有效",
+        "结论：不是域名/服务端/coturn 问题"
+      ]
+    },
+    {
+      "brief": "根因：TURN 地址里混入一条非法条目，整条 PeerConnection 建不起来",
+      "detail": [
+        "localConfig.turn.json（CI secret 同源）最后一段写成 `turn:36.154.238.42:3478;turn:129.153.80.126:3478`",
+        "客户端只按 `,` 切分 → 整串被当成一个 URL；libwebrtc 的 ice_server_parsing.cc 报 `Invalid port (SYNTAX_ERROR)`",
+        "用 Pod 里的 WebRTC.xcframework 直接跑 ObjC 探针（/tmp/rtcprobe/probe2.m）实测：单个合法 OK、两条合法 OK、分号串 nil、合法+分号坏条也 nil —— **一条坏条目会毁掉整个 RTCConfiguration**",
+        "于是 createPeerConnection 抛错 → VoiceCallService.invite() 的 catch 直接 _end(failed) → 界面一闪就断"
+      ]
+    },
+    {
+      "brief": "为什么现在才炸",
+      "detail": "9/26 那版 TURN 只有一条 `turn:einz.yuanjinx.com:3478`（当时实测跨网打通）；10/11 迁移独立域名时改成现在这串并引入分号坏条目，此后没有再成功通话过。与 10/27 的语音转写合并无关——该合并前后 voice_call_service.dart 只差一行注释，chat_page 的通话接线、Info.plist、AndroidManifest 均未改动（已 diff 核实）。"
+    },
+    {
+      "brief": "代码改动（未提交，待真机复测）",
+      "detail": [
+        "app/lib/data/voice_call_service.dart：新增 sanitizeTurnUrls()——`,` 与 `;` 都当分隔符，并按 libwebrtc 的解析严格卡形状（scheme + 主机字符集 + 端口 1–65535），非法条目一律丢弃并在 debug 包打一行日志；_iceServers 改用它",
+        "同一文件：invite()/accept() 的 catch 里加 debugPrint（以前静默，排障时看不出断在哪一步）",
+        "app/localConfig.turn.json：分号改逗号（该文件 gitignore，不进仓库）",
+        "app/test/turn_resolve_test.dart：新增 sanitizeTurnUrls 用例（分号拆分/垃圾条目/端口越界/主机带 @ ?）"
+      ]
+    },
+    {
+      "brief": "验证",
+      "detail": "flutter analyze 干净；flutter test test/turn_resolve_test.dart 7 项全绿。真机复测待老板出 CI 包。"
+    },
+    {
+      "brief": "待办",
+      "detail": [
+        "老板重出 CI 包（iOS + Android）复测",
+        "建议顺手把 GitHub secrets.VOICE_TURN_URLS 改成逗号分隔的 6 条，与 app/localConfig.turn.json 保持一致（代码已有兜底，不改也不会再炸）",
+        "开发脚本 app-apk-run / app-ios-run 仍不带 TURN（只读 localConfig.android/ios.json）；老板已表态不接，出 release 测"
+      ]
+    }
+  ]
+}

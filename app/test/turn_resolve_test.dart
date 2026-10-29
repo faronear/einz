@@ -8,6 +8,22 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   setUp(resetTurnResolution);
 
+  test('分隔符"逗号"与"分号"都切，非法条目丢弃（一拨就断的根因）', () {
+    expect(
+      sanitizeTurnUrls('turn:1.2.3.4:3478;turn:5.6.7.8:3478'),
+      ['turn:1.2.3.4:3478', 'turn:5.6.7.8:3478'],
+    );
+    expect(
+      sanitizeTurnUrls('turn:a.example:3478, turns:b.example:3478'),
+      ['turn:a.example:3478', 'turns:b.example:3478'],
+    );
+    // 半截/带空白的乱写不许进 ICE 配置（libwebrtc 遇到非法 URI 直接建连失败）
+    expect(sanitizeTurnUrls(' , turn:1.2.3.4:3478;http://x;turn:'), ['turn:1.2.3.4:3478']);
+    // 端口越界、主机带 @/? 这类 libwebrtc 会拒绝的形态也要挡掉
+    expect(sanitizeTurnUrls('turn:host:99999,turn:u@host:3478,turn:host?x:3478'), isEmpty);
+    expect(sanitizeTurnUrls(''), isEmpty);
+  });
+
   test('IP 字面量原样透传（零解析）', () async {
     var called = 0;
     final out = await resolveTurnUrls(

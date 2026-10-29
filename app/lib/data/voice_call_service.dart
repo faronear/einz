@@ -20,6 +20,38 @@ final Map<String, String> _turnResolvedIps = <String, String>{};
 @visibleForTesting
 void resetTurnResolution() => _turnResolvedIps.clear();
 
+/// 把编译期的 `VOICE_TURN_URLS` 拆成一条条合法地址。
+///
+/// 分隔符 **`,` 与 `;` 都认**：曾把两台服务器用 `;` 连成一串写进配置，
+/// 代码只按 `,` 切分 → 整串 `turn:1.2.3.4:3478;turn:5.6.7.8:3478` 被当成
+/// 一个 URL 交给 WebRTC。libwebrtc 对非法 ICE URI 是**致命错误**
+/// （"Invalid ICE configuration"），createPeerConnection 直接失败，
+/// 用户看到的就是"一拨就断"（2026-10-29 排查）。所以这里做两道防线：
+/// 两种分隔符都切 + 形状不合法的条目一律丢弃（坏配置不许毁掉整通电话）。
+List<String> sanitizeTurnUrls(String raw) {
+  // 形状按 libwebrtc 的解析器来卡（它比 Dart 严）：scheme + 主机 + 可选端口，
+  // 主机不许带 @ ? # /（那些会触发 "Invalid hostname format" / "query parameters"）。
+  final shape = RegExp(r'^(turns?):([A-Za-z0-9._-]+)(?::(\d{1,5}))?$');
+  final out = <String>[];
+  for (final piece in raw.split(RegExp('[,;]'))) {
+    final url = piece.trim();
+    if (url.isEmpty) continue;
+    final match = shape.firstMatch(url);
+    final port = match?.group(3);
+    final ok = match != null &&
+        (port == null || (int.tryParse(port)! > 0 && int.tryParse(port)! <= 65535));
+    if (!ok) {
+      assert(() {
+        debugPrint('[voice] 丢弃非法 TURN 地址: $url');
+        return true;
+      }());
+      continue;
+    }
+    out.add(url);
+  }
+  return out;
+}
+
 /// 对单条 TURN 地址做 DNS 消毒：`turn:<host>:<port>` 中 host 若为域名，
 /// 一律走加密 DoH 解析成 IP（DNS 劫持免疫，见 shared dns_fallback.dart）；
 /// DoH 失败退系统解析，再失败保留原地址（与今天行为一致，优雅降级）。
@@ -229,6 +261,12 @@ class VoiceCallService {
       await pc.setLocalDescription(offer);
       _send(kWsTypeCallOffer, callId, extra: <String, dynamic>{'sdp': offer.sdp});
     } catch (e) {
+      // 本地失败（麦克风权限 / 建连接 / SDP）以前是静默的，排障时看不出断在哪一步。
+      // debug 包打一行，正式包静默——原因进日志，不进 UI。
+      assert(() {
+        debugPrint('[voice] 通话建立失败: $e');
+        return true;
+      }());
       _end(VoiceCallEndReason.failed);
     }
   }
@@ -257,6 +295,12 @@ class VoiceCallService {
       _send(kWsTypeCallAnswer, callId, extra: <String, dynamic>{'sdp': answer.sdp});
       await _flushIce();
     } catch (e) {
+      // 本地失败（麦克风权限 / 建连接 / SDP）以前是静默的，排障时看不出断在哪一步。
+      // debug 包打一行，正式包静默——原因进日志，不进 UI。
+      assert(() {
+        debugPrint('[voice] 通话建立失败: $e');
+        return true;
+      }());
       _end(VoiceCallEndReason.failed);
     }
   }
@@ -515,7 +559,7 @@ class VoiceCallService {
     ];
     final turn = kVoiceTurnUrls.trim();
     if (turn.isNotEmpty) {
-      final urls = turn.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      final urls = sanitizeTurnUrls(turn);
       if (urls.isNotEmpty) {
         // TURN 域名先经 DoH 消毒成 IP（DNS 劫持免疫，见 resolveTurnUrls 注释）
         final cleanUrls = await resolveTurnUrls(urls);
