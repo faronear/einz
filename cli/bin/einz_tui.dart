@@ -280,7 +280,10 @@ const int _kWelcomeCountdownSeconds = 5;
 Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
-/// 出厂主域名（候选列表的第一个，也是全不通时的兜底）。
+/// 出厂主域名（候选列表的第一个）。
+///
+/// **不再兼任全不通兜底**（2026-10-29）：它解析到 127.0.0.1（已停用），全失败时
+/// 回它等于钉死在永远恢复不了的入口；兜底改用 [_kFallbackServer]。
 const String _kPrimaryServer = 'https://einz.tic.cc';
 
 /// 启动探测期（进 TUI 前）缓冲的 DNS 污染警报文本。
@@ -309,6 +312,10 @@ const List<String> _kServerCandidates = [
   'https://einz.farinear.cn', // 中国备用入口 1
   'https://einz.bittic.cn', // 中国备用入口 2
 ];
+
+/// 出厂候选全不通时的默认兜底（与 App 的 `kFallbackServer` 同构）：国内备案入口，
+/// 网络恢复后它自己就能通；不能用已停用的 `einz.tic.cc`。
+const String _kFallbackServer = 'https://einz.yuanjinx.com';
 
 /// 是否**打包好的产物**（`dart compile exe` 出来的 AOT 二进制，含 CI 编的那几份）。
 ///
@@ -393,7 +400,7 @@ Future<String> _defaultServer() async {
         await _pickReachable(configured, fallback: configured.first);
   }
   return _defaultServerCache =
-      await _pickReachable(_kServerCandidates, fallback: _kPrimaryServer);
+      await _pickReachable(_kServerCandidates, fallback: _kFallbackServer);
 }
 
 /// 并发探测候选地址，取第一个 `/health` 成功的；全不通 → [fallback]。

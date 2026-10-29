@@ -33,14 +33,17 @@ const String kEinzServer =
 
 /// 出厂**主域名**：产品部署的首要入口。
 ///
-/// 它的三个角色（都要求它等于 [kServerCandidates] 的第一项）：
+/// 它的两个角色（都要求它等于 [kServerCandidates] 的第一项）：
 /// 1. 候选列表第一项（注意：并发探测时**谁先响应谁赢**，它并不独占优先，顺序只影响
 ///    兜底与语义）；
-/// 2. 全不通时的兜底；
-/// 3. 编译期覆盖（[kEinzServer]）的默认值、以及"有没有被覆盖"的判定参照。
+/// 2. 编译期覆盖（[kEinzServer]）的默认值、以及"有没有被覆盖"的判定参照。
 ///
-/// 正因为身兼数职，换主域名（如备案域名上位）时**必须同时**改这里和候选列表，
-/// 别改一处忘另一处——`test/server_config_test.dart` 有一条断言守着这个一致性。
+/// **不再兼任"全不通时的兜底"**（2026-10-29 移出）：它当前解析到 127.0.0.1
+/// （已停用），全失败时回它等于把地址钉死在一个永远恢复不了的入口上。兜底改用
+/// [kFallbackServer]——必须是**可恢复**的国内入口。
+///
+/// 换主域名（如备案域名上位）时**必须同时**改这里和候选列表，别改一处忘另一处——
+/// `test/server_config_test.dart` 有一条断言守着这个一致性。
 const String kPrimaryServer = 'https://einz.tic.cc';
 
 /// 出厂域名候选（按优先级，第一个是主域名）。
@@ -61,6 +64,17 @@ const List<String> kServerCandidates = [
   'https://einz.farinear.cn', // 中国备用入口 1
   'https://einz.bittic.cn', // 中国备用入口 2
 ];
+
+/// 全不通时的**默认兜底入口**（2026-10-29 第 1 层）。
+///
+/// 不能再用 [kPrimaryServer]：`einz.tic.cc` 当前解析到 127.0.0.1（已停用），
+/// 冷启动四个候选全失败时回它，地址会被钉死在一个**永远不可能恢复**的入口上。
+/// 换成一个国内备案入口后，同为"全不通"，但网络一恢复该域名自己就能通，
+/// 不必先等运行期换入口（ServerFailover）把它救走。
+///
+/// 必须是 [kServerCandidates] 里的非主域名——`test/server_config_test.dart`
+/// 有一条断言守着这个一致性。
+const String kFallbackServer = 'https://einz.yuanjinx.com';
 
 /// 下载入口的**兜底**地址（老板 2026-10-13 定「服务端优先、硬编码兜底」）：
 /// GitHub releases 的 `latest` 页——`latest` 是 GitHub 的固定别名，releases
@@ -110,23 +124,23 @@ bool get isDevServer => !kServerCandidates.contains(effectiveServer);
 /// 1. 命令行 `--server` 覆盖 → 直接用，不探测；
 /// 2. 编译期覆盖（`kEinzServer != kPrimaryServer`）→ 直接用，不探测；
 /// 3. 否则在 [kServerCandidates] 里并发探测，取第一个 `/health` 成功的；
-///    全不通 → 回 [fallback]（默认主域名）。
+///    全不通 → 回 [fallback]（默认 [kFallbackServer]）。
 ///
 /// [probe] 可注入探测函数（测试用 fake；探测失败重试时复用页面注入的那个）。
 /// 注意：只在**未覆盖**（既无 `--server` 也无编译期覆盖）时才该拿它重选地址——
 /// 覆盖过的情况下传 null 会把开发地址冲掉（调用方负责判 [isDevServer]）。
 ///
-/// [fallback] 是**全不通**时的返回值。启动路径默认回主域名（由 SetupPage 的 4s
-/// 重试兜底）；运行期换入口（ServerFailover）必须传**当前地址**——否则一次探活
-/// 失败反而会把地址切到更坏的入口（2026-10-29：主域名解析到 127.0.0.1，全失败
-/// 切过去等于自断）。
+/// [fallback] 是**全不通**时的返回值。启动路径默认回 [kFallbackServer]（国内入口，
+/// 网络恢复后它能自己通）；运行期换入口（ServerFailover）必须传**当前地址**——
+/// 否则一次探活失败反而会把地址切到更坏的入口（2026-10-29：主域名解析到
+/// 127.0.0.1，全失败切过去等于自断）。
 Future<String> resolveServer(
   String? argServer, {
   Future<ServerHealth> Function(String server)? probe,
   String? fallback,
 }) async {
   final probeServerFn = probe ?? probeServer;
-  final fb = fallback ?? kPrimaryServer;
+  final fb = fallback ?? kFallbackServer;
   if (argServer != null && argServer.isNotEmpty) return argServer;
   if (kEinzServer != kPrimaryServer) return kEinzServer;
   if (kServerCandidates.length == 1) return fb;

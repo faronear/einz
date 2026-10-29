@@ -1,0 +1,30 @@
+{
+  "utc": "20261029T031452.201568Z",
+  "time": "2026-10-29 11:14+08:00",
+  "host": "doomship",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "冷启动兜底改为 kFallbackServer（第 1 层）",
+      "detail": [
+        "问题：resolveServer 全失败时默认回 kPrimaryServer（einz.tic.cc → 127.0.0.1，已停用）；有 Vault 冷启动无 SetupPage 重试，地址会钉死在永远恢复不了的入口，只能等第 2 层运行期换入口或重启。",
+        "新增 kFallbackServer = https://einz.yuanjinx.com（国内备案入口，同服务器）：resolveServer 默认 fallback 改用它；运行期 ServerFailover 仍传当前地址，不受影响。",
+        "kPrimaryServer 退出“全不通兜底”角色（仅保留候选首位与编译期覆盖参照）；TUI 同步新增 _kFallbackServer，_defaultServer 的工厂候选兜底改用它，两端保持同构。",
+        "测试：新增“默认兜底必须是候选里的非主域名”“全不通且未指定 fallback → 落在 kFallbackServer 而不是主域名”；原指定 fallback 用例保留。"
+      ]
+    },
+    {
+      "brief": "验证",
+      "detail": [
+        "flutter analyze 全 app：No issues found；dart analyze cli/bin/einz_tui.dart：No issues found。",
+        "flutter test server_config/server_failover/setup_probe_retry：14 例全过。"
+      ]
+    },
+    {
+      "brief": "文档",
+      "detail": "docs/SERVER_SETTINGS.md §4 补默认兜底变更说明；server_config/TUI 注释同步。"
+    }
+  ]
+}
