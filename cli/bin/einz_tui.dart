@@ -313,8 +313,10 @@ const List<String> _kServerCandidates = [
   'https://einz.bittic.cn', // 中国备用入口 2
 ];
 
-/// 出厂候选全不通时的默认兜底（与 App 的 `kFallbackServer` 同构）：国内备案入口，
-/// 网络恢复后它自己就能通；不能用已停用的 `einz.tic.cc`。
+/// 出厂候选全不通时的默认兜底（与 App 的 `kFallbackServer` 同构）：当前用国内
+/// 备案入口，网络恢复后它自己就能通。硬要求只是"必须是候选里当前可服务的入口"：
+/// 现在 tic.cc 已停用（127.0.0.1）不能用它；将来迁回海外、tic.cc 恢复后，
+/// 与主域名相同也合法。
 const String _kFallbackServer = 'https://einz.yuanjinx.com';
 
 /// 是否**打包好的产物**（`dart compile exe` 出来的 AOT 二进制，含 CI 编的那几份）。

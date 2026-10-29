@@ -38,9 +38,10 @@ const String kEinzServer =
 ///    兜底与语义）；
 /// 2. 编译期覆盖（[kEinzServer]）的默认值、以及"有没有被覆盖"的判定参照。
 ///
-/// **不再兼任"全不通时的兜底"**（2026-10-29 移出）：它当前解析到 127.0.0.1
+/// **当前不兼任"全不通时的兜底"**（2026-10-29 移出）：它现在解析到 127.0.0.1
 /// （已停用），全失败时回它等于把地址钉死在一个永远恢复不了的入口上。兜底改用
-/// [kFallbackServer]——必须是**可恢复**的国内入口。
+/// [kFallbackServer]。这不是永久规则——将来服务器迁回海外、tic.cc 恢复为真实
+/// 入口后，可以让两者相同（见 [kFallbackServer]）。
 ///
 /// 换主域名（如备案域名上位）时**必须同时**改这里和候选列表，别改一处忘另一处——
 /// `test/server_config_test.dart` 有一条断言守着这个一致性。
@@ -72,8 +73,11 @@ const List<String> kServerCandidates = [
 /// 换成一个国内备案入口后，同为"全不通"，但网络一恢复该域名自己就能通，
 /// 不必先等运行期换入口（ServerFailover）把它救走。
 ///
-/// 必须是 [kServerCandidates] 里的非主域名——`test/server_config_test.dart`
-/// 有一条断言守着这个一致性。
+/// **唯一的硬要求**：它必须出现在 [kServerCandidates] 里，且是当前拓扑下
+/// **实际可服务**的入口（网络恢复后能自己通）。当前主域名 tic.cc 已停用，
+/// 所以取国内入口；将来迁回海外、tic.cc 恢复后，`kFallbackServer` 完全可以
+/// 改成与 [kPrimaryServer] 相同——两者相等不是错误。
+/// `test/server_config_test.dart` 守着"必须在候选列表里"这一条。
 const String kFallbackServer = 'https://einz.yuanjinx.com';
 
 /// 下载入口的**兜底**地址（老板 2026-10-13 定「服务端优先、硬编码兜底」）：

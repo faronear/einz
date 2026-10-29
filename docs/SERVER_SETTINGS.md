@@ -93,7 +93,9 @@ _kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com',
   `127.0.0.1`），把它当"全不通兜底"会把地址钉死在一个永远恢复不了的入口上。
   `kFallbackServer`（App）与 `_kFallbackServer`（TUI）改为国内备案入口
   `einz.yuanjinx.com`——同为全不通，网络恢复后它能自己通，不必先等运行期换入口。
-  一致性由 `test/server_config_test.dart` 守着（必须在候选列表里、且不等于主域名）。
+  **硬要求只有"必须出现在候选列表里、且是当前实际可服务的入口"**；当前主域名已
+  停用所以取国内入口，将来服务器迁回海外、tic.cc 恢复后两者相等是合法的。
+  `test/server_config_test.dart` 守着"必须在候选列表里"。
 - **重试也回候选列表**（App，2026-09-21）：启动那一刻若网络还没就绪，地址会被钉死在
   兜底入口；此前向导页的 4s 重试只死磕这一个地址，备用入口就再也用不上了。现在每轮
   重试先 `resolveServer(null)` 并发重选一次（谁通换谁，首屏那行「正在连接 <地址>」随之

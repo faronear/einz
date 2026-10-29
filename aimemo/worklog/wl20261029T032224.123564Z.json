@@ -1,0 +1,22 @@
+{
+  "utc": "20261029T032224.123564Z",
+  "time": "2026-10-29 11:22+08:00",
+  "host": "doomship",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "修正 kFallbackServer 的过严约束",
+      "detail": [
+        "原测试要求 kFallbackServer != kPrimaryServer，把“tic.cc 当前停用”这个临时拓扑写成了永久规则。",
+        "老板指出：将来服务器迁回美国甲骨文云、tic.cc 恢复为真实主入口时，kPrimaryServer 与 kFallbackServer 都设为 einz.tic.cc 是合理的。",
+        "改为唯一硬要求：kFallbackServer 必须出现在 kServerCandidates 里，且是当前实际可服务的入口；两者相等合法。测试只断言 contains + startsWith('http')，文档/注释同步说明“当前取国内入口、将来可相同”。"
+      ]
+    },
+    {
+      "brief": "验证",
+      "detail": "flutter analyze 无 issue；server_config_test 6 例全过；dart analyze cli/bin/einz_tui.dart 无 issue。"
+    }
+  ]
+}

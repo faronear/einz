@@ -14,21 +14,21 @@ void main() {
     expect(kServerCandidates.first, startsWith('http'));
   });
 
-  // 2026-10-29 第 1 层：默认兜底必须是**可恢复**的国内入口，不能是已停用的
-  // kPrimaryServer（tic.cc → 127.0.0.1），否则冷启动全失败会把地址钉死。
-  test('默认兜底必须是候选里的非主域名', () {
-    expect(kFallbackServer, isNot(kPrimaryServer));
+  // 2026-10-29 第 1 层：默认兜底必须是候选里的**实际可服务入口**。
+  // 硬要求只有"在候选列表里"——当前主域名 tic.cc 已停用，所以 kFallbackServer
+  // 取国内入口；将来迁回海外、tic.cc 恢复后，两者相等是合法的（不要用
+  // isNot(kPrimaryServer) 把当前拓扑钉成永久规则）。
+  test('默认兜底必须出现在候选列表里', () {
     expect(kServerCandidates, contains(kFallbackServer));
     expect(kFallbackServer, startsWith('http'));
   });
 
-  test('全不通且未指定 fallback → 落在 kFallbackServer，而不是主域名', () async {
+  test('全不通且未指定 fallback → 落在 kFallbackServer', () async {
     final picked = await resolveServer(
       null,
       probe: (_) async => const ServerHealth(),
     );
     expect(picked, kFallbackServer);
-    expect(picked, isNot(kPrimaryServer));
   });
 
   test('全不通时返回指定 fallback（运行期换入口不降级到主域名）', () async {
