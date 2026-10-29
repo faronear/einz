@@ -12,7 +12,8 @@ import 'package:einz_shared/einz_shared.dart'
 /// - **不进任何持久层**：不写 `app_state`，也不写锁包（`AppLockPayload`）。锁包解锁
 ///   前读不到，地址存进去就会出现"锁屏页显示的和解锁后实际连的不一致"（早先靠「关于」
 ///   页给锁屏态加一条附注兜底，地址改成进程级同源之后那类附注已一并去掉）。
-/// - **每次启动算一次**：`main()` 里定好存进 [effectiveServer]，之后全程只读。页面
+/// - **每次启动算一次**：`main()` 里定好存进 [effectiveServer]，之后由运行期
+///   换入口（ServerFailover，2026-10-29）在探活失败时改写，其余页面只读。页面
 ///   之间不再层层透传地址（原先 18 处构造函数参数），所有页面读的是同一个变量。
 ///
 /// 三层优先级：
@@ -86,7 +87,8 @@ String resolveAppDownloadUrl(String? served) {
   return s.isEmpty ? kAppDownloadUrlFallback : s;
 }
 
-/// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
+/// 本次进程生效的服务器地址：`main()` 里定一次；运行期换入口（ServerFailover）
+/// 可能改写它，其余页面只读。
 ///
 /// **给默认值而非 late**：单元测试不走 `main()`，late 未初始化会直接崩。
 String effectiveServer = kPrimaryServer;
@@ -108,19 +110,26 @@ bool get isDevServer => !kServerCandidates.contains(effectiveServer);
 /// 1. 命令行 `--server` 覆盖 → 直接用，不探测；
 /// 2. 编译期覆盖（`kEinzServer != kPrimaryServer`）→ 直接用，不探测；
 /// 3. 否则在 [kServerCandidates] 里并发探测，取第一个 `/health` 成功的；
-///    全不通 → 回主域名（由 setup_page 的 4s 自动重试兜底）。
+///    全不通 → 回 [fallback]（默认主域名）。
 ///
 /// [probe] 可注入探测函数（测试用 fake；探测失败重试时复用页面注入的那个）。
 /// 注意：只在**未覆盖**（既无 `--server` 也无编译期覆盖）时才该拿它重选地址——
 /// 覆盖过的情况下传 null 会把开发地址冲掉（调用方负责判 [isDevServer]）。
+///
+/// [fallback] 是**全不通**时的返回值。启动路径默认回主域名（由 SetupPage 的 4s
+/// 重试兜底）；运行期换入口（ServerFailover）必须传**当前地址**——否则一次探活
+/// 失败反而会把地址切到更坏的入口（2026-10-29：主域名解析到 127.0.0.1，全失败
+/// 切过去等于自断）。
 Future<String> resolveServer(
   String? argServer, {
   Future<ServerHealth> Function(String server)? probe,
+  String? fallback,
 }) async {
   final probeServerFn = probe ?? probeServer;
+  final fb = fallback ?? kPrimaryServer;
   if (argServer != null && argServer.isNotEmpty) return argServer;
   if (kEinzServer != kPrimaryServer) return kEinzServer;
-  if (kServerCandidates.length == 1) return kPrimaryServer;
+  if (kServerCandidates.length == 1) return fb;
 
   // 并发探测：谁先 200 就用谁（主域名挂掉时不必干等 3s 超时才试备用）
   final picked = Completer<String>();
@@ -129,7 +138,7 @@ Future<String> resolveServer(
     probeServerFn(candidate).then((r) {
       if (r.ok && !picked.isCompleted) picked.complete(candidate);
       pending--;
-      if (pending == 0 && !picked.isCompleted) picked.complete(kPrimaryServer);
+      if (pending == 0 && !picked.isCompleted) picked.complete(fb);
     });
   }
   return picked.future;

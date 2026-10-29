@@ -66,7 +66,14 @@ class MessageRepository {
   }
 
   final LocalDatabase db;
-  final ApiClient api;
+
+  /// REST 客户端。**不能是 final**：运行期换入口（ServerFailover）后要换成新
+  /// 地址的客户端，否则同步/发送会一直打启动时的死入口。
+  ApiClient api;
+
+  /// 运行期换入口后替换 REST 客户端（同一服务器的不同入口，身份/token 不变）。
+  void updateApi(String server) => api = ApiClient(server);
+
   final Uint8List spaceKey;
   final String spaceId;
   final String entranceId;

@@ -41,6 +41,7 @@ import 'data/app_lock.dart';
 import 'data/demo_space.dart';
 import 'data/local_database.dart';
 import 'data/server_config.dart';
+import 'data/server_failover.dart';
 import 'error_text.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
@@ -1025,6 +1026,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 按 member 维度分左右分栏（服务器离线拉不到 entrance→member 映射）
       memberId: widget.memberId,
     );
+    // 运行期换入口（ServerFailover）：_repo 已就绪后再挂监听，切换时重建
+    // REST/WS 客户端并立即补同步（见 [_onServerSwitched]）。
+    ServerFailover.instance.switches.addListener(_onServerSwitched);
     // 头像加载要在 _repo 就绪后（重启路径要靠它反查本机 memberId）
     _loadMyAvatar();
     _loadPeerAvatar(); // 演示秘境的服务端路径（member 事件/空间解析）永不触发，
@@ -1579,6 +1583,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       unawaited(_refreshProfileFromServer());
     }
     _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
+  }
+
+  /// 运行期换入口（ServerFailover 已把 [effectiveServer] 改成新入口）：
+  /// REST 客户端 + WS 立即切到新地址，并补一次同步/资料校正——恢复不必等
+  /// 下一轮轮询（离线退避最长 60s，干等会把"恢复"拖成几十秒）。
+  void _onServerSwitched() {
+    if (!mounted) return;
+    _repo.updateApi(effectiveServer);
+    unawaited(_ws?.switchServer(effectiveServer));
+    unawaited(_refresh());
+    unawaited(_refreshProfileFromServer());
+    setState(() {}); // 顶栏/关于页读的是全局地址，尽快反映新入口
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -6164,6 +6180,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _input.removeListener(_onInputInteraction);
     _highlightTimer?.cancel(); // 跳转高亮定时清除（防 dispose 后 setState）
     _ampSub?.cancel();
+    ServerFailover.instance.switches.removeListener(_onServerSwitched);
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
     _voiceCall?.state.removeListener(_onVoiceCallStateChanged);
@@ -6691,9 +6708,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 自愈：sync 竞态漏掉的附件元数据（2026-10-09）——补拉后触发刷新
       unawaited(_healAttachments());
       _onSyncSucceeded();
-    } catch (_) {
+    } catch (e) {
       // 网络抖动忽略，下次轮询重试（并按连续失败次数退避）
       _onSyncFailed();
+      // 运行期换入口（2026-10-29）：只对网络级失败触发；401/403/409 等业务
+      // 错误换入口也没用。check 自带冷却/单飞，离线时每轮都调也不会打爆。
+      // 注入 fake api 的测试不做真实探测（保持用例确定性）。
+      if (widget.api == null && isNetworkFailure(e)) {
+        unawaited(ServerFailover.instance.check());
+      }
     }
   }
 

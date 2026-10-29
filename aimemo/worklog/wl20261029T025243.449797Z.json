@@ -1,0 +1,32 @@
+{
+  "utc": "20261029T025243.449797Z",
+  "time": "2026-10-29 10:52+08:00",
+  "host": "doomship",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "App 运行期自动换入口（第 2 层）",
+      "detail": [
+        "问题：冷启动四候选全失败时 resolveServer 兜底到 kPrimaryServer（einz.tic.cc → 127.0.0.1，已停用）；有 Vault 的老用户直接进聊天页，不经过 SetupPage 的 4s 重选；effectiveServer 进程级只读、WsClient 构造时拷死 server → 网络恢复后仍死磕死入口，只能重启。",
+        "新增 app/lib/data/server_failover.dart：聊天页网络级同步失败触发 check；先探当前地址（探通不换，避免 401/4401/限流误判）；探不通回候选列表并发重探；全不通保持原地址；30s 冷却 + single-flight；切换后 switches 通知。isNetworkFailure 区分网络层/5xx 与 4xx 业务错误。",
+        "resolveServer 增加可选 fallback（运行期传当前地址，避免全失败反而切到更坏的入口；启动路径默认主域名不变）。",
+        "WsRealtimeService.server 改为可变并新增 switchServer：复用同一 service 对象（VoiceCallService 持有它，通话状态不丢），旧 WsClient 停掉后用新地址重建；factory 命名构造保持调用点不变。",
+        "MessageRepository.api 改为可替换 + updateApi；ChatPage 监听 switches，切换时更新 REST 客户端、WS 地址并立即补 sync/资料校正。开发覆盖（--server / dart-define）不参与换入口。"
+      ]
+    },
+    {
+      "brief": "验证",
+      "detail": [
+        "flutter analyze 全 app：No issues found。",
+        "flutter test 全量：400 例全过（新增 server_failover_test 6 例、server_config fallback 1 例、ws_realtime_service switchServer 1 例）。",
+        "未做真机断网→恢复手测（交互/网络类验证按约定交老板）。"
+      ]
+    },
+    {
+      "brief": "文档",
+      "detail": "docs/SERVER_SETTINGS.md §4 补运行期换入口说明；server_config 头注释同步（effectiveServer 不再全程只读）。"
+    }
+  ]
+}

@@ -65,6 +65,29 @@ void main() {
     expect(service.connected.value, isFalse, reason: 'stop 后 connected 应为 false');
   });
 
+  test('switchServer：换入口后旧连接关闭、新连接落到新地址', () async {
+    final (first, firstConns) = await _startWsServer();
+    final (second, secondConns) = await _startWsServer();
+    addTearDown(() => first.close(force: true));
+    addTearDown(() => second.close(force: true));
+
+    final service =
+        WsRealtimeService(server: 'http://127.0.0.1:${first.port}', token: 'tok');
+    service.start();
+    await Future.delayed(const Duration(milliseconds: 400));
+    expect(service.connected.value, isTrue);
+    expect(firstConns, hasLength(1));
+
+    await service.switchServer('http://127.0.0.1:${second.port}');
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    expect(service.server, 'http://127.0.0.1:${second.port}');
+    expect(service.connected.value, isTrue, reason: '换入口后应立即重连');
+    expect(secondConns, hasLength(1), reason: '新连接应落到新地址');
+
+    await service.stop();
+  });
+
   test('entrance.revoked 广播 → onEntranceRevoked 触发（撤销登出）', () async {
     final (server, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));

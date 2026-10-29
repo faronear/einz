@@ -87,13 +87,22 @@ _kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com',
 影响全不通时的兜底与语义）。
 
 - `resolveServer()`（App）/ `_defaultServer()`（TUI）：命令行 / 本机配置**不探测**，直接用；否则对候选**并发**探测，取第一个 `/health` 成功的（主域名挂掉时不必干等 3s 超时才试备用）。
-- 全部不通 → 回主域名，由向导页的 4s 自动重试兜底。
+- 全部不通 → 回 `fallback`（启动路径默认主域名，由向导页的 4s 自动重试兜底；
+  运行期换入口传**当前地址**，见下条）。
 - **重试也回候选列表**（App，2026-09-21）：启动那一刻若网络还没就绪，地址会被钉死在
   兜底主域名；此前向导页的 4s 重试只死磕这一个地址，备用入口就再也用不上了。现在每轮
   重试先 `resolveServer(null)` 并发重选一次（谁通换谁，首屏那行「正在连接 <地址>」随之
   更新），再探测新地址。开发覆盖（`--server` / 编译期 dart-define）不参与重选——那是人为
   指定的地址，不该被候选列表劫持。
 - 老 App 加一个备用域名后**自愈**，不需要用户更新，也不需要在 App 里做任何操作。
+- **运行期换入口**（App，2026-10-29）：有 Vault 的老用户冷启动直接进聊天页，不经过
+  向导页的 4s 重选；[`effectiveServer`](app/lib/data/server_config.dart) 又是进程级
+  只读——启动时四个候选全失败会把它钉在兜底地址，网络恢复后仍死磕它。现在聊天页每次
+  **网络级**同步失败都会调 `ServerFailover.check()`（`app/lib/data/server_failover.dart`）：
+  先探当前地址（探通就不换——401/4401/限流等应用层错误不能触发换入口），探不通才回
+  候选列表并发重探；30s 冷却 + single-flight，全不通时保持原地址。切换后 REST 客户端
+  与 WS 连接一起重建（`WsRealtimeService.switchServer`），不必重启 App。
+  开发覆盖（`--server` / 编译期 dart-define）不参与换入口。
 
 ### 4.1 DNS 污染兜底（DoH + IP 钉扎，2026-10-11）
 

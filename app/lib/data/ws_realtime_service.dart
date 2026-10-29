@@ -6,10 +6,25 @@ import 'package:einz_shared/einz_shared.dart';
 /// [reauth]：session 过期（WS 4401）时自动重新认证的回调（返回新 token），
 /// 供 WsClient.onUnauthorized 续期后立即重连——24h 会话过期无感恢复。
 class WsRealtimeService {
-  WsRealtimeService({required this.server, required this._token, this.reauth});
+  /// 命名参数对外保持不变；内部私有构造直接种 [_server]/[_token]（两者可变）。
+  factory WsRealtimeService({
+    required String server,
+    required String token,
+    Future<String> Function()? reauth,
+  }) =>
+      WsRealtimeService._(server, token, reauth);
 
-  final String server;
+  WsRealtimeService._(this._server, this._token, this.reauth);
+
+  /// 当前连接的服务器入口。运行期换入口（ServerFailover）时经 [switchServer]
+  /// 替换——不能是 final，否则换完 WS 还在连旧地址。
+  String _server;
+  String get server => _server;
   String _token;
+
+  /// 是否处于"应该在连"的状态（[start] 到 [stop] 之间）。换入口期间旧 client
+  /// 已置空、新 client 还没建，不能用 `_client != null` 判断（会漏掉重建）。
+  bool _started = false;
 
   /// 401（session 过期）时自动重新认证的回调（由上层注入：setup_page 的
   /// challenge-response 流程），返回新 token 供 [updateToken] 后重连。
@@ -79,7 +94,6 @@ class WsRealtimeService {
     void Function(WsMemberJoinedEvent event)? onMemberJoined,
     void Function(WsMemberLeftEvent event)? onMemberLeft,
   }) {
-    if (_client != null) return; // 幂等：已有连接就不再建（见方法头注释）
     this.onMessageNew = onMessageNew;
     this.onEntranceRevoked = onEntranceRevoked;
     this.onPeerStatus = onPeerStatus;
@@ -89,8 +103,16 @@ class WsRealtimeService {
     this.onCall = onCall;
     this.onMemberJoined = onMemberJoined;
     this.onMemberLeft = onMemberLeft;
+    _started = true;
+    if (_client != null) return; // 幂等：已有连接就不再建（见方法头注释）
+    _createClient();
+  }
+
+  /// 用当前 [_server] 建一条新连接（换入口后由 [switchServer] 复用）。
+  void _createClient() {
+    if (_client != null || !_started) return;
     _client = WsClient(
-      server: server,
+      server: _server,
       token: _token,
       onUnauthorized: () async {
         // session 过期（4401）：自动重新认证并更新 token，随后 WsClient 立即重连
@@ -105,21 +127,37 @@ class WsRealtimeService {
         _client?.updateToken(fresh);
       },
       onEvent: (e) {
-        if (e is WsMessageNewEvent) this.onMessageNew?.call();
-        if (e is WsEntranceRevokedEvent) this.onEntranceRevoked?.call();
-        if (e is WsPeerStatusEvent) this.onPeerStatus?.call(e);
-        if (e is WsPassphraseRotatedEvent) this.onPassphraseRotated?.call(e);
-        if (e is WsProfileUpdatedEvent) this.onProfileUpdated?.call(e);
-        if (e is WsReceiptUpdatedEvent) this.onReceiptUpdated?.call(e);
-        if (e is WsCallEvent) this.onCall?.call(e);
-        if (e is WsMemberJoinedEvent) this.onMemberJoined?.call(e);
-        if (e is WsMemberLeftEvent) this.onMemberLeft?.call(e);
+        if (e is WsMessageNewEvent) onMessageNew?.call();
+        if (e is WsEntranceRevokedEvent) onEntranceRevoked?.call();
+        if (e is WsPeerStatusEvent) onPeerStatus?.call(e);
+        if (e is WsPassphraseRotatedEvent) onPassphraseRotated?.call(e);
+        if (e is WsProfileUpdatedEvent) onProfileUpdated?.call(e);
+        if (e is WsReceiptUpdatedEvent) onReceiptUpdated?.call(e);
+        if (e is WsCallEvent) onCall?.call(e);
+        if (e is WsMemberJoinedEvent) onMemberJoined?.call(e);
+        if (e is WsMemberLeftEvent) onMemberLeft?.call(e);
       },
       onStatus: (s) {
         status.value = s;
         connected.value = s == WsStatus.connected;
       },
     )..start();
+  }
+
+  /// 运行期换入口（ServerFailover）：停掉旧连接、用新地址重建。
+  ///
+  /// 保留本 service 对象本身——VoiceCallService 持有它，通话状态不能因为换
+  /// 入口被重建；回调/token/幂等语义也都留在原对象上。
+  Future<void> switchServer(String newServer) async {
+    if (newServer == _server) return;
+    _server = newServer;
+    final old = _client;
+    _client = null;
+    connected.value = false;
+    status.value = WsStatus.stopped;
+    await old?.stop();
+    // 已 stop（后台）时 _started=false，不重连；下次 start 会直接用新地址。
+    _createClient();
   }
 
   /// 发一个通话信令帧（未连接时静默丢弃——由上层通话状态机的超时/挂断兜底）。
@@ -133,6 +171,7 @@ class WsRealtimeService {
   /// 幂等判断会看到 `_client != null` 而拒绝重连，于是这条连接**永远不会再连上**
   /// （进后台→回前台的时序里完全可能撞上）。
   Future<void> stop() async {
+    _started = false;
     final client = _client;
     _client = null;
     connected.value = false;

@@ -14,6 +14,15 @@ void main() {
     expect(kServerCandidates.first, startsWith('http'));
   });
 
+  test('全不通时返回指定 fallback（运行期换入口不降级到主域名）', () async {
+    final picked = await resolveServer(
+      null,
+      probe: (_) async => const ServerHealth(),
+      fallback: kServerCandidates[2],
+    );
+    expect(picked, kServerCandidates[2]);
+  });
+
   group('probeServer DNS 污染兜底', () {
     setUp(resetDohFallbackState);
     tearDown(resetDohFallbackState);
