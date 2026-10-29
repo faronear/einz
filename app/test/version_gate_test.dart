@@ -6,8 +6,10 @@
 // 弹窗本身（UI）由老板真机自测，这里只钉逻辑。
 //
 // 运行：flutter test test/version_gate_test.dart
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/data/server_config.dart';
+import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/widgets/version_gate.dart';
 
 void main() {
@@ -139,6 +141,53 @@ void main() {
     test('服务端值首尾带空白 → trim 后用', () {
       expect(resolveAppDownloadUrl('  https://example.com/app  '),
           'https://example.com/app');
+    });
+  });
+
+  // checkVersionGate 返回值契约（2026-10-29 3B-1）：
+  // true = 已完成判定（探通；无论是否弹窗）；false = 没探通，启动选路换地址后可重试。
+  group('checkVersionGate 返回值', () {
+    Future<bool> run(WidgetTester tester, ServerHealth health) async {
+      late BuildContext ctx;
+      await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(builder: (c) {
+          ctx = c;
+          return const Scaffold(body: SizedBox());
+        }),
+      ));
+      return checkVersionGate(
+        ctx,
+        probe: (_) async => health,
+        appVersion: () async => '2610.01.00',
+      );
+    }
+
+    testWidgets('探通且无版本要求 -> true（不弹窗）', (tester) async {
+      expect(await run(tester, const ServerHealth(ok: true)), isTrue);
+    });
+
+    testWidgets('地址不可达 -> false（允许换地址后重试）', (tester) async {
+      expect(await run(tester, const ServerHealth()), isFalse);
+    });
+
+    testWidgets('探测异常 -> false（不误拦，可重试）', (tester) async {
+      late BuildContext ctx;
+      await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(builder: (c) {
+          ctx = c;
+          return const Scaffold(body: SizedBox());
+        }),
+      ));
+      final done = await checkVersionGate(
+        ctx,
+        probe: (_) async => throw StateError('boom'),
+        appVersion: () async => '2610.01.00',
+      );
+      expect(done, isFalse);
     });
   });
 }

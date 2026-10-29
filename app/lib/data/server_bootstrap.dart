@@ -70,7 +70,9 @@ class ServerBootstrap {
         return;
       }
       if (picked != before) {
-        applyEffectiveServer(picked);
+        // 启动选路不是"故障切换"，不写上次切换记录（About 的最近切换只留
+        // 运行期 ServerFailover 的自动切换）。
+        applyEffectiveServer(picked, recordSwitch: false);
         phase.value = ServerPhase.ready;
         return;
       }

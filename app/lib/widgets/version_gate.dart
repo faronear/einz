@@ -113,32 +113,37 @@ Future<String> appVersionString() async {
 
 /// 启动时核对版本级别；低于冻结线（frozen）弹**关不掉**的升级窗口，冷却中弹可关闭的提醒。
 ///
-/// 调用点：`StartupGate.initState`（首屏，所有入口——锁屏 / 向导 / 直接进聊天——
-/// 都会先经过它）。探测失败静默返回，不影响任何流程。
-Future<void> checkVersionGate(
+/// 调用点：`StartupGate`（首屏，所有入口——锁屏 / 向导 / 直接进聊天——都先经过它）。
+///
+/// 返回值（2026-10-29 3B）：
+/// - **true** = 已完成判定（探通；无论是否弹窗）。调用方不必再试；
+/// - **false** = 没探通（地址暂时不可达 / 探测异常）。调用方可在
+///   [serverRevision] 变化后重试一次，避免启动选路还没完成时探到临时地址
+///   导致冻结版本漏拦。
+Future<bool> checkVersionGate(
   BuildContext context, {
   String? server,
   Future<ServerHealth> Function(String)? probe,
   Future<String> Function()? appVersion,
 }) async {
-  if (kSkipVersionGate) return;
+  if (kSkipVersionGate) return true;
   final probeFn = probe ?? probeServer;
   final target = server ?? effectiveServer;
-  if (target.isEmpty) return;
+  if (target.isEmpty) return true;
 
   final ServerHealth health;
   try {
     health = await probeFn(target);
   } catch (_) {
-    return; // 探测本身出错：当作连不上，不拦
+    return false; // 探测本身出错：当作连不上，不拦（但允许换地址后重试）
   }
-  if (!health.ok) return;
+  if (!health.ok) return false;
 
   final current = await (appVersion ?? appVersionString)();
   final level = appVersionGateLevel(current,
       coldVersion: health.coldAppVersion,
       hotVersion: health.hotAppVersion);
-  if (level == VersionGateLevel.none || !context.mounted) return;
+  if (level == VersionGateLevel.none || !context.mounted) return true;
 
   await showDialog<void>(
     context: context,
@@ -159,6 +164,7 @@ Future<void> checkVersionGate(
             downloadUrl: resolveAppDownloadUrl(health.appDownloadUrl),
           ),
   );
+  return true;
 }
 
 /// 升级入口 URL 统一处理：能打开就外部浏览器打开，打不开（无浏览器/地址非法）

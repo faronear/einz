@@ -122,12 +122,25 @@ final ValueNotifier<int> serverRevision = ValueNotifier<int>(0);
 /// 覆盖过就不该被候选列表或启动选路劫持——即使覆盖地址恰好也是出厂候选之一。
 bool serverOverrideActive = false;
 
+/// 最近一次自动换入口（About 页展示"最近切换"；启动选路/运行期换入口共用）。
+String? lastServerSwitchFrom;
+String? lastServerSwitchTo;
+DateTime? lastServerSwitchAt;
+
 /// 换上新的生效地址并广播；返回是否真的变了。
 ///
 /// 所有换地址的路径（ServerBootstrap / ServerFailover）都必须走这里，
 /// 这样 `serverRevision` 不会漏发，聊天页也只需监听一个通知。
-bool applyEffectiveServer(String server) {
+///
+/// [recordSwitch] = 是否计入 About 的"最近切换"。启动选路传 false（那只是
+/// 选入口，不是故障切换）；运行期 ServerFailover 用默认 true。
+bool applyEffectiveServer(String server, {bool recordSwitch = true}) {
   if (server == effectiveServer) return false;
+  if (recordSwitch) {
+    lastServerSwitchFrom = effectiveServer;
+    lastServerSwitchTo = server;
+    lastServerSwitchAt = DateTime.now();
+  }
   effectiveServer = server;
   serverRevision.value++;
   return true;
@@ -138,6 +151,9 @@ bool applyEffectiveServer(String server) {
 void resetServerRuntimeForTest() {
   effectiveServer = kPrimaryServer;
   serverOverrideActive = false;
+  lastServerSwitchFrom = null;
+  lastServerSwitchTo = null;
+  lastServerSwitchAt = null;
   serverRevision.value = 0;
 }
 

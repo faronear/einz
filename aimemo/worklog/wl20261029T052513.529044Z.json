@@ -1,0 +1,43 @@
+{
+  "utc": "20261029T052513.529044Z",
+  "time": "2026-10-29 13:25+08:00",
+  "host": "doomship",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "codebuddy",
+  "notes": [
+    {
+      "brief": "3B-1 版本闸等启动选路有结论再判",
+      "detail": [
+        "checkVersionGate 返回 bool：true=已判定（探通，无论是否弹窗），false=没探通（可重试）。",
+        "StartupGate 不再首帧后立刻探；改为等 ServerBootstrap 离开 probing（最多 5s）再探，避免探到临时地址导致冻结版本漏拦。",
+        "serverRevision 变化且版本闸尚未探通时重试；running 期间的 revision 记 pending，结束后补跑。",
+        "用 root Navigator 的 context 弹窗：用户若在选路完成前解锁、StartupGate 被 pushReplacement 掉，版本闸仍能弹出。",
+        "首帧后启动，确保 StartupGate 已有 Navigator 祖先。"
+      ]
+    },
+    {
+      "brief": "3B-2 About 选路状态/最近切换/实时刷新",
+      "detail": [
+        "AboutSheet 监听 serverRevision，地址变更时重新探测当前入口（下载 URL/连接状态一起刷新）。",
+        "新增「选路状态」行：启动选路中 / 暂未找到可用入口（ready 时隐藏）；用 ServerBootstrap.phase。",
+        "新增「最近切换」行：只记录运行期 ServerFailover 的自动切换（applyEffectiveServer(recordSwitch:false) 用于启动选路，避免每次启动都显示）。",
+        "l10n 新增 4 键（中英）。"
+      ]
+    },
+    {
+      "brief": "暂不做（已记录 projectPlan 待办）",
+      "detail": [
+        "3B-3 锁屏页连接状态：ServerBootstrap.phase 已留好，按简洁偏好默认不做。",
+        "3C 选路 selector 收口：resolveServer 改 selectServer 返回 {server, reachable}，可选收敛 SetupPage；用户可见收益小，暂缓。"
+      ]
+    },
+    {
+      "brief": "验证",
+      "detail": [
+        "flutter analyze 全 app：No issues found。",
+        "flutter test 全量：416 例全过（新增 About 选路/切换/实时刷新 4 例；版本闸返回值 3 例）。"
+      ]
+    }
+  ]
+}

@@ -119,6 +119,11 @@ _kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com',
   全不通 → 保持临时地址、标 `unreachable`，聊天页照常离线可读。
   选路只跑一次，进入聊天后的断线恢复仍归 ServerFailover；无 Vault 的首次配置仍由
   SetupPage 的 4s 重选负责。
+- **版本闸等选路有结论再判**（App，2026-10-29，3B-1）：`checkVersionGate` 改为返回
+  `bool`（true=已判定，false=没探通），`StartupGate` 等 `ServerBootstrap` 离开
+  `probing`（最多 5s）后再探；没探通时若 `serverRevision` 变化（换到可用入口）会再试。
+  用 root Navigator 的 context 弹窗，即使用户在选路完成前就解锁、StartupGate 已被
+  pushReplacement 掉，版本闸仍能弹出。
 
 ### 4.1 DNS 污染兜底（DoH + IP 钉扎，2026-10-11）
 
@@ -215,6 +220,8 @@ dart run bin/einz_tui.dart --server http://localhost:3000     # 临时覆盖
 ## 7. 查看当前地址
 
 - App：「关于秘境」页（对话页 / 向导页 / 锁屏页右上角菜单），地址可长按复制；非出厂域名时标注「开发地址」。
+  2026-10-29（3B-2）起还会显示「选路状态」（启动选路中 / 暂未找到可用入口）与
+  「最近切换」（仅运行期自动换入口时出现，启动选路不算）；弹层开着遇地址变更会实时刷新。
 - TUI：`/status`（服务器地址 + 是本机默认还是本次覆盖、线路、WS、对方在线、绑定、同步锚点、数据文件路径），或 `/server` 不带参数。
 
 ## 8. 不做什么（以及将来要做的代价）

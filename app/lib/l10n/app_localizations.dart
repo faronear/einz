@@ -2252,6 +2252,30 @@ abstract class AppLocalizations {
   /// **'Development address for debugging only'**
   String get aboutServerDevNote;
 
+  /// No description provided for @aboutRouteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Route'**
+  String get aboutRouteLabel;
+
+  /// No description provided for @aboutRouteProbing.
+  ///
+  /// In en, this message translates to:
+  /// **'Selecting route…'**
+  String get aboutRouteProbing;
+
+  /// No description provided for @aboutRouteUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'No reachable entry yet'**
+  String get aboutRouteUnreachable;
+
+  /// No description provided for @aboutLastSwitchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last switch'**
+  String get aboutLastSwitchLabel;
+
   /// No description provided for @aboutStatusLabel.
   ///
   /// In en, this message translates to:

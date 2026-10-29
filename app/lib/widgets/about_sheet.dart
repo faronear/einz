@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../brand_logo.dart';
 import '../data/dns_poison_notice.dart';
+import '../data/server_bootstrap.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
 import 'clickable.dart';
@@ -22,8 +23,9 @@ typedef AboutInfo = ({String version, String buildNumber});
 /// 对话页顶栏 logo+品牌名（点击等同菜单项）。
 /// 版本号读的是打包时写进产物的 CFBundleShortVersionString / versionName
 /// （yymm.ddhh.mm，见 scripts/appVersion.js），不是 pubspec 里那个写死的 1.0.0。
-/// 服务器地址读 [effectiveServer]（启动时定好的进程全局量）——锁屏态与解锁后读的
-/// 是同一个变量，不可能不一致（地址不进锁包，见 `data/app_lock.dart`）。
+/// 服务器地址读 [effectiveServer]——锁屏态与解锁后读的是同一个变量，不可能不一致
+/// （地址不进锁包，见 `data/app_lock.dart`）。2026-10-29（3B-2）起监听
+/// [serverRevision]：启动选路/运行期换入口改了地址，弹层开着也会刷新地址与连接状态。
 ///
 /// **连接状态行（2026-10-11；2026-10-12 改口径）**：只探测**启动时定下的活
 /// 地址** [effectiveServer]（复用带 DoH 兜底的 [probeServer]）——可达显示
@@ -55,14 +57,36 @@ class AboutSheet extends StatefulWidget {
 class _AboutSheetState extends State<AboutSheet> {
   late final Future<AboutInfo> _info = _load();
 
-  /// 只探测**启动时定下的活地址** [effectiveServer]（2026-10-12 老板决策）：
+  /// 只探测**当前生效地址** [effectiveServer]（2026-10-12 老板决策）：
   /// About 是状态展示，不是连接管理器——重新去连其他候选没有意义（候选切换/
-  /// 兜底是启动探测的事，App 的实际连接也一直走 effectiveServer）。断开就如实
-  /// 显示断开，不尝试其他地址。
+  /// 兜底是启动选路/运行期换入口的事，App 的实际连接也一直走 effectiveServer）。
+  /// 断开就如实显示断开，不尝试其他地址。
   ///
+  /// 2026-10-29（3B-2）：地址变更（启动选路/运行期换入口）时监听
+  /// [serverRevision] 重新探测，避免弹层开着看到旧地址/旧状态。
   /// 存**整个 [ServerHealth]**（不只是可达性）：下载入口的 URL 也从这里出
   /// （`app_download_url`，见 [_DownloadRow]）——一次探测，两处消费。
-  late final Future<ServerHealth> _health = _probeEffective();
+  late Future<ServerHealth> _health;
+
+  @override
+  void initState() {
+    super.initState();
+    _health = _probeEffective();
+    serverRevision.addListener(_onServerRevisionChanged);
+  }
+
+  @override
+  void dispose() {
+    serverRevision.removeListener(_onServerRevisionChanged);
+    super.dispose();
+  }
+
+  void _onServerRevisionChanged() {
+    if (!mounted) return;
+    setState(() {
+      _health = _probeEffective();
+    });
+  }
 
   Future<AboutInfo> _load() async {
     final pkg = await PackageInfo.fromPlatform();
@@ -146,6 +170,40 @@ class _AboutSheetState extends State<AboutSheet> {
                         value: effectiveServer,
                         note: isDevServer ? l10n.aboutServerDevNote : null,
                       ),
+                      // 选路状态（3B-2）：启动选路中/全失败才显示；ready 后不占位。
+                      ValueListenableBuilder<ServerPhase>(
+                        valueListenable: ServerBootstrap.instance.phase,
+                        builder: (context, phase, _) {
+                          if (phase != ServerPhase.probing &&
+                              phase != ServerPhase.unreachable) {
+                            return const SizedBox.shrink();
+                          }
+                          final unreachable =
+                              phase == ServerPhase.unreachable;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: _InfoRow(
+                              label: l10n.aboutRouteLabel,
+                              value: unreachable
+                                  ? l10n.aboutRouteUnreachable
+                                  : l10n.aboutRouteProbing,
+                              valueColor: unreachable
+                                  ? Theme.of(context).colorScheme.error
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                      // 最近一次自动换入口（启动选路/运行期换入口都会记在
+                      // server_config 的 lastServerSwitch* 里）。
+                      if (lastServerSwitchAt != null) ...[
+                        const SizedBox(height: 14),
+                        _InfoRow(
+                          label: l10n.aboutLastSwitchLabel,
+                          value: '${lastServerSwitchFrom ?? '?'} → '
+                              '${lastServerSwitchTo ?? '?'}',
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       FutureBuilder<ServerHealth>(
                         future: _health,

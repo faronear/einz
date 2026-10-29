@@ -1323,6 +1323,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutServerDevNote => 'Development address for debugging only';
 
   @override
+  String get aboutRouteLabel => 'Route';
+
+  @override
+  String get aboutRouteProbing => 'Selecting route…';
+
+  @override
+  String get aboutRouteUnreachable => 'No reachable entry yet';
+
+  @override
+  String get aboutLastSwitchLabel => 'Last switch';
+
+  @override
   String get aboutStatusLabel => 'Connection';
 
   @override

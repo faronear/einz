@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:einz/data/dns_poison_notice.dart';
+import 'package:einz/data/server_bootstrap.dart';
 import 'package:einz/data/server_config.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/widgets/about_sheet.dart';
@@ -25,6 +26,16 @@ Future<void> _pump(
 }
 
 void main() {
+  setUp(() {
+    resetServerRuntimeForTest();
+    ServerBootstrap.instance.reset();
+  });
+
+  tearDown(() {
+    resetServerRuntimeForTest();
+    ServerBootstrap.instance.reset();
+  });
+
   testWidgets('启动定下的活地址可达 → 已连接', (tester) async {
     await _pump(tester, (server) async =>
         server == 'https://einz.tic.cc' ? const ServerHealth(ok: true) : const ServerHealth());
@@ -55,6 +66,52 @@ void main() {
     await _pump(tester, (server) => Completer<ServerHealth>().future);
     await tester.pump();
     expect(find.text('检测中…'), findsOneWidget);
+  });
+
+  // ---------- 选路状态 / 最近切换（3B-2，2026-10-29） ----------
+  testWidgets('启动选路中 → 显示选路状态', (tester) async {
+    ServerBootstrap.instance.phase.value = ServerPhase.probing;
+    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutRouteLabel), findsOneWidget);
+    expect(find.text(l10n.aboutRouteProbing), findsOneWidget);
+  });
+
+  testWidgets('选路完成 → 选路行不占位', (tester) async {
+    ServerBootstrap.instance.phase.value = ServerPhase.ready;
+    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutRouteLabel), findsNothing);
+  });
+
+  testWidgets('地址变更 → 弹层实时刷新地址与连接状态', (tester) async {
+    const next = 'https://einz.farinear.cn';
+    await _pump(tester, (server) async => ServerHealth(ok: server == next));
+    await tester.pumpAndSettle();
+    expect(find.text(kPrimaryServer), findsOneWidget);
+    expect(find.text('无法连接'), findsOneWidget);
+
+    applyEffectiveServer(next);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text(next), findsOneWidget);
+    expect(find.text('已连接'), findsOneWidget);
+  });
+
+  testWidgets('最近切换 → 显示 from → to', (tester) async {
+    const next = 'https://einz.farinear.cn';
+    await _pump(tester, (server) async => const ServerHealth(ok: true));
+    await tester.pumpAndSettle();
+
+    applyEffectiveServer(next);
+    await tester.pumpAndSettle();
+
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    expect(find.text(l10n.aboutLastSwitchLabel), findsOneWidget);
+    expect(find.text('$kPrimaryServer → $next'), findsOneWidget);
   });
 
   testWidgets('下载入口：服务端没给 URL → 回退硬编码 releases 地址，排在版本号下方',

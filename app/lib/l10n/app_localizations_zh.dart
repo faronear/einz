@@ -1251,6 +1251,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerDevNote => '开发地址，仅供测试';
 
   @override
+  String get aboutRouteLabel => '选路状态';
+
+  @override
+  String get aboutRouteProbing => '启动选路中…';
+
+  @override
+  String get aboutRouteUnreachable => '暂未找到可用入口';
+
+  @override
+  String get aboutLastSwitchLabel => '最近切换';
+
+  @override
   String get aboutStatusLabel => '连接状态';
 
   @override

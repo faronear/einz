@@ -9,7 +9,7 @@
 - **部署形态：** Multiverse 多租户（`spaces` 表 + 动态登记；**一条通道可进多个秘境**，
   见 `docs/GLOSSARY.md` 的术语分层）
 - **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.0）
-- **最后更新：** 2026-10-19
+- **最后更新：** 2026-10-29
 
 ---
 
@@ -28,6 +28,13 @@
   术语（`docs/GLOSSARY.md`）、`projectPlan` 索引化
 - `[ ]` 多空间**真机自测**：空间级「销毁本秘境通道」、`install_uid` 回填、未读角标、
   空间列表不再有破坏性入口
+- `[ ]` **3B-3 锁屏页连接状态**（暂不做，2026-10-29 记录）：在锁屏 Logo 下方显示
+  「正在连接服务器…」/「暂时无法连接，解锁后可查看本地消息」。`ServerBootstrap.phase`
+  已留好；按简洁偏好默认不做，需要时再接 `ValueListenableBuilder`。
+- `[ ]` **3C 选路 selector 收口**（暂不做，2026-10-29 记录）：把 `resolveServer` 改成
+  `selectServer` 返回 `{server, reachable}`，让 ServerBootstrap 不再补探一次、
+  ServerFailover 用 `reachable` 判断；可选把 SetupPage 的 4s 重选收敛到同一实现。
+  用户可见收益小，主要是代码质量，故暂缓。
 - `[ ]` `productLens` 剩余复核：§12 通道管理 / §14 路线图仍是 v1 口径（§2 概念模型已修）
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
 - `[x]` 字段改名**执行**（2026-09-23，见 `20260923_renamePlan.zhcn.md`）

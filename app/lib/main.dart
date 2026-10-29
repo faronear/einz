@@ -218,18 +218,26 @@ class _StartupGateState extends State<StartupGate> {
   String? _initError; // 本地库查询持续失败（重试耗尽）→ 展示重试页（不误进向导）
   int _retryCount = 0;
 
+  // 版本闸（2026-10-04；2026-10-29 3B-1 改为等启动选路有结论）：
+  // 只跑一次成功判定；地址没探通（false）时，等 serverRevision 变化后再试。
+  bool _versionGateStarted = false;
+  bool _versionGateDone = false;
+  bool _versionGateRunning = false;
+  bool _versionGateRetryPending = false;
+
   @override
   void initState() {
     super.initState();
+    // 启动选路（ServerBootstrap）/ 运行期换入口可能在中途改地址；版本闸
+    // 没探通时据此重试，避免"临时地址不通 → 冻结版本漏拦"。
+    serverRevision.addListener(_onServerRevisionForVersionGate);
     _check();
-    // 版本闸（2026-10-04）：核对服务端要求的最低 App 版本，不被支持就弹关不掉的
-    // 升级窗口。放在首屏（所有入口——锁屏 / 向导 / 直接进聊天——都先经过这里），
-    // 且**不 await**：探测在后台跑（3s 超时），正常客户端冷启动不受影响。
-    // 语言尚未就绪时 showDialog 会拿默认 locale，可接受——这扇窗只在极少数
-    // "客户端已过期"的场景出现，文案错过一次语言不影响"必须升级"这个指令。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(checkVersionGate(context));
-    });
+  }
+
+  @override
+  void dispose() {
+    serverRevision.removeListener(_onServerRevisionForVersionGate);
+    super.dispose();
   }
 
   Future<void> _check() async {
@@ -253,6 +261,10 @@ class _StartupGateState extends State<StartupGate> {
         _vault = vault;
         _initError = null;
       });
+      _startVersionGateOnce(
+        awaitBootstrap: widget.enableServerBootstrap &&
+            (hasLock || vault != null),
+      );
     } catch (e) {
       // 本地锁查询失败（如 SQLite 锁竞争/初始化竞态——热重启、异常退出后偶发）。
       // 不能降级为"未配置"进设置向导：数据仍在，向导会让用户误以为本机被清空
@@ -268,6 +280,75 @@ class _StartupGateState extends State<StartupGate> {
         setState(() => _initError = AppLocalizations.of(context)!.startupInitFailed);
       }
     }
+  }
+
+  /// 版本闸只启动一次；等启动选路有结论（或超时）再探，避免探到临时地址。
+  void _startVersionGateOnce({required bool awaitBootstrap}) {
+    if (_versionGateStarted) return;
+    _versionGateStarted = true;
+    // 等首帧再跑：确保 StartupGate 已有 Navigator 祖先（_check 可能在首帧前完成）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_runVersionGate(awaitBootstrap: awaitBootstrap));
+    });
+  }
+
+  Future<void> _runVersionGate({required bool awaitBootstrap}) async {
+    if (!mounted || _versionGateDone || _versionGateRunning) return;
+    // 先抓住 root Navigator：等启动选路期间 StartupGate 可能已被锁屏页
+    // pushReplacement 掉（用户手快），但 Navigator 本身还在；用它的 context
+    // 弹版本闸，避免"地址还没选完就解锁 → 版本闸被跳过"。
+    final navigator = Navigator.of(context, rootNavigator: true);
+    _versionGateRunning = true;
+    try {
+      if (awaitBootstrap) {
+        await _waitForBootstrapSettled(const Duration(seconds: 5));
+      }
+      if (_versionGateDone || !navigator.mounted) return;
+      final done = await checkVersionGate(navigator.context);
+      if (done) _versionGateDone = true;
+    } catch (e) {
+      // 版本闸失败不能影响进入；地址变化后还会重试。
+      debugPrint('StartupGate 版本闸失败: $e');
+    } finally {
+      _versionGateRunning = false;
+      if (_versionGateRetryPending) {
+        _versionGateRetryPending = false;
+        if (!_versionGateDone) {
+          unawaited(_runVersionGate(awaitBootstrap: false));
+        }
+      }
+    }
+  }
+
+  /// 等 ServerBootstrap 离开 probing（ready/unreachable），最多 [timeout]。
+  /// idle（无 Vault / 开发覆盖）或已经 ready/unreachable 时立即返回。
+  Future<void> _waitForBootstrapSettled(Duration timeout) async {
+    final phase = ServerBootstrap.instance.phase;
+    if (phase.value != ServerPhase.probing) return;
+    final settled = Completer<void>();
+    void listener() {
+      if (phase.value != ServerPhase.probing && !settled.isCompleted) {
+        settled.complete();
+      }
+    }
+
+    phase.addListener(listener);
+    try {
+      await settled.future.timeout(timeout, onTimeout: () {});
+    } finally {
+      phase.removeListener(listener);
+    }
+  }
+
+  /// 地址变了（启动选路换到更合适入口 / 运行期换入口）：版本闸若还没探通，重试。
+  void _onServerRevisionForVersionGate() {
+    if (!_versionGateStarted || _versionGateDone) return;
+    if (_versionGateRunning) {
+      _versionGateRetryPending = true;
+      return;
+    }
+    unawaited(_runVersionGate(awaitBootstrap: false));
   }
 
   /// 逃生口：清空本机全部本地数据并重来（启动失败页）。
