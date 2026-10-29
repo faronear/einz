@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:einz_shared/einz_shared.dart'
     show DoHResolver, createPinnedHttpClient, probeWithDohFallback;
+import 'package:flutter/foundation.dart';
 
 /// 服务器地址层（三层，见 docs/SERVER_SETTINGS.md）。
 ///
@@ -12,9 +13,10 @@ import 'package:einz_shared/einz_shared.dart'
 /// - **不进任何持久层**：不写 `app_state`，也不写锁包（`AppLockPayload`）。锁包解锁
 ///   前读不到，地址存进去就会出现"锁屏页显示的和解锁后实际连的不一致"（早先靠「关于」
 ///   页给锁屏态加一条附注兜底，地址改成进程级同源之后那类附注已一并去掉）。
-/// - **每次启动算一次**：`main()` 里定好存进 [effectiveServer]，之后由运行期
-///   换入口（ServerFailover，2026-10-29）在探活失败时改写，其余页面只读。页面
-///   之间不再层层透传地址（原先 18 处构造函数参数），所有页面读的是同一个变量。
+/// - **每次启动选一次**：`main()` 先给临时值（`kFallbackServer`）；有 Vault 时
+///   由 ServerBootstrap 在后台选路，运行期 ServerFailover 再按需改写，其余页面
+///   只读。页面之间不再层层透传地址（原先 18 处构造函数参数），所有页面读的是
+///   同一个变量 [effectiveServer]；变更经 [serverRevision] 广播。
 ///
 /// 三层优先级：
 /// 1. 运行时 `--server <地址>`（桌面端启动参数）——本次启动覆盖，仅本次生效；
@@ -105,11 +107,39 @@ String resolveAppDownloadUrl(String? served) {
   return s.isEmpty ? kAppDownloadUrlFallback : s;
 }
 
-/// 本次进程生效的服务器地址：`main()` 里定一次；运行期换入口（ServerFailover）
-/// 可能改写它，其余页面只读。
+/// 本次进程生效的服务器地址：`main()` 先给一个临时值，启动选路（ServerBootstrap）
+/// 或运行期换入口（ServerFailover）可能改写它；其余页面只读。
 ///
 /// **给默认值而非 late**：单元测试不走 `main()`，late 未初始化会直接崩。
 String effectiveServer = kPrimaryServer;
+
+/// 地址版本号：任何"当前入口变了"（启动选路 / 运行期换入口）都 +1。
+/// 页面（聊天页）只监听这一个通知，避免两个 selector 各发各的。
+final ValueNotifier<int> serverRevision = ValueNotifier<int>(0);
+
+/// 本次启动是否使用了人为覆盖（`--server` / 编译期 dart-define）。
+///
+/// 覆盖过就不该被候选列表或启动选路劫持——即使覆盖地址恰好也是出厂候选之一。
+bool serverOverrideActive = false;
+
+/// 换上新的生效地址并广播；返回是否真的变了。
+///
+/// 所有换地址的路径（ServerBootstrap / ServerFailover）都必须走这里，
+/// 这样 `serverRevision` 不会漏发，聊天页也只需监听一个通知。
+bool applyEffectiveServer(String server) {
+  if (server == effectiveServer) return false;
+  effectiveServer = server;
+  serverRevision.value++;
+  return true;
+}
+
+/// 测试隔离：复位地址相关全局量（不影响 `kServerCandidates` 等常量）。
+@visibleForTesting
+void resetServerRuntimeForTest() {
+  effectiveServer = kPrimaryServer;
+  serverOverrideActive = false;
+  serverRevision.value = 0;
+}
 
 /// 服务端附件大小上限（字节）：由 `/health` 的 `max_attachment_bytes` 探得，
 /// [probeServer] 探通时顺带写入。

@@ -14,12 +14,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   setUp(() {
-    effectiveServer = kPrimaryServer;
+    resetServerRuntimeForTest();
     ServerFailover.instance.reset();
   });
 
   tearDown(() {
-    effectiveServer = kPrimaryServer;
+    resetServerRuntimeForTest();
     ServerFailover.instance.reset();
   });
 
@@ -80,6 +80,22 @@ void main() {
 
     expect(first, greaterThan(0));
     expect(calls, first, reason: '冷却期内第二次 check 不应再探');
+  });
+
+  test('--server 覆盖即使地址在候选里也不参与换入口', () async {
+    effectiveServer = kServerCandidates[1];
+    serverOverrideActive = true;
+    final failover = ServerFailover(cooldown: Duration.zero);
+    addTearDown(failover.reset);
+    var calls = 0;
+
+    await failover.check(probe: (_) async {
+      calls++;
+      return const ServerHealth();
+    });
+
+    expect(calls, 0);
+    expect(effectiveServer, kServerCandidates[1]);
   });
 
   test('开发覆盖地址不参与换入口', () async {

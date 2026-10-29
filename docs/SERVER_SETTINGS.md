@@ -13,8 +13,10 @@
 
 由此推出一条贯穿两端的规则：
 
-> **地址每次启动算一次，永不落盘。**
+> **地址每次启动选一次，永不落盘。**
 > 不写 `app_state`、不写锁包（`AppLockPayload`）、不写 TUI 的 store。
+> 2026-10-29 起 App 的"选一次"是**非阻塞**的：`main()` 先给临时值立即出界面，
+> 有 Vault 时由 `ServerBootstrap` 在后台并发选路（见 §4）。
 
 **为什么不做"用户可配置服务器"**
 
@@ -110,6 +112,13 @@ _kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com',
   候选列表并发重探；30s 冷却 + single-flight，全不通时保持原地址。切换后 REST 客户端
   与 WS 连接一起重建（`WsRealtimeService.switchServer`），不必重启 App。
   开发覆盖（`--server` / 编译期 dart-define）不参与换入口。
+- **启动选路不阻塞首屏**（App，2026-10-29，3A）：`main()` 不再 `await resolveServer`，
+  先给临时值 `kFallbackServer` 立即 `runApp()`；`StartupGate` 读到有 Vault 后再启动
+  `ServerBootstrap`（`app/lib/data/server_bootstrap.dart`）在后台并发探候选。
+  当前入口可达且最快 → 不换；有更合适的 → 换并通过全局 `serverRevision` 广播；
+  全不通 → 保持临时地址、标 `unreachable`，聊天页照常离线可读。
+  选路只跑一次，进入聊天后的断线恢复仍归 ServerFailover；无 Vault 的首次配置仍由
+  SetupPage 的 4s 重选负责。
 
 ### 4.1 DNS 污染兜底（DoH + IP 钉扎，2026-10-11）
 

@@ -44,7 +44,7 @@ class ServerFailover {
 
   /// 是否可换：开发覆盖（`--server` / 编译期 dart-define）是人为指定地址，
   /// 不该被候选列表劫持（与 SetupPage._reprobe 同口径）。
-  bool get enabled => !isDevServer;
+  bool get enabled => !serverOverrideActive && !isDevServer;
 
   /// 检查一次（幂等/单飞/冷却）。
   ///
@@ -67,7 +67,7 @@ class ServerFailover {
       final picked =
           await resolveServer(null, probe: probeFn, fallback: before);
       if (picked == before || !enabled) return;
-      effectiveServer = picked;
+      if (!applyEffectiveServer(picked)) return;
       lastSwitchFrom = before;
       lastSwitchTo = picked;
       lastSwitchAt = DateTime.now();

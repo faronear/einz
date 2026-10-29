@@ -12,6 +12,7 @@ import 'data/launch_args.dart';
 import 'data/local_database.dart';
 import 'data/local_reset.dart';
 import 'data/locale_settings.dart';
+import 'data/server_bootstrap.dart';
 import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
@@ -21,8 +22,9 @@ import 'widgets/cancel_button.dart';
 
 /// Einz 移动端（及桌面端）入口。
 ///
-/// 启动流程：定好本次生效的服务器地址 → 检查是否已设置启动锁 → 已设置进锁屏页
-/// （PIN 解密 Space Key 包），未设置进一次性配置页（认证后设置 PIN）。
+/// 启动流程：先给一个临时服务器地址立即出界面 → 检查是否已设置启动锁 →
+/// 已设置进锁屏页（PIN 解密 Space Key 包），未设置进一次性配置页（认证后设置 PIN）；
+/// 有 Vault 时后台 `ServerBootstrap` 并发选路，选中后广播新地址（不阻塞首屏）。
 ///
 /// 桌面端支持一个启动参数：`--server <地址>`
 /// （`open -a Einz --args --server https://host`），覆盖本次启动使用的服务器地址，
@@ -44,8 +46,14 @@ Future<void> main() async {
     dnsPoisonNotice.value = DnsPoisonNotice(
         host: host, poisonedIp: poisonedIp, at: DateTime.now());
   };
-  // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
-  effectiveServer = await resolveServer(parseServerArg(await readLaunchArgs()));
+  // 本次生效地址：不再阻塞等待候选探测（2026-10-29 第 3A 层）。
+  // 先给一个可服务的临时值立即出界面；StartupGate 读到 Vault 后再由
+  // ServerBootstrap 在后台并发选路，选中就通过 serverRevision 广播。
+  final argServer = parseServerArg(await readLaunchArgs());
+  final compileOverride = kEinzServer != kPrimaryServer;
+  serverOverrideActive = argServer != null || compileOverride;
+  effectiveServer =
+      argServer ?? (compileOverride ? kEinzServer : kFallbackServer);
   runApp(const EinzApp());
 }
 
@@ -192,10 +200,13 @@ class _EinzAppState extends State<EinzApp> {
 ///
 /// 清空数据不在启动参数里：走「对话页菜单 → 高级 → 销毁本通道」。
 class StartupGate extends StatefulWidget {
-  const StartupGate({super.key, this.db});
+  const StartupGate({super.key, this.db, this.enableServerBootstrap = true});
 
   /// 测试注入用；默认 [LocalDatabase.shared]（与 LockPage.db 同款约定）。
   final LocalDatabase? db;
+
+  /// 测试可关掉后台选路（避免 widget 测试打真实网络）；生产恒为 true。
+  final bool enableServerBootstrap;
 
   @override
   State<StartupGate> createState() => _StartupGateState();
@@ -231,6 +242,11 @@ class _StartupGateState extends State<StartupGate> {
       final hasLock = await lock.isSetup;
       // 无锁包时读明文配置（跳过 PIN 的无锁场景：下次启动直接进聊天）
       final vault = hasLock ? null : await lock.loadVault();
+      // 有 Vault → 直接进锁屏/聊天，不经过 SetupPage 的 4s 重选；
+      // 在这里启动后台选路（3A），不阻塞进入。无 Vault 交给 SetupPage 自己探测。
+      if (widget.enableServerBootstrap && (hasLock || vault != null)) {
+        unawaited(ServerBootstrap.instance.start());
+      }
       if (!mounted) return;
       setState(() {
         _hasLock = hasLock;

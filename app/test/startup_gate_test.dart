@@ -30,7 +30,8 @@ Future<void> _pumpGate(WidgetTester tester, LocalDatabase db) async {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: const Locale('zh'),
-    home: StartupGate(db: db),
+    // 后台选路会打真实网络；widget 测试关掉（生产默认 true）。
+    home: StartupGate(db: db, enableServerBootstrap: false),
   ));
   await _settleGate(tester);
 }

@@ -1026,9 +1026,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 按 member 维度分左右分栏（服务器离线拉不到 entrance→member 映射）
       memberId: widget.memberId,
     );
-    // 运行期换入口（ServerFailover）：_repo 已就绪后再挂监听，切换时重建
-    // REST/WS 客户端并立即补同步（见 [_onServerSwitched]）。
-    ServerFailover.instance.switches.addListener(_onServerSwitched);
+    // 地址变更（启动选路 ServerBootstrap / 运行期换入口 ServerFailover）：
+    // _repo 已就绪后再挂监听，切换时重建 REST/WS 客户端并立即补同步。
+    serverRevision.addListener(_onServerChanged);
     // 头像加载要在 _repo 就绪后（重启路径要靠它反查本机 memberId）
     _loadMyAvatar();
     _loadPeerAvatar(); // 演示秘境的服务端路径（member 事件/空间解析）永不触发，
@@ -1585,12 +1585,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
   }
 
-  /// 运行期换入口（ServerFailover 已把 [effectiveServer] 改成新入口）：
+  /// 地址变更（启动选路或运行期换入口已把 [effectiveServer] 改成新入口）：
   /// REST 客户端 + WS 立即切到新地址，并补一次同步/资料校正——恢复不必等
   /// 下一轮轮询（离线退避最长 60s，干等会把"恢复"拖成几十秒）。
-  void _onServerSwitched() {
+  void _onServerChanged() {
     if (!mounted) return;
-    _repo.updateApi(effectiveServer);
+    // 注入 fake api 的测试不替换（保持用例确定性；生产恒为 null）。
+    if (widget.api == null) _repo.updateApi(effectiveServer);
     unawaited(_ws?.switchServer(effectiveServer));
     unawaited(_refresh());
     unawaited(_refreshProfileFromServer());
@@ -6180,7 +6181,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _input.removeListener(_onInputInteraction);
     _highlightTimer?.cancel(); // 跳转高亮定时清除（防 dispose 后 setState）
     _ampSub?.cancel();
-    ServerFailover.instance.switches.removeListener(_onServerSwitched);
+    serverRevision.removeListener(_onServerChanged);
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
     _voiceCall?.state.removeListener(_onVoiceCallStateChanged);
