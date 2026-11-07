@@ -4,6 +4,7 @@ import { requireSession } from "./guard.js";
 import { type ServerConfig } from "./config.js";
 import { attachmentsForMessages, deleteAttachmentFiles, type AttachmentMeta } from "./attachments.js";
 import { assertSafeMessageId } from "./safeId.js";
+import { notifyRecalledForMember } from "./ws.js";
 
 const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "audio", "file", "system"]);
 
@@ -151,6 +152,9 @@ export function recallMessage (
   })() as { message_id: string; server_sequence: number; storagePaths: string[] }
   // 事务提交后才删文件：文件系统操作不参与 SQLite 事务（见上注释）
   deleteAttachmentFiles(spaceId, result.storagePaths)
+  // 撤回同步：同 member 的其他在线通道把本地副本一并墓碑（放在函数内而非路由，
+  // 让任何调用路径——含回归测试——都带上这个副作用；ws.ts 对本模块只有类型依赖，无环）
+  notifyRecalledForMember(spaceId, myMemberId, entrance_id, result.message_id, result.server_sequence)
   return { message_id: result.message_id, server_sequence: result.server_sequence }
 }
 

@@ -75,6 +75,10 @@ class WsRealtimeService {
   /// 对偶：有人离开，名单/计数刷新 + 顶部通知。仅 group（duo 不开放退群）。
   void Function(WsMemberLeftEvent event)? onMemberLeft;
 
+  /// 撤回同步回调（message.recalled，2026-11-07）：我在另一条通道上撤回了消息，
+  /// 本通道把本地副本一并墓碑。
+  void Function(WsMessageRecalledEvent event)? onMessageRecalled;
+
   /// 建立连接（自动重连直到 [stop]）。
   ///
   /// **幂等**：已有连接（或正在重连）时直接返回，**不建第二条**。
@@ -93,6 +97,7 @@ class WsRealtimeService {
     void Function(WsCallEvent event)? onCall,
     void Function(WsMemberJoinedEvent event)? onMemberJoined,
     void Function(WsMemberLeftEvent event)? onMemberLeft,
+    void Function(WsMessageRecalledEvent event)? onMessageRecalled,
   }) {
     this.onMessageNew = onMessageNew;
     this.onEntranceRevoked = onEntranceRevoked;
@@ -103,6 +108,7 @@ class WsRealtimeService {
     this.onCall = onCall;
     this.onMemberJoined = onMemberJoined;
     this.onMemberLeft = onMemberLeft;
+    this.onMessageRecalled = onMessageRecalled;
     _started = true;
     if (_client != null) return; // 幂等：已有连接就不再建（见方法头注释）
     _createClient();
@@ -136,6 +142,7 @@ class WsRealtimeService {
         if (e is WsCallEvent) onCall?.call(e);
         if (e is WsMemberJoinedEvent) onMemberJoined?.call(e);
         if (e is WsMemberLeftEvent) onMemberLeft?.call(e);
+        if (e is WsMessageRecalledEvent) onMessageRecalled?.call(e);
       },
       onStatus: (s) {
         status.value = s;

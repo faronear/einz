@@ -16,6 +16,23 @@ const String kWsTypePassphraseRotated = 'passphrase.rotated';
 const String kWsTypeProfileUpdated = 'profile.updated';
 const String kWsTypeReceiptUpdated = 'receipt.updated';
 
+/// message.recalled（撤回同步，2026-11-07）：我的一条消息在**另一条通道**上被撤回，
+/// 本通道收到后把本地副本同样墓碑。只发给同 member 的其他通道（其他成员没拉到过
+/// 这条消息，不给他们发）；不落库不重放，离线设备不补发（已知残余窗口）。
+const String kWsTypeMessageRecalled = 'message.recalled';
+
+/// message.recalled：撤回同步事件。[messageId] + [serverSequence] 定位本地行。
+class WsMessageRecalledEvent extends WsEvent {
+  const WsMessageRecalledEvent({
+    required super.type,
+    required this.messageId,
+    this.serverSequence,
+  });
+
+  final String messageId;
+  final int? serverSequence;
+}
+
 /// 群聊一期（2026-10-03）：新**身份**入网（成员数 +1）。与 peer.online 不同——
 /// 后者是通道上下线（同一人的其他通道不算），这个是真来了新人，所有在线通道
 /// 都要刷新成员名单。
@@ -368,6 +385,13 @@ class WsClient {
             type: type,
             message: MessageEnvelope.fromJson(payload['message'] as Map<String, dynamic>),
             serverSequence: payload['server_sequence'] as int,
+          ));
+          break;
+        case kWsTypeMessageRecalled:
+          onEvent?.call(WsMessageRecalledEvent(
+            type: type,
+            messageId: payload['message_id'] as String? ?? '',
+            serverSequence: payload['server_sequence'] as int?,
           ));
           break;
         case kWsTypeEntranceRevoked:

@@ -989,6 +989,9 @@ Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String
       onUnrecognized: _onWsUnrecognized,
       // 对方送达/已读水位更新（receipt.updated）：重绘以刷新我发出消息的状态
       onReceiptUpdated: () => _scheduleRender(),
+      // 撤回同步（message.recalled，2026-11-07）：我的另一条通道撤回了消息，
+      // 本地行已由 chat_core 移除，这里只需重绘
+      onMessageRecalled: (_) => _scheduleRender(),
     );
   }
 

@@ -1276,6 +1276,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         .then((_) => _loadPeerReceipts()));
   }
 
+  /// 撤回同步（Server 广播 message.recalled，2026-11-07）：我在另一条通道上
+  /// 撤回了自己的消息，本通道把本地副本同样墓碑（kind 'recall'，UI 与本机撤回
+  /// 完全一致）。本地没有这条就忽略（如本通道在撤回后才入网，行本就不存在）。
+  void _onMessageRecalled(WsMessageRecalledEvent event) {
+    final idx = _messages.indexWhere((x) => x.env.messageId == event.messageId);
+    if (idx < 0 || _messages[idx].deleted) return;
+    unawaited(_repo.tombstoneMessage(event.messageId, kind: 'recall'));
+    if (!mounted) return;
+    setState(() {
+      _messages = [
+        for (final x in _messages)
+          if (x.env.messageId == event.messageId) _asDeleted(x, kind: 'recall') else x,
+      ];
+    });
+  }
+
   /// 从服务端校正双方名字与性别（GET /space 的 memberNames/memberGenders）。
   /// 本机 profile 只是入网时的快照：对方改名后若没收到广播（或广播前就重启），
   /// App 会一直显示旧名字（老板 2026-09-11 实测）；性别同理（v2 早期把对方性别
@@ -1556,6 +1572,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onCall: _onCallSignal,
       onMemberJoined: _onMemberJoined,
       onMemberLeft: _onMemberLeft,
+      onMessageRecalled: _onMessageRecalled,
     );
   }
 

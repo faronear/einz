@@ -558,6 +558,7 @@ class ChatSession {
     void Function(WsEntranceRevokedEvent event)? onRevoked,
     void Function()? onUnrecognized,
     void Function()? onReceiptUpdated,
+    void Function(WsMessageRecalledEvent event)? onMessageRecalled,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
     wsClient = WsClient(
@@ -620,6 +621,17 @@ class ChatSession {
         }
         if (event is WsProfileUpdatedEvent) {
           onProfileUpdated?.call(event);
+        }
+        if (event is WsMessageRecalledEvent) {
+          // 撤回同步（2026-11-07）：我在另一条通道上撤回了自己的消息——本地
+          // 整行移除（历史行 + 展示缓存；服务端已真删，行不会再从 /sync 回来，
+          // 留着会在重启 loadHistory 后复活）。本地没有这条就忽略（幂等）。
+          if (store.removeHistory(event.messageId)) {
+            store.save(storePath);
+          }
+          messages.removeWhere((m) => m.env.messageId == event.messageId);
+          _sortMessages();
+          onMessageRecalled?.call(event);
         }
         if (event is WsReceiptUpdatedEvent) {
           // 对方送达/已读水位更新：合并到本地（排除自己那行——见 peerDeliveredUpto）

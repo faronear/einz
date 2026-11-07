@@ -1,0 +1,24 @@
+{
+  "utc": "20261107T100122.830251Z",
+  "time": "2026-11-07 18:01+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "撤回同步上线：撤回后自己其他设备的本地副本一并删除",
+      "detail": [
+        "背景：撤回只真删服务端行，自己在其他设备/通道里已 sync 走的副本永远留着（TUI 里可见已撤回消息）。",
+        "方案：新 WS 帧 message.recalled（payload 只有 message_id+server_sequence），撤回成功后只发给同 member 的其他在线通道——对端成员没拉到过这条消息（撤回前提），发给他们反而泄露'存在过一条 seq=N 的消息'。",
+        "服务端：ws.ts 新增 notifyRecalledForMember；广播放在 messages.ts recallMessage 函数内（非路由层），任何调用路径都带上副作用，且回归测试可直接走真函数。不落库不重放：离线设备不补发，已知残余窗口（与 WS 推送窗口同批）记录在 PROTOCOL.md 帧表。",
+        "shared：ws_client.dart 加 kWsTypeMessageRecalled + WsMessageRecalledEvent + 解析分支。",
+        "app：ws_realtime_service 加 onMessageRecalled 回调；chat_page 收帧后 tombstoneMessage(kind:'recall')，本地没有该行则忽略（幂等）。",
+        "TUI：chat_core startWs 处理帧——store.removeHistory 整行移除（服务端已真删，留着会在重启 loadHistory 后复活）+ 展示缓存移除；einz_tui 接线只重绘。",
+        "docs/PROTOCOL.md §8 帧表加一行；老客户端忽略未知帧，PROTOCOL_VERSION 不升。",
+        "测试：server/test/recall_sync.test.ts（WS harness 照 entrance_retire.test.ts）——自己另一通道收到帧且载荷正确、发起通道不重收、对端绝不收到、行已真删。踩坑：第一版广播接在 app.ts 路由，单测走 recallMessage 真函数收不到帧 → 下沉到函数内。",
+        "验证：tsc 构建 + npm test 全量 exit 0（新用例 1/1 过）；dart analyze shared/app/cli 均 0 issue。"
+      ]
+    }
+  ]
+}

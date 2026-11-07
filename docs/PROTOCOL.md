@@ -563,6 +563,7 @@ Authorization: Bearer <session_token>
 | S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
 | S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加设备（attach token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
 | S→C | `member.left` | `{ "space_id": "…", "member_id": "…", "display_name": "…" }` | 自愿退群（2026-10-19，`PROTOCOL_MULTIVERSE.md` §4.2；**仅 group**）：某成员**身份级**退出（名下全部通道一并注销、成员行转墓碑）。与 `member.joined` 对偶——客户端刷新名单 + 顶部通知；`display_name` 只供通知文案，权威标识是 `member_id`。退出者自己的连接收不到这帧（已被静默摘除 / 撤销关闭）。老客户端忽略未知帧即可（`PROTOCOL_VERSION` 不为此升） |
+| S→C | `message.recalled` | `{ "message_id": "…", "server_sequence": 103 }` | 撤回同步（2026-11-07）：发送者撤回成功后，**只发给同 member 的其他在线通道**（其他成员没拉到过这条消息，不给他们发），客户端把本地副本一并移除/墓碑。不落库不重放——离线设备不补发，若它此前已拉走，本地副本留到清库/重置（已知残余窗口，与 WS 推送窗口同批）。老客户端忽略未知帧即可（`PROTOCOL_VERSION` 不为此升） |
 
 ### 8.3 顺序与重连
 

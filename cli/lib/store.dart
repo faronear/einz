@@ -312,6 +312,15 @@ class EntranceStore {
     }
   }
 
+  /// 撤回同步（message.recalled，2026-11-07）：把一条已入库的历史消息整行移除
+  /// （服务端已真删，行不会再从 /sync 回来——留着会在重启 loadHistory 后复活）。
+  /// 返回是否真的移除了一行（本来就没有则 false，幂等）。
+  bool removeHistory(String messageId) {
+    final before = history.length;
+    history.removeWhere((m) => m['message_id'] == messageId);
+    return history.length != before;
+  }
+
   /// 历史消息信封列表（按 server_sequence 升序；未同步的排最后，P3 修复与注释一致）。
   ///
   /// 逐条 try/catch：**解析不了的坏信封跳过**，不让 `MessageEnvelope.fromJson`

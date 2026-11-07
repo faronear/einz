@@ -184,6 +184,31 @@ export function notifyRevokedForMember(
   }
 }
 
+/** 撤回同步（2026-11-07）：发送者撤回成功后，通知**同身份的其他在线通道**
+ *  把本地副本一并墓碑（`message.recalled` 帧，只带 message_id/server_sequence）。
+ *  只发给发送者自己的其他通道——其他成员本就没拉到过这条消息（撤回的前提），
+ *  给它们发帧反而泄露"存在过一条 seq=N 的消息"。不落库不重放：离线设备
+ *  下次 sync 拉不到已删的行，但它此前若已拉走，本地副本会留到它清库/重置
+ *  ——该残余窗口与 WS 推送窗口同批，已知可接受（docs/E2EE.md 撤回设计备注）。
+ *  [exceptEntranceId] = 发起撤回的通道：它已本地墓碑，不重收。 */
+export function notifyRecalledForMember(
+  spaceId: string,
+  memberId: string,
+  exceptEntranceId: string,
+  messageId: string,
+  serverSequence: number,
+): void {
+  const payload = { message_id: messageId, server_sequence: serverSequence };
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.memberId !== memberId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type: "message.recalled", payload }));
+    }
+  }
+}
+
 /** 通话信令帧类型（PROTOCOL.md §8.4；与 shared 的 `kWsTypeCall*` 手工对齐）。 */
 const CALL_TYPES = new Set([
   "call.invite",
