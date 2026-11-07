@@ -148,6 +148,12 @@ export function recallMessage (
       .all(messageId, spaceId) as { storage_path: string }[]
     db.prepare(`DELETE FROM attachments WHERE message_id = ? AND space_id = ?`).run(messageId, spaceId)
     db.prepare(`DELETE FROM messages WHERE message_id = ? AND space_id = ?`).run(messageId, spaceId)
+    // 撤回标记（2026-11-07 第二期）：与删行同事务——离线设备靠 /sync 补发追认，
+    // 不再依赖 WS 帧在场（帧仍是实时快路径）
+    db.prepare(
+      `INSERT INTO recalls (space_id, member_id, message_id, server_sequence, recalled_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(spaceId, myMemberId, row.message_id, row.server_sequence, Date.now())
     return { message_id: row.message_id, server_sequence: row.server_sequence, storagePaths: atts.map(a => a.storage_path) }
   })() as { message_id: string; server_sequence: number; storagePaths: string[] }
   // 事务提交后才删文件：文件系统操作不参与 SQLite 事务（见上注释）
@@ -158,12 +164,23 @@ export function recallMessage (
   return { message_id: result.message_id, server_sequence: result.server_sequence }
 }
 
-/** GET /sync?after=&limit=：按 server_sequence 增量拉取（PROTOCOL.md §5.2）。 */
+/** GET /sync?after=&limit=&after_recall=：按 server_sequence 增量拉取（PROTOCOL.md §5.2）。
+ *  撤回标记（2026-11-07 第二期）随响应增量下发：客户端以 after_recall 游标去重，
+ *  应用墓碑后推进自己的水位——WS message.recalled 只是实时快路径，断线间隙
+ *  错过的撤回靠这里追认（recalls 表见 db.ts）。 */
 export function syncMessages(
   token: string,
   after: number,
-  limit: number
-): { messages: StoredMessage[]; attachments_meta: AttachmentMeta[]; last_sequence: number; has_more: boolean } {
+  limit: number,
+  afterRecall = 0
+): {
+  messages: StoredMessage[];
+  attachments_meta: AttachmentMeta[];
+  last_sequence: number;
+  has_more: boolean;
+  recalls: { id: number; message_id: string; server_sequence: number }[];
+  last_recall_id: number;
+} {
   const { entrance_id, space_id: sessionSpace } = requireSession(token);
   touchLastSeen(entrance_id);
   const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
@@ -189,5 +206,24 @@ export function syncMessages(
   const messageIds = page.map((m) => m.message_id);
   const attachmentsMeta = attachmentsForMessages(messageIds);
 
-  return { messages: page, attachments_meta: attachmentsMeta, last_sequence: last, has_more: hasMore };
+  // 撤回标记增量（2026-11-07）：id > afterRecall，按空间过滤，上限 500 条——
+  // 超出部分等客户端推进水位后下一轮 sync 继续（撤回是低频事件，实际到不了）
+  const recalls = db
+    .prepare(
+      `SELECT id, message_id, server_sequence FROM recalls
+       WHERE space_id = ? AND id > ? ORDER BY id ASC LIMIT 500`
+    )
+    .all(spaceId, afterRecall) as { id: number; message_id: string; server_sequence: number }[];
+  const lastRecall = db
+    .prepare(`SELECT COALESCE(MAX(id), 0) AS max_id FROM recalls WHERE space_id = ?`)
+    .get(spaceId) as { max_id: number };
+
+  return {
+    messages: page,
+    attachments_meta: attachmentsMeta,
+    last_sequence: last,
+    has_more: hasMore,
+    recalls,
+    last_recall_id: lastRecall.max_id,
+  };
 }

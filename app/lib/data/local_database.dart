@@ -75,6 +75,11 @@ class SyncState extends Table {
   TextColumn get spaceId => text()();
   IntColumn get lastServerSequence => integer().withDefault(const Constant(0))();
 
+  /// 撤回标记水位（2026-11-07 第二期）：已应用到的服务端 recalls.id 高水位。
+  /// 与消息锚点分开记——撤回标记的游标是 recalls 自增 id，不是消息 seq
+  /// （消息 seq 在拉到时已被锚点越过，复用会漏）。只前进，见 _advanceRecall。
+  IntColumn get lastRecallId => integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {spaceId};
 }
@@ -185,7 +190,7 @@ class LocalDatabase extends _$LocalDatabase {
       : super(DatabaseConnection(executor, closeStreamsSynchronously: true));
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -329,6 +334,13 @@ class LocalDatabase extends _$LocalDatabase {
                 "DELETE FROM app_state WHERE key IN "
                 "('voice_transcript_engine', 'voice_transcript_auto')",
               );
+            }
+          }
+          if (from < 13) {
+            // v13（2026-11-07）：sync_state 加撤回标记水位列（last_recall_id，
+            // 默认 0）——撤回同步第二期（sync 补发），见 SyncState 注释。
+            if (!await _hasColumn('sync_state', 'last_recall_id')) {
+              await m.addColumn(syncState, syncState.lastRecallId);
             }
           }
         },

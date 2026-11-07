@@ -1581,8 +1581,24 @@ class $SyncStateTable extends SyncState
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _lastRecallIdMeta = const VerificationMeta(
+    'lastRecallId',
+  );
   @override
-  List<GeneratedColumn> get $columns => [spaceId, lastServerSequence];
+  late final GeneratedColumn<int> lastRecallId = GeneratedColumn<int>(
+    'last_recall_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    spaceId,
+    lastServerSequence,
+    lastRecallId,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1612,6 +1628,15 @@ class $SyncStateTable extends SyncState
         ),
       );
     }
+    if (data.containsKey('last_recall_id')) {
+      context.handle(
+        _lastRecallIdMeta,
+        lastRecallId.isAcceptableOrUnknown(
+          data['last_recall_id']!,
+          _lastRecallIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1629,6 +1654,10 @@ class $SyncStateTable extends SyncState
         DriftSqlType.int,
         data['${effectivePrefix}last_server_sequence'],
       )!,
+      lastRecallId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_recall_id'],
+      )!,
     );
   }
 
@@ -1641,15 +1670,22 @@ class $SyncStateTable extends SyncState
 class SyncStateData extends DataClass implements Insertable<SyncStateData> {
   final String spaceId;
   final int lastServerSequence;
+
+  /// 撤回标记水位（2026-11-07 第二期）：已应用到的服务端 recalls.id 高水位。
+  /// 与消息锚点分开记——撤回标记的游标是 recalls 自增 id，不是消息 seq
+  /// （消息 seq 在拉到时已被锚点越过，复用会漏）。只前进，见 _advanceRecall。
+  final int lastRecallId;
   const SyncStateData({
     required this.spaceId,
     required this.lastServerSequence,
+    required this.lastRecallId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['space_id'] = Variable<String>(spaceId);
     map['last_server_sequence'] = Variable<int>(lastServerSequence);
+    map['last_recall_id'] = Variable<int>(lastRecallId);
     return map;
   }
 
@@ -1657,6 +1693,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     return SyncStateCompanion(
       spaceId: Value(spaceId),
       lastServerSequence: Value(lastServerSequence),
+      lastRecallId: Value(lastRecallId),
     );
   }
 
@@ -1668,6 +1705,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     return SyncStateData(
       spaceId: serializer.fromJson<String>(json['spaceId']),
       lastServerSequence: serializer.fromJson<int>(json['lastServerSequence']),
+      lastRecallId: serializer.fromJson<int>(json['lastRecallId']),
     );
   }
   @override
@@ -1676,20 +1714,28 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     return <String, dynamic>{
       'spaceId': serializer.toJson<String>(spaceId),
       'lastServerSequence': serializer.toJson<int>(lastServerSequence),
+      'lastRecallId': serializer.toJson<int>(lastRecallId),
     };
   }
 
-  SyncStateData copyWith({String? spaceId, int? lastServerSequence}) =>
-      SyncStateData(
-        spaceId: spaceId ?? this.spaceId,
-        lastServerSequence: lastServerSequence ?? this.lastServerSequence,
-      );
+  SyncStateData copyWith({
+    String? spaceId,
+    int? lastServerSequence,
+    int? lastRecallId,
+  }) => SyncStateData(
+    spaceId: spaceId ?? this.spaceId,
+    lastServerSequence: lastServerSequence ?? this.lastServerSequence,
+    lastRecallId: lastRecallId ?? this.lastRecallId,
+  );
   SyncStateData copyWithCompanion(SyncStateCompanion data) {
     return SyncStateData(
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
       lastServerSequence: data.lastServerSequence.present
           ? data.lastServerSequence.value
           : this.lastServerSequence,
+      lastRecallId: data.lastRecallId.present
+          ? data.lastRecallId.value
+          : this.lastRecallId,
     );
   }
 
@@ -1697,44 +1743,51 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
   String toString() {
     return (StringBuffer('SyncStateData(')
           ..write('spaceId: $spaceId, ')
-          ..write('lastServerSequence: $lastServerSequence')
+          ..write('lastServerSequence: $lastServerSequence, ')
+          ..write('lastRecallId: $lastRecallId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(spaceId, lastServerSequence);
+  int get hashCode => Object.hash(spaceId, lastServerSequence, lastRecallId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncStateData &&
           other.spaceId == this.spaceId &&
-          other.lastServerSequence == this.lastServerSequence);
+          other.lastServerSequence == this.lastServerSequence &&
+          other.lastRecallId == this.lastRecallId);
 }
 
 class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   final Value<String> spaceId;
   final Value<int> lastServerSequence;
+  final Value<int> lastRecallId;
   final Value<int> rowid;
   const SyncStateCompanion({
     this.spaceId = const Value.absent(),
     this.lastServerSequence = const Value.absent(),
+    this.lastRecallId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SyncStateCompanion.insert({
     required String spaceId,
     this.lastServerSequence = const Value.absent(),
+    this.lastRecallId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : spaceId = Value(spaceId);
   static Insertable<SyncStateData> custom({
     Expression<String>? spaceId,
     Expression<int>? lastServerSequence,
+    Expression<int>? lastRecallId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (spaceId != null) 'space_id': spaceId,
       if (lastServerSequence != null)
         'last_server_sequence': lastServerSequence,
+      if (lastRecallId != null) 'last_recall_id': lastRecallId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1742,11 +1795,13 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   SyncStateCompanion copyWith({
     Value<String>? spaceId,
     Value<int>? lastServerSequence,
+    Value<int>? lastRecallId,
     Value<int>? rowid,
   }) {
     return SyncStateCompanion(
       spaceId: spaceId ?? this.spaceId,
       lastServerSequence: lastServerSequence ?? this.lastServerSequence,
+      lastRecallId: lastRecallId ?? this.lastRecallId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1760,6 +1815,9 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     if (lastServerSequence.present) {
       map['last_server_sequence'] = Variable<int>(lastServerSequence.value);
     }
+    if (lastRecallId.present) {
+      map['last_recall_id'] = Variable<int>(lastRecallId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1771,6 +1829,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     return (StringBuffer('SyncStateCompanion(')
           ..write('spaceId: $spaceId, ')
           ..write('lastServerSequence: $lastServerSequence, ')
+          ..write('lastRecallId: $lastRecallId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4869,11 +4928,13 @@ typedef $$LocalAttachmentsTableProcessedTableManager =
 typedef $$SyncStateTableCreateCompanionBuilder = SyncStateCompanion Function({
   required String spaceId,
   Value<int> lastServerSequence,
+  Value<int> lastRecallId,
   Value<int> rowid,
 });
 typedef $$SyncStateTableUpdateCompanionBuilder = SyncStateCompanion Function({
   Value<String> spaceId,
   Value<int> lastServerSequence,
+  Value<int> lastRecallId,
   Value<int> rowid,
 });
 
@@ -4893,6 +4954,11 @@ class $$SyncStateTableFilterComposer
 
   ColumnFilters<int> get lastServerSequence => $composableBuilder(
     column: $table.lastServerSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastRecallId => $composableBuilder(
+    column: $table.lastRecallId,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4915,6 +4981,11 @@ class $$SyncStateTableOrderingComposer
     column: $table.lastServerSequence,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get lastRecallId => $composableBuilder(
+    column: $table.lastRecallId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncStateTableAnnotationComposer
@@ -4931,6 +5002,11 @@ class $$SyncStateTableAnnotationComposer
 
   GeneratedColumn<int> get lastServerSequence => $composableBuilder(
     column: $table.lastServerSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastRecallId => $composableBuilder(
+    column: $table.lastRecallId,
     builder: (column) => column,
   );
 }
@@ -4968,20 +5044,24 @@ class $$SyncStateTableTableManager
               ({
                 Value<String> spaceId = const Value.absent(),
                 Value<int> lastServerSequence = const Value.absent(),
+                Value<int> lastRecallId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncStateCompanion(
                 spaceId: spaceId,
                 lastServerSequence: lastServerSequence,
+                lastRecallId: lastRecallId,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String spaceId,
                 Value<int> lastServerSequence = const Value.absent(),
+                Value<int> lastRecallId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncStateCompanion.insert(
                 spaceId: spaceId,
                 lastServerSequence: lastServerSequence,
+                lastRecallId: lastRecallId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

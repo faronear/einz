@@ -507,7 +507,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     const sess = requireSession(token)
     const after = Number(url.searchParams.get('after') ?? 0)
     const limit = Number(url.searchParams.get('limit') ?? 100)
-    const result = syncMessages(token, after, limit)
+    const afterRecall = Number(url.searchParams.get('after_recall') ?? 0)
+    const result = syncMessages(token, after, limit, afterRecall)
     // 审计：消息「接收」证据（该通道拉到第几条；空闲轮询受节流，见 audit.ts）
     logSyncActivity({
       entranceId: sess.entrance_id,

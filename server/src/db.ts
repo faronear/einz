@@ -191,6 +191,23 @@ export function openDb(path?: string): Database.Database {
       PRIMARY KEY (space_id, member_id)
     );
 
+    -- ── 撤回标记（2026-11-07，撤回同步第二期：sync 补发）─────────────────────
+    -- 起因：message.recalled 是 WS-only 帧，对端恰在重连间隙就永久丢失——服务端
+    -- 行已真删，之后没有任何机制再告知那台设备，本地副本永远留着。
+    -- 手段：撤回时在同一事务里落一行标记；/sync 响应带出 recalls 增量
+    -- （按自增 id 游标 after_recall 分页），客户端应用墓碑后推进自己的水位。
+    -- 消息行依旧真删（不改变存储语义）；标记只含元数据（id/seq，无内容）。
+    -- id 全局自增（跨空间），空间过滤在查询侧做；客户端水位按空间各存各的。
+    CREATE TABLE IF NOT EXISTS recalls (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      space_id        TEXT NOT NULL,
+      member_id       TEXT NOT NULL,   -- 发起撤回的身份（审计/排查用）
+      message_id      TEXT NOT NULL,
+      server_sequence INTEGER NOT NULL,
+      recalled_at     INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_recalls_space ON recalls (space_id, id);
+
     -- ── 邮件通知（2026-10-01）——──────────────────────────────────────────────
     -- 起因：没进应用商店 → 没有后台推送；离线期间的来信对方完全不知道（上线才知道）。
     -- 手段：给离线的对方发一封邮件，借邮件系统自带的推送能力把他拉回来。

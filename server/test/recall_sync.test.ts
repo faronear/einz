@@ -18,7 +18,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 
 import { hashSessionToken } from '../src/auth.js'
 import { getDb, openDb } from '../src/db.js'
-import { recallMessage } from '../src/messages.js'
+import { recallMessage, syncMessages } from '../src/messages.js'
 import { attachWs } from '../src/ws.js'
 import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
@@ -61,6 +61,19 @@ function seed (): void {
     `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
      VALUES ('m-1', 'space-a', 'a1', 'p1', 'text', 1, 'bm9uY2U=', 'Y2lwaGVy', 1, ?)`,
   ).run(now)
+
+  // 第二个空间（隔离对照）：c1 的 sync 不该看到 space-a 的撤回标记
+  db.prepare(
+    `INSERT INTO spaces (space_id, space_address, space_public_key, created_at, updated_at)
+     VALUES ('space-b', 'addr-b', 'pk-b', ?, ?)`,
+  ).run(now, now)
+  dev.run('c1', 'p3', now, now)
+  member.run('space-b', 'p3', 0, now)
+  session.run(hashSessionToken('tok-c1'), 'c1', expires, now)
+  // 上面 session 复用的 INSERT 硬编码 space_id='space-a'，c1 的会话须改绑 space-b
+  getDb()
+    .prepare(`UPDATE sessions SET space_id = 'space-b' WHERE session_token = ?`)
+    .run(hashSessionToken('tok-c1'))
 }
 
 interface Client {
@@ -132,11 +145,31 @@ test('撤回同步：自己其他在线通道收到 message.recalled；对端与
       '对端不得收到撤回帧（没拉到过这条消息，帧只会泄露其存在）',
     )
 
-    // 3) 服务端行已真删（既有语义不回归）
+    // 3) 服务端行已真删（既有语义不回归），且撤回标记已落库
     const row = getDb()
       .prepare(`SELECT COUNT(*) AS n FROM messages WHERE message_id = 'm-1'`)
       .get() as { n: number }
     assert.equal(row.n, 0, '撤回后消息行真删')
+
+    // 4) sync 补发：WS 帧丢了的设备靠 /sync 追认（整个空间都会下发——seq 断号
+    //    本来就会让对端推断出"有消息没给我"，标记不泄露额外信息）
+    const syncA1 = syncMessages('tok-a1', 0, 100, 0)
+    assert.equal(syncA1.recalls.length, 1, '撤回标记应随 sync 下发')
+    assert.equal(syncA1.recalls[0].message_id, 'm-1')
+    assert.equal(syncA1.recalls[0].server_sequence, 1)
+    const recallId = syncA1.recalls[0].id
+    assert.ok(recallId > 0)
+    assert.equal(syncA1.last_recall_id, recallId, 'last_recall_id 应为该空间标记最高 id')
+
+    // 5) 水位推进：按 after_recall 去重，不再重复下发（不重放）
+    const syncAgain = syncMessages('tok-a1', 0, 100, recallId)
+    assert.deepEqual(syncAgain.recalls, [], '水位已推进 → 不再下发')
+    assert.equal(syncAgain.last_recall_id, recallId, 'last_recall_id 仍返回当前最高值')
+
+    // 6) 空间隔离：另一空间的 sync 看不到 space-a 的撤回标记
+    const syncC1 = syncMessages('tok-c1', 0, 100, 0)
+    assert.deepEqual(syncC1.recalls, [], '跨空间不得下发撤回标记')
+    assert.equal(syncC1.last_recall_id, 0, '跨空间 last_recall_id 为 0')
   } finally {
     wss.close()
     rmSync(dir, { recursive: true, force: true })

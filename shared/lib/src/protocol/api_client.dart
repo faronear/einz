@@ -509,18 +509,39 @@ class ApiClient {
     return res;
   }
 
-  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+  Future<
+      ({
+        List<MessageEnvelope> messages,
+        List<Map<String, dynamic>> attachmentsMeta,
+        int lastSequence,
+        bool hasMore,
+        List<({int id, String messageId, int serverSequence})> recalls,
+        int lastRecallId,
+      })> sync(
     String token, {
     int after = 0,
     int limit = 100,
+    int afterRecall = 0,
   }) async {
-    final res = await _get('${Api.sync}?after=$after&limit=$limit', token: token);
+    final res =
+        await _get('${Api.sync}?after=$after&limit=$limit&after_recall=$afterRecall', token: token);
     final list = (res['messages'] as List).cast<Map<String, dynamic>>();
+    final recallList = (res['recalls'] as List? ?? []).cast<Map<String, dynamic>>();
     return (
       messages: list.map(MessageEnvelope.fromJson).toList(),
       attachmentsMeta: (res['attachments_meta'] as List? ?? []).cast<Map<String, dynamic>>(),
       lastSequence: res['last_sequence'] as int,
       hasMore: res['has_more'] as bool,
+      // 撤回标记增量（2026-11-07 第二期）：旧服务端不带该字段 → 空列表，调用方
+      // 按水位 0 处理即 no-op（协议向前兼容）
+      recalls: recallList
+          .map((r) => (
+                id: r['id'] as int,
+                messageId: r['message_id'] as String,
+                serverSequence: r['server_sequence'] as int,
+              ))
+          .toList(),
+      lastRecallId: (res['last_recall_id'] as int?) ?? 0,
     );
   }
 
