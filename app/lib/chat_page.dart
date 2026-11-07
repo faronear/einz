@@ -1278,11 +1278,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 撤回同步（Server 广播 message.recalled，2026-11-07）：我在另一条通道上
   /// 撤回了自己的消息，本通道把本地副本同样墓碑（kind 'recall'，UI 与本机撤回
-  /// 完全一致）。本地没有这条就忽略（如本通道在撤回后才入网，行本就不存在）。
+  /// 完全一致）。
+  ///
+  /// **DB 墓碑无条件先行，不依赖内存列表命中**：消息刚发出、撤回紧接着发生时，
+  /// 本通道的 _refresh（WS message.new 触发的 sync）可能还在路上——此刻
+  /// `_messages` 里没有这条，若因此 return，帧被丢弃且 DB 没打标记，这条消息
+  /// 就永远撤不掉了（帧不重放，服务端行已删，之后无从得知）。墓碑先行则
+  /// 稍后落库的消息……注意服务端行已删，sync 本就不会再返回它，两边语义一致。
+  /// 本地确实没有该行时墓碑更新命中 0 行，天然幂等。内存里命中才刷新 UI。
   void _onMessageRecalled(WsMessageRecalledEvent event) {
-    final idx = _messages.indexWhere((x) => x.env.messageId == event.messageId);
-    if (idx < 0 || _messages[idx].deleted) return;
     unawaited(_repo.tombstoneMessage(event.messageId, kind: 'recall'));
+    if (_messages.every((x) => x.env.messageId != event.messageId)) return;
     if (!mounted) return;
     setState(() {
       _messages = [

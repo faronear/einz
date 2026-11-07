@@ -1,0 +1,18 @@
+{
+  "utc": "20261107T124033.237997Z",
+  "time": "2026-11-07 20:40+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "撤回同步不稳定排查：修掉撤回帧先于消息到达被丢弃的竞态",
+      "detail": [
+        "老板实测（macOS app + iPhone 模拟器 + 本地 server 同一用户多通道）：消息回显与撤回同步都'有时行有时不行'。",
+        "诊断①（已修）：chat_page._onMessageRecalled 原先在 _messages 里找不到该消息就整帧 return——消息刚发出、撤回紧跟发生时，对端 _refresh 的 sync 还在路上，内存列表没有这条，帧被丢弃且 DB 墓碑没打，这条消息永远撤不掉。修法：DB 墓碑无条件先行（tombstoneMessage 命中 0 行天然幂等），内存命中才刷新 UI。dart analyze 干净。",
+        "诊断②（待老板决策）：message.new 与 message.recalled 都是 WS-only 不落库不重放。消息回显丢了有 3s/30s 轮询兜底（只是晚到）；撤回帧赶上对端 WS 重连间隙则永久丢失（服务端行已删，之后无从得知）——这是'不稳定'的另一半。彻底修需要服务端持久化撤回标记 + sync 补发，涉及协议与两端，等老板拍板。"
+      ]
+    }
+  ]
+}
