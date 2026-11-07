@@ -200,13 +200,22 @@ Server 从不解析 ciphertext，所以载荷形状是**客户端约定**，编�
   ],
   "attachments_meta": [ /* 消息引用的附件元数据，§6 */ ],
   "last_sequence": 104,
-  "has_more": false
+  "has_more": false,
+  "recalls": [
+    { "id": 7, "message_id": "…", "server_sequence": 101 }
+  ],
+  "last_recall_id": 7
 }
 ```
 
 - `after` 为客户端 `last_server_sequence`；返回大于该值的消息，按 `server_sequence` 升序。
 - `has_more=true` 时客户端继续翻页；避免一次性拉取全量历史。
 - 客户端把消息写入本地 SQLite 后，才推进 `last_server_sequence`。
+- **撤回标记增量**（2026-11-07 第二期）：`recalls` 为 `id > after_recall` 的撤回标记
+  （每空间过滤，上限 500 条；`after_recall` 是查询参数，缺省 0）。客户端逐条把本地
+  副本移除/墓碑后推进自己的 `after_recall` 水位（按空间各存各的）——WS
+  `message.recalled`（§8.2）只是实时快路径，断线间隙错过的撤回靠这里追认。
+  旧服务端不带这两个字段 → 客户端按空列表/水位 0 处理（协议向前兼容）。
 
 ### 5.3 顺序保证
 

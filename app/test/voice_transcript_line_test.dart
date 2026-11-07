@@ -32,8 +32,8 @@ class _FakeApi extends ApiClient {
       (file: null, updatedAt: null);
 
   @override
-  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
-      String token, {int after = 0, int limit = 100}) async {
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId})> sync(
+      String token, {int after = 0, int limit = 100, int afterRecall = 0}) async {
     var seq = after;
     final withSeq = <MessageEnvelope>[
       for (final env in messages)
@@ -47,7 +47,9 @@ class _FakeApi extends ApiClient {
       messages: withSeq,
       attachmentsMeta: attachmentsMeta,
       lastSequence: seq,
-      hasMore: false
+      hasMore: false,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     );
   }
 }

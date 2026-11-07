@@ -1,0 +1,23 @@
+{
+  "utc": "20261107T131147.133245Z",
+  "time": "2026-11-07 21:11+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "撤回同步第二期：服务端持久化撤回标记 + /sync 补发（老板拍板方案 B）",
+      "detail": [
+        "背景：实测发现撤回同步'不稳定'——①修掉了 app 端撤回帧先于消息落库被整帧丢弃的竞态（86078174）；②残余根因是 message.recalled 为 WS-only 帧不落库不重放，对端恰在 WS 重连间隙就永久丢失（消息回显丢帧有 3s/30s 轮询兜底只是晚到，撤回没有兜底）。老板在'维持现状'与'服务端持久化+sync 补发'之间选了后者。",
+        "服务端：db.ts 新增 recalls 表（id 全局自增作游标，space_id+id 索引；只含元数据，消息行仍真删、存储语义不变）；recallMessage 同事务落标记；syncMessages 响应新增 recalls（id > after_recall，按空间过滤，上限 500 条）+ last_recall_id；/sync 路由透传 after_recall。",
+        "下发范围：sync 补发是全空间下发（对端也会收到标记）——但 seq 断号本就会让对端推断出'有消息没给我'，标记不泄露 WS 帧方案之外的信息，与 WS 帧只发同 member 的差异已在 PROTOCOL.md 记录。",
+        "app：SyncState 加 last_recall_id 列（schema v12→v13，迁移加列幂等防已发布版本坑——沿用 v11 的教训写法）；api_client.sync 加 afterRecall 参数并解析 recalls/last_recall_id（旧服务端缺字段→空列表，向前兼容）；repository.sync 逐条 tombstoneMessage(kind:'recall') 并单调推进水位（_advanceRecall，与 _advanceAnchor 同款 upsert）。",
+        "TUI：EntranceStore 加 last_recall_id（toJson/fromJson）；chat_core.sync 应用标记（store.removeHistory 整行移除防重启复活）+ 推进水位 + 清展示缓存。",
+        "测试：recall_sync.test.ts 扩展 sync 断言（补发下发/水位推进不重放/跨空间隔离）；踩坑——seed 里新空间 c1 的会话沿用了硬编码 space_id='space-a'，隔离断言失败，UPDATE 改绑 space-b 后通过。",
+        "app 测试适配：api_client.sync 记录类型加两个字段 → 30 个测试文件的 FakeApi.sync 签名/返回记录逐一补齐（search_replace 三种签名形态 + hasMore 字段后插字段 + const [] 显式类型参数防 List<dynamic> 推断）；message_repository_test 的 pages 列表与 golden_render 的 _FakeApi.page 字段同步扩型。",
+        "验证：tsc 构建 + npm test 全量 exit 0（186 项子测试）；dart analyze shared/app/cli 均 0 issue（app drift build_runner 重生成）。"
+      ]
+    }
+  ]
+}

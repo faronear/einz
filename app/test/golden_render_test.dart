@@ -48,13 +48,14 @@ final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 /// 最小 fake ApiClient：sync 返回编排好的消息页（渲染聊天界面用）。
 class _FakeApi extends ApiClient {
   _FakeApi(this.page) : super('http://fake');
-  final ({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore}) page;
+  final ({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId}) page;
 
   @override
-  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId})> sync(
     String token, {
     int after = 0,
     int limit = 100,
+    int afterRecall = 0,
   }) async {
     return page;
   }
@@ -194,6 +195,8 @@ void main() {
       attachmentsMeta: <Map<String, dynamic>>[],
       lastSequence: 2,
       hasMore: false,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     ));
 
     await tester.pumpWidget(MaterialApp(

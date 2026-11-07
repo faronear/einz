@@ -23,16 +23,19 @@ class _JumpFakeApi extends ApiClient {
   _JumpFakeApi() : super('http://fake');
 
   @override
-  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId})> sync(
     String token, {
     int after = 0,
     int limit = 100,
+    int afterRecall = 0,
   }) async =>
       (
         messages: const <MessageEnvelope>[],
         attachmentsMeta: const <Map<String, dynamic>>[],
         lastSequence: 0,
         hasMore: false,
+        recalls: const <({int id, String messageId, int serverSequence})>[],
+        lastRecallId: 0,
       );
 
   @override

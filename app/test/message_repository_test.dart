@@ -21,7 +21,7 @@ class FakeApi extends ApiClient {
   final List<String> posted;
 
   /// 编排的 sync 页（每页是一个 SyncPage）。
-  List<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> pages = [];
+  List<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId})> pages = [];
 
   /// 编排的 /space 通道列表（member 映射测试用）。
   List<SpaceEntrance> spaceEntrances = [];
@@ -86,13 +86,21 @@ class FakeApi extends ApiClient {
   }
 
   @override
-  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId})> sync(
     String token, {
     int after = 0,
     int limit = 100,
+    int afterRecall = 0,
   }) async {
     final page = pages.isEmpty
-        ? (messages: <MessageEnvelope>[], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: after, hasMore: false)
+        ? (
+            messages: <MessageEnvelope>[],
+            attachmentsMeta: <Map<String, dynamic>>[],
+            lastSequence: after,
+            hasMore: false,
+            recalls: const <({int id, String messageId, int serverSequence})>[],
+            lastRecallId: 0,
+          )
         : pages.removeAt(0);
     // 模拟 Server 分配 server_sequence（真实 Server 在同步响应中携带，见 PROTOCOL.md §5.2）
     var seq = after;
@@ -108,6 +116,8 @@ class FakeApi extends ApiClient {
       attachmentsMeta: page.attachmentsMeta,
       lastSequence: seq,
       hasMore: page.hasMore,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     );
   }
 }
@@ -171,6 +181,8 @@ void main() {
       attachmentsMeta: <Map<String, dynamic>>[],
       lastSequence: 2,
       hasMore: false,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     ));
 
     await repo.sync();
@@ -233,7 +245,7 @@ void main() {
         keyVersion: 1,
       ));
     }
-    api.pages.add((messages: envs, attachmentsMeta: const [], lastSequence: 7, hasMore: false));
+    api.pages.add((messages: envs, attachmentsMeta: const [], lastSequence: 7, hasMore: false, recalls: const [], lastRecallId: 0));
     await repo.sync();
 
     // recent：最近 3 条（升序）
@@ -263,7 +275,7 @@ void main() {
         keyVersion: 1,
       ));
     }
-    api.pages.add((messages: envs, attachmentsMeta: const [], lastSequence: 3, hasMore: false));
+    api.pages.add((messages: envs, attachmentsMeta: const [], lastSequence: 3, hasMore: false, recalls: const [], lastRecallId: 0));
     await repo.sync();
     repo.token = null; // 之后 send 只落库 pending（不尝试上传 → 未同步）
     final mid = await repo.send('pending-new'); // 未同步
@@ -380,7 +392,7 @@ void main() {
     final repo = makeRepo(api, token: 'tok');
     final env = await _makeEnv(spaceKey, 'dev-a2', 'msg-old', '换通道前的历史消息');
     api.pages.add((messages: [env],
-        attachmentsMeta: const [], lastSequence: 1, hasMore: false));
+        attachmentsMeta: const [], lastSequence: 1, hasMore: false, recalls: const [], lastRecallId: 0));
     await repo.sync();
     final id = (await repo.history()).single.env.messageId;
     expect((await repo.history()).single.env.serverSequence, isNotNull,
@@ -401,7 +413,7 @@ void main() {
     final repo = makeRepo(api, token: 'tok');
     final env = await _makeEnv(spaceKey, 'dev-a2', 'msg-old', '历史消息');
     api.pages.add((messages: [env],
-        attachmentsMeta: const [], lastSequence: 1, hasMore: false));
+        attachmentsMeta: const [], lastSequence: 1, hasMore: false, recalls: const [], lastRecallId: 0));
     await repo.sync();
     final id = (await repo.history()).single.env.messageId;
     await _forceFailed(db, id);
@@ -461,8 +473,8 @@ void main() {
           'sha256': 'abc',
           'nonce': 'bm9uY2U=',
         }
-      ], lastSequence: 2, hasMore: true),
-      (messages: [env3], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 3, hasMore: false),
+      ], lastSequence: 2, hasMore: true, recalls: const [], lastRecallId: 0),
+      (messages: [env3], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 3, hasMore: false, recalls: const [], lastRecallId: 0),
     ];
 
     final repo = makeRepo(api, token: 'tok');
@@ -497,7 +509,7 @@ void main() {
     final api = FakeApi();
     final env1 = await _makeEnv(spaceKey, 'peer', 'msg-1', 'only once');
     api.pages = [
-      (messages: [env1], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 1, hasMore: false),
+      (messages: [env1], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 1, hasMore: false, recalls: const [], lastRecallId: 0),
     ];
     final repo = makeRepo(api, token: 'tok');
 
@@ -509,7 +521,7 @@ void main() {
     final api = FakeApi();
     final env = await _makeEnv(spaceKey, 'dev-a', 'msg-own', '我自己发的');
     api.pages = [
-      (messages: [env], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 1, hasMore: false),
+      (messages: [env], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 1, hasMore: false, recalls: const [], lastRecallId: 0),
     ];
     final repo = makeRepo(api, token: 'tok');
     await repo.sync();
@@ -590,6 +602,8 @@ void main() {
       attachmentsMeta: <Map<String, dynamic>>[],
       lastSequence: 1,
       hasMore: false,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     ));
     await repo.sync(); // 等价重启后 _loadInitial 里的 sync
 
@@ -637,7 +651,7 @@ void main() {
     // 先同步来一条消息 A（对方发送）
     final envA = await _makeEnv(spaceKey, 'dev-b', 'msg-a', '旧消息');
     api.pages.add((messages: [envA],
-        attachmentsMeta: const [], lastSequence: 1, hasMore: false));
+        attachmentsMeta: const [], lastSequence: 1, hasMore: false, recalls: const [], lastRecallId: 0));
     await repo.sync();
     expect((await repo.history()).singleWhere((h) => h.env.messageId == 'msg-a').burnAfterSeconds, 0);
 
@@ -656,7 +670,7 @@ void main() {
     // 后续新消息 B 到达（对方新发）
     final envB = await _makeEnv(spaceKey, 'dev-b', 'msg-b', '新消息');
     api.pages.add((messages: [envB],
-        attachmentsMeta: const [], lastSequence: 2, hasMore: false));
+        attachmentsMeta: const [], lastSequence: 2, hasMore: false, recalls: const [], lastRecallId: 0));
     await repo.sync();
     final hist = await repo.history();
     final a = hist.singleWhere((h) => h.env.messageId == 'msg-a');

@@ -35,6 +35,7 @@ class EntranceStore {
     this.lastServerSequence = 0,
     this.lastReportedDeliveredSeq = 0,
     this.lastReportedReadSeq = 0,
+    this.lastRecallId = 0,
     this.escrowUploaded = false,
     Map<String, String>? memberNames,
     Map<String, String>? memberGenders,
@@ -90,6 +91,11 @@ class EntranceStore {
   /// 重启后这里仍保留，可少发一次；丢失也无害（重复上报服务端单调夹紧，是 no-op）。
   int lastReportedDeliveredSeq = 0;
   int lastReportedReadSeq = 0;
+
+  /// 撤回标记水位（2026-11-07 第二期，sync 补发）：已应用到的服务端 recalls.id
+  /// 高水位。与消息锚点分开记——撤回标记的游标是 recalls 自增 id，不是消息 seq
+  /// （消息 seq 在拉到时已被锚点越过，复用会漏）。只前进，见 chat_core.sync。
+  int lastRecallId = 0;
 
   /// 创建者口令密保箱是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
   bool escrowUploaded;
@@ -153,6 +159,7 @@ class EntranceStore {
         'last_server_sequence': lastServerSequence,
         'last_reported_delivered_seq': lastReportedDeliveredSeq,
         'last_reported_read_seq': lastReportedReadSeq,
+        'last_recall_id': lastRecallId,
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
@@ -183,6 +190,7 @@ class EntranceStore {
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
         lastReportedDeliveredSeq: (json['last_reported_delivered_seq'] as int?) ?? 0,
         lastReportedReadSeq: (json['last_reported_read_seq'] as int?) ?? 0,
+        lastRecallId: (json['last_recall_id'] as int?) ?? 0,
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,

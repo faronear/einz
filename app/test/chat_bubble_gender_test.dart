@@ -20,10 +20,11 @@ class _FakeApi extends ApiClient {
   final List<MessageEnvelope> messages;
 
   @override
-  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore, List<({int id, String messageId, int serverSequence})> recalls, int lastRecallId})> sync(
     String token, {
     int after = 0,
     int limit = 100,
+    int afterRecall = 0,
   }) async {
     var seq = after;
     final withSeq = <MessageEnvelope>[
@@ -38,6 +39,8 @@ class _FakeApi extends ApiClient {
       attachmentsMeta: <Map<String, dynamic>>[],
       lastSequence: seq,
       hasMore: false,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     );
   }
 

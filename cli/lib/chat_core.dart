@@ -445,9 +445,12 @@ class ChatSession {
     final api = ApiClient(server);
 
     var cursor = from ?? store.lastServerSequence;
+    var recallCursor = store.lastRecallId;
     final added = <MessageEnvelope>[];
+    final recalledMessageIds = <String>[];
     while (true) {
-      final result = await _withAutoAuth((token) => api.sync(token, after: cursor));
+      final result = await _withAutoAuth(
+          (token) => api.sync(token, after: cursor, afterRecall: recallCursor));
       for (final env in result.messages) {
         final seq = env.serverSequence ?? cursor;
         // 关键：用服务端下发的真实 created_at 落盘（旧版本误存 seq/0 →
@@ -458,6 +461,16 @@ class ChatSession {
       }
       if (result.lastSequence > cursor) cursor = result.lastSequence;
       store.advanceAnchor(result.lastSequence);
+      // 撤回标记补发（2026-11-07 第二期）：WS message.recalled 帧丢了的撤回在
+      // 这里追认——历史行整行移除（服务端已真删，行不会再从 /sync 回来，留着会
+      // 在重启 loadHistory 后复活）。逐条推进水位，哪怕中途抛异常也不重放已应用的。
+      for (final recall in result.recalls) {
+        if (store.removeHistory(recall.messageId)) {
+          recalledMessageIds.add(recall.messageId);
+        }
+        store.lastRecallId = recall.id;
+        recallCursor = recall.id;
+      }
       // 附件元数据落盘（供 /open 解密：nonce/sha256/key_version 必需，
       // PROTOCOL.md §5.2 attachments_meta）——收到的附件消息同样要能打开
       for (final meta in result.attachmentsMeta) {
@@ -474,6 +487,11 @@ class ChatSession {
       if (!result.hasMore || result.messages.isEmpty) break;
     }
     store.save(storePath);
+    // 补发移除的撤回行同步清出展示缓存（WS 帧已处理过则此处空集，幂等）
+    if (recalledMessageIds.isNotEmpty) {
+      messages.removeWhere((m) => recalledMessageIds.contains(m.env.messageId));
+      _sortMessages();
+    }
 
     // 存量修复（尽力而为）：旧版本曾把 created_at 落成 server_sequence 或 0，
     // 重启后时间标签显示 1970。检测到坏时间戳（< 1973 年）时全量拉取服务端消息，

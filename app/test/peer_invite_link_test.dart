@@ -30,12 +30,16 @@ class _EntranceFakeApi extends ApiClient {
         List<Map<String, dynamic>> attachmentsMeta,
         int lastSequence,
         bool hasMore,
-      })> sync(String token, {int after = 0, int limit = 100}) async {
+        List<({int id, String messageId, int serverSequence})> recalls,
+        int lastRecallId,
+      })> sync(String token, {int after = 0, int limit = 100, int afterRecall = 0}) async {
     return (
       messages: const <MessageEnvelope>[],
       attachmentsMeta: const <Map<String, dynamic>>[],
       lastSequence: 0,
       hasMore: false,
+      recalls: const <({int id, String messageId, int serverSequence})>[],
+      lastRecallId: 0,
     );
   }
 
