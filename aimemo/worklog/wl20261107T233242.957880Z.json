@@ -1,0 +1,18 @@
+{
+  "utc": "20261107T233242.957880Z",
+  "time": "2026-11-08 07:31+0800",
+  "host": "doomship",
+  "os": "macOS",
+  "user": "lukas",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修复 CI 测试失败",
+      "detail": [
+        "local_database_migration_test 3 用例失败：v13 迁移（sync_state.last_recall_id）昨晚上线后测试断言仍写 12，且迁移假设 sync_state 表存在——user_version=6 的极老库没有该表，ALTER 抛 no such table（与 v12 当初对 app_state 的坑同款）。",
+        "修复：① 测试断言 12→13；② local_database.dart v13 迁移先 PRAGMA table_info(sync_state) 判存在，不存在则跳过。",
+        "全量 flutter test 418 全过；另遇 attachment_storage_scope 一例偶发失败，单跑与重跑全量均过（疑似用例间干扰/偶发，未处理）。"
+      ]
+    }
+  ]
+}

@@ -339,7 +339,13 @@ class LocalDatabase extends _$LocalDatabase {
           if (from < 13) {
             // v13（2026-11-07）：sync_state 加撤回标记水位列（last_recall_id，
             // 默认 0）——撤回同步第二期（sync 补发），见 SyncState 注释。
-            if (!await _hasColumn('sync_state', 'last_recall_id')) {
+            // 表可能不存在（sqlite3 手工造的落后库：user_version=6 只有四张表，
+            // 迁移测试实测），同 v12 对 app_state 的防护：没有就跳过。
+            final syncStateExists =
+                (await customSelect('PRAGMA table_info(sync_state)').get())
+                    .isNotEmpty;
+            if (syncStateExists &&
+                !await _hasColumn('sync_state', 'last_recall_id')) {
               await m.addColumn(syncState, syncState.lastRecallId);
             }
           }

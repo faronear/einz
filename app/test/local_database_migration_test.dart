@@ -24,7 +24,7 @@ Future<int> _userVersion(LocalDatabase db) async =>
         .read<int>('user_version');
 
 void main() {
-  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v11 且列改名正确', () async {
+  test('迁移幂等：user_version=6 但已含 v7 对象时，仍升到 v13 且列改名正确', () async {
     final dir = Directory.systemTemp.createTempSync('einz-mig-');
     final path = '${dir.path}/einz.sqlite';
     final script = '''
@@ -49,8 +49,8 @@ PRAGMA user_version = 6;
     // 触发打开 → 迁移（原先就在这里抛 "duplicate column name: space_id"）。
     await db.select(db.spaces).get();
 
-    expect(await _userVersion(db), 12,
-        reason: '迁移后版本戳应升到当前 schema 版本（v12：转写设置 per-space 善后）');
+    expect(await _userVersion(db), 13,
+        reason: '迁移后版本戳应升到当前 schema 版本（v13：sync_state 撤回水位列）');
 
     // v11 新表已建（语音转写派生缓存）。
     expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue);
@@ -89,7 +89,7 @@ PRAGMA user_version = 6;
     // 触发打开 → 迁移（回归：新表曾塞进 from<10 块，v10 存量库打不开它）。
     await db.select(db.localVoiceTranscripts).get();
 
-    expect(await _userVersion(db), 12, reason: 'v10 存量库应升到当前版本');
+    expect(await _userVersion(db), 13, reason: 'v10 存量库应升到当前版本');
     expect(await _has(db, 'local_voice_transcripts', 'message_id'), isTrue,
         reason: 'v10 存量库必须补建语音转写表，否则转写行报 no such table');
     // v10 已引入的列不受影响。
@@ -127,7 +127,7 @@ PRAGMA user_version = 6;
     // 触发打开 → v12 迁移。
     await db.select(db.appState).get();
 
-    expect(await _userVersion(db), 12);
+    expect(await _userVersion(db), 13);
     Future<String?> valueOf(String key) async =>
         (await (db.select(db.appState)..where((s) => s.key.equals(key)))
                 .getSingleOrNull())
