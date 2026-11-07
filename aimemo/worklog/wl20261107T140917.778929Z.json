@@ -1,0 +1,14 @@
+{
+  "utc": "20261107T140917.778929Z",
+  "time": "2026-11-07 22:09+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "桌面端生命周期放宽：窗口失焦不再断 WS",
+      "detail": "老板拍板：macOS 等桌面端只在 hidden（最小化/完全遮挡）与 paused/detached 断链，inactive（点去别的窗口）保持在线。iOS 后台序列 inactive→paused 仍在 paused 处断链，2026-09-26 '离线快速可见'的意图不受影响；锁屏计时（_lockTimer.recordBackgrounded）口径不动。dart analyze 干净。配合 f25b6d9d（补发墓碑同步进内存列表），撤回同步无论红绿灯都能在秒级到位。"
+    }
+  ]
+}

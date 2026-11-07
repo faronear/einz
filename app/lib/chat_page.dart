@@ -6262,9 +6262,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 不这么做的话要等服务端的 30s 心跳超时、再等对端 30s 轮询，最长约 90 秒里
       // 对方还以为你在线（老板 2026-09-26）。
       //
+      // **桌面端放宽**（老板 2026-11-07）：macOS/桌面多窗口下"失焦"是常态
+      // （inactive——点去别的窗口而已），不该等于离线；只在 hidden（最小化/
+      // 完全遮挡）与 paused/detached 才断链。iOS 的后台序列 inactive→paused
+      // 仍会在 paused 处断链，原意图（离线可见性）不受影响。
+      //
       // **通话中绝不停**：贴耳通话必然息屏，停了就直接把通话掐断——通话期间靠
       // iOS 的 audio 后台模式 + 常亮维持，本来也不会进到这里断链。
-      if (_voiceCall?.state.value.inCall != true) {
+      if (_voiceCall?.state.value.inCall != true &&
+          (state == AppLifecycleState.hidden ||
+              state == AppLifecycleState.paused ||
+              state == AppLifecycleState.detached)) {
         unawaited(_ws?.stop());
       }
     } else if (state == AppLifecycleState.resumed) {
