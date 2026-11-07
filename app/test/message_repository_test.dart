@@ -116,8 +116,8 @@ class FakeApi extends ApiClient {
       attachmentsMeta: page.attachmentsMeta,
       lastSequence: seq,
       hasMore: page.hasMore,
-      recalls: const <({int id, String messageId, int serverSequence})>[],
-      lastRecallId: 0,
+      recalls: page.recalls,
+      lastRecallId: page.lastRecallId,
     );
   }
 }
@@ -790,6 +790,57 @@ void main() {
     await repo.reportReceipts(deliveredUptoSeq: 3);
     expect(api.reportedReceipts, isEmpty, reason: '无 token 不应上报');
     expect(repo.token, isNull);
+  });
+
+  test('撤回补发：sync 把 recalls 应用为本地墓碑并推进水位（2026-11-07 第二期）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+
+    // 第一轮 sync：消息 B 正常落到本地（模拟另一台设备发来的）
+    final envB = await _makeEnv(spaceKey, 'dev-a2', 'msg-b', '会被撤回的消息');
+    api.pages.add((
+      messages: [envB],
+      attachmentsMeta: const [],
+      lastSequence: 1,
+      hasMore: false,
+      recalls: const [],
+      lastRecallId: 0,
+    ));
+    await repo.sync();
+    expect((await repo.history()).single.deleted, isFalse);
+
+    // 第二轮 sync：服务端已真删该行（不会再出现在 messages 里），只带撤回标记
+    // ——WS 帧丢了的设备（断线重连间隙）靠这里追认
+    api.pages.add((
+      messages: [],
+      attachmentsMeta: const [],
+      lastSequence: 1,
+      hasMore: false,
+      recalls: [(id: 1, messageId: 'msg-b', serverSequence: 1)],
+      lastRecallId: 1,
+    ));
+    await repo.sync();
+
+    final h = await repo.history();
+    expect(h.single.deleted, isTrue, reason: '撤回补发应把本地副本墓碑');
+    expect(h.single.deletedKind, 'recall', reason: '墓碑来路应为撤回（与 WS 帧路径一致）');
+    final state = await (db.select(db.syncState)
+          ..where((s) => s.spaceId.equals('space-test')))
+        .getSingle();
+    expect(state.lastRecallId, 1, reason: '水位应推进到标记 id，避免下轮重放');
+
+    // 第三轮 sync：水位已推进，重复 sync 不再重复下发（不重放也不报错）
+    api.pages.clear();
+    api.pages.add((
+      messages: [],
+      attachmentsMeta: const [],
+      lastSequence: 1,
+      hasMore: false,
+      recalls: const [],
+      lastRecallId: 1,
+    ));
+    await repo.sync();
+    expect((await repo.history()).single.deleted, isTrue, reason: '状态保持墓碑');
   });
 }
 

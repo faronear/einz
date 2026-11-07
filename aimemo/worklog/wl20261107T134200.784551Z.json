@@ -1,0 +1,20 @@
+{
+  "utc": "20261107T134200.784551Z",
+  "time": "2026-11-07 21:42+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "撤回补发单测落地；mac→iPhone 反向失效初判为环境态",
+      "detail": [
+        "老板实测不对称：mac 撤回→iPhone 大概率自动同步；iPhone 撤回→mac 大概率不同步（偶尔会）。",
+        "新增单测（message_repository_test.dart）：第二轮 sync 只带 recalls 标记 → 本地墓碑（deleted/deletedKind='recall'）→ sync_state.last_recall_id 推进 → 重复 sync 不重放。全过——app 端补发逻辑本身可靠。",
+        "测试踩坑：FakeApi.sync 起初写死 recalls: const []，没有透传 page.recalls，测试假失败；透传后过。",
+        "初判：server 端（recall_sync.test.ts 全过）与 app 端逻辑都验证可靠，mac 反向失效大概率是 mac 端环境态——①mac app 是旧构建（无帧处理也无 sync 补发，永不墓碑，'偶尔会'疑似中途重启过新构建）；②同通道双 mac 实例互踢（dist 版 + debug 会话，WS 反复 4408 重连，帧常丢、sync 兜底 30s 才追上）；③mac WS 断着且聊天页没开（sync 只活在聊天页）。已给老板三条鉴别步骤。",
+        "另：iOS 模拟器 app 切后台后 WS 会被系统挂起——这解释了为什么 mac→iPhone 方向'看着正常'：帧虽丢，iPhone 回前台重连后 sync 补发立刻追上，视觉上像实时。"
+      ]
+    }
+  ]
+}
