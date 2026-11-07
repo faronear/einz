@@ -1,0 +1,20 @@
+{
+  "utc": "20261107T140314.842896Z",
+  "time": "2026-11-07 22:03+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修 UI 层最后缺口：sync 补发的墓碑同步进内存列表",
+      "detail": [
+        "老板发来 server 日志，关键证据：13:58:18 撤回（POST /messages/recall 200），13:58:20 mac 的 3s 轮询 sync 即带走标记（after_recall 14→15）——数据层 2 秒内已墓碑，但界面不动。",
+        "根因（app）：chat_page._refreshLocal 用 historySince(afterSequence) 只拉新消息，已上屏行被 sync 补发墓碑后内存列表永远不知道；WS 帧路径（_onMessageRecalled）与本机撤回都是内存里直接替换，唯独补发路径缺这一步。",
+        "修法：MessageRepository.sync 返回值从 int 扩为 ({added, recalledIds})，chat_page._refresh 拿到 recalledIds 后把内存列表对应行替换成 _asDeleted(kind:'recall')。",
+        "单测扩展：撤回补发用例补 recalledIds 断言（注释写明 UI 依赖）；分页/锚点两个用 int 返回值的调用点适配 .added。message_repository_test 29 项全过，app analyze 干净。",
+        "顺带确认（未改动，待老板决策）：mac '鼠标离开就红灯'是 chat_page.didChangeAppLifecycleState 的 2026-09-26 设计——进非 resumed 态即主动断 WS（让对端快速看到离线）。在 iOS 语义正确，但在 macOS 桌面端等于'窗口失焦=离线'，桌面多窗口常态下偏激进；本轮补发已把可靠性兜住，要不要放宽桌面端生命周期口径（如只在 hidden/paused 断链）另议。"
+      ]
+    }
+  ]
+}

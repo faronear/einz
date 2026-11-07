@@ -256,6 +256,30 @@ class MessageRepository {
     return row?.lastServerSequence ?? 0;
   }
 
+  /// 撤回标记水位（已应用到的服务端 recalls.id 高水位；2026-11-07 第二期）。
+  Future<int> get lastRecallId async {
+    final row = await (db.select(db.syncState)
+          ..where((s) => s.spaceId.equals(spaceId)))
+        .getSingleOrNull();
+    return row?.lastRecallId ?? 0;
+  }
+
+  /// 推进撤回水位（单调，只前进；与消息锚点同款 upsert）。
+  Future<void> _advanceRecall(int recallId) async {
+    final row = await (db.select(db.syncState)
+          ..where((s) => s.spaceId.equals(spaceId)))
+        .getSingleOrNull();
+    if (row == null) {
+      await db.into(db.syncState).insert(
+            SyncStateCompanion.insert(spaceId: spaceId, lastRecallId: Value(recallId)),
+          );
+    } else if (recallId > row.lastRecallId) {
+      await (db.update(db.syncState)..where((s) => s.spaceId.equals(spaceId))).write(
+        SyncStateCompanion(lastRecallId: Value(recallId)),
+      );
+    }
+  }
+
   /// 清空本空间全部**本机**消息与附件元数据（高级安全「删除所有消息」，2026-10-02
   /// 老板定稿：纯本机删除，服务端与对方设备不动）。
   /// 刻意**不动 sync_state 锚点**：服务端消息仍在，锚点＝已同步到的最新序号，
@@ -518,15 +542,19 @@ class MessageRepository {
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
-  /// 返回本次新增的消息条数。
-  Future<int> sync() async {
+  /// 返回本次新增的消息条数与补发墓碑的消息 id 列表（recalledIds——撤回标记
+  /// 经 sync 补发应用的那些行；调用方须把它们在内存列表里替换成墓碑，否则
+  /// 已上屏的原文一直挂着，见 chat_page._refresh）。
+  Future<({int added, List<String> recalledIds})> sync() async {
     final t = token;
-    if (t == null) return 0;
+    if (t == null) return (added: 0, recalledIds: const <String>[]);
 
     var added = 0;
+    final recalledIds = <String>[];
     var cursor = await lastSequence;
+    var recallCursor = await lastRecallId;
     while (true) {
-      final result = await _withAutoAuth((tok) => api.sync(tok, after: cursor));
+      final result = await _withAutoAuth((tok) => api.sync(tok, after: cursor, afterRecall: recallCursor));
       for (final env in result.messages) {
         final bs = await _burnState();
         await _insertLocal(
@@ -539,6 +567,15 @@ class MessageRepository {
       }
       for (final meta in result.attachmentsMeta) {
         await _insertAttachmentMeta(meta);
+      }
+      // 撤回标记补发（2026-11-07 第二期）：WS 帧丢了的撤回在这里追认——本地
+      // 有行就打墓碑（kind 'recall'），没有行（从没拉到过/已墓碑）则命中 0 行，
+      // 天然幂等。逐条推进水位，哪怕中途抛异常也不重放已应用的。
+      for (final recall in result.recalls) {
+        await tombstoneMessage(recall.messageId, kind: 'recall');
+        await _advanceRecall(recall.id);
+        recallCursor = recall.id;
+        recalledIds.add(recall.messageId);
       }
       if (result.messages.isNotEmpty) {
         cursor = result.lastSequence;
@@ -557,7 +594,7 @@ class MessageRepository {
     } catch (_) {
       // 网络抖动忽略，下次 sync 再拉
     }
-    return added;
+    return (added: added, recalledIds: recalledIds);
   }
 
   /// 自愈某条消息缺失的附件元数据（接收端 sync 竞态修复，2026-10-09）。

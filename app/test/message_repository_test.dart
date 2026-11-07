@@ -478,7 +478,7 @@ void main() {
     ];
 
     final repo = makeRepo(api, token: 'tok');
-    final added = await repo.sync();
+    final added = (await repo.sync()).added;
 
     expect(added, 3, reason: '两页共 3 条');
     expect(await repo.lastSequence, 3, reason: '锚点应推进到 3');
@@ -513,8 +513,8 @@ void main() {
     ];
     final repo = makeRepo(api, token: 'tok');
 
-    expect(await repo.sync(), 1);
-    expect(await repo.sync(), 0, reason: '锚点已到 1，二次 sync 应无新增');
+    expect((await repo.sync()).added, 1);
+    expect((await repo.sync()).added, 0, reason: '锚点已到 1，二次 sync 应无新增');
   });
 
   test('同步回来的自己消息：status=sent 且信封回填 server_sequence（分页/锚点依赖）', () async {
@@ -819,11 +819,13 @@ void main() {
       recalls: [(id: 1, messageId: 'msg-b', serverSequence: 1)],
       lastRecallId: 1,
     ));
-    await repo.sync();
+    final syncResult = await repo.sync();
 
     final h = await repo.history();
     expect(h.single.deleted, isTrue, reason: '撤回补发应把本地副本墓碑');
     expect(h.single.deletedKind, 'recall', reason: '墓碑来路应为撤回（与 WS 帧路径一致）');
+    expect(syncResult.recalledIds, ['msg-b'],
+        reason: '调用方（chat_page._refresh）靠它把内存列表替换成墓碑——UI 侧不发这个列表，气泡一直挂原文');
     final state = await (db.select(db.syncState)
           ..where((s) => s.spaceId.equals('space-test')))
         .getSingle();

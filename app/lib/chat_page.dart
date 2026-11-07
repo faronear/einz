@@ -6723,7 +6723,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (_wiped) return; // 已撤销自毁：不再发起任何网络请求（页面正在被替换）
     await _refreshLocal(realtime: realtime);
     try {
-      await _repo.sync();
+      final syncResult = await _repo.sync();
+      // sync 补发的撤回墓碑：historySince（按 seq 增量）拉不到"已上屏行"的墓碑
+      // 更新——不在这里替换内存列表的话，界面一直挂着原文（2026-11-07 实测：
+      // 对端撤回、本端红灯走 3s 补发时，数据层已墓碑而气泡不动）
+      if (syncResult.recalledIds.isNotEmpty && mounted) {
+        final recalled = syncResult.recalledIds.toSet();
+        setState(() {
+          _messages = [
+            for (final x in _messages)
+              if (recalled.contains(x.env.messageId) && !x.deleted)
+                _asDeleted(x, kind: 'recall')
+              else
+                x,
+          ];
+        });
+      }
       await _repo.refreshEntranceMap();
       await _persistPeerMemberId();
       // 同步时顺带拉了对方回执（repo.sync 内）→ 载入渲染缓存
