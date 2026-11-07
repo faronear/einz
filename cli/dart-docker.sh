@@ -50,6 +50,46 @@ run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
     "$IMG" "$@"
 }
 
+# 解析参数里的 --store（含 --store=path 形式），把 store 所在宿主目录以相同路径
+# 挂进容器并把参数改写为绝对路径——否则容器里看不到仓库/~/.einz 之外的宿主 store。
+# 输出（全局变量）：TUI_EXTRA_MOUNTS（追加的 -v 参数）、TUI_PASSTHRU_ARGS（改写后参数）。
+prepare_store_args() {
+  TUI_EXTRA_MOUNTS=()
+  TUI_PASSTHRU_ARGS=()
+  local args=("$@") i=0
+  while [ $i -lt ${#args[@]} ]; do
+    local a="${args[$i]}"
+    if [ "$a" = "--store" ]; then
+      local raw="${args[$((i + 1))]}" abs="" dir=""
+      # 容器 cwd 是 /app/cli = 宿主 $ROOT/cli：相对路径按此基准还原成宿主绝对路径
+      case "$raw" in
+        /*) abs="$raw" ;;
+        *) abs="$ROOT/cli/$raw" ;;
+      esac
+      dir="$(cd "$(dirname "$abs")" && pwd)"
+      # 仓库内（挂 /app）或身份仓库 ~/.einz（挂 /tmp/.einz）已可见，不重复挂
+      case "$dir" in
+        "$ROOT"|"$ROOT"/*) abs="$(cd "$dir" && pwd)/$(basename "$abs")" ;;
+        "$REAL_HOME/.einz") ;;
+        *)
+          TUI_EXTRA_MOUNTS+=(-v "$dir":"$dir")
+          abs="$dir/$(basename "$abs")"
+          ;;
+      esac
+      TUI_PASSTHRU_ARGS+=(--store "$abs")
+      i=$((i + 2))
+    elif [[ "$a" == --store=* ]]; then
+      # --store=path：拆成两段交给上面同一逻辑处理
+      args[$i]="${a%%=*}"
+      args=("${args[@]:0:$((i + 1))}" "${a#*=}" "${args[@]:$((i + 1))}")
+      continue
+    else
+      TUI_PASSTHRU_ARGS+=("$a")
+      i=$((i + 1))
+    fi
+  done
+}
+
 build_image() {
   echo "==> 构建开发镜像 ${IMG}（dart:stable + libsodium）…"
   docker build -f "$DIR/Dockerfile.dart-sodium" -t "$IMG" "$DIR"
@@ -82,6 +122,8 @@ setup() {
 case "${1:-setup}" in
   tui)
     shift
+    prepare_store_args "$@"
+    set -- "${TUI_PASSTHRU_ARGS[@]}"
     ensure_image
     # 按入库 lockfile 强制解析：lockfile 与 pubspec 不符或缓存残留旧包时直接报错，
     # 避免静默解析出不兼容版本（曾致首次安装时报 SodiumSumoInit 旧 API 编译错）
@@ -101,12 +143,13 @@ case "${1:-setup}" in
       echo "==> 编译内核快照（源码有改动或首次启动；之后启动免编译）…"
       run_container -i dart compile kernel -o "$dill" bin/einz_tui.dart
     fi
-    run_container -it dart "$dill" "$@"
+    run_container -it "${TUI_EXTRA_MOUNTS[@]}" dart "$dill" "$@"
     ;;
   dartc)
     shift
+    prepare_store_args "$@"
     ensure_image
-    run_container -i dart "$@"
+    run_container -i "${TUI_EXTRA_MOUNTS[@]}" dart "${TUI_PASSTHRU_ARGS[@]}"
     ;;
   build)
     ensure_image
