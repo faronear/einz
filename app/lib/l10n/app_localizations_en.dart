@@ -894,7 +894,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageTombstoneSubmit => 'Apply';
 
   @override
-  String get chatPageBurnFailed => 'Failed to set burn-after-read';
+  String get chatPageBurnFailed => 'Failed to set burn-after';
 
   @override
   String get chatPageBurnAllOff =>
@@ -902,7 +902,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageBurnAllAfter(String duration) {
-    return 'New messages will disappear after $duration';
+    return 'New messages will be burn after $duration';
   }
 
   @override
@@ -910,7 +910,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageBurnOneAfter(String duration) {
-    return 'This message will disappear after $duration';
+    return 'This message will be burn after $duration';
   }
 
   @override

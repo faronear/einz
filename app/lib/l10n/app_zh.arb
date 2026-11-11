@@ -501,11 +501,11 @@
   "chatPageTombstoneHide": "彻底消失",
   "chatPageTombstoneHideDesc": "完全不再显示，从消息流中彻底消失",
   "chatPageTombstoneSubmit": "启用",
-  "chatPageBurnFailed": "设置失败阅后即焚",
-  "chatPageBurnAllOff": "已关闭阅后即焚，新消息将不再自动消失",
-  "chatPageBurnAllAfter": "新的消息将在 {duration} 后消失",
-  "chatPageBurnOneOff": "已取消这个消息的延时即焚",
-  "chatPageBurnOneAfter": "这个消息将在 {duration} 后消失",
+  "chatPageBurnFailed": "设置失败",
+  "chatPageBurnAllOff": "已关闭阅后即焚，新消息将不再自动焚毁",
+  "chatPageBurnAllAfter": "新的消息将在 {duration} 后焚毁",
+  "chatPageBurnOneOff": "已关闭这个消息的延时即焚",
+  "chatPageBurnOneAfter": "这个消息将在 {duration} 后焚毁",
   "@chatPageBurnOneAfter": {
     "placeholders": {
       "duration": {

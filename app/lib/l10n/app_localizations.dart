@@ -1571,7 +1571,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to set burn-after-read'**
+  /// **'Failed to set burn-after'**
   String get chatPageBurnFailed;
 
   /// No description provided for @chatPageBurnAllOff.
@@ -1583,7 +1583,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnAllAfter.
   ///
   /// In en, this message translates to:
-  /// **'New messages will disappear after {duration}'**
+  /// **'New messages will be burn after {duration}'**
   String chatPageBurnAllAfter(String duration);
 
   /// No description provided for @chatPageBurnOneOff.
@@ -1595,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnOneAfter.
   ///
   /// In en, this message translates to:
-  /// **'This message will disappear after {duration}'**
+  /// **'This message will be burn after {duration}'**
   String chatPageBurnOneAfter(String duration);
 
   /// No description provided for @chatPageActionDelete.
