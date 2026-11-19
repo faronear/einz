@@ -1236,7 +1236,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      '秘境是一个秘密王国，你和伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中，留在你自己的设备上——没有账号，不留痕迹。不允许任何第三方（包括秘境自身）偷看内容，全力守护你的隐私。';
+      '秘境是一个秘密王国，你和伙伴在自己的领地里尽情聊天分享，与世隔绝。一切尽在你的掌控之中——端到端加密，没有账号，不留痕迹。甚至秘境本身也无法偷窥内容，全力守护你的隐私。';
 
   @override
   String get aboutVersionLabel => '版本号';

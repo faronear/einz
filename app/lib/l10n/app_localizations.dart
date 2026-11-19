@@ -2225,7 +2225,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control, on your own device — no account, no trace. No third party, including Einz itself, can peek at the content, fully safeguarding your privacy.'**
+  /// **'Einz is the secret realm where you and your selected companions chat and share in your own spaces, away from the world. Everything stays under your control —- end-to-end encrypted, no account, no trace. Even Einz itself cannot peek at the content, fully safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.
