@@ -1,0 +1,11 @@
+{
+  "utc": "20261121T084049.000000Z",
+  "time": "2026-11-21 16:40+0800",
+  "host": "doomship",
+  "os": "macOS",
+  "user": "lukas",
+  "agent": "atomcode",
+  "notes": [
+    { "brief": "顶栏锁屏按钮加长按入口与时长标签", "detail": ["chat_page.dart 顶栏锁图标：单击=立即锁屏（不变），长按=锁屏码设置弹窗（_showSetLockDialog，与菜单「本机 PIN」同入口）；IconButton 无长按回调，外包 GestureDetector(onLongPress)。", "样式对齐阅后即焚顶栏标记：InkWell + 图标(24) + 时长量纲文字（复用 _burnBadgeText 显示 _lockSeconds），时长随设置弹窗关闭即时刷新。", "阅后即焚与锁屏两处标记的图标-文字间距 2→1，增强整体感。", "flutter analyze 通过；老板自行热重启验收。"] }
+  ]
+}

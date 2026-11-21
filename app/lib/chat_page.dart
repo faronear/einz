@@ -677,7 +677,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               const _BurnHourglass(burned: false, size: 24),
-              const SizedBox(width: 2),
+              const SizedBox(width: 1),
               Text(_burnBadgeText(_burnSeconds),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ],
@@ -10397,9 +10397,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 仅在已设置锁屏码时出现——没设 PIN 时锁屏不激活（LockPage 只会显示
           // "尚未设置锁屏码"提示页），摆一个按了没用的按钮反而误导。
           if (_hasPin)
-            IconButton(
-              icon: const Icon(Icons.lock_outline),
-              onPressed: _lockNow,
+            // 单击=立即锁屏；长按=锁屏码设置弹窗（老板 2026-11-21）。
+            // IconButton 没有长按回调，包 GestureDetector 补上。样式对齐阅后即焚
+            // 顶栏标记（_buildBurnBadge）：图标 + 时长量纲文字（d/h/m/s）。
+            GestureDetector(
+              onLongPress: _showSetLockDialog,
+              child: InkWell(
+                mouseCursor: SystemMouseCursors.click,
+                borderRadius: BorderRadius.circular(16),
+                onTap: _lockNow,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_outline, size: 24),
+                      const SizedBox(width: 1),
+                      Text(_burnBadgeText(_lockSeconds),
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           // 顶栏统一入口：语言/阅后即焚/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(

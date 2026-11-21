@@ -1,0 +1,18 @@
+{
+  "utc": "20261107T234019.000000Z",
+  "time": "2026-11-08 07:40+0800",
+  "host": "doomship",
+  "os": "macOS",
+  "user": "lukas",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "Intel Mac 视频无法播放定论",
+      "detail": [
+        "Android 10月初发的视频为 HEVC 编码（mdls kMDItemCodecs 确认），Intel iMac 无 HEVC 硬解，video_player/AVFoundation 初始化失败；iOS 与 Apple Silicon Mac 均能播。",
+        "非 app bug、无格式升级：发送端原字节加密传输不转码，播放缓存固定 .mp4 扩展名亦无影响（容器本就是 MP4）。",
+        "老板决定不改代码，Intel Mac 上保存后用 VLC/IINA 打开。"
+      ]
+    }
+  ]
+}
