@@ -1,0 +1,19 @@
+{
+  "utc": "20261122T040050.470030Z",
+  "time": "2026-11-22 12:00+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "TestFlight 上传失败根因：ASC 账号协议缺失/过期（403），需老板在 ASC 处理",
+      "detail": [
+        "CI ios job 的 TestFlight 上传失败：altool 报 'Cannot determine the Apple ID from Bundle ID cc.tic.einz and platform IOS'（CI 端截断为 error 19）。构建、签名、IPA 产物全部正常。",
+        "本地用同一 IPA + 同一 ASC key（~/private_keys/AuthKey_333XP37M8H.p8）重试，得到完整报错：'Failed to determine the Apple ID from Bundle ID cc.tic.einz with platform IOS. A required agreement is missing or has expired. (403)'——认证没问题，是账号下必需的协议（Agreements, Tax, and Banking 里的协议，如 Paid Applications 或税表）缺失/过期，ASC 拒绝该 app 的任何交付。",
+        "结论：非代码/CI 问题，本地与 CI 双双验证。需要老板登录 App Store Connect → Agreements, Tax, and Banking 接受/续签协议后，重试上传即可（IPA 在 GitHub Release 'Latest Build'，本地 /tmp/tf-retry/ 也有一份；CI 重跑失败 job 或本地 altool 皆可）。",
+        "排查方法备忘：run 未结束前 --log-failed 拿不到分段日志，用 gh api repos/.../actions/jobs/<id>/logs --allow-escape-sequences 直接拉 job 日志。"
+      ]
+    }
+  ]
+}
