@@ -1,0 +1,19 @@
+{
+  "utc": "20261122T034500.000000Z",
+  "time": "2026-11-22 11:45+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修 CI testAll 失败：给 flutter-action 锁定 flutter-version 3.47.2",
+      "detail": [
+        "推送 7b1bb559 后 GitHub CI test 失败。日志定位：flutter analyze 报一整片 deprecated_member_use info——'package:flutter/material.dart' is deprecated… Use material_ui，'deprecated after v3.47.0-0.0.pre'，analyze 带infos 挂掉（server/cli 测试全绿）。",
+        "根因：testAll.yml / buildMultiPlatform.yml 的 subosito/flutter-action@v2 只写了 channel: stable 没锁版本，11-07→11-22 之间 GitHub stable 通道升到带 material.dart 弃用标记的版本；本地 Flutter 3.47.2 stable 无此标记，所以本地干净、CI 挂。",
+        "修法：两个工作流全部 7 处 flutter-action 补 flutter-version: 3.47.2（与本地一致），YAML 校验通过。",
+        "备注：material_ui 迁移是 Flutter 官方后续方向，等本地升级 Flutter 时一起做（一次性大改 import），不作为 CI 临时修法。"
+      ]
+    }
+  ]
+}

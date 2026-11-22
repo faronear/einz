@@ -72,6 +72,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       # cli 的 analyze/test 用 flutter 自带的 dart（flutter-action 会把它放进 PATH），
       # 所以不必再 setup-dart
@@ -97,6 +98,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       - name: Flutter pub get
         working-directory: app
@@ -212,6 +214,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       - name: Flutter pub get
         working-directory: app
@@ -290,6 +293,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       - name: Check Developer ID secrets
         id: devid
@@ -587,6 +591,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       - name: 装 GTK/libsecret/gstreamer 等构建依赖
         run: |
@@ -716,6 +721,7 @@ jobs:
         if: steps.secrets.outputs.configured == 'true'
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       - name: Install signing certificate
         if: steps.secrets.outputs.configured == 'true'

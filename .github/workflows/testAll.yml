@@ -56,6 +56,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       # shared/lib/src/sodium.dart 走 DynamicLibrary.open 加载系统 libsodium（Linux
       # 候选路径里有 /usr/lib/x86_64-linux-gnu/libsodium.so）；libsodium-dev 提供该 .so
