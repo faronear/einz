@@ -1,0 +1,18 @@
+{
+  "utc": "20261122T041139.282101Z",
+  "time": "2026-11-22 12:11+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "TestFlight 上传成功：协议重签生效，UPLOAD SUCCEEDED",
+      "detail": [
+        "老板重签 ASC 协议后，本地 altool 重传 /tmp/tf-retry/einz-app-ios-appstore.ipa（从 GitHub Release 'Latest Build' 下载的 CI 产物）→ UPLOAD SUCCEEDED，Delivery UUID 180de547-c6ff-4133-8666-959e2c947e64，30MB / 2.4s。TestFlight 处理需几分钟才出现在 ASC。",
+        "⚠️ altool 警告（90725）：IPA 用 iOS 26.5 SDK 构建；2027 年 4 月起必须 iOS 27 SDK（Xcode 27+）才能上传 ASC。当前 CI macos runner 是 Xcode 26.6 ——明年升级 runner/Flutter 前要记得。",
+        "CI ios job 失败的完整链路已闭环：ASC 协议过期（403）→ 老板重签 → 重传成功。CI 侧无需改动；后续正常 push 触发的 ios job 会自动恢复。"
+      ]
+    }
+  ]
+}
