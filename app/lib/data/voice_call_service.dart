@@ -250,9 +250,12 @@ class VoiceCallService {
     _emit(state.value.copyWith(phase: VoiceCallPhase.calling, isCaller: true, callId: callId));
     _send(kWsTypeCallInvite, callId);
     _startRingTimer();
-    await _startTone(caller: true); // 回铃音：听声就知道"已经拨出、在等对方接"
     try {
+      // 先占麦克风再放回铃音：macOS/移动端上 mic 捕获会重建音频会话，若在
+      // 回铃音开始播之后才占，刚启动的播放会被打断——主叫就听不到回铃音了
+      // （被叫不受影响：铃声早就在播，mic 是接听时才占的，2026-11-22 实测）。
       await _ensureMic();
+      await _startTone(caller: true); // 回铃音：听声就知道"已经拨出、在等对方接"
       final pc = await _createPc();
       for (final track in _localStream!.getAudioTracks()) {
         await pc.addTrack(track, _localStream!);
@@ -505,8 +508,13 @@ class VoiceCallService {
         // 桌面端没有音频路由 API
       }
       await player.play(BytesSource(caller ? CallTones.ringback() : CallTones.ringtone()));
-    } catch (_) {
+    } catch (e) {
       _tonePlayer = null;
+      // 播不出来不影响通话本身——但排障要看得到（2026-11-22：主叫回铃音无声排查）
+      assert(() {
+        debugPrint('[voice] 提示音播放失败: $e');
+        return true;
+      }());
     }
   }
 

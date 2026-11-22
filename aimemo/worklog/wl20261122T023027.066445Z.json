@@ -1,0 +1,20 @@
+{
+  "utc": "20261122T023027.066445Z",
+  "time": "2026-11-22 10:30+08:00",
+  "host": "DoomBase",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修主叫无回铃音：先占麦克风再放提示音",
+      "detail": [
+        "老板报：语音呼叫时拨出方没有响铃提示（被叫铃声正常）。",
+        "定位：invite() 原顺序是先 _startTone(caller:true) 再 _ensureMic()（getUserMedia）。主叫的 mic 捕获在回铃音刚启动时才占，会重建音频会话把 AVAudioPlayer 播放打断；被叫不受影响——铃声在收到 invite 帧时就开始播了，mic 是用户点接听（accept）时才占，播放已稳定。",
+        "修法：invite() 里把 _ensureMic() 提到 _startTone 之前（audio 会话先定型再播放）；_startTone 原本吞掉的播放异常补 debug 日志（对齐 invite 里已有的 assert+debugPrint 口径），正式包仍静默。",
+        "WAV 合成（call_tones.dart）检查无问题：RIFF/PCM 头、8kHz/16bit/单声道、淡入淡出均正确。",
+        "验证：dart analyze 干净；app 无语音通话专用测试，建议老板真机/双端重测回铃音。"
+      ]
+    }
+  ]
+}
