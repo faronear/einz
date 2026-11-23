@@ -106,3 +106,44 @@ jobs:
           node-version: '22'
       - name: 跑测试
         run: scripts/testAll.sh server
+
+  # Bark 通知（同 buildMultiPlatform.yml 的 notify job，2026-11-23）：
+  # 特性分支测试红没红也直接弹手机。secrets 共用 BARK_URL / BARK_SOUND。
+  notify:
+    name: bark 通知（成功/失败）
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [app, shared, cli, server]
+    steps:
+      - name: 汇总结果并推 Bark
+        env:
+          BARK_URL: ${{ secrets.BARK_URL }}
+          BARK_SOUND: ${{ secrets.BARK_SOUND }}
+          R_APP: ${{ needs.app.result }}
+          R_SHARED: ${{ needs.shared.result }}
+          R_CLI: ${{ needs.cli.result }}
+          R_SERVER: ${{ needs.server.result }}
+          REF: ${{ github.head_ref || github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ -z "$BARK_URL" ]; then
+            echo "未配置 BARK_URL secrets，跳过通知"
+            exit 0
+          fi
+          FAILED=""
+          for entry in "app|$R_APP" "shared|$R_SHARED" "cli|$R_CLI" "server|$R_SERVER"; do
+            job="${entry%%|*}"; result="${entry##*|}"
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              FAILED="$FAILED $job($result)"
+            fi
+          done
+          if [ -z "$FAILED" ]; then
+            TITLE="Einz 测试成功"
+            BODY="app/shared/cli/server 全过 @ $REF ($EVENT)"
+          else
+            TITLE="Einz 测试失败"
+            BODY="失败:$FAILED @ $REF ($EVENT)"
+          fi
+          URL="$BARK_URL/$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$TITLE/$BODY")"
+          [ -n "$BARK_SOUND" ] && URL="$URL?sound=$BARK_SOUND"
+          curl -sf "$URL" > /dev/null && echo "已推送: $TITLE $BODY" || echo "Bark 推送失败（不影响测试结果）"
