@@ -251,11 +251,12 @@ class VoiceCallService {
     _send(kWsTypeCallInvite, callId);
     _startRingTimer();
     try {
-      // 先占麦克风再放回铃音：macOS/移动端上 mic 捕获会重建音频会话，若在
-      // 回铃音开始播之后才占，刚启动的播放会被打断——主叫就听不到回铃音了
-      // （被叫不受影响：铃声早就在播，mic 是接听时才占的，2026-11-22 实测）。
+      // 音频会话的所有抖动（mic 捕获、WebRTC 音频模块初始化）都要在回铃音
+      // 起播之前完成——任何一步落在起播之后都会打断刚启动的播放，主叫就
+      // 听不到回铃音了（2026-11-22 修了 mic 这半边，之后真机复测仍无声，
+      // 剩下的打断源就是下面的 pc.addTrack；2026-11-23 把起播挪到链路末尾）。
+      // 被叫不受影响：铃声在收到 invite 帧时就起播了，彼时还没有任何 WebRTC 初始化。
       await _ensureMic();
-      await _startTone(caller: true); // 回铃音：听声就知道"已经拨出、在等对方接"
       final pc = await _createPc();
       for (final track in _localStream!.getAudioTracks()) {
         await pc.addTrack(track, _localStream!);
@@ -263,6 +264,7 @@ class VoiceCallService {
       final offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       _send(kWsTypeCallOffer, callId, extra: <String, dynamic>{'sdp': offer.sdp});
+      await _startTone(caller: true); // 回铃音：听声就知道"已经拨出、在等对方接"
     } catch (e) {
       // 本地失败（麦克风权限 / 建连接 / SDP）以前是静默的，排障时看不出断在哪一步。
       // debug 包打一行，正式包静默——原因进日志，不进 UI。
@@ -507,7 +509,10 @@ class VoiceCallService {
       } catch (_) {
         // 桌面端没有音频路由 API
       }
-      await player.play(BytesSource(caller ? CallTones.ringback() : CallTones.ringtone()));
+      final path = await CallTones.writeWavFile(
+          caller ? 'call_ringback' : 'call_ringtone',
+          caller ? CallTones.ringback() : CallTones.ringtone());
+      await player.play(DeviceFileSource(path));
     } catch (e) {
       _tonePlayer = null;
       // 播不出来不影响通话本身——但排障要看得到（2026-11-22：主叫回铃音无声排查）

@@ -1,0 +1,19 @@
+{
+  "utc": "20261123T082003.000000Z",
+  "time": "2026-11-23 08:20+08:00",
+  "host": "mac15",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "主叫回铃音仍无声：起播挪到 WebRTC 链路末尾",
+      "detail": [
+        "老板复测：2026-11-22 修了 mic 先占后，主叫仍听不到回铃音（被叫正常）。",
+        "定位：invite() 里回铃音起播后紧接着 _createPc()+pc.addTrack(audio)——WebRTC 音频模块初始化同样会重建音频会话，把刚启动的播放再次打断。这是主叫链路上最后一次音频会话抖动，正好落在起播之后。",
+        "修法：_startTone(caller:true) 挪到 offer 发送完成之后（整条 WebRTC 建立链路末尾），等音频会话定型再起播。被叫不受影响：铃声在收到 invite 帧即起播，彼时无任何 WebRTC 初始化。",
+        "验证：dart analyze 干净；待老板真机双端复测。"
+      ]
+    }
+  ]
+}

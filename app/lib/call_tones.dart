@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// 语音通话的提示音（**程序生成 WAV**，不依赖任何素材文件）。
 ///
@@ -23,10 +25,22 @@ class CallTones {
   static Uint8List? _ringbackCache;
   static Uint8List? _ringtoneCache;
 
-  /// 主叫侧：回铃音。450Hz，**响 1 秒、停 4 秒**（一回 5 秒循环）。
+  /// 把 WAV 字节落成带 `.wav` 后缀的临时文件，返回路径供播放。
+  ///
+  /// 为什么不直接用 BytesSource：Darwin 端的 AVPlayer 要求文件路径带扩展名
+  /// （audioplayers #803），BytesSource 落的无后缀临时文件会直接
+  /// `AVPlayerItem.Status.failed`——主叫回铃音无声就是它（2026-11-23）。
+  static Future<String> writeWavFile(String name, Uint8List wav) async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$name.wav');
+    await file.writeAsBytes(wav, flush: false);
+    return file.path;
+  }
+
+  /// 主叫侧：回铃音。450Hz，**响 1 秒、停 2 秒**（一回 3 秒循环）。
   static Uint8List ringback() => _ringbackCache ??= _encode(_synth(<_Tone>[
         const _Tone(frequency: 450, seconds: 1),
-        const _Tone(frequency: 0, seconds: 4), // 0Hz = 静音段
+        const _Tone(frequency: 0, seconds: 2), // 0Hz = 静音段
       ]));
 
   /// 被叫侧：来电铃声。三个上行音一组、组间留白（叮铃铃 —— 叮铃铃 ——）。

@@ -1,0 +1,19 @@
+{
+  "utc": "20261123T082409.000000Z",
+  "time": "2026-11-23 08:24+08:00",
+  "host": "mac15",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "真机日志坐实根因：BytesSource 无扩展名，Darwin AVPlayer 拒播",
+      "detail": [
+        "老板贴出日志：AVPlayerItem.Status.failed on setSourceUrl，DeviceFileSource 路径 …/Caches/cc.tic.einz/8568c 无扩展名。",
+        "audioplayers 已知限制（troubleshooting.md / issue #803）：Darwin 端 AVPlayer 只播带扩展名的文件；BytesSource 落的临时文件无后缀 → 直接 failed。前两轮「播放被打断」的归因不成立，真正根因是它。",
+        "修法：CallTones.writeWavFile() 把 WAV 落到临时目录带 .wav 后缀的文件（call_ringback.wav / call_ringtone.wav），_startTone 改用 DeviceFileSource(path)。两次抖动顺序调整无害保留。",
+        "验证：dart analyze 干净；待真机复测。"
+      ]
+    }
+  ]
+}
