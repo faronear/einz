@@ -3,7 +3,7 @@
 > **状态：** `[已实现]`（§2 全部对照代码事实）+ §5 政策由老板维护
 > **决策日期：** 2026-09-14（"不做 Space Key 轮换"定稿）
 > **关联：** `E2EE.md`（密码学）、`KEY_ESCROW.md`（口令托管）、`DATABASE.md` §4（密钥存储）、
-> `PROTOCOL.md`（通道在册/撤销）、`PROTOCOL_MULTIVERSE.md`（空间隔离）、`aimemo/productLens.zhcn.md` §3 §4.4 §12
+> `PROTOCOL.md`（通道在册/撤销）、`PROTOCOL_MULTIVERSE.md`（空间隔离）、`aimemo/productLens.md` §3 §4.4 §12
 
 本文档是 Einz 安全口径的**唯一权威**：威胁模型、现有控制、明确不做的、事件处置手册、
 用户侧政策、已接受的残留风险。文档之间若有冲突，以本文档为准。

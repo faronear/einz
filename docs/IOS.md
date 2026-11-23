@@ -174,7 +174,7 @@ Debug / Profile 配置仍是 Automatic（项目默认），用于模拟器开发
 
 ## 4. 玩法 B：App Store 包 + TestFlight（试用分发，不上架）
 
-> **边界**：`aimemo/productLens.zhcn.md` §1.4/§14.1 定的是「**不上架** App Store、不向第三方分发」。
+> **边界**：`aimemo/productLens.md` §1.4/§14.1 定的是「**不上架** App Store、不向第三方分发」。
 > TestFlight 只作**自己与伴侣的试用安装**不违背它；但**外部测试组**（外人可装的公开链接）
 > 属于"向第三方分发"，要老板自己拍板。
 

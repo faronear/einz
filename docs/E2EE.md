@@ -4,7 +4,7 @@
 > （2026-09-15 v1 收敛：通道登记改为 `POST /spaces` / `POST /spaces/join` 自助完成，
 > 静态白名单 `config.json` 与脚本 CLI 已删除。下文凡涉及"白名单"处均指 `entrances` 表的
 > 在册状态；协议细节见 `PROTOCOL_MULTIVERSE.md`）。
-> **权威依据：** `aimemo/productLens.zhcn.md` §4（密码学与密钥层级）、§5（一次性配置）
+> **权威依据：** `aimemo/productLens.md` §4（密码学与密钥层级）、§5（一次性配置）
 > **阅读对象：** 客户端与服务端开发者；实现时必须与本文档逐条对齐。
 
 ---

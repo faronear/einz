@@ -8,7 +8,7 @@
 - **产品：** Einz — 两个人的私密秘境（E2EE 聊天 + 共享空间）
 - **部署形态：** Multiverse 多租户（`spaces` 表 + 动态登记；**一条通道可进多个秘境**，
   见 `docs/GLOSSARY.md` 的术语分层）
-- **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.0）
+- **架构依据：** `aimemo/productLens.md`（Draft v2.0）
 - **最后更新：** 2026-10-29
 
 ---

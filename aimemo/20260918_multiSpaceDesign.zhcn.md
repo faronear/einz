@@ -2,7 +2,7 @@
 
 状态：`[已评审·部分定稿]`（2026-09-18 起草；方案 A 已获老板原则同意；**2026-09-22 代码核查后修订**：
 修正 6 处与现状不符的断言、补入 4 个漏掉的耦合点，⑤⑥⑦ 三项已定，①②③④ 待老板一句话确认）
-关联：`docs/PROTOCOL_MULTIVERSE.md`、`aimemo/20260910_appWizardMultiverse.md`、`aimemo/productLens.zhcn.md`
+关联：`docs/PROTOCOL_MULTIVERSE.md`、`aimemo/20260910_appWizardMultiverse.md`、`aimemo/productLens.md`
 
 > 2026-09-22 修订依据：逐条对照 `server/src`（db/spaces/auth/guard/push）与 `app/lib`
 > （app_lock/server_config/chat_page/local_database/media_cache 等）核实原稿断言。

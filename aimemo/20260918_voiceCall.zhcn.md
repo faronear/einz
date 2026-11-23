@@ -1,7 +1,7 @@
 # Einz 语音实时通话方案（voiceCall）
 
 > 状态：**[待评审]**（2026-09-18 由讨论整理，尚未开工；评审通过后才进入 `projectPlan.md` 任务列表）
-> 依据：`aimemo/productLens.zhcn.md` §14.2 V2 候选「语音/视频通话（WebRTC + STUN/TURN，成熟方案，不自研）」
+> 依据：`aimemo/productLens.md` §14.2 V2 候选「语音/视频通话（WebRTC + STUN/TURN，成熟方案，不自研）」
 > 关联：`docs/PROTOCOL.md` §8 WebSocket、`docs/SECURITY.md`、`docs/IOS.md` §0.1、`server/src/push.ts`
 
 ---
