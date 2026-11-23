@@ -1,0 +1,18 @@
+{
+  "utc": "20261123T102544.000000Z",
+  "time": "2026-11-23 10:25+08:00",
+  "host": "mac15",
+  "os": "MacOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "CI 加 Bark 通知 job + 离线 Bark 通道立项",
+      "detail": [
+        "老板选定 Bark 做 CI 通知（iPhone 弹推送），secrets 已配好（BARK_URL 必填、BARK_SOUND 可选）。",
+        "buildMultiPlatform.yml 加 notify job：needs 全部 8 个出包 job + if:always()，skipped（手动触发未选平台）不算失败；失败列具体 job(result)；推送失败不搞红构建。ruby YAML 校验过。",
+        "projectPlan.md 立项「离线通知加 Bark 通道」：邮件闸门复用、服务端按通道分发、App 设置页、PUT /notify/bark。老板确认后待排期。"
+      ]
+    }
+  ]
+}

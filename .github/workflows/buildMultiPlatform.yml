@@ -862,3 +862,51 @@ jobs:
           xcrun altool --upload-app -f /tmp/einz-out/einz-app-ios-appstore.ipa -t ios \
             --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER"
           echo "✅ 已上传 TestFlight（处理需要几分钟才出现在 App Store Connect）"
+
+  # Bark 通知（老板 2026-11-23）：全部出包 job 结束后给 iPhone 推一条结果。
+  # secrets：BARK_URL（完整 URL，含 key，如 https://api.day.app/xxxx）+
+  # 可选 BARK_SOUND（铃声名，缺省用 App 当前设置）。未配 secrets 则静默跳过。
+  notify:
+    name: bark 通知（成功/失败）
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test, android, windows, macos, macos-cli, linux-cli, linux-gui, ios]
+    steps:
+      - name: 汇总结果并推 Bark
+        env:
+          BARK_URL: ${{ secrets.BARK_URL }}
+          BARK_SOUND: ${{ secrets.BARK_SOUND }}
+          # needs.*.result 直接取（skipped = 手动触发时没选的平台，不算失败）
+          R_TEST: ${{ needs.test.result }}
+          R_ANDROID: ${{ needs.android.result }}
+          R_WINDOWS: ${{ needs.windows.result }}
+          R_MACOS: ${{ needs.macos.result }}
+          R_MACOS_CLI: ${{ needs.macos-cli.result }}
+          R_LINUX_CLI: ${{ needs.linux-cli.result }}
+          R_LINUX_GUI: ${{ needs.linux-gui.result }}
+          R_IOS: ${{ needs.ios.result }}
+          REF: ${{ github.ref_name }}
+        run: |
+          if [ -z "$BARK_URL" ]; then
+            echo "未配置 BARK_URL secrets，跳过通知"
+            exit 0
+          fi
+          FAILED=""
+          for entry in "test|$R_TEST" "android|$R_ANDROID" "windows|$R_WINDOWS" \
+                       "macos|$R_MACOS" "macos-cli|$R_MACOS_CLI" "linux-cli|$R_LINUX_CLI" \
+                       "linux-gui|$R_LINUX_GUI" "ios|$R_IOS"; do
+            job="${entry%%|*}"; result="${entry##*|}"
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              FAILED="$FAILED $job($result)"
+            fi
+          done
+          if [ -z "$FAILED" ]; then
+            TITLE="Einz CI 成功"
+            BODY="全部构建通过 @ $REF"
+          else
+            TITLE="Einz CI 失败"
+            BODY="失败:$FAILED @ $REF"
+          fi
+          URL="$BARK_URL/$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$TITLE/$BODY")"
+          [ -n "$BARK_SOUND" ] && URL="$URL?sound=$BARK_SOUND"
+          curl -sf "$URL" > /dev/null && echo "已推送: $TITLE $BODY" || echo "Bark 推送失败（不影响构建结果）"

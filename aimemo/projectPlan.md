@@ -39,6 +39,14 @@
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
 - `[x]` 字段改名**执行**（2026-09-23，见 `20260923_renamePlan.zhcn.md`）
 - `[x]` **中文「设备」→「通道」清扫 + CLI `/device`→`/entrance`**（2026-09-23，见 `20260923_renamePlan.zhcn.md` §7）
+- `[ ]` **离线通知加 Bark 通道**（立项 2026-11-23）：现有邮件通知（notifier.ts 四道闸门）
+  保持不动，投递环节加 Bark 通道——①服务端：按通道类型分发（Bark = 一个 HTTP GET，
+  不走 nodemailer），闸门/静默/冷却对两通道共享，Bark URL 视作机密只存服务端；
+  ②App 设置页：「邮件通知」旁加「Bark 推送」，粘贴 URL + 发测试推送验证；
+  ③协议：PROTOCOL.md 加 `PUT /notify/bark`。服务端已有 APNs/FCM 占位
+  （push_tokens 表），与之不冲突。
+- `[x]` **CI Bark 通知**（2026-11-23）：buildMultiPlatform.yml 加 notify job
+  （if: always() + Bark secrets，成功/失败都推）
 - `[x]` **邮件通知（替代后台推送）**——2026-10-01 全线完成
   server `[x]`：`notify_emails`/`notify_tokens` 表 + `space_members.email`、`notifier.ts`
   （派生式 tick + 四道闸门）、`mailer.ts`、`PUT|GET|DELETE /notify/email` +
