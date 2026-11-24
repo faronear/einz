@@ -610,11 +610,13 @@ jobs:
             "https://github.com/jedisct1/libsodium/releases/download/${SODIUM_VER}-RELEASE/libsodium-${SODIUM_VER}.tar.gz"
           tar -xzf /tmp/libsodium.tar.gz -C /tmp
           cd /tmp/libsodium-${SODIUM_VER}
-          # --disable-asm 必须：runner CPU 新，默认 configure 会把 AVX2 优化编进
-          # .a，whole-archive 后无运行时分发保护，老 CPU（无 AVX2，如 Celeron
-          # N3150）启动即 SIGILL。2026-11-24 cn1 实测：默认构建 objdump 有 1 万+
-          # 条 AVX2 指令且启动即 Illegal instruction；旧包 0 条正常。
+          # SIMD 全部显式禁用：--disable-asm 只关汇编文件，AVX2/SSE 走的是
+          # C intrinsics 文件（blake2b-compress-avx2.c 等），由 --enable-avx2
+          # 等开关控制（默认 auto=按构建机 CPU 编入）。cn1 实测 2026-11-24：
+          # 只 --disable-asm 时二进制仍有 1 万+ 条 AVX2 指令、启动即 SIGILL。
           ./configure --disable-shared --enable-static --with-pic --disable-asm \
+            --disable-ssse3 --disable-sse4_1 --disable-sse4_2 \
+            --disable-avx --disable-avx2 --disable-avx512f --disable-aesni \
             --prefix=/tmp/libsodium-install
           make -j"$(nproc)"
           echo "LIBSODIUM_STATIC_LIB=/tmp/libsodium-${SODIUM_VER}/src/libsodium/.libs/libsodium.a" >> "$GITHUB_ENV"
