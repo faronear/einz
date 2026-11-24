@@ -464,6 +464,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 此后再松手没人会去停它——只能等 60s 上限自动停。用该标记让 _stopVoice 在
   // 「还没进录音态但正在启动」时也能执行取消，而不是被 inputMode 检查直接放过。
   bool _voiceStarting = false;
+  /// 本次录音是否由**单击**启动（false=长按启动）：录音中的停止提示文案据此切换。
+  bool _voiceTapStarted = false;
   int _recordSeconds = 0;
   bool _previewPlaying = false; // 预览态试听播放中
   String? _playingMessageId; // 播放意图（点按即置：含下载解密等待期，按钮变停止）
@@ -7791,7 +7793,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _startVoice() async {
+  Future<void> _startVoice({bool tapStarted = false}) async {
     // 已在启动中（hasPermission / recorder.start 的 await 期间）：直接返回，
     // 不重入——点按开录后连点两下，第二次会再启一次录音器（二次 start 抛错，
     // 弹「录音启动失败」）。入口图标那条链路由 _onVoiceEntryTap 自己守卫。
@@ -7806,6 +7808,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 录音时收起键盘（输入框被录音条覆盖，键盘占屏无意义）
     FocusManager.instance.primaryFocus?.unfocus();
     _voiceStarting = true;
+    // 记住启动方式（单击/长按）：录音中的提示文案据此区分——单击启动的不会
+    // 因松手结束，提示「点按结束录音」；长按启动的松手即停，无需文字（luk 2026-11-24）。
+    _voiceTapStarted = tapStarted;
     try {
       // 重新录音（提示态再长按）：先清掉上一次未发送的临时文件
       final old = _recordingPath;
@@ -8282,6 +8287,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   padding: EdgeInsets.symmetric(horizontal: 6),
                   child: Icon(Icons.stop_circle, size: 22, color: Colors.green),
                 ),
+                // 单击启动（不会因松手结束）：显式提示「点按结束录音」；长按启动
+                // 的松手即停，无文字（luk 2026-11-24）
+                if (_voiceTapStarted) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    AppLocalizations.of(context)!.chatPageTapToStopRecord,
+                    style: const TextStyle(color: Colors.green, fontSize: 13),
+                  ),
+                ],
                 const SizedBox(width: 4),
                 // 与预览态共用同一个渲染器（[_VoiceWaveform]，条宽 3/间距 2/高
                 // 28）：录音中取最新的一段从左往右排（slidingWindow）——两态
@@ -8421,7 +8435,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       children: [
         Expanded(
           child: _voiceCapsule(
-            onTap: () => unawaited(_startVoice()),
+            onTap: () => unawaited(_startVoice(tapStarted: true)),
             onLongPressStart: (_) => _startVoice(),
             onLongPressEnd: (_) => _stopVoice(),
             child: Center(

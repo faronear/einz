@@ -995,6 +995,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageLongPressToRecord => '点按或长按开始录音';
 
   @override
+  String get chatPageTapToStopRecord => '点按结束录音';
+
+  @override
   String get chatPageLongPressToTranscribe => '长按转文字';
 
   @override

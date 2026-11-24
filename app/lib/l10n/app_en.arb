@@ -641,6 +641,7 @@
   "chatPageVoicePermissionDenied": "Microphone permission denied. Please enable it in system settings.",
   "chatPageVoiceEmpty": "Recording was empty and was discarded.",
   "chatPageLongPressToRecord": "Tap or long-press to record",
+  "chatPageTapToStopRecord": "Tap to stop recording",
   "chatPageLongPressToTranscribe": "Long press to text",
   "chatPageInputHint": "Type a message…",
   "chatPageAudioMetaMissing": "Audio metadata missing",

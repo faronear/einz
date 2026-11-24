@@ -1056,6 +1056,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageLongPressToRecord => 'Tap or long-press to record';
 
   @override
+  String get chatPageTapToStopRecord => 'Tap to stop recording';
+
+  @override
   String get chatPageLongPressToTranscribe => 'Long press to text';
 
   @override
