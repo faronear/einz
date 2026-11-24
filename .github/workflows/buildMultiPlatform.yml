@@ -607,6 +607,13 @@ jobs:
         run: |
           eval "$(node ../scripts/appVersion.js)"
           flutter build linux --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+          # 抹掉主执行体上的 x86-64-v3 ISA note：Ubuntu runner 的构建链会把它打进
+          # `einz`，glibc 启动时检查到 CPU 不支持 AVX2 就拒绝运行（"CPU ISA level
+          # is lower than required"，老机器如 Celeron N3150 中招）。2026-11-24 老板
+          # 在 cn1 实测：抹掉 note 后 N3150 正常跑完 wizard——说明产物实际没用
+          # AVX2 指令，只是被打了标。lib/*.so 均无 note，只处理主执行体即可。
+          objcopy --remove-section .note.gnu.property \
+            app/build/linux/x64/release/bundle/einz
           # Flutter 的 Linux 构建不接受把版本写进产物：--build-name 只是被公共参数
           # 收下，linux 侧无人消费（对比 Windows 写 PE FILEVERSION / macOS 写
           # Info.plist），二进制里 strings 也找不到版本串。所以旁车 version.txt
@@ -633,7 +640,8 @@ jobs:
             PipeWire:    gstreamer1.0-pipewire
             PulseAudio:  gstreamer1.0-pulseaudio
           注：libsqlite3 已由构建内嵌（native assets），无需单独装；
-              glibc 需 ≥ 2.39（构建线），Debian 13 / Fedora 41+ 满足。
+              glibc 需 ≥ 2.39（构建线），Debian 13 / Fedora 41+ 满足；
+              CPU 无 AVX2 也能跑（打包时已抹掉 x86-64-v3 ISA note）。
 
           运行：
             chmod +x einz

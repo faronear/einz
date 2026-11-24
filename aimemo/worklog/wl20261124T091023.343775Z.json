@@ -1,0 +1,6 @@
+{ "utc": "20261124T091023.343775Z", "time": "2026-11-24 17:10:10+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "Linux 包在老 CPU 上报 CPU ISA level is lower than required", "detail": "cn1（Celeron N3150，Debian 13）跑 GitHub CI 构建的 einz 报错。readelf 定位：主执行体带 x86-64-baseline/v2/v3 三级 ISA note（lib/*.so 均无），glibc 因 N3150 无 AVX2 过不了 v3 检查直接拒绝。我们的 CMake 与 CI 均未设 -march，note 是 Ubuntu runner 构建链打的。" },
+    { "brief": "修复：抹掉 .note.gnu.property 段，cn1 实测通过", "detail": "objcopy --remove-section .note.gnu.property einz 后 N3150 正常启动 UI 并进 wizard——产物实际未用 AVX2，只是被打标。注意补丁版二进制必须放在原 bundle 目录（与 lib/ 同级）才能找到插件库，放 /tmp 会报 libaudioplayers_linux_plugin.so 找不到，那是路径问题不是库问题。" },
+    { "brief": "CI 根治已改 buildMultiPlatform.yml", "detail": "linux-gui job 的 Build 步在 flutter build linux 之后对 bundle/einz 跑 objcopy 抹 ISA note（仅主执行体），README-linux-gui.txt 注明无 AVX2 也能跑。待下次 CI 构建后在 cn1 验证正式包。" }
+  ] }
