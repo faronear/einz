@@ -17,34 +17,41 @@
 #   · 不要为绕过失败把 registry 改镜像再顺手 npm install：那会把
 #     registry.npmmirror.com 写进 package-lock.json 的 resolved（2026-10-28 已清理回归
 #     官方源）。真要救急就用环境变量或 Dockerfile 的 --build-arg，不改文件。
+#
+# 注意（2026-11-24）：
+#   · /faronear/einz 属 root（cn1 统一 root 运行策略），git pull 与 npm 步骤都要 sudo；
+#   · npm 在 adot 的 nvm 目录下，sudo 的 secure_path 不含它 → sudo env 带显式 PATH，
+#     路径动态探测、不写死版本号，node 升级后自动跟随。
 
 set -e
+NPM_DIR="$(ssh adot@cn1 'dirname "$(command -v npm)"')"
+echo "▶ npm 路径：$NPM_DIR"
+SUDO_ENV="sudo env PATH=$NPM_DIR:/usr/bin:/bin"
 echo "▶ cn1 bare-node update..."
-ssh adot@cn1 '
+ssh adot@cn1 "
 set -e
 cd /faronear/einz/
-echo "▶ git pull..."
-git pull --ff-only
+echo 'git pull（仓库属 root，须 sudo）...'
+sudo git pull --ff-only
 
 cd server
-echo "▶ npm ci --prefer-offline ..."
-if ! npm ci --prefer-offline; then
-  echo "⚠ npm ci 失败，重试一次（同样 --prefer-offline）..."
-  npm ci --prefer-offline
+echo 'npm ci --prefer-offline ...'
+if ! $SUDO_ENV npm ci --prefer-offline; then
+  echo 'npm ci 失败，重试一次（同样 --prefer-offline）...'
+  $SUDO_ENV npm ci --prefer-offline
 fi
 
-echo "▶ npm run build..."
-npm run build
+echo 'npm run build...'
+$SUDO_ENV npm run build
 
-echo "▶ systemctl restart einz-server..."
+echo 'systemctl restart einz-server...'
 sudo systemctl restart einz-server
 
 sleep 2
-echo "▶ 服务状态："
+echo '服务状态：'
 systemctl is-active einz-server
 # /health 免协议版本头（app.ts assertProtocolVersion 白名单），不必硬编码版本号
-curl -s http://127.0.0.1:3000/health || echo "(health 未就绪，可稍后 journalctl -u einz-server 查看)"
+curl -s http://127.0.0.1:3000/health || echo '(health 未就绪，可稍后 journalctl -u einz-server 查看)'
 echo
-'
-echo "✅ done"
-
+"
+echo "DONE"
