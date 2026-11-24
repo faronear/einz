@@ -1,0 +1,4 @@
+{ "utc": "20261124T132050.698885Z", "time": "2026-11-24 21:20+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "放弃静态链 libsodium，Linux GUI 回归系统依赖方案（老板决策）", "detail": ["老板理由：cn1 是唯一带桌面的 Linux 测试机，保住验证链路比用户免装更重要。", "改动：① CI 撤掉 Build libsodium (static) 步；② app/linux/runner/CMakeLists.txt 撤掉 LIBSODIUM_STATIC_LIB 可选分支（留注释指向 worklog）；③ README 恢复 libsodium23 安装指引，并注明打包已抹 ISA note、无 AVX2 老 CPU（Celeron N3150/Debian 13 实测）可运行。", "保留：objcopy 抹主执行体 x86-64-v3 ISA note（老包能启动的关键，cn1 实测）。", "cn1 现状：libsodium23 已装；老包 einz-old/einz（抹过 note）+ 系统 sodium 实测进 wizard 成功。注意 Debian 的 libsodium23 不带 libsodium.so 裸名链接（那属 libsodium-dev），老包靠 LIBSODIUM_PATH=/usr/lib/x86_64-linux-gnu/libsodium.so.23 或 /usr/local/lib/libsodium.so 符号链接命中。", "后续：新 CI 包出包后 cn1 直接下载验证（无需手动 objcopy——打包步已抹 note），装 libsodium23 即应可用。"] }
+  ] }

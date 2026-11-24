@@ -599,27 +599,6 @@ jobs:
           sudo apt-get install -y -qq clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libsecret-1-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-      - name: Build libsodium (static)
-        # 静态链进主执行体，见 app/linux/runner/CMakeLists.txt 注释：让 shared 的
-        # DynamicLibrary.process() 命中 sodium_init，用户免装系统 libsodium。
-        # 从源码编：Ubuntu 的 libsodium-dev 不带 .a；--with-pic 必须开（主执行体
-        # 是 PIE）。版本手动升级，升级时同步检查 sodium Dart 包的兼容性说明。
-        run: |
-          SODIUM_VER=1.0.20
-          curl -fL --retry 3 -o /tmp/libsodium.tar.gz \
-            "https://github.com/jedisct1/libsodium/releases/download/${SODIUM_VER}-RELEASE/libsodium-${SODIUM_VER}.tar.gz"
-          tar -xzf /tmp/libsodium.tar.gz -C /tmp
-          cd /tmp/libsodium-${SODIUM_VER}
-          # SIMD 全部显式禁用：--disable-asm 只关汇编文件，AVX2/SSE 走的是
-          # C intrinsics 文件（blake2b-compress-avx2.c 等），由 --enable-avx2
-          # 等开关控制（默认 auto=按构建机 CPU 编入）。cn1 实测 2026-11-24：
-          # 只 --disable-asm 时二进制仍有 1 万+ 条 AVX2 指令、启动即 SIGILL。
-          ./configure --disable-shared --enable-static --with-pic --disable-asm \
-            --disable-ssse3 --disable-sse4_1 --disable-sse4_2 \
-            --disable-avx --disable-avx2 --disable-avx512f --disable-aesni \
-            --prefix=/tmp/libsodium-install
-          make -j"$(nproc)"
-          echo "LIBSODIUM_STATIC_LIB=/tmp/libsodium-${SODIUM_VER}/src/libsodium/.libs/libsodium.a" >> "$GITHUB_ENV"
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get
@@ -655,18 +634,16 @@ jobs:
           cat > _release.gitomit/einz/README-linux-gui.txt <<'TXT'
           einz（Linux x64 GUI）
 
-          运行前置（缺 gstreamer 起不来或语音没声音）：
-            Debian/Ubuntu: sudo apt install libsecret-1-0 libgtk-3-0 \
+          运行前置（缺 libsodium 起不来 wizard 密钥生成、缺 gstreamer 语音没声音）：
+            Debian/Ubuntu: sudo apt install libsodium23 libsecret-1-0 libgtk-3-0 \
               gstreamer1.0-plugins-base gstreamer1.0-plugins-good
           音频输出（按声音系统装，Debian 13 默认 PipeWire）：
             PipeWire:    gstreamer1.0-pipewire
             PulseAudio:  gstreamer1.0-pulseaudio
-          注：libsodium（E2EE）已静态内置（纯 C 实现），无需安装；
-              libsqlite3 已由构建内嵌（native assets），无需单独装；
+          注：libsqlite3 已由构建内嵌（native assets），无需单独装；
               glibc 需 ≥ 2.39（构建线），Debian 13 / Fedora 41+ 满足；
-              打包时已抹掉主执行体的 x86-64-v3 ISA note，但引擎/加密
-              代码仍按较新 CPU 设计——极老 CPU（无 AVX2，如 Celeron
-              N3150）启动可能 Illegal instruction，不承诺可用。
+              打包时已抹掉主执行体的 x86-64-v3 ISA note，无 AVX2 的老
+              CPU（如 Celeron N3150，实测 Debian 13）也可运行。
 
           运行：
             chmod +x einz
