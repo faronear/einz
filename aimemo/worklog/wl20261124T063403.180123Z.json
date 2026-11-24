@@ -1,0 +1,14 @@
+{
+  "utc": "20261124T063403.180123Z",
+  "time": "2026-11-24 14:34+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "语音/音频条与转写行之间加 6px 间距",
+      "detail": "波形行与下方「Tap to transcribe」提示/转写文字太近，点转写区容易误触播放区；播放区与转写行之间加 SizedBox(height:6)（luk 2026-11-24）"
+    }
+  ]
+}

@@ -9882,6 +9882,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         playAreaTappable,
+        // 波形行与转写行之间留一点间距：太近的话点「点按转写/转写行」容易误触
+        // 播放区（luk 2026-11-24）
+        const SizedBox(height: 6),
         // 语音消息：波形行下方挂本地转写行（aimemo/20261009_voiceTranscript.zhcn.md §10——
         // 仅消息流气泡有；纯音频文件消息挂 wav 转写行，非 wav 不占位）
         // 手动模式（自动转写关）且还没有任何转写行时，转写行位置显示「图标+转写」
