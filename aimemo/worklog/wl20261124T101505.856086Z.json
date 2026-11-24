@@ -1,0 +1,4 @@
+{ "utc": "20261124T101505.856086Z", "time": "2026-11-24 18:15+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "新 Linux 包启动 SIGILL 根因：静态 libsodium 带入 1 万+ 条 AVX2 指令", "detail": ["CI 新包（静态链 libsodium）在 cn1 启动即 Illegal instruction（Impeller 日志后崩）；旧包能进 GUI 只报缺 libsodium。SSH 到 cn1（adot@cn1，旧包在 /home/adot/einz-old）实测：objdump 统计 AVX2 指令——新 einz 10138 条，旧包两个二进制均 0 条；二进制内可见 sodium_* 符号。", "结论：CI 默认 configure 编出的 libsodium.a 含 AVX2 优化代码，--whole-archive 链入后未过运行时分发在启动阶段即执行（glibc ISA note 检查拦不住 .so 无 note 的情形，代码真实执行了 AVX2）。libflutter 预编译产物干净（旧包 0 条）。", "修复：CI Build libsodium 步 configure 加 --disable-asm，注释写明缘由。性能损失对本 app 可忽略（加密数据量小）。", "待办：老板推送 CI 重出包后，cn1 重新下载验证（启动 + wizard 密钥生成）；老包备份在 /home/adot/einz-old。"] }
+  ] }
