@@ -8287,33 +8287,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   padding: EdgeInsets.symmetric(horizontal: 6),
                   child: Icon(Icons.stop_circle, size: 22, color: Colors.green),
                 ),
-                // 单击启动（不会因松手结束）：显式提示「点按结束录音」；长按启动
-                // 的松手即停，无文字（luk 2026-11-24）
-                if (_voiceTapStarted) ...[
-                  const SizedBox(width: 2),
-                  Text(
-                    AppLocalizations.of(context)!.chatPageTapToStopRecord,
-                    style: const TextStyle(color: Colors.green, fontSize: 13),
-                  ),
-                ],
-                const SizedBox(width: 4),
-                // 与预览态共用同一个渲染器（[_VoiceWaveform]，条宽 3/间距 2/高
-                // 28）：录音中取最新的一段从左往右排（slidingWindow）——两态
-                // 几何完全一致，切换时不会有尺寸跳变（长录音进预览会把整段
-                // 包络压进同一宽度，形状按语义变，不是渲染差异）。没有播放
-                // 进度，深浅两色都传绿——整条同色。
                 Expanded(
-                  child: LayoutBuilder(builder: (context, constraints) {
-                    return _VoiceWaveform(
-                      playing: false,
-                      durationSeconds: _recordSeconds,
-                      samples: _voiceSamples,
-                      slidingWindow: true,
-                      width: constraints.maxWidth,
-                      activeColor: Colors.green,
-                      inactiveColor: Colors.green,
-                    );
-                  }),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 单击启动（不会因松手结束）：显式提示「点按结束录音」，
+                      // 挂在波形上方——位置与字体同预览态的「长按转文字」
+                      // （luk 2026-11-24）；长按启动的松手即停，无文字
+                      if (_voiceTapStarted)
+                        Align(
+                          alignment: Alignment.topCenter,
+                          child: Text(
+                            AppLocalizations.of(context)!
+                                .chatPageTapToStopRecord,
+                            style: TextStyle(
+                              // 淡青绿=波形未播静态同款 shade200（同「长按转文字」）
+                              color: Colors.green.shade200,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      // 与预览态共用同一个渲染器（[_VoiceWaveform]，条宽 3/间距 2/高
+                      // 28）：录音中取最新的一段从左往右排（slidingWindow）——两态
+                      // 几何完全一致，切换时不会有尺寸跳变（长录音进预览会把整段
+                      // 包络压进同一宽度，形状按语义变，不是渲染差异）。没有播放
+                      // 进度，深浅两色都传绿——整条同色。
+                      LayoutBuilder(builder: (context, constraints) {
+                        return _VoiceWaveform(
+                          playing: false,
+                          durationSeconds: _recordSeconds,
+                          samples: _voiceSamples,
+                          slidingWindow: true,
+                          width: constraints.maxWidth,
+                          activeColor: Colors.green,
+                          inactiveColor: Colors.green,
+                        );
+                      }),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Text(elapsed,
@@ -9852,9 +9865,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长都在范围里
             // （老板 2026-09-27）。behavior=opaque：否则容器自身不参与命中测试，
             // 只有子控件占的那几块能点——播放键与波形之间的空隙会漏掉（文件卡片同理）。
+            // borderRadius：悬浮/按压的高亮跟随圆弧角，别在气泡里渲染成四个直角
+            // （luk 2026-11-24）。
             onTap: () => _playAudioMessage(m),
             behavior: HitTestBehavior.opaque,
-            child: playArea,
+            borderRadius: BorderRadius.circular(8),
+            // 右缘留一点空白：高亮不直接贴在时长文字的最后一个字母上（luk 2026-11-24）
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: playArea,
+            ),
           )
         : playArea;
     final Widget body = Column(
@@ -11452,26 +11472,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     // 引用块应在消息正文下面，而不是上面）
                                     // 点击引用卡跳转到原消息位置（老板要求 2026-09-10）
                                     if (m.quote != null)
-                                      Clickable(
-                                        onTap: () => _jumpToMessage(
-                                            m.quote!['messageId'] as String? ?? ''),
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          margin: const EdgeInsets.only(top: 4),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          constraints: BoxConstraints(
-                                              maxWidth: MediaQuery.sizeOf(context)
-                                                      .width *
-                                                  0.55),
-                                          decoration: BoxDecoration(
-                                            color: _uiStyle == 'gradient'
-                                                ? Colors.white12
-                                                : Colors.black
-                                                    .withValues(alpha: 0.06),
-                                            borderRadius: BorderRadius.circular(8),
+                                      Padding(
+                                        // margin 放 Clickable 外面：悬浮遮罩
+                                        // Positioned.fill 会铺满含 margin 的整块，
+                                        // 若在内侧，顶上多出的 4px 遮罩叠在气泡底色
+                                        // 上像多了一层边框（luk 2026-11-24 实测）
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Clickable(
+                                          onTap: () => _jumpToMessage(
+                                              m.quote!['messageId'] as String? ?? ''),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            constraints: BoxConstraints(
+                                                maxWidth:
+                                                    MediaQuery.sizeOf(context)
+                                                            .width *
+                                                        0.55),
+                                            decoration: BoxDecoration(
+                                              color: _uiStyle == 'gradient'
+                                                  ? Colors.white12
+                                                  : Colors.black
+                                                      .withValues(alpha: 0.06),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: _buildQuoteBlockContent(
+                                                m.quote!),
                                           ),
-                                          child: _buildQuoteBlockContent(m.quote!),
                                         ),
                                       ),
                                   ],
