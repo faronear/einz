@@ -224,7 +224,10 @@ const CALL_TYPES = new Set([
  * 通话信令转发（PROTOCOL.md §8.4）：**只搬、不解析、不落库、不进 server_sequence**。
  *
  * - 只发给同 Space 的其它通道（与 peer 广播同一套循环），天然空间隔离；
- * - 补 `from_entrance_id`，让接收端知道是谁打来的、并能忽略自己另一条通道的回显；
+ * - **跳过同一用户的其它通道**（同一人多通道共享 member_id）：不掐断的话，
+ *   自己 mac 上拨出的呼叫会广播到自己的 iPhone，被当成「对方来电」弹起
+ *   （老板 2026-11-24 实测）；member_id 未知（null）时退回旧行为不过滤；
+ * - 补 `from_entrance_id`，让接收端知道是谁打来的；
  * - sdp / candidate 原样透传——服务端手里没有密钥，也看不懂（保持哑转发器性质）。
  * 断线重连不需要补通话信令（通话状态机在客户端），所以不做持久化。
  */
@@ -235,6 +238,7 @@ function broadcastCall(
 ): void {
   const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
+  const senderMemberId = conns.get(exceptEntranceId)?.memberId ?? null;
   const frame = JSON.stringify({
     id: 0,
     type,
@@ -243,6 +247,7 @@ function broadcastCall(
   for (const [entranceId, conn] of conns) {
     if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== spaceId) continue;
+    if (senderMemberId != null && conn.memberId === senderMemberId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(frame);
   }
 }
