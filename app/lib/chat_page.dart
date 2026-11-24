@@ -9459,33 +9459,37 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             ),
                           ),
                         ),
-                        // 左右切换箭头：在媒体层之后入栈，点击不会被「轻触关闭」层吃掉
-                        if (index > 0)
-                          Positioned(
-                            left: 8,
-                            top: 0,
-                            bottom: 0,
-                            child: Center(
-                              child: _GalleryArrow(
-                                icon: Icons.chevron_left,
-                                onTap: () =>
-                                    setDialogState(() => index--),
-                              ),
+                        // 左右切换箭头：在媒体层之后入栈，点击不会被「轻触关闭」层吃掉。
+                        // 前后**终点**放空壳圆钮（有底色无图标、点击无反应）：一直点
+                        // 不会突然消失/关闭，出乎意料感比少一枚按钮小（luk 2026-11-24）
+                        Positioned(
+                          left: 8,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: _GalleryArrow(
+                              icon: index > 0 ? Icons.chevron_left : null,
+                              onTap: index > 0
+                                  ? () => setDialogState(() => index--)
+                                  : null,
                             ),
                           ),
-                        if (index < items.length - 1)
-                          Positioned(
-                            right: 8,
-                            top: 0,
-                            bottom: 0,
-                            child: Center(
-                              child: _GalleryArrow(
-                                icon: Icons.chevron_right,
-                                onTap: () =>
-                                    setDialogState(() => index++),
-                              ),
+                        ),
+                        Positioned(
+                          right: 8,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: _GalleryArrow(
+                              icon: index < items.length - 1
+                                  ? Icons.chevron_right
+                                  : null,
+                              onTap: index < items.length - 1
+                                  ? () => setDialogState(() => index++)
+                                  : null,
                             ),
                           ),
+                        ),
                         Positioned(
                           top: 8,
                           right: 8,
@@ -14835,11 +14839,13 @@ class _GalleryItem {
 /// 画廊箭头按钮：白 chevron + 黑 54% 半透明圆底（配色同 [_FullscreenCloseButton]，
 /// 压在渐变底/浅色画面上都可见）。挂在外层轻触关闭层**之后**的 Stack 层里，
 /// 点击不会被吃掉。
+/// [icon]/[onTap] 为 null = 画廊终点的空壳占位（有底色、点击无反应）——一直点
+/// 不会让全屏突然关闭（luk 2026-11-24）。
 class _GalleryArrow extends StatelessWidget {
   const _GalleryArrow({required this.icon, required this.onTap});
 
-  final IconData icon;
-  final VoidCallback onTap;
+  final IconData? icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -14888,12 +14894,6 @@ class _GalleryMediaViewState extends State<_GalleryMediaView> {
     if (widget.item.type == 'video') _initVideo();
   }
 
-  @override
-  void didUpdateWidget(covariant _GalleryMediaView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 换页（key 变化走的是整树重建，到这里说明同一条目复用，不必再初始化）
-  }
-
   Future<void> _initVideo() async {
     try {
       final m = widget.item.message;
@@ -14910,6 +14910,10 @@ class _GalleryMediaViewState extends State<_GalleryMediaView> {
         return;
       }
       setState(() => _controller = c);
+      // 播放/暂停/进度变化都走一次重建：播放图标与进度条据此刷新
+      c.addListener(() {
+        if (mounted) setState(() {});
+      });
       unawaited(c.play());
     } catch (e) {
       debugPrint('画廊视频初始化失败（${widget.item.message.env.messageId}）：$e');
@@ -14944,7 +14948,8 @@ class _GalleryMediaViewState extends State<_GalleryMediaView> {
         ),
       );
     }
-    // 视频：初始化中转圈；失败给明确错误态；好了就全屏播放
+    // 视频页：点画面暂停/继续（内层手势优先于外层「轻触关闭」，点空白仍关闭）；
+    // 底部叠加可拖动进度条（luk 2026-11-24：能看到进度、能暂停/继续）
     final c = _controller;
     if (c == null) {
       return Center(
@@ -14955,9 +14960,46 @@ class _GalleryMediaViewState extends State<_GalleryMediaView> {
       );
     }
     return Center(
-      child: AspectRatio(
-        aspectRatio: c.value.aspectRatio,
-        child: VideoPlayer(c),
+      child: GestureDetector(
+        onTap: () async {
+          if (c.value.isPlaying) {
+            await c.pause();
+          } else {
+            await c.play();
+          }
+          if (mounted) setState(() {});
+        },
+        child: AspectRatio(
+          aspectRatio: c.value.aspectRatio,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              VideoPlayer(c),
+              // 暂停中叠一个播放图标，一眼知道「还能继续」
+              if (!c.value.isPlaying)
+                const Center(
+                  child: Icon(Icons.play_circle_fill,
+                      size: 44, color: Colors.white70),
+                ),
+              // 底部进度条（可拖动跳转）；留一点底边距不贴死边
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: 8,
+                child: VideoProgressIndicator(
+                  c,
+                  allowScrubbing: true,
+                  colors: const VideoProgressColors(
+                    playedColor: Colors.white,
+                    bufferedColor: Colors.white24,
+                    backgroundColor: Colors.black38,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,0 +1,18 @@
+{
+  "utc": "20261124T055941.592011Z",
+  "time": "2026-11-24 13:59+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "画廊视频加播放控制条；终点放空壳箭头",
+      "detail": [
+        "视频全屏播放控制（luk 2026-11-24）：点画面暂停/继续（内层 GestureDetector 优先于外层轻触关闭，暂停中叠半透明播放图标），底部叠加可拖动进度条 VideoProgressIndicator（白已播/白24缓冲/黑38底）；controller addListener 驱动重建",
+        "画廊前后终点放空壳圆钮（有 black54 底色、无图标、点击无反应）：一直点不会突然关闭全览；_GalleryArrow 的 icon/onTap 改可空",
+        "flutter analyze 通过；luk 真机验收通过（2026-11-24）"
+      ]
+    }
+  ]
+}
