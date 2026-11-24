@@ -1,0 +1,4 @@
+{ "utc": "20261124T130027.201020Z", "time": "2026-11-24 21:00+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "老 CPU 放弃支持，Linux GUI 定格为静态链 + SIMD 全禁", "detail": ["后续实测：CI 新包（SIMD 全禁用版）在 cn1 仍有 10113 条 AVX2 指令，函数归属显示在 sodium 的 aes256gcm/chacha20/salsa20/blake2b(scrypt blockmix) 等 .part.0 函数内——--disable-* 开关未拦住这些代码，仍启动即 Illegal instruction。崩溃机制未彻底查明（gdb 无符号 backtrace 失败），继续深挖性价比低。", "老板决策：放弃老 CPU（无 AVX2）支持。定格方案：静态链 libsodium（免装系统依赖，新 CPU 受益）+ SIMD 全禁（确定性、损失可忽略）；README 注明极老 CPU 可能 Illegal instruction 不承诺可用。", "cn1 退路：sudo apt install libsodium23 + /home/adot/einz-old/einz.orig.bak（抹过 ISA note 的旧包）实测可用。", "教训：remote 名是 github（github.com/faronear/einz），origin 是 git.tic.cc——push CI 用 git push github main；之前以为推送过实际没有，排查时先看 git status -sb 的 ahead 计数。"] }
+  ] }

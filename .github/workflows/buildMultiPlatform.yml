@@ -661,10 +661,12 @@ jobs:
           音频输出（按声音系统装，Debian 13 默认 PipeWire）：
             PipeWire:    gstreamer1.0-pipewire
             PulseAudio:  gstreamer1.0-pulseaudio
-          注：libsodium（E2EE）已静态内置，无需安装；libsqlite3 已由构建
-              内嵌（native assets），无需单独装；
+          注：libsodium（E2EE）已静态内置（纯 C 实现），无需安装；
+              libsqlite3 已由构建内嵌（native assets），无需单独装；
               glibc 需 ≥ 2.39（构建线），Debian 13 / Fedora 41+ 满足；
-              CPU 无 AVX2 也能跑（打包时已抹掉 x86-64-v3 ISA note）。
+              打包时已抹掉主执行体的 x86-64-v3 ISA note，但引擎/加密
+              代码仍按较新 CPU 设计——极老 CPU（无 AVX2，如 Celeron
+              N3150）启动可能 Illegal instruction，不承诺可用。
 
           运行：
             chmod +x einz
