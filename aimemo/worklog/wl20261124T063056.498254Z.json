@@ -1,0 +1,18 @@
+{
+  "utc": "20261124T063056.498254Z",
+  "time": "2026-11-24 14:30+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "VoiceTranscriptModel.ensureInstalled 加全局单飞去重",
+      "detail": [
+        "luk mac 版双击 Tap to transcribe，第一次安装 100% 后又起了第二次安装；页面层 _prepareVoiceModel 的并发去重有时序缝隙（第二次点击先查 isReady=false，真正调用时共享 future 恰被清掉）",
+        "修复：VoiceTranscriptModel.ensureInstalled 加静态 in-flight future 单飞去重——进行中的安装所有调用方共用，完成后重入=已装好秒回，杜绝任何路径的双跑",
+        "flutter analyze 通过"
+      ]
+    }
+  ]
+}

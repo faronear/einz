@@ -102,7 +102,23 @@ class VoiceTranscriptModel {
   ///
   /// [onProgress] 收 (已完成字节, 总字节)——两种路径都报**绝对字节**；
   /// [cancelled] 返回 true 时立刻中止（抛 [_Cancelled]，调用方与失败区分开）。
+  /// 单飞去重（2026-11-24 luk 双击复测）：页面层的并发去重（_prepareVoiceModel
+  /// ??=）有个缝隙——第二次点击先查 isReady 得 false，等它真正调用时第一次安装
+  /// 恰好刚完成、共享 future 已被清掉，就会各自起一次。这里全局再挡一道：
+  /// 进行中的安装所有调用方共用，完成后才放行下一次（重入=装好的秒回）。
+  static Future<String>? _ensureInFlight;
+
   static Future<String> ensureInstalled({
+    void Function(int received, int total)? onProgress,
+    bool Function()? cancelled,
+  }) {
+    return _ensureInFlight ??= _ensureInstalledImpl(
+      onProgress: onProgress,
+      cancelled: cancelled,
+    ).whenComplete(() => _ensureInFlight = null);
+  }
+
+  static Future<String> _ensureInstalledImpl({
     void Function(int received, int total)? onProgress,
     bool Function()? cancelled,
   }) async {
