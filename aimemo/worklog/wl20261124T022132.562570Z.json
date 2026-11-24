@@ -1,0 +1,20 @@
+{
+  "utc": "20261124T022132.562570Z",
+  "time": "2026-11-24 10:21+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "语音通话：默认听筒 + 多设备接听/拒接防护，测试通过",
+      "detail": [
+        "接通默认走听筒（VoiceCallState.speaker 默认 false）：原「默认开免提」是 2026-09-26 实现时的决策，无 worklog 记录，推断为照顾桌面端无听筒；现按 luk 2026-11-24 要求反转，桌面端 setSpeakerphoneOn 不支持会静默忽略、不受影响。铃声阶段仍强制扬声器",
+        "多设备漏洞修复（客户端）：同一人多台设备同 space 都会收到 invite；call.accept 原只被主叫处理，另一台被叫设备持续响铃；call.reject 原只判 callId，其他设备拒接会连带终止已接通的通话。修复：被叫振铃中收到同 callId 的 accept → _answeredElsewhere() 静默停铃回 idle（不发信令，防主叫误判被拒）；reject 只由主叫端响应",
+        "自呼根子在服务端（broadcastCall 转发给同空间所有其他通道，自己 iPhone 显示「vic 来电」），已随 902ec67b 在 cn1 部署修复；客户端防护保留作老服务端兜底",
+        "mac debug 版真机复测通过（luk 2026-11-24）；package.json 一并提交：Docker 部署脚本更名 server-update-remote-docker",
+        "部署脚本 updateServerRemoteBare.sh 已适配 cn1（root 属主仓库 sudo git pull + sudo env 显式 nvm PATH），端到端验证通过，提交 4a46d8cc"
+      ]
+    }
+  ]
+}

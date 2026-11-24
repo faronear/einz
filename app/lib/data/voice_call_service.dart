@@ -160,7 +160,7 @@ class VoiceCallState {
     this.startedAt,
     this.endReason,
     this.muted = false,
-    this.speaker = true,
+    this.speaker = false,
   });
 
   final VoiceCallPhase phase;
@@ -176,7 +176,7 @@ class VoiceCallState {
 
   final bool muted;
 
-  /// 免提（接通后默认开——手持听筒贴耳的场景在 Einz 里没意义）。
+  /// 免提（接通后默认关，走听筒；铃声阶段仍强制走扬声器）。
   final bool speaker;
 
   bool get inCall =>
@@ -373,14 +373,19 @@ class VoiceCallService {
         await _startTone(caller: false); // 来电铃声（与主叫那声不同）
         break;
       case kWsTypeCallAccept:
-        if (s.phase == VoiceCallPhase.calling && s.callId == callId) {
+        if (s.callId != callId) break;
+        if (s.isCaller && s.phase == VoiceCallPhase.calling) {
           _ringTimer?.cancel();
           _emit(s.copyWith(phase: VoiceCallPhase.connecting));
           _startConnectTimer();
+        } else if (!s.isCaller && s.phase == VoiceCallPhase.ringing) {
+          // 同一人的另一台设备已接听：本机静默停铃回 idle（不显示结束横幅、不发信令）
+          _answeredElsewhere();
         }
         break;
       case kWsTypeCallReject:
-        if (s.callId == callId) {
+        // 只有主叫端响应拒接；被叫另一台设备的拒接与已接通的通话无关
+        if (s.isCaller && s.callId == callId) {
           _end(event.reason == 'busy' ? VoiceCallEndReason.busy : VoiceCallEndReason.declined);
         }
         break;
@@ -584,6 +589,15 @@ class VoiceCallService {
       }
     }
     return servers;
+  }
+
+  /// 同一人的另一台设备已接听来电：本机停止振铃，静默回 idle。
+  void _answeredElsewhere() {
+    _ringTimer?.cancel();
+    unawaited(_stopTone());
+    _isCaller = false;
+    _remoteOfferSdp = null;
+    _emit(const VoiceCallState());
   }
 
   void _end(VoiceCallEndReason reason) {
