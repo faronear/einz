@@ -23,4 +23,17 @@ add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 
+# 可选：静态链接 libsodium 进主执行体（Linux 打包用，2026-11-24）。
+# 设 LIBSODIUM_STATIC_LIB（指向 libsodium.a）即启用：
+# - --whole-archive 强制纳入全部目标文件（Dart 侧无链接期引用，仅运行时
+#   dlsym 查符号，按需引用会被普通链接丢弃，同 iOS pod 的 -force_load）；
+# - -rdynamic 把符号导出到进程动态符号表，shared/lib/src/sodium.dart 的
+#   DynamicLibrary.process() 即可命中，用户不再需要 apt install libsodium。
+# 未设置（本地开发）行为不变：回落系统 libsodium 路径。
+if(DEFINED ENV{LIBSODIUM_STATIC_LIB})
+  target_link_options(${BINARY_NAME} PRIVATE -rdynamic)
+  target_link_libraries(${BINARY_NAME} PRIVATE
+    -Wl,--whole-archive "$ENV{LIBSODIUM_STATIC_LIB}" -Wl,--no-whole-archive)
+endif()
+
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
