@@ -1,0 +1,20 @@
+{
+  "utc": "20261124T054540.888887Z",
+  "time": "2026-11-24 13:45+08:00",
+  "host": "DoomBase",
+  "os": "macOS",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "图片/视频全屏改微信同款画廊：左右切换 + 按钮半透明 + 空白关闭",
+      "detail": [
+        "_showFullImage 升级为画廊：聊天流里的图片+视频按消息顺序成页，左右 < > 半透明圆钮切换（首末条不出箭头）；底部「保存」跟随当前页",
+        "视频入列：点视频气泡走画廊（_VideoPreview.onOpenFullscreen 回调），画廊内复用 _VideoPreview 初始化链路（MediaCache 缓存文件 → VideoPlayerController）自动播放，切页/关闭 dispose；未传回调保留旧 _playFullscreen 兜底",
+        "半透明按钮：画廊/视频全屏/头像全屏的「保存」「更换头像」「应用于本机所有秘境」统一 Colors.black54，与 ✕/箭头同款（luk 2026-11-24：完全不透明遮挡画面）",
+        "视频页四周空白关闭：外层 Clickable 补 HitTestBehavior.opaque（Center+AspectRatio 子树不满屏，deferToChild 漏命中，与 _playFullscreen 同款教训）",
+        "flutter analyze 通过；luk 真机验收通过（2026-11-24）"
+      ]
+    }
+  ]
+}

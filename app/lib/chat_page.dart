@@ -9065,7 +9065,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               bytes: snap.data!,
               spaceId: widget.spaceId,
               messageId: m.env.messageId,
-              onDownload: () => unawaited(_saveAttachment(m)));
+              onDownload: () => unawaited(_saveAttachment(m)),
+              onOpenFullscreen: () => unawaited(_showFullImage(m, snap.data!)));
         }
         if (snap.hasError) {
           return Clickable(
@@ -9396,7 +9397,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 点任何位置关闭，与头像全屏一致）。
+  /// 全屏查看图片/视频（品牌粉蓝渐变大图 + 双指缩放 + 点任何位置关闭，与头像全屏一致）。
   /// useSafeArea:false + 直角 shape：背景铺满整屏，不留圆角和上下安全区空隙。
   /// 背景 = kBrandGradient（老板 2026-09-15：全屏查看用首屏同款渐变，更有品牌感）。
   /// 底部「保存」按钮（老板 2026-10-08）：移动端存相册 / 桌面弹保存对话框。
@@ -9404,58 +9405,120 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 与头像全屏 [showMyAvatarFullscreen] 同一套 Clickable 包裹——缩放/拖动仍归
   /// InteractiveViewer，只有"轻触"（ pointer 未移动即抬起）才关，双指放大后误触
   /// 不会关掉大图。
+  /// 微信同款左右切换（luk 2026-11-24）：聊天流里的图片+视频按消息顺序组成画廊，
+  /// 点左右 < > 图标切上/下一条（首末条不显示对应箭头）；视频入列播放，
+  /// 切走时随 widget 重建自动释放播放器。
   Future<void> _showFullImage(HistoryMessage m, Uint8List bytes) async {
+    // 聊天流里的全部图片+视频（按消息顺序）＝画廊的页序；当前消息不在（异常兜底）
+    // 就单开一页。
+    final items = <_GalleryItem>[
+      for (final x in _messages)
+        if (!x.deleted && (x.env.type == 'image' || x.env.type == 'video'))
+          _GalleryItem(message: x, type: x.env.type),
+    ];
+    var index = items
+        .indexWhere((e) => e.message.env.messageId == m.env.messageId);
+    if (index < 0) {
+      items.insert(index = 0, _GalleryItem(message: m, type: m.env.type));
+    }
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
           useSafeArea: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.zero,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            // SizedBox.expand：渐变底严格铺满整屏（含状态栏与刘海区域）
-            child: SizedBox.expand(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(gradient: kBrandGradient),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Clickable(
-                        onTap: () => Navigator.of(ctx).pop(),
-                        child: InteractiveViewer(
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              final current = items[index];
+              return Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: EdgeInsets.zero,
+                shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero),
+                // SizedBox.expand：渐变底严格铺满整屏（含状态栏与刘海区域）
+                child: SizedBox.expand(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(gradient: kBrandGradient),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Clickable(
+                            // opaque：视频页的画面只占 AspectRatio 一块，四周空白
+                            // 不在子树里——不显式声明的话这些区域点不到、关不掉
+                            // （与 _playFullscreen 同款，luk 2026-11-24）
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => Navigator.of(ctx).pop(),
+                            child: _GalleryMediaView(
+                              // 按消息 id 换 key：切换时旧页（含视频播放器）整个
+                              // 重建走 dispose，不留挂着的控制器
+                              key: ValueKey(
+                                  current.message.env.messageId),
+                              item: current,
+                              spaceId: widget.spaceId,
+                              loadBytes: () => current.type == 'image'
+                                  ? _imageBytes(current.message)
+                                  : _videoBytes(current.message),
+                            ),
+                          ),
+                        ),
+                        // 左右切换箭头：在媒体层之后入栈，点击不会被「轻触关闭」层吃掉
+                        if (index > 0)
+                          Positioned(
+                            left: 8,
+                            top: 0,
+                            bottom: 0,
+                            child: Center(
+                              child: _GalleryArrow(
+                                icon: Icons.chevron_left,
+                                onTap: () =>
+                                    setDialogState(() => index--),
+                              ),
+                            ),
+                          ),
+                        if (index < items.length - 1)
+                          Positioned(
+                            right: 8,
+                            top: 0,
+                            bottom: 0,
+                            child: Center(
+                              child: _GalleryArrow(
+                                icon: Icons.chevron_right,
+                                onTap: () =>
+                                    setDialogState(() => index++),
+                              ),
+                            ),
+                          ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
+                          child: SafeArea(child: _FullscreenCloseButton()),
+                        ),
+                        // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
+                        // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。
+                        // 保存的对象跟随当前页（luk 2026-11-24）。
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 32,
                           child: Center(
-                              child: Image.memory(bytes, fit: BoxFit.contain)),
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.black54),
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                unawaited(_saveAttachment(current.message));
+                              },
+                              icon: const Icon(Icons.save_alt),
+                              label: Text(
+                                  AppLocalizations.of(ctx)!.chatPageActionSave),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
-                      child: SafeArea(child: _FullscreenCloseButton()),
-                    ),
-                    // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
-                    // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 32,
-                      child: Center(
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            unawaited(_saveAttachment(m));
-                          },
-                          icon: const Icon(Icons.save_alt),
-                          label:
-                              Text(AppLocalizations.of(ctx)!.chatPageActionSave),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ));
   }
@@ -13793,6 +13856,8 @@ Future<void> showMyAvatarFullscreen(
                       child: SafeArea(
                         child: Center(
                           child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                                backgroundColor: Colors.black54),
                             onPressed: () {
                               Navigator.of(ctx).pop();
                               onReplace();
@@ -13842,6 +13907,7 @@ Future<void> showMyAvatarFullscreen(
                               FilledButton.icon(
                                 style: FilledButton.styleFrom(
                                   textStyle: const TextStyle(fontSize: 13),
+                                  backgroundColor: Colors.black54,
                                 ),
                                 onPressed: () {
                                   Navigator.of(ctx).pop();
@@ -13855,6 +13921,8 @@ Future<void> showMyAvatarFullscreen(
                             // 与消息图片全屏同款（老板 2026-10-17）
                             if (onSave != null && onApplyAllSpaces == null)
                               FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.black54),
                                 onPressed: () {
                                   Navigator.of(ctx).pop();
                                   unawaited(onSave(bytes));
@@ -14524,7 +14592,8 @@ class _VideoPreview extends StatefulWidget {
       {required this.bytes,
       required this.spaceId,
       required this.messageId,
-      this.onDownload});
+      this.onDownload,
+      this.onOpenFullscreen});
 
   final Uint8List bytes;
   final String spaceId; // 缓存按空间分目录（与服务端 files/<space_id>/ 同构）
@@ -14533,6 +14602,10 @@ class _VideoPreview extends StatefulWidget {
   /// 全屏播放器底部「保存」按钮的回调（老板 2026-10-08）。null = 不放按钮。
   /// 具体存哪儿由聊天页决定：移动端入相册、桌面弹保存对话框（见 `_saveAttachment`）。
   final VoidCallback? onDownload;
+
+  /// 点预览打开**画廊**（图片+视频左右切换，luk 2026-11-24）。null = 退回
+  /// 自带的全屏播放器（旧行为兜底）。
+  final VoidCallback? onOpenFullscreen;
 
   @override
   State<_VideoPreview> createState() => _VideoPreviewState();
@@ -14653,7 +14726,10 @@ class _VideoPreviewState extends State<_VideoPreview> {
     }
     return Clickable(
       key: const ValueKey('videoPreview'),
-      onTap: () => _playFullscreen(c),
+      // 有画廊回调（聊天页）→ 打开图片+视频画廊；null → 自带全屏播放器（旧行为）
+      onTap: widget.onOpenFullscreen != null
+          ? () => widget.onOpenFullscreen!()
+          : () => _playFullscreen(c),
       borderRadius: BorderRadius.circular(8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
@@ -14726,6 +14802,8 @@ class _VideoPreviewState extends State<_VideoPreview> {
                         bottom: 32,
                         child: Center(
                           child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                                backgroundColor: Colors.black54),
                             onPressed: () {
                               Navigator.of(ctx).pop();
                               widget.onDownload!();
@@ -14743,6 +14821,145 @@ class _VideoPreviewState extends State<_VideoPreview> {
           ),
         ));
     await c.pause();
+  }
+}
+
+/// 全屏画廊的一项：聊天流里的一张图片或一个视频（luk 2026-11-24，微信同款
+/// 左右切换）。[type] 取消息的 env.type，只会是 'image' / 'video'。
+class _GalleryItem {
+  const _GalleryItem({required this.message, required this.type});
+  final HistoryMessage message;
+  final String type;
+}
+
+/// 画廊箭头按钮：白 chevron + 黑 54% 半透明圆底（配色同 [_FullscreenCloseButton]，
+/// 压在渐变底/浅色画面上都可见）。挂在外层轻触关闭层**之后**的 Stack 层里，
+/// 点击不会被吃掉。
+class _GalleryArrow extends StatelessWidget {
+  const _GalleryArrow({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, size: 32, color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// 全屏画廊的单页媒体：图片 = FutureBuilder 拉解密字节 + InteractiveViewer
+/// （与原 _showFullImage 同款，双指缩放/轻触关闭都归外层）；视频 = 复用
+/// [_VideoPreview] 的初始化链路（解密缓存文件 → VideoPlayerController），
+/// 初始化完自动播放（与气泡点开全屏的旧行为一致），切页/关闭时 dispose。
+class _GalleryMediaView extends StatefulWidget {
+  const _GalleryMediaView({
+    super.key,
+    required this.item,
+    required this.spaceId,
+    required this.loadBytes,
+  });
+
+  final _GalleryItem item;
+
+  /// 所属空间 id（解密缓存按空间分目录，与 [_VideoPreview] 同口径）。
+  final String spaceId;
+
+  /// 拉当前条目的解密字节：图片走 _imageBytes（解密缓存），视频走 _attachmentBytes。
+  final Future<Uint8List> Function() loadBytes;
+
+  @override
+  State<_GalleryMediaView> createState() => _GalleryMediaViewState();
+}
+
+class _GalleryMediaViewState extends State<_GalleryMediaView> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.item.type == 'video') _initVideo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _GalleryMediaView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 换页（key 变化走的是整树重建，到这里说明同一条目复用，不必再初始化）
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      final m = widget.item.message;
+      final tmp = await MediaCache.pathFor(
+          widget.spaceId, m.env.messageId, 'mp4');
+      if (!await tmp.exists()) {
+        final bytes = await widget.loadBytes();
+        await tmp.writeAsBytes(bytes, flush: true);
+      }
+      final c = VideoPlayerController.file(tmp);
+      await c.initialize();
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
+      setState(() => _controller = c);
+      unawaited(c.play());
+    } catch (e) {
+      debugPrint('画廊视频初始化失败（${widget.item.message.env.messageId}）：$e');
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.item.type == 'image') {
+      return InteractiveViewer(
+        child: Center(
+          child: FutureBuilder<Uint8List>(
+            future: widget.loadBytes(),
+            builder: (context, snap) {
+              if (snap.hasData) {
+                return Image.memory(snap.data!, fit: BoxFit.contain);
+              }
+              if (snap.hasError) {
+                return const Icon(Icons.broken_image_outlined,
+                    size: 48, color: Colors.white70);
+              }
+              return const CircularProgressIndicator(strokeWidth: 2);
+            },
+          ),
+        ),
+      );
+    }
+    // 视频：初始化中转圈；失败给明确错误态；好了就全屏播放
+    final c = _controller;
+    if (c == null) {
+      return Center(
+        child: _failed
+            ? const Icon(Icons.videocam_off_outlined,
+                size: 48, color: Colors.white70)
+            : const CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    return Center(
+      child: AspectRatio(
+        aspectRatio: c.value.aspectRatio,
+        child: VideoPlayer(c),
+      ),
+    );
   }
 }
 
