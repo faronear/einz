@@ -212,6 +212,13 @@ class MessageRepository {
     return env.senderEntranceId == entranceId;
   }
 
+  /// 归属判定的**公开实时版**：UI 渲染时调用，而不是沿用 history 加载时写死的
+  /// sender 标签。刚开空间那次加载可能撞上身份映射还没就绪（持久映射被别的
+  /// 空间的 refreshEntranceMap 覆盖/离线/重启路径未种 memberId），标签会整体
+  /// 误判成对方且不再重算（老板 2026-11-25 实测"全左对齐"）；渲染时现算则
+  /// 映射刷新完成后的下一次 build 自动纠正。
+  bool isMineMessage(MessageEnvelope env) => _isMineMessage(env);
+
   /// 通道 → 用户（member_id）查询（渲染兜底：旧版附件消息信封可能缺 senderMemberId）。
   String? memberIdOfEntrance(String entranceId) => _memberByEntrance[entranceId];
 

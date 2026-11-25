@@ -11137,7 +11137,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   itemCount: displayMessages.length,
                   itemBuilder: (context, i) {
                     final m = displayMessages[i];
-                final mine = m.sender == 'me';
+                // 归属实时现算，不用加载时写死的 m.sender——刚开空间那次加载
+                // 可能撞上身份映射未就绪，标签会全误判成对方且不再重算
+                // （老板 2026-11-25 实测"消息流全左对齐"，见 isMineMessage 注释）。
+                final mine = _repo.isMineMessage(m.env);
                 // 发送者 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底。
                 // 群聊一期：group 空间的**气泡配色**与**发送者名字**都要它，不能只在
                 // 头像开关打开时才算（配色永远按 member 走）。

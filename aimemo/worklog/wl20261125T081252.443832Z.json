@@ -1,0 +1,4 @@
+{ "utc": "20261125T081252.443832Z", "time": "2026-11-25 16:12+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "修复：刚开空间消息流几率性全部左对齐（归属误判）", "detail": ["现象：打开空间时消息流有几率全部显示为左侧对方消息，含自己发的。", "根因：气泡归属 m.sender=='me' 是 history 加载那一刻算一次定死的（_rowsToHistory→_isMineMessage），之后永不重算。判定依赖的 entrance→member 身份映射存在时序窗口——持久化映射是单一全局 key，被'最后刷新的空间'覆盖写入（refreshEntranceMap ..clear()..addEntries(本空间) 后落盘），PIN 重启路径又不种 memberId；开空间撞上映射空/截断时 member 维度判定失败，sender 标签整体误判成 peer。之后 refreshEntranceMap 即使拉回正确映射，已写死的标签也不重算。", "修复：① repo 新增公开 isMineMessage(env)（_isMineMessage 的实时版）；② chat_page 消息流 itemBuilder 改为 _repo.isMineMessage(m.env) 渲染时现算——映射刷新完成后的下一次 build 自动纠正，不再需要用户重进。", "flutter analyze 全绿。顺带确认归属判定三层结构：member 优先（信封 senderMemberId）→ 持久映射查表 → entrance 兜底。"] }
+  ] }
