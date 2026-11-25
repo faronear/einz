@@ -9434,6 +9434,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (index < 0) {
       items.insert(index = 0, _GalleryItem(message: m, type: m.env.type));
     }
+    // 左滑/右滑翻页的触点起点（Listener 原始指针，见媒体层的 Listener 注释）
+    Offset? swipeStart;
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
@@ -9441,7 +9443,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           builder: (ctx) => StatefulBuilder(
             builder: (ctx, setDialogState) {
               final current = items[index];
-              return Dialog(
+              // 键盘左右箭头翻页（桌面端，luk 2026-11-25）：autofocus 让 Dialog
+              // 一打开就收键；在终点页按对应方向键不动作也不响铃。
+              return Focus(
+                autofocus: true,
+                onKeyEvent: (node, event) {
+                  if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+                    return KeyEventResult.ignored;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+                      index > 0) {
+                    setDialogState(() => index--);
+                    return KeyEventResult.handled;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+                      index < items.length - 1) {
+                    setDialogState(() => index++);
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: Dialog(
                 backgroundColor: Colors.transparent,
                 insetPadding: EdgeInsets.zero,
                 shape: const RoundedRectangleBorder(
@@ -9453,22 +9475,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     child: Stack(
                       children: [
                         Positioned.fill(
-                          child: Clickable(
-                            // opaque：视频页的画面只占 AspectRatio 一块，四周空白
-                            // 不在子树里——不显式声明的话这些区域点不到、关不掉
-                            // （与 _playFullscreen 同款，luk 2026-11-24）
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => Navigator.of(ctx).pop(),
-                            child: _GalleryMediaView(
-                              // 按消息 id 换 key：切换时旧页（含视频播放器）整个
-                              // 重建走 dispose，不留挂着的控制器
-                              key: ValueKey(
-                                  current.message.env.messageId),
-                              item: current,
-                              spaceId: widget.spaceId,
-                              loadBytes: () => current.type == 'image'
-                                  ? _imageBytes(current.message)
-                                  : _videoBytes(current.message),
+                          // 左滑/右滑翻页（手机端，luk 2026-11-25）：用 Listener
+                          // 原始指针而非 GestureDetector——后者会与内层
+                          // InteractiveViewer 的拖动在手势竞技场打架。按位移判
+                          // 翻页：横向 >80px 且横向位移 ≥ 2 倍纵向才算，缩放后
+                          // 拖动查看的误触被阈值挡掉；双击/单击不受影响。
+                          child: Listener(
+                            onPointerDown: (e) => swipeStart = e.position,
+                            onPointerUp: (e) {
+                              final start = swipeStart;
+                              swipeStart = null;
+                              if (start == null) return;
+                              final dx = e.position.dx - start.dx;
+                              final dy = e.position.dy - start.dy;
+                              if (dx.abs() < 80 || dx.abs() < dy.abs() * 2) {
+                                return;
+                              }
+                              // 左滑（dx<0）下一条、右滑（dx>0）上一条，同 PageView
+                              if (dx < 0 && index < items.length - 1) {
+                                setDialogState(() => index++);
+                              } else if (dx > 0 && index > 0) {
+                                setDialogState(() => index--);
+                              }
+                            },
+                            child: Clickable(
+                              // opaque：视频页的画面只占 AspectRatio 一块，四周空白
+                              // 不在子树里——不显式声明的话这些区域点不到、关不掉
+                              // （与 _playFullscreen 同款，luk 2026-11-24）
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => Navigator.of(ctx).pop(),
+                              child: _GalleryMediaView(
+                                // 按消息 id 换 key：切换时旧页（含视频播放器）整个
+                                // 重建走 dispose，不留挂着的控制器
+                                key: ValueKey(
+                                    current.message.env.messageId),
+                                item: current,
+                                spaceId: widget.spaceId,
+                                loadBytes: () => current.type == 'image'
+                                    ? _imageBytes(current.message)
+                                    : _videoBytes(current.message),
+                              ),
                             ),
                           ),
                         ),
@@ -9534,6 +9580,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
+              ),
               );
             },
           ),

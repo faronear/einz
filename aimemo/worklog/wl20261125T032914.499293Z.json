@@ -1,0 +1,4 @@
+{ "utc": "20261125T032914.499293Z", "time": "2026-11-25 11:29+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "画廊支持键盘左右箭头与移动端左右滑动翻页", "detail": ["桌面：Dialog 外包 Focus(autofocus)，←→ 翻页，终点页不动作不关闭，支持长按连发（KeyDownEvent/KeyRepeatEvent）。", "手机：媒体层包 Listener 原始指针（绕开与内层 InteractiveViewer 的手势竞技场竞争，GestureDetector 的拖动手势会打架），横向位移 >80px 且 ≥2 倍纵向才翻页；左滑下一条、右滑上一条同 PageView；单击关闭/双击/视频点按等原交互不动。", "无平台分支：键盘手机上无副作用，桌面鼠标按住拖动也能翻页。flutter analyze 全绿；UI 改动老板验收后提交。"] }
+  ] }
