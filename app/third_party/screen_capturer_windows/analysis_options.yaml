@@ -1,1 +1,4 @@
-include: package:mostly_reasonable_lints/analysis_options.yaml
+# vendored 补丁版（win32 6 兼容，见 ../lib/src/commands/ms_screenclip.dart）。
+# 原文件 include 了 package:mostly_reasonable_lints/analysis_options.yaml，
+# 但该包不在主工程依赖里，`flutter analyze` 会报 include_file_not_found
+# ——这里改为最小配置，跟随主工程默认规则。
