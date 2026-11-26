@@ -1,0 +1,19 @@
+{
+  "utc": "20261126T041847.970209Z",
+  "time": "2026-11-26 12:18+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修复 ASC Guideline 4 驳回：权限弹窗文案与 App 本地化语言不一致",
+      "detail": [
+        "驳回原因：App 支持 en+zh，但 iOS 权限弹窗（NSCameraUsageDescription 等 4 条）只有中文一份，英文环境审核时界面英文、弹窗中文。",
+        "老板要求默认(兜底)文案为英文：Info.plist 原始值改回英文；新增 app/ios/Runner/en.lproj/InfoPlist.strings 与 zh-Hans.lproj/InfoPlist.strings。",
+        "project.pbxproj 六处修改：PBXBuildFile、PBXFileReference(en/zh-Hans)、Runner 组 children、PBXVariantGroup(InfoPlist.strings)、Resources build phase、knownRegions 加 zh-Hans。",
+        "验证：plutil lint 通过；flutter build ios --debug --no-codesign 成功(126.7s)；产物 Runner.app 内 en.lproj/zh-Hans.lproj/InfoPlist.strings 均存在，Info.plist 兜底文案为英文。"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+/* Permission prompts — English (App localization: en) */
+"NSCameraUsageDescription" = "Einz needs camera access to take photos or videos and send them encrypted to your contact.";
+"NSMicrophoneUsageDescription" = "Einz needs microphone access to record voice messages and make encrypted voice calls.";
+"NSPhotoLibraryUsageDescription" = "Einz needs photo library access to select photos or videos to send encrypted.";
+"NSPhotoLibraryAddUsageDescription" = "Einz needs permission to save decrypted photos and videos to your photo library.";
