@@ -71,6 +71,7 @@ import 'widgets/labeled_checkbox.dart';
 import 'widgets/sheet_close_button.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/clickable.dart';
+import 'widgets/dissipate_icon.dart';
 import 'widgets/transcribe_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
@@ -1871,7 +1872,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 onTap: () => Navigator.of(ctx).pop('storage'),
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline),
+                // 云雾散点自绘图标（老板 2026-11-26）：一团渐疏的随机散点，
+                // 代表消息「消失的中间过程」，替换语义偏"删除"的 delete_outline。
+                leading: const DissipateIcon(size: 24, color: Color(0xFF1A1A1A)),
                 title: Text(l10n.chatPageMoreSettingsTombstone),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,

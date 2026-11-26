@@ -1,0 +1,18 @@
+{
+  "utc": "20261126T053538.197873Z",
+  "time": "2026-11-26 13:35+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "消息留痕设置项换云雾散点自绘图标",
+      "detail": [
+        "老板要求：Removed messages（消息留痕）设置项图标换成「一团云雾般的随机点」，代表消失的中间过程，替换 Icons.delete_outline。",
+        "新建 app/lib/widgets/dissipate_icon.dart（同 TranscribeIcon 自绘惯例，固定种子保证形状稳定）：经三轮迭代——①高斯散点太小→②铺满~90%盒→③老板指出中心叠成黑点，改圆盘均匀采样无中心点→④加密（62 点、r3.0）老板验收通过。",
+        "chat_page.dart 更多设置弹层 ListTile leading 替换为 DissipateIcon(size:24)。analyze 干净，老板 2026-11-26 验收后提交。"
+      ]
+    }
+  ]
+}
