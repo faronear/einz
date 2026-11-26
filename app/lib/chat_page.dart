@@ -2324,7 +2324,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 空群占位头像自带 tooltip「我的同伴」；已有成员时头像条里每个头像自带
     // 人名 tooltip（`_stripAvatar`）。
     final Widget avatarSlot = others.isEmpty
-        ? SizedBox(
+        ? Transform.translate(
+            // 空群占位：40px 圆与胶囊左端圆弧**同心**，左移 8px 贴住弧边
+            //（与 duo 头像三面贴壁同款，老板 2026-11-26）——40 圆 = 胶囊高，
+            // 贴合后不会被弧削掉。成员条（头像下有名字标签）仍保持右移 8。
+            offset: const Offset(-8, 0),
+            child: SizedBox(
               width: kStatusMemberAvatarSize,
               height: kStatusMemberAvatarSize,
               // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
@@ -2337,7 +2342,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 child: const Icon(Icons.groups_outlined, size: 22),
               ),
-            )
+            ),
+          )
         : _avatarStrip(others, avatarBudget);
 
     // **一个大胶囊**（2026-10-11 老板）：多人头像条 + 群名/编辑图标 + 在线
@@ -2752,6 +2758,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 onTap: _startVoiceCall,
                 hoverColor: Colors.black.withValues(alpha: 0.05),
                 highlightColor: Colors.black.withValues(alpha: 0.08),
+                // 键盘聚焦反馈（老板 2026-11-26）：Tab 停点清晰可见
+                overlayColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.focused)
+                      ? Colors.black.withValues(alpha: 0.08)
+                      : null,
+                ),
                 child: const SizedBox(
                   width: kStatusAvatarSize,
                   height: kStatusAvatarSize,

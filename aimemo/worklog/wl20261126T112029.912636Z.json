@@ -1,0 +1,18 @@
+{
+  "utc": "20261126T112029.912636Z",
+  "time": "2026-11-26 19:20+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "状态条呼叫按钮 Tab 可达；空群占位头像贴左弧边",
+      "detail": [
+        "① 呼叫按钮 InkWell 加 overlayColor 的 focused 档（black 8%）——invite 链接上一轮已加，呼叫按钮补上，Tab 停点可见。",
+        "② 空群（尚无其他成员加入）的群组占位头像：40px 圆与胶囊左端圆弧同心，Transform.translate 左移 8px 贴住弧边（与 duo 头像三面贴壁同款）；成员头像条（头像下有名字标签，标签会被弧削掉）保持原右移 8 不变。",
+        "验证：analyze 干净 + multi_space_pages_test 9 用例全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
