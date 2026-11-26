@@ -1,0 +1,19 @@
+{
+  "utc": "20261126T110508.085151Z",
+  "time": "2026-11-26 19:05+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "「我的资料」弹层头像编辑热区 Tab 可达",
+      "detail": [
+        "老板反馈：我的资料弹层里 Tab 走不到头像编辑。根因：头像热区用自定义 Clickable（内部 GestureDetector），不在焦点遍历链上；名字胶囊用 InkWell 天然可达，Tab 于是跳过头像。",
+        "修法：Clickable 加 focusable 参数（默认关——全 app 的 Clickable 都可聚焦会搅乱 Tab 顺序，只给需要的入口显式打开）+ focusNode 参数；focusable 时包 Focus：Tab 可达、Enter/空格触发 onTap、聚焦时显示悬浮遮罩（与 hover 同档）作可见反馈。",
+        "接入：「我的资料」弹层头像热区 focusable: true。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

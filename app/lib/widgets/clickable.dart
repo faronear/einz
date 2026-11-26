@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// 可点击区域（桌面端**鼠标变手型** + 统一交互反馈）。
 ///
@@ -31,6 +32,8 @@ class Clickable extends StatefulWidget {
     this.cursor,
     this.hoverAlpha,
     this.pressAlpha,
+    this.focusable = false,
+    this.focusNode,
     this.child,
   });
 
@@ -67,6 +70,15 @@ class Clickable extends StatefulWidget {
   /// 按压遮罩浓度覆盖（null=默认 10%；配 [hoverAlpha] 0.10 用 **0.14**）。
   final double? pressAlpha;
 
+  /// 是否参与键盘焦点遍历（Tab 可达、Enter/空格触发 [onTap]、聚焦时显示
+  /// 悬浮遮罩）。默认关——GestureDetector 系不在焦点链上；全 app 的
+  /// Clickable 都可聚焦会搅乱 Tab 顺序，只给需要的入口显式打开
+  /// （如「我的资料」弹层的头像编辑热区，老板 2026-11-26）。
+  final bool focusable;
+
+  /// 外部可控焦点节点（null = 内部自建）。
+  final FocusNode? focusNode;
+
   final Widget? child;
 
   @override
@@ -76,6 +88,7 @@ class Clickable extends StatefulWidget {
 class _ClickableState extends State<Clickable> {
   bool _hovered = false;
   bool _pressed = false;
+  bool _focused = false;
 
   // 手型/反馈只认**单击类**手势（tap/doubleTap/secondaryTap）：纯长按的（消息
   // 气泡菜单）保持默认箭头、无反馈，把手型留给真正"一点就有动作"的对象
@@ -105,6 +118,47 @@ class _ClickableState extends State<Clickable> {
       );
     }
     final base = widget.overlayColor ?? Colors.black;
+    final interactiveChild = GestureDetector(
+      onTap: widget.onTap,
+      // 长按相关手势也挂在这里（可点区域同时支持长按/松手，如录音条）；
+      // 按压深色遮罩用 onTapDown 感知，手机长按与桌面单击都能看到
+      onLongPressStart: widget.onLongPressStart,
+      onLongPressEnd: widget.onLongPressEnd,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: widget.behavior,
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          child!,
+          // 前景遮罩：悬浮淡色 / 按压深色，统一全 app 可点击元素的反馈
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _pressed
+                    ? _pressA
+                    : (_hovered || _focused ? _hoverA : 0.0),
+                duration: const Duration(milliseconds: 120),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    // 色相由 [overlayColor] 定（默认黑），浓度由 AnimatedOpacity
+                    // 按悬浮/按压档控制——这里给不透明色避免二次稀释
+                    color: base,
+                    shape: widget.circle
+                        ? BoxShape.circle
+                        : BoxShape.rectangle,
+                    borderRadius:
+                        widget.circle ? null : widget.borderRadius,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    // focusable 时挂焦点：Tab 可达，Enter/空格触发 onTap，聚焦显示遮罩
     return MouseRegion(
       cursor: widget.cursor ?? SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -112,44 +166,22 @@ class _ClickableState extends State<Clickable> {
         _hovered = false;
         _pressed = false;
       }),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        // 长按相关手势也挂在这里（可点区域同时支持长按/松手，如录音条）；
-        // 按压深色遮罩用 onTapDown 感知，手机长按与桌面单击都能看到
-        onLongPressStart: widget.onLongPressStart,
-        onLongPressEnd: widget.onLongPressEnd,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        behavior: widget.behavior,
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            child!,
-            // 前景遮罩：悬浮淡色 / 按压深色，统一全 app 可点击元素的反馈
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: _pressed ? _pressA : (_hovered ? _hoverA : 0.0),
-                  duration: const Duration(milliseconds: 120),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      // 色相由 [overlayColor] 定（默认黑），浓度由 AnimatedOpacity
-                      // 按悬浮/按压档控制——这里给不透明色避免二次稀释
-                      color: base,
-                      shape: widget.circle
-                          ? BoxShape.circle
-                          : BoxShape.rectangle,
-                      borderRadius:
-                          widget.circle ? null : widget.borderRadius,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: widget.focusable
+          ? Focus(
+              focusNode: widget.focusNode,
+              onFocusChange: (v) => setState(() => _focused = v),
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.enter ||
+                        event.logicalKey == LogicalKeyboardKey.space)) {
+                  widget.onTap?.call();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: interactiveChild,
+            )
+          : interactiveChild,
     );
   }
 }

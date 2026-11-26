@@ -5720,6 +5720,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         behavior: HitTestBehavior.opaque, // 方角空白也算热区
                         circle: true, // 反馈遮罩仍跟圆走，方角不染色
                         onTap: () => avatarKey.currentState?.handleTap(),
+                        // 键盘焦点可达（老板 2026-11-26）：Tab 能走到头像编辑，
+                        // Enter/空格触发，聚焦显示遮罩
+                        focusable: true,
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
