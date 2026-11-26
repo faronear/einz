@@ -1,0 +1,4 @@
+{ "utc": "20261126T020920.239961Z", "time": "2026-11-26 10:09+08:00", "host": "DoomBase", "os": "macOS", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "修复：安卓后台恢复后消息不刷新（vic 实测反馈）", "detail": ["现象（vic 安卓实测）：对方发消息后，home 键回主页再打开 App，第一次打开不刷新出新消息；必须返回键完全退出再启动才能看到。", "根因：回前台分支只做 WS 重连 + 未读/邮件刷新，没有强制 REST 增量同步——WS 重连只推'重连之后'的新消息，后台期间错过的要靠 sync 拉回；而 _onWsStatusChanged 的'连上即同步'被 _consecutiveSyncFailures>0 挡住（后台前最后一次同步是成功的，计数为 0），不触发。", "修复：didChangeAppLifecycleState 的 resumed 分支补 unawaited(_refresh())——回前台无条件增量同步一次。flutter analyze 全绿。", "备注：安卓进后台我们主动断 WS（省电），此设计不变；本修复补的是'错过消息'的拉取缺口。"] }
+  ] }

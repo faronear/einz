@@ -6280,6 +6280,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.resumed) {
       // 回到前台：把后台时停掉的 WS 接回来（通话中的那次没停，这里幂等重连）
       _startRealtime();
+      // 后台期间错过的消息必须补一次增量同步：WS 重连只推"重连之后"的新消息，
+      // 错过的靠 REST sync 拉回；_onWsStatusChanged 的"连上即同步"被
+      // _consecutiveSyncFailures>0 挡住（后台前最后一次同步是成功的）→
+      // 不触发。vic 安卓实测 2026-11-25：home 退出再回来消息不刷新，只能杀进程。
+      unawaited(_refresh());
       unawaited(_refreshOtherUnread());
       // 邮件通知：确认链接是在 App 外面（浏览器）点的，回前台正是最该重查的时刻
       unawaited(_refreshNotifyEmail());
