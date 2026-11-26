@@ -1,0 +1,19 @@
+{
+  "utc": "20261126T110914.475155Z",
+  "time": "2026-11-26 19:09+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "状态条三个胶囊补键盘聚焦反馈",
+      "detail": [
+        "老板反馈：Tab 走到对方大胶囊后，下一个焦点不知所踪，没到我方状态大胶囊。",
+        "排查：我方两处（更多通道 devices 按钮、我的资料胶囊）都是 InkWell，本就在焦点链上——焦点其实有落，但透明底 Material 上聚焦无任何视觉变化，看起来像焦点消失。",
+        "修法：给状态条三处 InkWell（对方胶囊 / 更多通道按钮 / 我的资料胶囊）加 overlayColor 的 focused 档（black 8%，与 hover 5% 同族但略深），Tab 停点清晰可见。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

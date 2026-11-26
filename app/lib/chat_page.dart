@@ -2708,6 +2708,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 与「我的」状态芯片同一档（那块也没有常驻底色）
               hoverColor: Colors.black.withValues(alpha: 0.05),
               highlightColor: Colors.black.withValues(alpha: 0.08),
+              // 键盘聚焦反馈（老板 2026-11-26）：Tab 停点清晰可见
+              overlayColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.focused)
+                    ? Colors.black.withValues(alpha: 0.08)
+                    : null,
+              ),
               child: Padding(
                 // **不能共用左块的 `pad`**（那个是给头像定制的：左/上/下都是 0，
                 // 好让头像三面贴住胶囊内壁）。共用会让这里的左内边距变成 0——
@@ -11122,6 +11128,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 onTap: _showEntranceListSheet,
                                 hoverColor: Colors.black.withValues(alpha: 0.05),
                                 highlightColor: Colors.black.withValues(alpha: 0.08),
+                                // 键盘聚焦反馈（老板 2026-11-26）：Tab 停点清晰可见
+                                overlayColor: WidgetStateProperty.resolveWith(
+                                  (states) => states.contains(WidgetState.focused)
+                                      ? Colors.black.withValues(alpha: 0.08)
+                                      : null,
+                                ),
                                 child: SizedBox(
                                     // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
                                     // 状态条上下边缘（与 invite 同源的问题）。
@@ -11170,6 +11182,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         Colors.black.withValues(alpha: 0.05),
                                     highlightColor:
                                         Colors.black.withValues(alpha: 0.08),
+                                    // 键盘聚焦反馈（老板 2026-11-26）：Tab 停点清晰可见
+                                    overlayColor: WidgetStateProperty.resolveWith(
+                                      (states) => states.contains(WidgetState.focused)
+                                          ? Colors.black.withValues(alpha: 0.08)
+                                          : null,
+                                    ),
                                     child: Padding(
                                       // 右 0：头像三面贴住胶囊右缘（与左侧对方
                                       // 头像贴左缘同款，老板 2026-09-26 约定）；
