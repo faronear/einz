@@ -3,8 +3,6 @@ import 'widgets/menu_metrics.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-// ImageByteFormat（dart:ui）供聊天页截图 toByteData 用
-import 'dart:ui' show ImageByteFormat;
 
 // drift 的 Value 包装（服务端转写写 local_voice_transcripts 行用）：
 // show 导入避免与页面里其他同名符号冲突
@@ -15,7 +13,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderProxyBox, RenderRepaintBoundary;
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/services.dart';
 
 import 'widgets/linkified_text.dart';
@@ -26,6 +24,7 @@ import 'package:pasteboard/pasteboard.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
+import 'package:screen_capturer/screen_capturer.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
@@ -8764,18 +8763,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             caption: anyName,
           );
       case _AttachmentKind.screenshot:
-        // RepaintBoundary 截聊天页整体 → PNG → 走图片附件管线（错误处理
-        // 复用外层 try/catch 的口径）。菜单 pop 之后才执行，弹层已不在
-        // boundary 内，不会截进画面。
-        final boundary =
-            _chatScreenshotKey.currentContext?.findRenderObject();
-        if (boundary is! RenderRepaintBoundary) return;
-        final captured = await boundary.toImage(pixelRatio: 2.0);
-        final byteData =
-            await captured.toByteData(format: ImageByteFormat.png);
-        captured.dispose();
-        if (byteData == null) return;
-        final pngBytes = byteData.buffer.asUint8List();
+        // 系统级框选截图（screen_capturer）：调起系统截图工具，用户框选屏幕
+        // 任意区域 → 存临时 PNG → 读出字节走图片附件管线。错误处理复用外层
+        // try/catch 的口径。仅桌面端入口（见 [_screenshotSupported]）。
+        final tmpDir = await getTemporaryDirectory();
+        final imagePath =
+            '${tmpDir.path}/screenshot-${DateTime.now().millisecondsSinceEpoch}.png';
+        final captured = await ScreenCapturer.instance.capture(
+          mode: CaptureMode.region,
+          imagePath: imagePath,
+          copyToClipboard: false,
+        );
+        if (captured == null) return; // 用户取消截图
+        final pngBytes = await File(captured.imagePath!).readAsBytes();
+        if (pngBytes.isEmpty) return;
         if (!_withinAttachmentLimit(pngBytes.length)) return;
         await _sendAttachmentOptimistic(
           fileBytes: pngBytes,
@@ -10540,10 +10541,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 截图边界 key（桌面端「+」菜单「截图」）：挂在 body 的 RepaintBoundary 上，
-  /// 见 build 里该处注释。
-  final GlobalKey _chatScreenshotKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -10949,11 +10946,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      // 截图边界（桌面端「+」菜单「截图」）：包住 body 整体，点截图时把聊天页
-      // 栅格化成 PNG 走图片附件管线。纯 Flutter 能力，不需要系统屏幕录制权限。
-      body: RepaintBoundary(
-        key: _chatScreenshotKey,
-        child: Stack(
+      body: Stack(
         children: [
           // 界面主题背景层：gradient=品牌粉蓝渐变（首屏/向导同款）；plain=不铺
           // 背景（露出 Scaffold 浅粉白纸感底色，与原有视觉效果完全一致）
@@ -11890,7 +11883,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 桌面端拖入文件的高亮浮层（覆盖整页，松手即发送）
           if (_fileDragHover) const Positioned.fill(child: _DropHintOverlay()),
         ],
-    ),
     ),
   );
   // 前台无操作锁屏（老板 2026-10-17）：整页套两层（包在最内层，后面的

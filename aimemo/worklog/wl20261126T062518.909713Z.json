@@ -1,0 +1,22 @@
+{
+  "utc": "20261126T062518.909713Z",
+  "time": "2026-11-26 14:25+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "桌面端「截图」改用 screen_capturer 系统级框选（撤掉 RepaintBoundary 方案）",
+      "detail": [
+        "老板澄清：要的是系统级框选截图（screen_capturer），不是截本 app；约束是手机端不加权限（iOS 审核刚补过英文权限文案，怕节外生枝）。screen_capturer 只声明 mac/win/linux 平台，iOS/Android 构建不嵌入原生码，不碰移动端。",
+        "依赖死锁：screen_capturer_windows 锁 win32 <6，而 wakelock_plus 1.8/package_info_plus 10 要 win32 ^6。解法 dependency_overrides win32 ^6.0.1 + vendor 补丁版 screen_capturer_windows（app/third_party/，path override）。",
+        "win32 6 兼容补丁（ms_screenclip.dart 六类改法）：SHOW_WINDOW_CMD.SW_SHOWNORMAL→顶层 SW_SHOWNORMAL；HWND(nullptr)/PCWSTR(...) 包装；OpenProcess 返回 Win32Result<HANDLE> 解包 .value 且 null 判断；GetForegroundWindow 返回 HWND；BOOL 参数传 bool；HMODULE 不再是 NativeType（calloc<HMODULE> 编译不过）→ calloc<Pointer> + HMODULE(hModules[i])；EnumProcessModules/GetModuleFileNameEx 返回 Win32Result 用 .value。",
+        "macOS sandbox：两个 entitlements 加 com.apple.security.temporary-exception.mach-register.global-name=com.apple.screencapture.interactive（插件沙盒要求）。",
+        "实现：_sendMedia case screenshot → ScreenCapturer.capture(region) 存临时 PNG → 读字节 → _sendAttachmentOptimistic(type image)；入口仍桌面专属 _screenshotSupported。移除了上一版 RepaintBoundary 方案的全部残留。",
+        "踩坑：flutter build 管道接 tail 会吞退出码，===MACOS_OK=== 无条件打印过一次假阳性——长构建不要用 | tail 判断成败。",
+        "验证：analyze 干净；flutter build macos --debug 成功；flutter build ios --debug --no-codesign 成功（插件未影响 iOS）。Windows 侧代码仅本地编译过，真机运行待 CI/后续验证。"
+      ]
+    }
+  ]
+}

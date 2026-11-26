@@ -31,6 +31,8 @@ PODS:
     - FlutterMacOS
   - record_macos (2.0.0):
     - FlutterMacOS
+  - screen_capturer_macos (0.0.1):
+    - FlutterMacOS
   - sherpa_onnx_macos (1.13.8):
     - FlutterMacOS
   - url_launcher_macos (0.0.1):
@@ -57,6 +59,7 @@ DEPENDENCIES:
   - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - pasteboard (from `Flutter/ephemeral/.symlinks/plugins/pasteboard/macos`)
   - record_macos (from `Flutter/ephemeral/.symlinks/plugins/record_macos/macos`)
+  - screen_capturer_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_capturer_macos/macos`)
   - sherpa_onnx_macos (from `Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos`)
   - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
   - video_player_avfoundation (from `Flutter/ephemeral/.symlinks/plugins/video_player_avfoundation/darwin`)
@@ -95,6 +98,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/pasteboard/macos
   record_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/record_macos/macos
+  screen_capturer_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/screen_capturer_macos/macos
   sherpa_onnx_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos
   url_launcher_macos:
@@ -119,6 +124,7 @@ SPEC CHECKSUMS:
   package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   pasteboard: b594eaf838d930b276d7a35a44a32b4f489170cb
   record_macos: 2e43c16b84ce188b8137754ee648322a2dcdf7fa
+  screen_capturer_macos: 229306903c56767a7c7d3a48167ba303e95c6d29
   sherpa_onnx_macos: 3adccf0b64e301371a6b9b15e30cee6b05f2d7fe
   url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
   video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52

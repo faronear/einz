@@ -11,6 +11,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   gal
   pasteboard
   record_windows
+  screen_capturer_windows
   url_launcher_windows
 )
 

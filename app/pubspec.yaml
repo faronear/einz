@@ -72,6 +72,7 @@ dependencies:
   flutter_webrtc: ^1.6.2+hotfix.3
   wakelock_plus: ^1.8.0
   gal: ^2.3.3
+  screen_capturer: ^0.2.3
 
 dev_dependencies:
   flutter_test:
@@ -152,3 +153,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+dependency_overrides:
+  # vendored 补丁版：0.2.2 原始代码在 win32 6 上类型编译不过
+  #（SW_SHOWNORMAL/HWND/PCWSTR 均为 win32 6 breaking change），补丁见
+  # third_party/screen_capturer_windows/lib/src/commands/ms_screenclip.dart
+  screen_capturer_windows:
+    path: third_party/screen_capturer_windows
+  # screen_capturer_windows 锁 win32 <6，但只用稳定 API（GetForegroundWindow/
+  # ShellExecute/EnumProcessModules），实测与 win32 6 兼容；wakelock_plus 1.8/
+  # package_info_plus 10 要 win32 ^6，此处统一抬到 6.x（2026-11-26）
+  win32: ^6.0.1

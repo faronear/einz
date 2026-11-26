@@ -4,6 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- 桌面端「截图」（screen_capturer）：沙盒模式下插件要求声明此临时豁免，
+	     否则调不起系统截图工具（see plugin docs, macOS section）。 -->
+	<key>com.apple.security.temporary-exception.mach-register.global-name</key>
+	<string>com.apple.screencapture.interactive</string>
 	<!-- 麦克风（语音消息/语音通话）。hardened runtime（Developer ID 分发必开）下
 	     TCC 要求 hardened runtime app 声明此 entitlement 才有弹授权框的资格，
 	     缺了直接静默拒绝、系统设置麦克风列表里也不出现（老板 2026-10-13 实测，
