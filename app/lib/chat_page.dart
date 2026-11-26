@@ -1750,9 +1750,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: l10n.chatPageMenuAttachmentStorage,
         note: l10n.chatPageAttachmentStorageNote,
         selected: _attachmentStorage,
-        submitLabel: l10n.chatPageAttachmentStorageSubmit,
-        // 「应用于本机所有秘境」勾选框（老板 2026-10-15；提交按钮上方）。
-        // 单秘境时不传 = 整个不渲染（没有可作用的对象，老板 2026-10-17）
+        // 点选即生效（老板 2026-11-26：同语言选择弹层）。选「远程托管」的
+        // 警示确认保留（见方法尾）
         scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
         options: [
           for (final mode in kAttachmentStorageOptions)
@@ -2023,11 +2022,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: l10n.chatPageTombstoneHeading,
         note: l10n.chatPageTombstoneNote,
         selected: _tombstoneDisplay,
-        // 单选 + 提交（老板 2026-10-15：与附件存储同构——勾选框配提交按钮才
-        // 防呆：提交前统一确认"选什么 + 作用域"）
-        submitLabel: l10n.chatPageTombstoneSubmit,
-        // 「应用于本机所有秘境」勾选框（提交按钮上方，提交时随 onApply 交出）。
-        // 单秘境时不传 = 整个不渲染（老板 2026-10-17）
+        // 点选即生效（老板 2026-11-26：同语言选择弹层，去掉 2026-10-15 的
+        // "单选+提交"模式）。「应用于本机所有秘境」勾选框保留，移到选项区上方
         scopeAllLabel: _hasMultipleSpaces ? l10n.settingsScopeAll : null,
         options: [
           OptionPickerItem(

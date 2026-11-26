@@ -1,0 +1,20 @@
+{
+  "utc": "20261126T104158.779504Z",
+  "time": "2026-11-26 18:41+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "消息留痕/附件存储选择器改点选即生效，保留远端存储警示确认",
+      "detail": [
+        "老板要求：两个选择器去掉「启用」提交按钮，像语言选择一样点选即生效；但附件存储选「远程托管」后的警示确认弹窗保留。",
+        "实现：两个 picker 去掉 submitLabel（OptionPickerSheet 本就支持点选即生效模式，勾选框自动移到选项区上方）。「远程托管」链路：点选 → 弹层关闭 → 警示确认弹窗 → 确认才落盘，与原流程一致。",
+        "测试同步：tombstone_display_test 三处去掉提交按钮点击（其中 scopeAll-only 用例改为点当前选项带作用域生效）；attachment_storage_scope_test 三处同步；chat_page_menu_test 2538 是语音转写弹层复用同键、未改无需动。",
+        "验证：四测试文件全过 + analyze 干净 + macOS debug 构建成功。",
+        "CI：85d4b05d（Esc 修复）曾挂在 analyze——vendored 包 analysis_options 引用缺失包（已修），后又暴露补丁内死代码 null 判断（已修）；两修后待本轮 CI 确认全绿。"
+      ]
+    }
+  ]
+}
