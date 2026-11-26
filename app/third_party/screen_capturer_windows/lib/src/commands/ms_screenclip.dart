@@ -27,10 +27,6 @@ bool _isScreenClipping() {
     lpdwProcessId.value,
   ).value;
 
-  if (hProcess == null) {
-    return false;
-  }
-
   // Get a list of all the modules in this process.
   // win32 6 兼容补丁（einz）：HMODULE 不再是 NativeType 子类（calloc<HMODULE>
   // 编译不过），EnumProcessModules/GetModuleFileNameEx 改为返回
