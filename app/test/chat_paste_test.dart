@@ -5,7 +5,7 @@
 //   ③ 确认弹窗点取消 → 不发送；
 //   ④ 只有文本 → 插进输入框、不发消息、不弹窗；
 //   ⑤ 全空 → 提示「剪贴板是空的」；
-//   ⑥ 附件面板入口顺序（表情符之后）+ 空剪贴板也常显；
+//   ⑥ 附件面板入口顺序（emoji 殿后，粘贴在表情符之前）；
 //   ⑦ 附件面板点入口 → 同一条确认链路；
 //   ⑧ Finder 拷的 png → 按图片发（弹窗缩略图是文件内容，不是系统图标）；
 //   ⑨ Finder 拷的 mp4 → 按视频问、按视频发；
@@ -392,13 +392,14 @@ void main() {
         reason: '空剪贴板也应显示粘贴入口（不预检）');
     expect(find.text('表情符'), findsOneWidget, reason: '表情符入口照常');
 
-    // 顺序：粘贴必须在表情符之后（老板 2026-10-12 指定排末尾）。同一行比 x，
-    // 换了行比 y——两者都满足"更靠后"
+    // 顺序：emoji 殿后（老板 2026-11-26：表情符移到整个网格末尾，取代
+    // 2026-10-12「粘贴排最后」的旧指定）。同一行比 x，换了行比 y——两者都
+    // 满足"更靠后"
     final paste = tester.getTopLeft(find.text('粘贴'));
     final emoji = tester.getTopLeft(find.text('表情符'));
-    expect(paste.dy > emoji.dy || (paste.dy == emoji.dy && paste.dx > emoji.dx),
+    expect(emoji.dy > paste.dy || (emoji.dy == paste.dy && emoji.dx > paste.dx),
         isTrue,
-        reason: '粘贴应排在表情符之后（paste=$paste, emoji=$emoji）');
+        reason: '表情符应排在粘贴之后（emoji=$emoji, paste=$paste）');
 
     // 点入口 → 面板收起 → 空剪贴板 → 提示（不发消息、不崩）
     await tester.tap(find.text('粘贴'));

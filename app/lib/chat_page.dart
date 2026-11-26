@@ -8688,8 +8688,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   label: l10n.chatPageAttachAnyFile,
                   onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
                 ),
-                // 截图仅桌面端有（RepaintBoundary 截聊天页整体，纯 Flutter 能力
-                // 不需要系统屏幕录制权限，见 [_screenshotSupported] 注释）
+                // 截图仅桌面端有（screen_capturer 系统级框选，见
+                // [_screenshotSupported] 注释）
                 if (_screenshotSupported)
                   _buildActionCard(
                     icon: Icons.screenshot_monitor_rounded,
