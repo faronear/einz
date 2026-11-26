@@ -1036,6 +1036,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachAnyFile => '任意文件';
 
   @override
+  String get chatPageAttachScreenshot => '截图';
+
+  @override
   String get chatPageVoiceLabel => '语音';
 
   @override

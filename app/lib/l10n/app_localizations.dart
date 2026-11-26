@@ -1880,6 +1880,12 @@ abstract class AppLocalizations {
   /// **'Any file'**
   String get chatPageAttachAnyFile;
 
+  /// No description provided for @chatPageAttachScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot'**
+  String get chatPageAttachScreenshot;
+
   /// No description provided for @chatPageVoiceLabel.
   ///
   /// In en, this message translates to:

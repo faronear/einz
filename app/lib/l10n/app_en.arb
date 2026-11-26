@@ -661,6 +661,7 @@
   "chatPageAttachVideoGallery": "Gallery video",
   "chatPageAttachAudioFile": "Audio file",
   "chatPageAttachAnyFile": "Any file",
+  "chatPageAttachScreenshot": "Screenshot",
   "chatPageVoiceLabel": "Voice",
   "voiceTranscribing": "Transcribing…",
   "voiceTranscriptRetry": "Transcription failed, tap to retry",

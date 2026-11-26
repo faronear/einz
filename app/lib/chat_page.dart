@@ -3,6 +3,8 @@ import 'widgets/menu_metrics.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+// ImageByteFormat（dart:ui）供聊天页截图 toByteData 用
+import 'dart:ui' show ImageByteFormat;
 
 // drift 的 Value 包装（服务端转写写 local_voice_transcripts 行用）：
 // show 导入避免与页面里其他同名符号冲突
@@ -13,7 +15,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderProxyBox;
+import 'package:flutter/rendering.dart' show RenderProxyBox, RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 
 import 'widgets/linkified_text.dart';
@@ -76,7 +78,7 @@ import 'widgets/transcribe_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
-enum _AttachmentKind { emoji, paste, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
+enum _AttachmentKind { emoji, paste, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile, screenshot }
 
 /// 本平台是否具备**相机采集**能力（拍照/拍摄）。
 ///
@@ -109,6 +111,12 @@ bool get _clipboardPasteSupported =>
 /// 行为调整（焦点链实测定的，见 build 里 CallbackShortcuts 注释）。
 /// 移动端没有键盘快捷键这一说，入口走附件面板。
 bool get _pasteShortcutSupported =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+/// 桌面端专属：聊天页「截图」入口。RepaintBoundary 离屏栅格化**本 app 窗口**
+/// 的画面，纯 Flutter 能力——不读屏幕上其他窗口，**不需要**任何系统屏幕录制
+/// 权限（老板 2026-11-26 明确不加）。移动端无此入口，也不引入该能力。
+bool get _screenshotSupported =>
     !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
 /// 剪贴板**文件**分支仅桌面：插件在 Android 返回的是 content:// URI
@@ -8628,6 +8636,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   label: l10n.chatPageAttachAnyFile,
                   onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
                 ),
+                // 截图仅桌面端有（RepaintBoundary 截聊天页整体，纯 Flutter 能力
+                // 不需要系统屏幕录制权限，见 [_screenshotSupported] 注释）
+                if (_screenshotSupported)
+                  _buildActionCard(
+                    icon: Icons.screenshot_monitor_rounded,
+                    accent: _attachImageColor,
+                    label: l10n.chatPageAttachScreenshot,
+                    onTap: () => Navigator.of(ctx).pop(_AttachmentKind.screenshot),
+                  ),
                 // 表情符放最后（老板 2026-09-15）：附件优先，表情不是附件
                 _buildActionCard(
                   icon: Icons.emoji_emotions_rounded,
@@ -8746,6 +8763,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             type: 'file',
             caption: anyName,
           );
+      case _AttachmentKind.screenshot:
+        // RepaintBoundary 截聊天页整体 → PNG → 走图片附件管线（错误处理
+        // 复用外层 try/catch 的口径）。菜单 pop 之后才执行，弹层已不在
+        // boundary 内，不会截进画面。
+        final boundary =
+            _chatScreenshotKey.currentContext?.findRenderObject();
+        if (boundary is! RenderRepaintBoundary) return;
+        final captured = await boundary.toImage(pixelRatio: 2.0);
+        final byteData =
+            await captured.toByteData(format: ImageByteFormat.png);
+        captured.dispose();
+        if (byteData == null) return;
+        final pngBytes = byteData.buffer.asUint8List();
+        if (!_withinAttachmentLimit(pngBytes.length)) return;
+        await _sendAttachmentOptimistic(
+          fileBytes: pngBytes,
+          fileName: 'screenshot-${DateTime.now().millisecondsSinceEpoch}.png',
+          type: 'image',
+        );
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -10504,6 +10540,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 截图边界 key（桌面端「+」菜单「截图」）：挂在 body 的 RepaintBoundary 上，
+  /// 见 build 里该处注释。
+  final GlobalKey _chatScreenshotKey = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -10909,7 +10949,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: Stack(
+      // 截图边界（桌面端「+」菜单「截图」）：包住 body 整体，点截图时把聊天页
+      // 栅格化成 PNG 走图片附件管线。纯 Flutter 能力，不需要系统屏幕录制权限。
+      body: RepaintBoundary(
+        key: _chatScreenshotKey,
+        child: Stack(
         children: [
           // 界面主题背景层：gradient=品牌粉蓝渐变（首屏/向导同款）；plain=不铺
           // 背景（露出 Scaffold 浅粉白纸感底色，与原有视觉效果完全一致）
@@ -11846,9 +11890,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 桌面端拖入文件的高亮浮层（覆盖整页，松手即发送）
           if (_fileDragHover) const Positioned.fill(child: _DropHintOverlay()),
         ],
-      ),
-    );
-    // 前台无操作锁屏（老板 2026-10-17）：整页套两层（包在最内层，后面的
+    ),
+    ),
+  );
+  // 前台无操作锁屏（老板 2026-10-17）：整页套两层（包在最内层，后面的
     // CallbackShortcuts/DropTarget 不消费指针事件，都能正常收到）。
     // ① Listener：点/滑/拖都在 onPointerDown 抓到 → 重排 idle 计时器。
     //    打字由输入框控制器监听兜底（软键盘在 Flutter 视图外，点不到）。

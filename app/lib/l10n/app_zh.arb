@@ -623,6 +623,7 @@
   "chatPageAttachVideoGallery": "相册视频",
   "chatPageAttachAudioFile": "音频文件",
   "chatPageAttachAnyFile": "任意文件",
+  "chatPageAttachScreenshot": "截图",
   "chatPageVoiceLabel": "语音",
   "voiceTranscribing": "转写中…",
   "voiceTranscriptRetry": "转写失败，点按重试",

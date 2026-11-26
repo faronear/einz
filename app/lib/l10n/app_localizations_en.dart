@@ -1097,6 +1097,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageAttachAnyFile => 'Any file';
 
   @override
+  String get chatPageAttachScreenshot => 'Screenshot';
+
+  @override
   String get chatPageVoiceLabel => 'Voice';
 
   @override

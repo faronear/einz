@@ -1,0 +1,20 @@
+{
+  "utc": "20261126T055338.184185Z",
+  "time": "2026-11-26 13:53+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "桌面端 + 菜单新增「截图」入口（无系统权限）",
+      "detail": [
+        "老板要求：桌面 app 输入条 + 菜单加「截图」按钮，不影响手机版、不多加屏幕录制权限。",
+        "方案：不引 screen_capturer（那要 macOS 屏幕录制 TCC 权限），改用 RepaintBoundary 包住聊天页 body，_ChatPageState 持 GlobalKey，截本 app 窗口画面——纯 Flutter 能力零权限。手机端 _screenshotSupported=false 不渲染入口。",
+        "实现：_AttachmentKind 加 screenshot；桌面专属卡片 Icons.screenshot_monitor_rounded（_attachImageColor）；_sendMedia 新 case：boundary.toImage(pixelRatio:2)→PNG→_sendAttachmentOptimistic(type:'image', 文件名 screenshot-<ts>.png)，错误处理复用外层 try/catch；arb 新键 chatPageAttachScreenshot（Screenshot/截图）+ gen-l10n。",
+        "踩坑：body 套 RepaintBoundary 时右括号先加错到 page= 赋值链末尾（analyze 报括号错），移正到 Stack 收尾；ImageByteFormat 需显式 import 'dart:ui' show ImageByteFormat。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。待老板桌面端实测截图发送。"
+      ]
+    }
+  ]
+}
