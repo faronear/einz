@@ -1,0 +1,19 @@
+{
+  "utc": "20261126T124816.389817Z",
+  "time": "2026-11-26 20:48+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "撤回点选即生效——消息留痕/附件存储找回「启用」按钮",
+      "detail": [
+        "老板醒悟：多空间时「应用于所有秘境」勾选框需要配「启用」按钮（提交前统一确认选什么+作用域），点选即生效的方案撤回。",
+        "撤回范围仅选择器模式：两个 picker 恢复 submitLabel（提交模式），勾选框回到启用按钮上方（OptionPickerSheet 提交模式的固定布局，正是老板要的位置）；远端存储警示确认保留。",
+        "测试同步恢复：tombstone_display_test 三处、attachment_storage_scope_test 三处回到提交流程。",
+        "验证：analyze lib+test 干净 + tombstone/attachment_storage/chat_paste 测试全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

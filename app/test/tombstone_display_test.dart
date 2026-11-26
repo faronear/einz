@@ -171,20 +171,24 @@ void main() {
       expect(await TombstoneSettings(db, spaceId: 'space-a').load(), 'keep');
     });
 
-    // ② 彻底隐藏：选「彻底消失」→ 点选即生效（点选制，老板 2026-11-26），
+    // ② 彻底隐藏：选「彻底消失」→ 提交（单选+提交制，老板 2026-10-15），
     // 墓碑整条从消息流消失，正常消息不受影响
     await _openTombstonePicker(tester);
     expect(find.text(_zh.chatPageTombstoneHeading), findsOneWidget,
         reason: '应弹出墓碑消息选择器');
     await tester.tap(find.text(_zh.chatPageTombstoneHide));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageTombstoneSubmit));
+    await tester.pumpAndSettle();
     expect(find.text('正常消息'), findsOneWidget, reason: '正常消息不该被隐藏');
     expect(find.byIcon(Icons.delete_outline), findsNothing,
         reason: '彻底隐藏：墓碑应从消息流消失');
 
-    // ③ 切回保留消息状态：选「保留占位」即生效，墓碑占位回来
+    // ③ 切回保留消息状态：选「保留占位」→ 提交，墓碑占位回来
     await _openTombstonePicker(tester);
     await tester.tap(find.text(_zh.chatPageTombstoneKeep));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageTombstoneSubmit));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.delete_outline), findsOneWidget,
         reason: '切回保留消息状态：墓碑占位应恢复');
@@ -228,11 +232,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     await _openTombstonePicker(tester);
-    // 只勾「应用于本机所有秘境」、**不改选项**就点当前选项——作用域本身是
-    // 有效操作（把当前模式推广到所有空间）；点选即生效后弹层随即关闭
+    // 只勾「应用于本机所有秘境」、**不改选项**就提交——作用域本身是有效操作
+    // （把当前模式推广到所有空间），提交按钮此时必须可用（防呆的另一面：
+    // 不能因为"选项没动"就把人堵死）
     await tester.tap(find.text(_zh.settingsScopeAll));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(_zh.chatPageTombstoneKeep));
+    await tester.tap(find.text(_zh.chatPageTombstoneSubmit));
     await tester.pumpAndSettle();
 
     // 两端都变成 keep；b 的 per-space 覆盖被清除（读全局值）

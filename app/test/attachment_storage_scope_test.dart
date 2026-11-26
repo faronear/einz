@@ -216,10 +216,10 @@ void main() {
     });
 
     await _openStorageSheet(tester);
-    // 选「远程托管」→ 点选即生效（老板 2026-11-26）→ **确认弹窗**（标题=选项名、
-    // 内容=警示）→ 确认
+    // 选「远程托管」→ 提交 → **确认弹窗**（标题=选项名、内容=警示）→ 确认
     await tester.tap(find.text(_zh.chatPageAttachmentStorageSecured));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSubmit));
     await _confirmSecuredDialog(tester);
     await _settleFileIo(tester);
 
@@ -276,11 +276,12 @@ void main() {
     });
 
     await _openStorageSheet(tester);
-    // 勾「应用于本机所有秘境」→ 选「远程托管」（点选即生效）→ 确认弹窗 → 确认
+    // 勾「应用于本机所有秘境」→ 选「远程托管」→ 提交 → 确认弹窗 → 确认
     await tester.tap(find.text(_zh.settingsScopeAll));
     await tester.pumpAndSettle();
     await tester.tap(find.text(_zh.chatPageAttachmentStorageSecured));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSubmit));
     await _confirmSecuredDialog(tester);
     // onApply 里清的是**全部空间**的真实文件 I/O（同上一用例）
     await _settleFileIo(tester);
@@ -330,7 +331,8 @@ void main() {
     await _openStorageSheet(tester);
     await tester.tap(find.text(_zh.chatPageAttachmentStorageSecured));
     await tester.pumpAndSettle();
-    // 点选即生效 → 确认弹窗出现 → 点**取消**
+    await tester.tap(find.text(_zh.chatPageAttachmentStorageSubmit));
+    // 确认弹窗出现 → 点**取消**
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     expect(find.text(_zh.chatPageAttachmentStorageSecured), findsOneWidget,
