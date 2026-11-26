@@ -19,6 +19,10 @@ class EscDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 聚焦描边**基于现有主题样式叠加**，不从零构造——否则会把全局主题里
+    // FilledButton 的 96×50 尺寸盖掉，弹窗里取消/发送两颗按钮就一大一小
+    //（老板 2026-11-26 实测反馈）。
+    final theme = Theme.of(context);
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
@@ -34,11 +38,15 @@ class EscDialog extends StatelessWidget {
         },
         // 给弹窗内所有 TextButton/FilledButton 套聚焦描边（Tab 切换可见）
         child: Theme(
-          data: Theme.of(context).copyWith(
+          data: theme.copyWith(
             textButtonTheme: TextButtonThemeData(
-                style: dialogKeyboardFocusStyle(TextButton.styleFrom())),
+              style: dialogKeyboardFocusStyle(
+                  theme.textButtonTheme.style ?? TextButton.styleFrom()),
+            ),
             filledButtonTheme: FilledButtonThemeData(
-                style: dialogKeyboardFocusStyle(FilledButton.styleFrom())),
+              style: dialogKeyboardFocusStyle(theme.filledButtonTheme.style ??
+                  FilledButton.styleFrom()),
+            ),
           ),
           child: child,
         ),
