@@ -1,0 +1,18 @@
+{
+  "utc": "20261126T130442.443782Z",
+  "time": "2026-11-26 21:04+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "LabeledCheckbox 整行只占一个 Tab 停点",
+      "detail": [
+        "老板反馈：确认弹窗里「应用于本机所有秘境」的 Tab 切换有两次——一次整条、一次勾选框。根因：外层整行 InkWell 与内层 Checkbox 各自可聚焦，一行占了两个停点。",
+        "修法：勾框包 IgnorePointer + ExcludeFocus——退出指针事件与焦点遍历，勾选/取消全走外层整行 InkWell（点勾框=点整行），视觉不变。",
+        "验证：analyze 干净 + tombstone_display/attachment_storage_scope 测试全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

@@ -59,12 +59,19 @@ class LabeledCheckbox extends StatelessWidget {
               // 整体居中：勾框+标签作为一组居中排布，与下方全宽提交按钮成一系
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Checkbox(
-                  value: value,
-                  onChanged: (v) => onChanged(v ?? false),
-                  // 默认 24px 的勾框在这一行里偏大，收一档与 13px 标签相称
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
+                // 勾框退出焦点遍历与指针事件（老板 2026-11-26：整行只占
+                // **一个** Tab 停点）——勾选/取消全走外层整行 InkWell，
+                // 视觉上仍是勾框，点勾框=点整行。
+                IgnorePointer(
+                  child: ExcludeFocus(
+                    child: Checkbox(
+                      value: value,
+                      onChanged: (v) => onChanged(v ?? false),
+                      // 默认 24px 的勾框在这一行里偏大，收一档与 13px 标签相称
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 // Flexible：标签再长也只压缩到行宽内（不溢出）；短标签时随勾框
