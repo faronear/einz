@@ -6,6 +6,7 @@ import '../data/app_lock.dart';
 import '../data/local_database.dart';
 import '../data/space_session.dart';
 import '../widgets/cancel_button.dart';
+import '../widgets/dialog_keyboard.dart';
 import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
@@ -65,6 +66,10 @@ Future<bool> _confirmDestructive(
     barrierDismissible: false,
     builder: (ctx) => PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        // Esc/系统返回 = 取消（老板 2026-11-26），同其余 PopScope 弹窗
+        if (!didPop) Navigator.of(ctx).pop(false);
+      },
       child: _ConfirmDestructiveDialog(
         db: db,
         entranceName: expected,
@@ -396,10 +401,15 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
         ],
       ),
       actions: [
-        CancelButton(onPressed: () => Navigator.of(context).pop(false)),
+        CancelButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          style: dialogKeyboardFocusStyle(grayButtonStyle()),
+        ),
         FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
+          style: dialogKeyboardFocusStyle(
+            FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
           ),
           onPressed: _busy ? null : _submit,
           child: Text(widget.copy.confirmLabel),

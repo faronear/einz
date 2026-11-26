@@ -19,6 +19,7 @@ import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/version_gate.dart';
 import 'widgets/cancel_button.dart';
+import 'widgets/dialog_keyboard.dart';
 
 /// Einz 移动端（及桌面端）入口。
 ///
@@ -364,15 +365,27 @@ class _StartupGateState extends State<StartupGate> {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
           title: Center(child: Text(l10n.startupInitClearDataTitle)),
           content: Text(l10n.startupInitClearDataMessage),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            CancelButton(
+              autofocus: true, // 销毁类弹窗：初始焦点在取消上，Enter 走安全项
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: dialogKeyboardFocusStyle(grayButtonStyle()),
+            ),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error,
+              style: dialogKeyboardFocusStyle(
+                FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
+                ),
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(l10n.startupInitClearData),

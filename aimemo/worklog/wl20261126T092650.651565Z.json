@@ -1,0 +1,21 @@
+{
+  "utc": "20261126T092650.651565Z",
+  "time": "2026-11-26 17:26+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "全 app 弹窗键盘支持：Esc=取消 + 按钮聚焦描边",
+      "detail": [
+        "老板反馈三连：确认弹窗 Esc 不生效（Enter 已生效）；其他弹窗 Tab 焦点变化不显眼；其他弹窗也要 Esc 取消。",
+        "根因：对话框路由默认把 Esc 映射为 maybePop，被 PopScope(canPop:false) 拦住 → 按了没反应。",
+        "修法：PopScope 加 onPopInvokedWithResult——maybePop 被拦（didPop:false）时程序化补 pop(false)，等同点取消；点外面仍被 barrierDismissible:false 挡住。chat_page 9 处 + lock_page/main/setup_page 4 处用 search_replace 批量加；chat_page 口令输入(StatefulBuilder)、reset_entrance、pin_prompt 三处手改（pop(null)/pop(false) 对应各自类型）。",
+        "聚焦描边：新增 widgets/dialog_keyboard.dart（dialogKeyboardFocusStyle 聚焦 2px 描边 + EscDialog 备用组件），应用到 lock_page/main/setup_page/reset_entrance/pin_prompt 各弹窗按钮；销毁类弹窗 autofocus 放取消（Enter 走安全项），欢迎弹窗 autofocus 唯一按钮；含输入框的弹窗不抢初始焦点。",
+        " cancelButton 加可选 style/autofocus 参数（merge 默认样式，不影响其他调用点）。voice_call_sheet（通话中 Esc=挂断太危险）与 version_gate frozen（故意不可关）保持原样。",
+        "验证：flutter analyze lib 全量干净 + flutter build macos --debug 成功。"
+      ]
+    }
+  ]
+}

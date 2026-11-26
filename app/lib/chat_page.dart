@@ -1790,6 +1790,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题 = 选项名「远程托管」（复用同一个 l10n 键，老板 2026-10-15）
           title: Center(child: Text(l10n.chatPageAttachmentStorageSecured)),
@@ -3325,6 +3331,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           title: Center(child: Text(l10n.chatPageNotifyTitle)),
           // 标题→备注 4 / 备注→内容 14（参考底部弹层的节奏；M3 默认标题→内容 16
@@ -3654,6 +3666,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26），同其余 PopScope 弹窗
+          if (!didPop) Navigator.of(ctx).pop(null);
+        },
         child: StatefulBuilder(
           builder: (ctx, setLocal) {
             // 提交：先本地拦空值，再等后台验；任何失败都**留在弹窗里**红字报错
@@ -5420,6 +5436,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
           title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
@@ -5536,6 +5558,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题居中（与菜单下其它弹窗一致）
           title: Center(child: Text(l10n.chatPageGroupNameTitle)),
@@ -5875,6 +5903,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
           title: Center(child: Text(l10n.chatPageRenameNameTitle)),
@@ -6028,6 +6062,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
           title: Center(child: Text(l10n.chatPageExitTitle)),
@@ -7400,6 +7440,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
           content: Text(l10n.chatPageDeleteConfirmMessage),
@@ -7445,6 +7491,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
           content: Text(l10n.chatPageRecallConfirmBody),
@@ -9001,6 +9053,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题按类型问：图片问"这张图片"，视频/音频/文件各自问（复数走
           // Intl.plural，1 个走单数形态）—— Finder 里拷的 mp4 不该问"文件"

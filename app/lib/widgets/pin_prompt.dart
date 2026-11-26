@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'cancel_button.dart';
+import 'dialog_keyboard.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_lock.dart';
@@ -29,6 +30,10 @@ Future<String?> promptLockCode(
     barrierDismissible: false,
     builder: (ctx) => PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        // Esc/系统返回 = 取消（老板 2026-11-26），同其余 PopScope 弹窗
+        if (!didPop) Navigator.of(ctx).pop(null);
+      },
       child: _LockCodeDialog(
         db: db,
         title: title ?? l10n.promptLockCodeTitle,
@@ -135,9 +140,11 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
       actions: [
         CancelButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          style: dialogKeyboardFocusStyle(grayButtonStyle()),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
+          style: dialogKeyboardFocusStyle(FilledButton.styleFrom()),
           child: Text(l10n.confirm),
         ),
       ],

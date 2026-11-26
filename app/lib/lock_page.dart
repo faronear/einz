@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'widgets/about_sheet.dart';
 import 'widgets/cancel_button.dart';
+import 'widgets/dialog_keyboard.dart';
 import 'brand_logo.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
@@ -288,13 +289,27 @@ class _LockPageState extends State<LockPage> {
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          // Esc/系统返回 = 取消（老板 2026-11-26）：maybePop 被 canPop:false
+          // 拦下时程序化补一次 pop(false)，等同点取消；点外面仍被
+          // barrierDismissible:false 挡住，误触保护不变。
+          if (!didPop) Navigator.of(ctx).pop(false);
+        },
         child: AlertDialog(
           // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
           title: Center(child: Text(l10n.chatPageExitTitle)),
           content: Text(l10n.chatPageExitMessage),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
-            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+            CancelButton(
+              autofocus: true, // 销毁类弹窗：初始焦点在取消上，Enter 走安全项
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: dialogKeyboardFocusStyle(grayButtonStyle()),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: dialogKeyboardFocusStyle(FilledButton.styleFrom()),
+              child: Text(l10n.chatPageMenuExit),
+            ),
           ],
         ),
       ),
