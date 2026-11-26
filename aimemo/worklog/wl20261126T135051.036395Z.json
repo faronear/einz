@@ -1,0 +1,20 @@
+{
+  "utc": "20261126T135051.036395Z",
+  "time": "2026-11-26 21:50+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "归属映射按空间分键持久化——开空间首帧气泡方位即正确",
+      "detail": [
+        "老板反馈：渲染时现算归属的改进后气泡最终正确，但开空间头几帧仍常看到全排一侧；问为何不在本地保存归属。",
+        "排查结论：归属材料（entrance→member 映射）其实一直在本地持久化，但存的是全 app 单键 identity.entrance_member_map——每个空间 refreshEntranceMap 成功后互相覆盖，切回上一空间时本空间映射已丢 → map[我的entrance] 查不到 → 判定退化成入口比对 → 首帧全左，直到 GET /space 刷新才纠正。",
+        "修法（采纳老板思路，本地保存归属）：持久化键按空间分键 identity.entrance_member_map.<spaceId>；本空间键缺失时回读旧全局键一次（迁移）；写入改到分键。开空间首帧（_rowsToHistory 前已 await _ensureIdentityLoaded）读到的必是本空间的映射，离线/重启路径同样正确。",
+        "同步：chat_page 气泡渲染处过时注释更新（归属材料已按空间分键）。",
+        "验证：flutter analyze 全量干净 + tombstone/attachment_storage/chat_paste/multi_space 测试全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

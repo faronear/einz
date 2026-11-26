@@ -136,10 +136,14 @@ class MessageRepository {
   /// 用于判断消息是否"同一个人"发送：同 member 不同通道显示为 'me'。
   final Map<String, String> _memberByEntrance = {};
 
-  /// entrance→member 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
-  /// 缓存才认得出"同一身份其他通道"发来的消息（否则一律判成对方、气泡全左对齐——
-  /// 老板 2026-09-13 实测；TUI 侧因持久化 memberId 而无此问题）。
-  static const _kEntranceMemberMap = 'identity.entrance_member_map';
+  /// entrance→member 映射的本地持久化键：**按空间分键**（老板 2026-11-26）。
+  /// 旧版是全 app 单键——每个空间 refreshEntranceMap 成功后互相覆盖，开另一个
+  /// 空间再回来时本空间的映射就没了 → 首帧归属退化成入口比对 → 气泡全左。
+  /// 分键后开空间首帧读到的必是本空间的映射（离线/重启路径同样正确）。
+  String get _identityMapKey => 'identity.entrance_member_map.$spaceId';
+
+  /// 旧版全 app 单键（迁移回读用：分键后第一次启动若本空间键缺失，回读它）。
+  static const _kEntranceMemberMapLegacy = 'identity.entrance_member_map';
 
   /// 身份缓存是否已从库里载入（首次判归属 / 发送前惰性载入一次）。
   bool _identityLoaded = false;
@@ -150,9 +154,17 @@ class MessageRepository {
     _identityLoaded = true;
     try {
       final row = await (db.select(db.appState)
-            ..where((s) => s.key.equals(_kEntranceMemberMap)))
+            ..where((s) => s.key.equals(_identityMapKey)))
           .getSingleOrNull();
-      final raw = row?.value;
+      var raw = row?.value;
+      if (raw == null || raw.isEmpty) {
+        // 迁移：分键前只有旧的全 app 单键（最后写入的那个空间的映射）——
+        // 本空间键缺失时回读一次兜底（下次 refreshEntranceMap 会写入分键）。
+        final legacy = await (db.select(db.appState)
+              ..where((s) => s.key.equals(_kEntranceMemberMapLegacy)))
+            .getSingleOrNull();
+        raw = legacy?.value;
+      }
       if (raw == null || raw.isEmpty) return;
       final m = jsonDecode(raw) as Map<String, dynamic>;
       // putIfAbsent：不覆盖构造函数种入的本端 memberId（向导已知，优先采信）
@@ -170,7 +182,7 @@ class MessageRepository {
     try {
       await db.into(db.appState).insertOnConflictUpdate(
             AppStateCompanion.insert(
-              key: _kEntranceMemberMap,
+              key: _identityMapKey,
               value: jsonEncode(_memberByEntrance),
             ),
           );
