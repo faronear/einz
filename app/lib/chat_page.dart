@@ -8644,19 +8644,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     label: l10n.chatPageAttachScreenshot,
                     onTap: () => Navigator.of(ctx).pop(_AttachmentKind.screenshot),
                   ),
-                // 表情符放最后（老板 2026-09-15）：附件优先，表情不是附件
-                _buildActionCard(
-                  icon: Icons.emoji_emotions_rounded,
-                  accent: _attachEmojiColor,
-                  label: l10n.chatPageAttachEmoji,
-                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
-                ),
-                // 「粘贴」排表情符之后——整个网格的末尾（老板 2026-10-12 指定）。
-                // **总显示、不做剪贴板预检**：iOS 上 App 读剪贴板会弹系统"已粘贴"
-                // 横幅，每开一次面板弹一次没人受得了；空了就空了，点了由
-                // _pasteFromClipboard 提示「剪贴板是空的」兜底（老板拍简：接受这个
-                // 代价，换实现简单 + iOS 不被横幅骚扰）。放末尾也不挤常用入口。
-                // Web 不摆：浏览器读剪贴板图片要权限弹窗，且 Web 版本就未发布
+                // 表情符移到整个网格的末尾（老板 2026-11-26：emoji 放最后，
+                // 取代 2026-10-12「粘贴排最后」的旧指定）
                 if (_clipboardPasteSupported)
                   _buildActionCard(
                     icon: Icons.content_paste_rounded,
@@ -8664,6 +8653,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     label: l10n.chatPageAttachPaste,
                     onTap: () => Navigator.of(ctx).pop(_AttachmentKind.paste),
                   ),
+                _buildActionCard(
+                  icon: Icons.emoji_emotions_rounded,
+                  accent: _attachEmojiColor,
+                  label: l10n.chatPageAttachEmoji,
+                  onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
+                ),
               ]),
             ],
           ),
@@ -8778,6 +8773,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final pngBytes = await File(captured.imagePath!).readAsBytes();
         if (pngBytes.isEmpty) return;
         if (!_withinAttachmentLimit(pngBytes.length)) return;
+        // 截完**不直接发**，与粘贴同口径：弹确认窗让用户预览后手动提交
+        // （老板 2026-11-26），复用粘贴确认弹窗（图片预览 + 键盘操作）。
+        final ok = await _confirmPasteSend(_PastePayload.image(pngBytes));
+        if (!ok) return;
         await _sendAttachmentOptimistic(
           fileBytes: pngBytes,
           fileName: 'screenshot-${DateTime.now().millisecondsSinceEpoch}.png',
@@ -8980,6 +8979,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 粘贴发送前的确认弹窗（老板 2026-10-12）：图片给预览、文件给名单，
   /// 按钮 取消/发送。点遮罩或系统返回 = 取消（不能默认发送）。
   /// 返回 true = 用户确认发送。
+  /// 确认弹窗按钮的键盘聚焦描边（老板 2026-11-26）：默认聚焦着色太淡，
+  /// Tab 切换时分不清焦点在哪个按钮——聚焦时加 2px 深色描边，一眼可辨。
+  ButtonStyle _dialogKeyboardFocusStyle(ButtonStyle base) => base.copyWith(
+        side: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.focused)
+              ? BorderSide(
+                  color: Colors.black.withValues(alpha: 0.6), width: 2)
+              : const BorderSide(color: Colors.transparent),
+        ),
+      );
+
   Future<bool> _confirmPasteSend(_PastePayload payload) async {
     final l10n = AppLocalizations.of(context)!;
     final bytes = payload.bytes;
@@ -9027,9 +9037,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
           ),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            CancelButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: _dialogKeyboardFocusStyle(grayButtonStyle()),
+            ),
+            // autofocus（老板 2026-11-26）：弹窗刚打开焦点就在发送上——
+            // 首次 Enter 即发送，Tab 可切到取消；Esc 走弹窗默认关闭
             FilledButton(
+              autofocus: true,
               onPressed: () => Navigator.of(ctx).pop(true),
+              style: _dialogKeyboardFocusStyle(FilledButton.styleFrom()),
               child: Text(l10n.send),
             ),
           ],

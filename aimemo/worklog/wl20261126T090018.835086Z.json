@@ -1,0 +1,21 @@
+{
+  "utc": "20261126T090018.835086Z",
+  "time": "2026-11-26 17:00+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "+ 菜单三项交互优化：emoji 殿后、截图弹窗确认、键盘焦点可视化",
+      "detail": [
+        "老板 macOS 实测截图功能通过后提的三点优化，一次做齐。",
+        "① emoji 卡片移到 + 菜单整个网格末尾（取代 2026-10-12「粘贴排最后」的旧指定，新顺序：…文件/截图/粘贴/emoji）。",
+        "② 截图截完不再直接发送：复用粘贴确认弹窗 _confirmPasteSend(_PastePayload.image(bytes))，预览后手动提交；标题文案「发送这张图片？」本身中性，无需新键。",
+        "③ 弹窗键盘：发送按钮加 autofocus（弹窗一开焦点即在发送上，首次 Enter 即发送，此前要先按一次 Tab 焦点才落到按钮上）；Tab 切换、Esc 关闭走既有机制。",
+        "追加：老板反馈 Tab 时 Send/Cancel 焦点变化不显眼——新增 _dialogKeyboardFocusStyle（聚焦加 2px 深色描边）应用到两键；CancelButton 加可选 style 参数（merge 默认样式，不影响其他调用点）。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。"
+      ]
+    }
+  ]
+}

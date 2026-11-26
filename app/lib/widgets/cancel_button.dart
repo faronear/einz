@@ -41,18 +41,23 @@ WidgetStateProperty<Color?> _grayOverlay() {
 /// 统一的「取消」按钮（老板 2026-10-18）：淡灰底色，取代此前各弹窗
 /// 有的用边框（OutlinedButton）、有的纯文字无底色的不一致。
 class CancelButton extends StatelessWidget {
-  const CancelButton({super.key, this.onPressed, this.label});
+  const CancelButton({super.key, this.onPressed, this.label, this.style});
 
   final VoidCallback? onPressed;
 
   /// 覆盖文案（缺省用通用 l10n「取消」）。
   final String? label;
 
+  /// 调用方可再叠加样式（如确认弹窗的键盘聚焦描边），merge 在默认样式之后。
+  final ButtonStyle? style;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return TextButton(
-      style: grayButtonStyle().copyWith(overlayColor: _grayOverlay()),
+      style: grayButtonStyle()
+          .copyWith(overlayColor: _grayOverlay())
+          .merge(style),
       onPressed: onPressed,
       child: Text(label ?? l10n.cancel),
     );
