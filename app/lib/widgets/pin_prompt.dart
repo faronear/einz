@@ -24,7 +24,7 @@ Future<String?> promptLockCode(
 }) async {
   if (!context.mounted) return null;
   final l10n = AppLocalizations.of(context)!;
-  return showDialog<String>(
+  return showEscDialog<String>(
     context: context,
     // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
     barrierDismissible: false,

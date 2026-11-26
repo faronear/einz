@@ -1195,7 +1195,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 确认后彻底关闭应用（不再回 LockPage——未设 PIN 时锁屏不应激活）。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    final shouldExit = await showDialog<bool>(
+    final shouldExit = await showEscDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
@@ -2145,7 +2145,7 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _showWelcomeDialog() async {
     final l10n = AppLocalizations.of(context)!;
     final isCreate = _role == _WizardRole.create;
-    final start = await showDialog<bool>(
+    final start = await showEscDialog<bool>(
       context: context,
       barrierDismissible: false, // 只有一个按钮：开始聊天
       builder: (ctx) => PopScope(

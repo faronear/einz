@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 /// 确认/选择类弹窗的键盘支持共享件（老板 2026-11-26）：
-/// - [EscDialog]：Esc 等同点按「取消」（pop(false)/null）；
-/// - [dialogKeyboardFocusStyle]：按钮聚焦时加 2px 深色描边，Tab 切换焦点一眼可辨。
+/// - [showEscDialog]：Esc 等同点按「取消」（pop(false)/null），并给弹窗内
+///   按钮套上键盘聚焦描边（[dialogKeyboardFocusStyle]）；
+/// - [dialogKeyboardFocusStyle]：聚焦加 2px 深色描边，Tab 切换焦点一眼可辨。
 
-/// 对话框路由默认把 Esc 映射为 maybePop，而我们的确认弹窗都是
-/// `PopScope(canPop: false)` 禁误触——结果就是 Esc 按了没反应。这里用
-/// 子树级 Shortcuts/Actions 覆写 DismissIntent 的处理：Esc → pop(false)
-/// （即"点取消"），误触保护只针对点外面/系统返回，不针对 Esc。
-///
-/// 键事件从焦点所在节点向上冒泡，所以无论焦点在哪个按钮/输入框上都生效。
+/// 为什么必须子树覆写而不能靠路由默认行为：Flutter 的 `_DismissModalAction`
+/// 只在 `route.barrierDismissible == true` 时启用（见 widgets/routes.dart），
+/// 而我们的确认弹窗全是 `barrierDismissible: false` 禁误触——路由层 Esc 处理
+/// 被整体禁用，Esc 按了没反应。这里在弹窗子树里注册更近的
+/// DismissIntent → pop(false)（"点取消"），优先级高于路由默认，误触保护
+/// （点外面不关）不受影响。
 class EscDialog extends StatelessWidget {
   const EscDialog({super.key, required this.child});
 
@@ -31,10 +32,33 @@ class EscDialog extends StatelessWidget {
             },
           ),
         },
-        child: child,
+        // 给弹窗内所有 TextButton/FilledButton 套聚焦描边（Tab 切换可见）
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            textButtonTheme: TextButtonThemeData(
+                style: dialogKeyboardFocusStyle(TextButton.styleFrom())),
+            filledButtonTheme: FilledButtonThemeData(
+                style: dialogKeyboardFocusStyle(FilledButton.styleFrom())),
+          ),
+          child: child,
+        ),
       ),
     );
   }
+}
+
+/// [showDialog] 的键盘增强替身：Esc = 取消（pop(false)/null）+ 按钮聚焦描边。
+/// 其余参数与 showDialog 相同；barrierDismissible 等误触保护原样透传。
+Future<T?> showEscDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+}) {
+  return showDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    builder: (ctx) => EscDialog(child: builder(ctx)),
+  );
 }
 
 /// 弹窗按钮的键盘聚焦样式：聚焦加 2px 深色描边（默认聚焦着色太淡，

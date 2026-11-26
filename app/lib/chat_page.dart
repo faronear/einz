@@ -73,6 +73,7 @@ import 'widgets/sheet_close_button.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/clickable.dart';
 import 'widgets/dissipate_icon.dart';
+import 'widgets/dialog_keyboard.dart';
 import 'widgets/transcribe_icon.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
@@ -1784,7 +1785,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 与弹层关闭动画错开再开 dialog（Overlay 交叉卸载断言，同 _menuAction）
     await Future<void>.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showEscDialog<bool>(
       context: context,
       // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -3117,7 +3118,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final db = widget.db ?? LocalDatabase.shared;
     final hasPin = await AppLockService(db).isSetup;
     if (!mounted) return;
-    final ok = await showDialog<bool>(
+    final ok = await showEscDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -3325,7 +3326,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 正文语言：服务端不知道收件人读哪种语言，按本机界面语言上报（zh / 其它一律 en）
     final lang = Localizations.localeOf(context).languageCode == 'zh' ? 'zh' : 'en';
 
-    final saved = await showDialog<bool>(
+    final saved = await showEscDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -3560,7 +3561,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传
   /// （本地不落共享口令，与 TUI 对齐）。
   Future<void> _showChangePassphraseDialog() async {
-    final changed = await showDialog<bool>(
+    final changed = await showEscDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -3660,7 +3661,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 都会重新执行，声明在里面的变量会被重置（与改名弹窗的 notifier 同思路）
     var verifying = false; // 验证中：确认钮转圈、禁重复提交
     String? error; // 弹窗内联红字（口令错 / 网络失败）；一改输入就清
-    final result = await showDialog<T>(
+    final result = await showEscDialog<T>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -5430,7 +5431,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
     // 默认不勾选（与邮件通知/我的身份弹窗同策略）
     final allSpaces = ValueNotifier<bool>(false);
-    final saved = await showDialog<bool>(
+    final saved = await showEscDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -5552,7 +5553,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: _groupName);
     final nameError = ValueNotifier<String?>(null);
-    final saved = await showDialog<bool>(
+    final saved = await showEscDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -5897,7 +5898,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 各空间会话 + 本地各空间 profile 一起改）；不勾＝只改当前秘境。每次开弹窗
     // 默认不勾选（与邮件通知弹窗同策略——扇出必须是每次显式 opt-in）
     final allSpaces = ValueNotifier<bool>(false);
-    final saved = await showDialog<bool>(
+    final saved = await showEscDialog<bool>(
       context: context,
       // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -6057,7 +6058,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 退出秘境（等价 TUI /exit）：确认后回到锁屏（LockPage），下次解锁重新认证。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    final shouldExit = await showDialog<bool>(
+    final shouldExit = await showEscDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
@@ -7434,7 +7435,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方通道不受影响；重启后记录仍在、内容仍隐藏）。
   Future<void> _deleteMessage(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showEscDialog<bool>(
       context: context,
       // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -7485,7 +7486,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     // 确认弹窗（2026-10-11）：撤回不可恢复且对方永远收不到，比删除更重，
     // 不做二次确认容易误触
-    final ok = await showDialog<bool>(
+    final ok = await showEscDialog<bool>(
       context: context,
       // 破坏性确认：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
       barrierDismissible: false,
@@ -9046,7 +9047,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final bytes = payload.bytes;
     final files = payload.files;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showEscDialog<bool>(
       context: context,
       // 破坏性确认（粘贴发送不可轻点）：禁误触关闭（点外面/系统返回都不行），
       // 必须点按钮（老板 2026-10-15）

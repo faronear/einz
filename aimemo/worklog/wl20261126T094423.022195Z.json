@@ -1,0 +1,20 @@
+{
+  "utc": "20261126T094423.022195Z",
+  "time": "2026-11-26 17:44+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "真修 Esc：上一版 onPopInvokedWithResult 是死代码，改 showEscDialog 子树覆写",
+      "detail": [
+        "老板实测上一版 Esc 仍不生效、其他弹窗也没聚焦描边。根因定位（探针 widget test 证实）：Flutter 的 _DismissModalAction.isEnabled 要求 route.barrierDismissible==true 才响应 Esc（widgets/routes.dart:981），我们全部确认弹窗都是 barrierDismissible:false——路由层 Esc 处理整体被禁，上一版加的 onPopInvokedWithResult 对 Esc 是死代码（只对系统返回有效）。",
+        "修法：新建 showEscDialog<T>（widgets/dialog_keyboard.dart）替代 showDialog——builder 外包 EscDialog：子树 Shortcuts/Actions 覆写 DismissIntent→pop(false)，优先级高于路由默认；同一 Theme 给弹窗内所有 TextButton/FilledButton 套 dialogKeyboardFocusStyle 聚焦描边（此前只给截图/粘贴弹窗两处按钮手动加了，其余弹窗没加——这就是老板看不到描边的原因）。",
+        "覆盖：chat_page 12 处 + lock_page/main/setup_page×2/reset_entrance/pin_prompt 共 18 处 showEscDialog<bool/T/String>。voice_call_sheet（Esc=挂断太危险）、version_gate frozen（故意不可关）、三处 withImmersiveFullscreen 全屏页保持原样。",
+        "上一版加的 onPopInvokedWithResult 保留（系统返回被拦时补 pop(false)，行为一致无害）。",
+        "验证：新增探针 test/esc_dialog_probe_test.dart（真实 sendKeyEvent(Esc) 路径，断言弹窗关闭且返回 false）通过；flutter analyze lib+test 干净；flutter build macos --debug 成功。"
+      ]
+    }
+  ]
+}

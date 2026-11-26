@@ -360,7 +360,7 @@ class _StartupGateState extends State<StartupGate> {
   /// 提示用户彻底退出重开。两条路都**不可逆**，故先过确认弹窗。
   Future<void> _clearLocalDataEscape() async {
     final l10n = AppLocalizations.of(context)!;
-    final ok = await showDialog<bool>(
+    final ok = await showEscDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(

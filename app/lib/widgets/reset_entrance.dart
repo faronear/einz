@@ -60,7 +60,7 @@ Future<bool> _confirmDestructive(
   final expected = entranceName.trim().isEmpty
       ? (fallbackConfirmWord ?? l10n.resetEntranceConfirmWord)
       : entranceName.trim();
-  final ok = await showDialog<bool>(
+  final ok = await showEscDialog<bool>(
     context: context,
     // 含输入框：禁误触关闭（点外面/系统返回都不行），必须点按钮（老板 2026-10-15）
     barrierDismissible: false,

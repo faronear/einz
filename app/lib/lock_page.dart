@@ -284,7 +284,7 @@ class _LockPageState extends State<LockPage> {
   /// 退出应用（等价 TUI /exit）：确认后彻底关闭（锁屏页无聊天可回，不回任何页）。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    final shouldExit = await showDialog<bool>(
+    final shouldExit = await showEscDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
