@@ -1807,7 +1807,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 fontSize: 12, color: Theme.of(ctx).colorScheme.error),
           ),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            CancelButton(
+              autofocus: true, // 销毁类确认：Enter 走安全项（老板 2026-11-26）
+              onPressed: () => Navigator.of(ctx).pop(false),
+            ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(l10n.confirm),
@@ -3424,7 +3427,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            CancelButton(
+              autofocus: true, // 初始焦点在取消上，Enter 走安全项
+              onPressed: () => Navigator.of(ctx).pop(false),
+            ),
             // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
             if (active)
               ValueListenableBuilder<bool>(
@@ -6074,7 +6080,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           title: Center(child: Text(l10n.chatPageExitTitle)),
           content: Text(l10n.chatPageExitMessage),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            CancelButton(
+              autofocus: true, // 销毁类确认：Enter 走安全项（老板 2026-11-26）
+              onPressed: () => Navigator.of(ctx).pop(false),
+            ),
             FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
           ],
         ),
@@ -7451,7 +7460,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
           content: Text(l10n.chatPageDeleteConfirmMessage),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false), label: l10n.chatPageDeleteCancel),
+            CancelButton(
+              autofocus: true, // 销毁类确认：Enter 走安全项（老板 2026-11-26）
+              onPressed: () => Navigator.of(ctx).pop(false),
+              label: l10n.chatPageDeleteCancel),
             // 确认按钮红底白字（2026-10-11 老板：与撤回确认弹窗一致；弹窗按钮
             // 用实体样式，不再是纯文字）
             FilledButton(
@@ -7502,7 +7514,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           title: Center(child: Text(l10n.chatPageRecallConfirmTitle)),
           content: Text(l10n.chatPageRecallConfirmBody),
           actions: [
-            CancelButton(onPressed: () => Navigator.of(ctx).pop(false)),
+            CancelButton(
+              autofocus: true, // 销毁类确认：Enter 走安全项（老板 2026-11-26）
+              onPressed: () => Navigator.of(ctx).pop(false),
+            ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: FilledButton.styleFrom(
