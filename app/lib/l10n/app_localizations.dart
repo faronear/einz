@@ -1307,7 +1307,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersTitle.
   ///
   /// In en, this message translates to:
-  /// **'{mode, select, duo{My companion} group{My group} other{My space}}'**
+  /// **'{mode, select, duo{My companion} group{Group companions} other{My space}}'**
   String chatPageMembersTitle(String mode);
 
   /// No description provided for @chatPageMembersUnnamed.

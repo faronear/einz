@@ -443,7 +443,7 @@
       }
     }
   },
-  "chatPageMembersTitle": "{mode, select, duo{My companion} group{My group} other{My space}}",
+  "chatPageMembersTitle": "{mode, select, duo{My companion} group{Group companions} other{My space}}",
   "@chatPageMembersTitle": {
     "placeholders": {
       "mode": {

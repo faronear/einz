@@ -1,0 +1,18 @@
+{
+  "utc": "20261127T001828.731392Z",
+  "time": "2026-11-27 08:18+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "群空间弹层标题改名「我的群组」→「群组同伴」（Group companions）",
+      "detail": [
+        "老板要求：chatPageMembersTitle 的 group 分支改名（My group → Group companions / 我的群组 → 群组同伴）。duo（My companion/我的同伴）与其他（My space/我的秘境）分支不动。",
+        "实现：仅改 app_en/app_zh arb 的 group select 分支 + gen-l10n 重生成；测试里的「我的群组」均为注释、非字面断言，无需改。",
+        "验证：flutter analyze lib test 干净 + group_exit_flow/member_profile 测试全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

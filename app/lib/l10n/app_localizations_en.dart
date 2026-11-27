@@ -736,7 +736,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
-      'group': 'My group',
+      'group': 'Group companions',
       'other': 'My space',
     });
     return '$_temp0';
