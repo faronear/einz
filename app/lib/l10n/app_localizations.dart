@@ -2345,7 +2345,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedDestroyEntrance.
   ///
   /// In en, this message translates to:
-  /// **'Destroy this device'**
+  /// **'Destroy this device channel'**
   String get advancedDestroyEntrance;
 
   /// No description provided for @advancedClearMessages.
@@ -2381,13 +2381,13 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Destroy this device?'**
+  /// **'Destroy this device channel?'**
   String get leaveSpaceTitle;
 
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases the current device, and you can\'t visit the current space on this device. This cannot be undone!'**
+  /// **'Permanently erases the current device channel, and you can\'t visit the current space on this device. This cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetEntranceNameLabel.

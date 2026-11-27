@@ -1371,7 +1371,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedMenuTitle => 'Advanced security';
 
   @override
-  String get advancedDestroyEntrance => 'Destroy this device';
+  String get advancedDestroyEntrance => 'Destroy this device channel';
 
   @override
   String get advancedClearMessages => 'Delete all messages';
@@ -1392,11 +1392,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get leaveSpaceTitle => 'Destroy this device?';
+  String get leaveSpaceTitle => 'Destroy this device channel?';
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases the current device, and you can\'t visit the current space on this device. This cannot be undone!';
+      'Permanently erases the current device channel, and you can\'t visit the current space on this device. This cannot be undone!';
 
   @override
   String resetEntranceNameLabel(String name) {

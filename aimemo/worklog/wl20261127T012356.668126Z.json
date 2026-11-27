@@ -1,0 +1,18 @@
+{
+  "utc": "20261127T012356.668126Z",
+  "time": "2026-11-27 09:23+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "EN 销毁文案对齐「设备通道」：Destroy this device → Destroy this device channel",
+      "detail": [
+        "老板指出 zh 已改「销毁本设备通道」而 en 仍是 destroy this device。补齐三处：advancedDestroyEntrance、leaveSpaceTitle、leaveSpaceMessage（current device → current device channel）。",
+        "clearMessagesMessage 保持 current device 不变——zh 对应「删除当前设备保存的…」也用的是设备而非设备通道，口径一致。",
+        "验证：gen-l10n + flutter analyze 干净 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
