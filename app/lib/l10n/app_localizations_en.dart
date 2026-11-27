@@ -265,11 +265,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Too many requests — try again later (this is not a problem with the authorization code)';
 
   @override
-  String get setupTokenTitle => 'Verify authorization code';
+  String get setupTokenTitle => 'Authorization';
 
   @override
   String get setupTokenHint =>
-      'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified device in the space.';
+      'Authorize this device to join a space. Valid for one-time use within 24 hours.';
 
   @override
   String get setupTokenInputHint => 'Authorization code';
@@ -288,7 +288,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenSpaceAlreadyAdded =>
-      'This device is already connected to this space (one device can hold only one connection to a space)';
+      'This device is already connected to this space and cannot connect again';
 
   @override
   String setupTokenOtherServer(String other, String current) {
@@ -440,7 +440,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => 'Invite';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => 'Authorize my new device';
+  String get chatPageInviteDialogTitleAttachSelf => 'Add my new device';
 
   @override
   String get chatPageInviteDialogTitleReinvite => 'Re-invite';
@@ -453,7 +453,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.';
+      'Authorize my another device to connect to this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteDialogHintInvite =>
@@ -461,7 +461,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'If “$name” loses all devices into this space, send the dedicated authorization code below to “$name” to join again. One-time use, valid for 24 hours.';
+    return 'Send the dedicated authorization code below to “$name” to join this space again. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -787,8 +787,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageEntranceListFailed =>
-      'Could not load other devices (offline?)';
+  String get chatPageEntranceListFailed => 'Failed to load device list.';
 
   @override
   String get chatPageEntranceScopeHint =>
@@ -798,7 +797,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceName => 'Current device name';
 
   @override
-  String get chatPageEntranceListNew => 'Authorize my new device';
+  String get chatPageEntranceListNew => 'Add my new device';
 
   @override
   String get chatPagePinLabel => 'PIN';
@@ -1023,7 +1022,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceUnrecognized =>
-      'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.';
+      'This device is not recognized by the server. Local messages only, no sync.';
 
   @override
   String get chatPageMsgsSyncing =>
@@ -1371,7 +1370,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedMenuTitle => 'Advanced security';
 
   @override
-  String get advancedDestroyEntrance => 'Destroy this device channel';
+  String get advancedDestroyEntrance => 'Unbind this device';
 
   @override
   String get advancedClearMessages => 'Delete all messages';
@@ -1392,11 +1391,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get leaveSpaceTitle => 'Destroy this device channel?';
+  String get leaveSpaceTitle => 'Unbind this device?';
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases the current device channel, and you can\'t visit the current space on this device. This cannot be undone!';
+      'Unbinding erases all local data for the current space, and this device will no longer be able to access this space. This cannot be undone!';
 
   @override
   String resetEntranceNameLabel(String name) {

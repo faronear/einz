@@ -131,13 +131,13 @@
     }
   },
   "setupTokenTitle": "验证授权码",
-  "setupTokenHint": "连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的设备生成。",
+  "setupTokenHint": "授权本机绑定到秘境。24 小时内一次性有效。",
   "setupTokenInputHint": "授权码",
   "setupTokenNeedInput": "请填写授权码",
   "setupTokenInvalid": "授权码无效",
   "setupTokenExpired": "授权码已过期",
   "setupTokenUsed": "授权码已被使用",
-  "setupTokenSpaceAlreadyAdded": "本机已经有设备加入了这个秘境（一台设备只能有一条线路到同一个秘境）",
+  "setupTokenSpaceAlreadyAdded": "本机已经绑定了这个秘境，无法再次绑定",
   "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}，不能混用",
   "@setupTokenOtherServer": {
     "placeholders": {
@@ -238,13 +238,13 @@
   "chatPageSetLockCleared": "已清除锁屏码，其他人拿到这台设备就能进入秘境。",
   "chatPageLockClearConfirm": "清除",
   "chatPageInviteDialogTitleInvite": "邀请",
-  "chatPageInviteDialogTitleAttachSelf": "授权我的新设备",
+  "chatPageInviteDialogTitleAttachSelf": "添加我的新设备",
   "chatPageInviteDialogTitleReinvite": "重新邀请",
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
-  "chatPageInviteDialogHintAttachSelf": "使用以下的专属授权码，连接我的其他设备到本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintAttachSelf": "授权我的其他设备绑定到本秘境。24 小时内一次性有效。",
   "chatPageInviteDialogHintInvite": "把以下授权码发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintReinvite": "如果“{name}”丢失了进入本秘境的所有设备，可凭以下的专属授权码重新加入。24 小时内一次性有效。",
+  "chatPageInviteDialogHintReinvite": "把以下授权码发给“{name}”，凭它重新加入本秘境。24 小时内一次性有效。",
   "chatPageInviteDialogReinviteFallbackName": "对方",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -443,10 +443,10 @@
   "chatPagePassphraseVerifyFailed": "验证失败，请重试",
   "chatPageMembersInviteNew": "邀请新同伴",
   "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
-  "chatPageEntranceListFailed": "无法获取其他设备（当前离线？）",
-  "chatPageEntranceScopeHint": "可授权多台设备连接到当前秘境。",
+  "chatPageEntranceListFailed": "无法获取设备列表。",
+  "chatPageEntranceScopeHint": "可授权多台设备绑定到当前秘境。",
   "chatPageEntranceListThisDevice": "当前设备名称",
-  "chatPageEntranceListNew": "授权我的新设备",
+  "chatPageEntranceListNew": "添加我的新设备",
   "chatPagePinLabel": "锁屏码",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "新消息通知",
@@ -580,7 +580,7 @@
       }
     }
   },
-  "chatPageEntranceUnrecognized": "这台设备未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。",
+  "chatPageEntranceUnrecognized": "本机未被服务器识别。仅可查看本地历史，不能同步消息。",
   "chatPageMsgsSyncing": "等待同步中… 暂时无法收发，仅可查看本地消息",
   "chatPageMsgResending": "重发中…",
   "chatPageMsgSpeedingUp": "加速中…",
@@ -801,9 +801,9 @@
   "aboutDnsPoisonUnknownIp": "未知",
   "aboutDnsPoisonNote": "当前网络在劫持该域名的解析（上面是它给出的假地址）；连接已由加密解析（DoH）自动修复，事件已上报服务器。真地址已保护不展示",
   "advancedMenuTitle": "高级安全",
-  "advancedDestroyEntrance": "销毁本设备通道",
+  "advancedDestroyEntrance": "解绑本设备",
   "advancedClearMessages": "删除所有消息",
-  "clearMessagesMessage": "删除当前设备保存的所有消息和附件。本设备仍然可用，将继续收到新消息。其他设备不受影响。",
+  "clearMessagesMessage": "删除当前设备保存的本秘境所有消息和附件。本设备仍然可用，将继续收到新消息。其他设备不受影响。",
   "clearMessagesConfirm": "删除",
   "clearMessagesDone": "已删除全部消息。",
   "clearMessagesFailed": "删除失败: {error}",
@@ -814,8 +814,8 @@
       }
     }
   },
-  "leaveSpaceTitle": "销毁本设备通道？",
-  "leaveSpaceMessage": "彻底销毁当前设备通道，无法再通过本设备访问当前秘境。此操作无法撤销！",
+  "leaveSpaceTitle": "解绑本设备？",
+  "leaveSpaceMessage": "解绑将销毁当前秘境在本地的所有数据，本设备将无法访问本秘境。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {

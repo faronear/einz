@@ -527,13 +527,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify authorization code'**
+  /// **'Authorization'**
   String get setupTokenTitle;
 
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified device in the space.'**
+  /// **'Authorize this device to join a space. Valid for one-time use within 24 hours.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -569,7 +569,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenSpaceAlreadyAdded.
   ///
   /// In en, this message translates to:
-  /// **'This device is already connected to this space (one device can hold only one connection to a space)'**
+  /// **'This device is already connected to this space and cannot connect again'**
   String get setupTokenSpaceAlreadyAdded;
 
   /// No description provided for @setupTokenOtherServer.
@@ -827,7 +827,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Authorize my new device'**
+  /// **'Add my new device'**
   String get chatPageInviteDialogTitleAttachSelf;
 
   /// No description provided for @chatPageInviteDialogTitleReinvite.
@@ -851,7 +851,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.'**
+  /// **'Authorize my another device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintInvite.
@@ -863,7 +863,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'If “{name}” loses all devices into this space, send the dedicated authorization code below to “{name}” to join again. One-time use, valid for 24 hours.'**
+  /// **'Send the dedicated authorization code below to “{name}” to join this space again. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -1391,7 +1391,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not load other devices (offline?)'**
+  /// **'Failed to load device list.'**
   String get chatPageEntranceListFailed;
 
   /// No description provided for @chatPageEntranceScopeHint.
@@ -1409,7 +1409,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'Authorize my new device'**
+  /// **'Add my new device'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPagePinLabel.
@@ -1751,7 +1751,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceUnrecognized.
   ///
   /// In en, this message translates to:
-  /// **'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.'**
+  /// **'This device is not recognized by the server. Local messages only, no sync.'**
   String get chatPageEntranceUnrecognized;
 
   /// No description provided for @chatPageMsgsSyncing.
@@ -2345,7 +2345,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedDestroyEntrance.
   ///
   /// In en, this message translates to:
-  /// **'Destroy this device channel'**
+  /// **'Unbind this device'**
   String get advancedDestroyEntrance;
 
   /// No description provided for @advancedClearMessages.
@@ -2381,13 +2381,13 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Destroy this device channel?'**
+  /// **'Unbind this device?'**
   String get leaveSpaceTitle;
 
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases the current device channel, and you can\'t visit the current space on this device. This cannot be undone!'**
+  /// **'Unbinding erases all local data for the current space, and this device will no longer be able to access this space. This cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetEntranceNameLabel.

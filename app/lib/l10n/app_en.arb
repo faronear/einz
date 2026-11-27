@@ -144,14 +144,14 @@
       }
     }
   },
-  "setupTokenTitle": "Verify authorization code",
-  "setupTokenHint": "Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified device in the space.",
+  "setupTokenTitle": "Authorization",
+  "setupTokenHint": "Authorize this device to join a space. Valid for one-time use within 24 hours.",
   "setupTokenInputHint": "Authorization code",
   "setupTokenNeedInput": "Enter the authorization code",
   "setupTokenInvalid": "Invalid authorization code",
   "setupTokenExpired": "Authorization code expired",
   "setupTokenUsed": "Authorization code already used",
-  "setupTokenSpaceAlreadyAdded": "This device is already connected to this space (one device can hold only one connection to a space)",
+  "setupTokenSpaceAlreadyAdded": "This device is already connected to this space and cannot connect again",
   "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
     "placeholders": {
@@ -252,13 +252,13 @@
   "chatPageSetLockCleared": "PIN cleared. Anyone who has access to this device can visit your space.",
   "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
-  "chatPageInviteDialogTitleAttachSelf": "Authorize my new device",
+  "chatPageInviteDialogTitleAttachSelf": "Add my new device",
   "chatPageInviteDialogTitleReinvite": "Re-invite",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
-  "chatPageInviteDialogHintAttachSelf": "Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintAttachSelf": "Authorize my another device to connect to this space. One-time use, valid for 24 hours.",
   "chatPageInviteDialogHintInvite": "Send the authorization code below to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintReinvite": "If “{name}” loses all devices into this space, send the dedicated authorization code below to “{name}” to join again. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintReinvite": "Send the dedicated authorization code below to “{name}” to join this space again. One-time use, valid for 24 hours.",
   "chatPageInviteDialogReinviteFallbackName": "them",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -481,10 +481,10 @@
       }
     }
   },
-  "chatPageEntranceListFailed": "Could not load other devices (offline?)",
+  "chatPageEntranceListFailed": "Failed to load device list.",
   "chatPageEntranceScopeHint": "You can connect multiple devices to this space.",
   "chatPageEntranceName": "Current device name",
-  "chatPageEntranceListNew": "Authorize my new device",
+  "chatPageEntranceListNew": "Add my new device",
   "chatPagePinLabel": "PIN",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "Notifications",
@@ -618,7 +618,7 @@
       }
     }
   },
-  "chatPageEntranceUnrecognized": "This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.",
+  "chatPageEntranceUnrecognized": "This device is not recognized by the server. Local messages only, no sync.",
   "chatPageMsgsSyncing": "Waiting to sync… Service temporarily unavailable, local messages only",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
@@ -849,7 +849,7 @@
   "aboutDnsPoisonUnknownIp": "unknown",
   "aboutDnsPoisonNote": "Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown",
   "advancedMenuTitle": "Advanced security",
-  "advancedDestroyEntrance": "Destroy this device channel",
+  "advancedDestroyEntrance": "Unbind this device",
   "advancedClearMessages": "Delete all messages",
   "clearMessagesMessage": "Deletes all messages and attachments saved in the current device. The device stays usable and will keep receiving new messages. Other devices are unaffected.",
   "clearMessagesConfirm": "Delete",
@@ -862,8 +862,8 @@
       }
     }
   },
-  "leaveSpaceTitle": "Destroy this device channel?",
-  "leaveSpaceMessage": "Permanently erases the current device channel, and you can't visit the current space on this device. This cannot be undone!",
+  "leaveSpaceTitle": "Unbind this device?",
+  "leaveSpaceMessage": "Unbinding erases all local data for the current space, and this device will no longer be able to access this space. This cannot be undone!",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {
