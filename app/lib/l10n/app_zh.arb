@@ -243,7 +243,7 @@
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
   "chatPageInviteDialogHintInvite": "把以下的专属授权码发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintAttachSelf": "使用以下的专属授权码，在我的其他设备上加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintAttachSelf": "使用以下的专属授权码，连接我的其他设备到本秘境。24 小时内一次性有效。",
   "chatPageInviteDialogHintReinvite": "如果“{name}”丢失了进入本秘境的所有设备，可凭以下的专属授权码重新加入本秘境。24 小时内一次性有效。",
   "chatPageInviteDialogReinviteFallbackName": "对方",
   "@chatPageInviteDialogHintReinvite": {
@@ -801,7 +801,7 @@
   "aboutDnsPoisonUnknownIp": "未知",
   "aboutDnsPoisonNote": "当前网络在劫持该域名的解析（上面是它给出的假地址）；连接已由加密解析（DoH）自动修复，事件已上报服务器。真地址已保护不展示",
   "advancedMenuTitle": "高级安全",
-  "advancedDestroyEntrance": "销毁本设备",
+  "advancedDestroyEntrance": "销毁本设备通道",
   "advancedClearMessages": "删除所有消息",
   "clearMessagesMessage": "删除当前设备保存的所有消息和附件。本设备仍然可用，将继续收到新消息。其他设备不受影响。",
   "clearMessagesConfirm": "删除",
@@ -814,8 +814,8 @@
       }
     }
   },
-  "leaveSpaceTitle": "销毁本设备？",
-  "leaveSpaceMessage": "彻底销毁当前设备，无法再通过本设备访问当前秘境。此操作无法撤销！",
+  "leaveSpaceTitle": "销毁本设备通道？",
+  "leaveSpaceMessage": "彻底销毁当前设备通道，无法再通过本设备访问当前秘境。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {

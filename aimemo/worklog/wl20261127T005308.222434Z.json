@@ -1,0 +1,18 @@
+{
+  "utc": "20261127T005308.222434Z",
+  "time": "2026-11-27 08:53+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "键名改 chatPageEntranceName、销毁文案改「设备通道」、cli/tui 术语迁移",
+      "detail": [
+        "三点老板反馈的落地：① 键名 chatPageEntranceListThisDevice 改为 chatPageEntranceName（该键值就是"当前设备名称"输入框标签，原键名冗余）；② 「销毁本设备」语义不通，改「销毁本设备通道」（销毁的是设备连到秘境的通道，不是设备本身），leaveSpaceMessage 同步；③ cli/tui 字符串字面量迁移：通道码→授权码（32 处）、通道→设备，注释保留（实现层文档，entrance 概念原样）。",
+        "cli 迁移踩坑：正则按引号段替换被嵌套单引号干扰（'/help 查看命令 /entoken 生成通道码…' 在嵌套串里漏替换），改用逐行方式（跳过 // 注释行、行内 // 后不碰）后清零；残留 163 处全部在注释里。",
+        "验证：app flutter analyze 全量干净 + chat_page_menu/tombstone/attachment_storage/multi_space 测试全过 + flutter build macos --debug 成功 + bash scripts/testAll.sh cli 全过（analyze + dart test 28 用例）。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

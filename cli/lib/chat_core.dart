@@ -217,7 +217,7 @@ class ChatSession {
     // 未登记（登记失败/通道码输错）时 entranceId 为 null——先检查，避免空断言崩溃
     final entranceId = store.entranceId;
     if (entranceId == null) {
-      throw StateError('通道尚未绑定秘境，请先 /space create（新建）或 /space join <通道码或邀请链接>（加入）');
+      throw StateError('设备尚未绑定秘境，请先 /space create（新建）或 /space join <授权码或邀请链接>（加入）');
     }
     // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
     // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。
@@ -225,8 +225,8 @@ class ChatSession {
     try {
       challenge = await api.challenge(entranceId, spaceId: store.spaceId);
     } on ApiException catch (e) {
-      // 挑战被明确拒绝为"通道已撤销" → 通知 UI 清盘退出（其他失败原样抛出：
-      // FORBIDDEN 只是"服务器不认本通道"，最常见的原因是后台库被重置，绝不能删数据）
+      // 挑战被明确拒绝为"设备已撤销" → 通知 UI 清盘退出（其他失败原样抛出：
+      // FORBIDDEN 只是"服务器不认本设备"，最常见的原因是后台库被重置，绝不能删数据）
       if (e.code == 'ENTRANCE_REVOKED') onEntranceRevoked?.call();
       rethrow;
     }

@@ -78,7 +78,7 @@ class EntranceStore {
   int? lockSeconds;
 
   /// 安装级标识（服务端 `entrances.install_uid` 的来源）：服务端据此把同一台物理设备
-  /// 在各空间的 entrance_id 认成一台。**TUI 的粒度是"一个 store = 一条通道"**（见
+  /// 在各空间的 entrance_id 认成一台。**TUI 的粒度是"一个 store = 一条设备"**（见
   /// `_deleteLocalData` 的注释：同机多 store 是刻意的多通道模拟），故各 store 各一份；
   /// 随 create/join 上报，存量 store 由启动时补登（`_registerInstallUid`）。
   /// 惰性生成，见 [ensureInstallUid]。
@@ -221,7 +221,7 @@ class EntranceStore {
 
   void requireSpace() {
     if (spaceKey == null || spaceId == null) {
-      throw StateError('通道尚未导入 Space Key（先运行 config 或 import）');
+      throw StateError('设备尚未导入 Space Key（先运行 config 或 import）');
     }
   }
 

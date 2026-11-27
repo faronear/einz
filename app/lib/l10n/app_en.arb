@@ -483,7 +483,7 @@
   },
   "chatPageEntranceListFailed": "Could not load other devices (offline?)",
   "chatPageEntranceScopeHint": "You can connect multiple devices to this space.",
-  "chatPageEntranceListThisDevice": "Current device name",
+  "chatPageEntranceName": "Current device name",
   "chatPageEntranceListNew": "Add my new device",
   "chatPagePinLabel": "PIN",
   "chatPagePinMenuValue": "{duration}",

@@ -1400,11 +1400,11 @@ abstract class AppLocalizations {
   /// **'You can connect multiple devices to this space.'**
   String get chatPageEntranceScopeHint;
 
-  /// No description provided for @chatPageEntranceListThisDevice.
+  /// No description provided for @chatPageEntranceName.
   ///
   /// In en, this message translates to:
   /// **'Current device name'**
-  String get chatPageEntranceListThisDevice;
+  String get chatPageEntranceName;
 
   /// No description provided for @chatPageEntranceListNew.
   ///

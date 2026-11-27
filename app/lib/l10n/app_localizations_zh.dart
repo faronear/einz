@@ -746,7 +746,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceScopeHint => '可将多台设备连接到当前秘境。';
 
   @override
-  String get chatPageEntranceListThisDevice => '当前设备名称';
+  String get chatPageEntranceName => 'Current device name';
 
   @override
   String get chatPageEntranceListNew => '添加我的新设备';
@@ -1299,7 +1299,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedMenuTitle => '高级安全';
 
   @override
-  String get advancedDestroyEntrance => '销毁本设备';
+  String get advancedDestroyEntrance => '销毁本设备通道';
 
   @override
   String get advancedClearMessages => '删除所有消息';
@@ -1320,10 +1320,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get leaveSpaceTitle => '销毁本设备？';
+  String get leaveSpaceTitle => '销毁本设备通道？';
 
   @override
-  String get leaveSpaceMessage => '彻底销毁当前设备，无法再通过本设备访问当前秘境。此操作无法撤销！';
+  String get leaveSpaceMessage => '彻底销毁当前设备通道，无法再通过本设备访问当前秘境。此操作无法撤销！';
 
   @override
   String resetEntranceNameLabel(String name) {

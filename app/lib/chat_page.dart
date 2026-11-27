@@ -5492,7 +5492,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 focusNode: nameFocus,
                 autofocus: true,
                 decoration: InputDecoration(
-                  labelText: l10n.chatPageEntranceListThisDevice,
+                  labelText: l10n.chatPageEntranceName,
                   border: const OutlineInputBorder(),
                   counterText: '',
                 ),

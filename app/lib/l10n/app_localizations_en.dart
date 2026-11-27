@@ -795,7 +795,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'You can connect multiple devices to this space.';
 
   @override
-  String get chatPageEntranceListThisDevice => 'Current device name';
+  String get chatPageEntranceName => 'Current device name';
 
   @override
   String get chatPageEntranceListNew => 'Add my new device';

@@ -1240,7 +1240,7 @@ void main() {
     await _openCurrentEntranceRename(tester);
 
     expect(find.text(_zh.chatPageRenameEntranceTitle), findsOneWidget, reason: '弹窗标题');
-    expect(find.text(_zh.chatPageEntranceListThisDevice), findsWidgets, reason: '输入框标签');
+    expect(find.text(_zh.chatPageEntranceName), findsWidgets, reason: '输入框标签');
     // 老板 2026-10-24：不再有初始只读态/编辑按钮——弹窗打开即直接输入
     expect(find.byIcon(Icons.edit), findsNothing, reason: '冻结态已取消，无编辑按钮');
 
