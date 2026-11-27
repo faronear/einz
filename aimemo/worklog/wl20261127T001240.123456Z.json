@@ -12,7 +12,9 @@
         "chatPageEntranceScopeHint 改为直陈要点（en: You can connect multiple devices to this space. / zh: 您能够连接多个设备到当前秘境。）。",
         "www/howto/get_started/_enus.md 同步术语迁移：entrance code → authorization code、Add a new entrance of mine → Add a new device of mine。",
         "老板手改邀请弹窗文案：AttachSelf 标题与入口行改 Authorize my new device / 授权我的新设备（授权语义，与授权码呼应）；HintInvite 提前到 AttachSelf 之前。",
-        "老板明确要求提交其文案修改；未推送。"
+        "老板明确要求提交其文案修改；未推送。",
+        "追加（同日）：邀请弹窗与 scope hint 的「连接」→「绑定」2 处（设备与秘境是归属关系，网络连接语义保留不动）；en 保持 connect 不动。cli/tui 排查确认无对应改动——剩余 24 处「连接」全是网络语义。",
+        "追加 2（同日）：TUI 未识别提示缩短——「⚠️ 本机未被服务器识别。仅可查看本地历史，不能同步消息。」（老板手改，原两句提示过长）。"
       ]
     }
   ]
