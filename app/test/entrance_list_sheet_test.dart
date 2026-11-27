@@ -636,7 +636,7 @@ void main() {
     expect(sheetDot(Colors.green), findsOneWidget);
     expect(sheetTimeText(), findsNothing);
     // 其他设备区失败提示 + 「新建设备」仍在
-    expect(sheetTextContaining('无法获取其他设备'), findsOneWidget);
+    expect(sheetTextContaining('无法获取设备列表'), findsOneWidget);
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
   });
 
@@ -739,11 +739,11 @@ void main() {
           return 'fresh';
         });
 
-    // 续期后重试成功：其他设备照常列出，而不是"无法获取其他设备（当前离线？）"
+    // 续期后重试成功：其他设备照常列出，而不是"无法获取设备列表。"
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('iPad'), findsOneWidget,
         reason: '401 的直接请求应被续期后重试，而不是把失败亮给用户');
-    expect(sheetTextContaining('无法获取其他设备'), findsNothing);
+    expect(sheetTextContaining('无法获取设备列表'), findsNothing);
     expect(reauthCalls, 1, reason: '一处过期只该续期一次');
     expect(api.tokensSeen, contains('tok'), reason: '第一次确实用旧 token 发了（才 401）');
     expect(api.tokensSeen, contains('fresh'), reason: '重试用的是续期后的新 token');

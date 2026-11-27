@@ -1,0 +1,18 @@
+{
+  "utc": "20261127T083653.602901Z",
+  "time": "2026-11-27 16:36+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修 testAll：entrance_list_sheet_test 断言同步「无法获取设备列表」",
+      "detail": [
+        "老板跑 testAll 发现 app 全量测试挂 1 个：entrance_list_sheet_test 断言 '无法获取其他设备'——boss 后续文案精简把 chatPageEntranceListFailed 改为 '无法获取设备列表。'，断言没跟上。",
+        "修法：两处断言与注释同步为 '无法获取设备列表'。",
+        "验证：entrance_list_sheet_test 单跑通过 + flutter test 全量 419 用例全过 + analyze 干净。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
