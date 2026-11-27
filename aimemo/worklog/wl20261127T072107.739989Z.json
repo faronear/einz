@@ -1,0 +1,19 @@
+{
+  "utc": "20261127T072107.739989Z",
+  "time": "2026-11-27 15:21+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "修 testAll：entrance_list_sheet_test 残留旧字面量「无法获取其他通道」",
+      "detail": [
+        "老板跑 testAll 发现 app 全量测试挂 1 个：entrance_list_sheet_test 断言 '无法获取其他通道'——entrance→device 迁移时漏改了测试字面量（arb 已改为「无法获取其他设备」）。",
+        "修法：两处断言同步为 '无法获取其他设备'（含一处注释）。其余测试里的「通道」均为注释/用例名/reason，不影响断言。",
+        "教训：arb 文案层面的批量迁移要连测试字面量断言一起 grep 同步（本次 通道→设备 与上销毁闸门同理）。",
+        "验证：entrance_list_sheet_test 单跑通过 + flutter test 全量 419 用例全过 + analyze 干净。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
