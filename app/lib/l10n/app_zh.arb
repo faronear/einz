@@ -444,7 +444,7 @@
   "chatPageMembersInviteNew": "邀请新同伴",
   "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
   "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",
-  "chatPageEntranceScopeHint": "通道是设备连接到秘境的专属线路。以下是您在当前秘境的所有通道。",
+  "chatPageEntranceScopeHint": "您能够绑定多个设备到同一个秘境。以下是您在当前秘境的所有通道。",
   "chatPageEntranceListThisDevice": "当前通道名称",
   "chatPageEntranceListNew": "添加我的新通道",
   "chatPagePinLabel": "锁屏码",

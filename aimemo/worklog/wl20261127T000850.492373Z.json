@@ -1,0 +1,17 @@
+{
+  "utc": "20261127T000850.492373Z",
+  "time": "2026-11-27 08:08+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "英文菜单文案缩短为 Notifications",
+      "detail": [
+        "老板拍简：Message Notifications → Notifications（菜单语境下单数即可，与其他短名菜单项一致）。中文「新消息通知」不动。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

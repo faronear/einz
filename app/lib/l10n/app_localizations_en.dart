@@ -809,10 +809,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageNotifyLabel => 'Message Notifications';
+  String get chatPageNotifyLabel => 'Notifications';
 
   @override
-  String get chatPageNotifyTitle => 'Message Notifications';
+  String get chatPageNotifyTitle => 'Notifications';
 
   @override
   String get chatPageNotifyHint =>
