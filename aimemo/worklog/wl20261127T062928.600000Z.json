@@ -1,0 +1,11 @@
+{ "utc": "20261127T062928.6Z", "time": "2026-11-27 14:29+08:00", "host": "doomship.local", "os": "Darwin", "user": "luk", "agent": "atomcode",
+  "notes": [
+    { "brief": "macBook dev：localhost:3000 连不上 → 改 127.0.0.1", "detail": [
+      "现象：macBook 上 npm run server-run-dev + app-mac-run 后 mac debug app 无法连接服务器，服务器本身正常（curl http://localhost:3000/health 200）。",
+      "根因：macOS 上 localhost 优先解析 IPv6 ::1，node dev server 只监听 IPv4（lsof 见 *:3000 即 0.0.0.0:3000）；curl 会自动回退 127.0.0.1 所以终端测通，Dart HttpClient 解析到 ::1 被拒后不回退 → app 连不上。curl http://[::1]:3000/health 拒连实锤。iMac 没发作是侥幸。",
+      "修复：package.json 6 处、app/localConfig.macos.json、app/localConfig.example.json 里 http://localhost:3000 全部改为 http://127.0.0.1:3000。重启 app-mac-run 后老板新建空间连接正常。",
+      "遗留①：npm script 的 SERVER= 运行期覆盖会把 --server= 直接传给 flutter run 导致 Could not find an option，需改成经 -- 转发给 app。",
+      "遗留②：macBook 的 Clash Verge (mihomo) runtime 未加载 Script.js 的 tic.cc 直连规则，einz.tic.cc 被劫持成 fake-ip 198.18.x.x 连不通；需在 Verge UI 重切订阅生效。本次 app 走 127.0.0.1 未受影响。",
+      "本次会话另修：macBook 首次跑 macos debug 截图无反应——TCC 屏幕录制权限 + 沙盒组合，授权 Debug/einz.app 屏幕录制后正常。"
+    ] }
+  ] }
