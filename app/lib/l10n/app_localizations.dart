@@ -827,7 +827,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Add my new device'**
+  /// **'Authorize my new device'**
   String get chatPageInviteDialogTitleAttachSelf;
 
   /// No description provided for @chatPageInviteDialogTitleReinvite.
@@ -848,17 +848,17 @@ abstract class AppLocalizations {
   /// **'Regenerate'**
   String get chatPageInviteRegenerate;
 
-  /// No description provided for @chatPageInviteDialogHintInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'Send the dedicated authorization code below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
-  String get chatPageInviteDialogHintInvite;
-
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
   /// **'Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
+
+  /// No description provided for @chatPageInviteDialogHintInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the authorization code below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
+  String get chatPageInviteDialogHintInvite;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
@@ -1409,7 +1409,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'Add my new device'**
+  /// **'Authorize my new device'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPagePinLabel.

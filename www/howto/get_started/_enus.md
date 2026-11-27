@@ -27,11 +27,11 @@ Follow the wizard on first launch:
 
 ## Step 3: Invite your companion
 
-Open the menu and tap **Invite** to generate an **entrance code**, then send it through whatever channel you already share (in person, SMS, chat). The code is valid once, within 24 hours.
+Open the menu and tap **Invite** to generate an **authorization code**, then send it through whatever channel you already share (in person, SMS, chat). The code is valid once, within 24 hours.
 
 Your companion installs the app, chooses **Join a space** at launch, enters the code and the shared passphrase — and they're in.
 
-> There are three kinds of codes: **Invite** (bring in someone new), **Add a new entrance of mine** (for your own new device), and **Re-invite** (when your companion has lost all their entrances).
+> There are three kinds of codes: **Invite** (bring in someone new), **Add a new device of mine** (for your own new device), and **Re-invite** (when your companion has lost all their entrances).
 
 ## Step 4: Start chatting
 

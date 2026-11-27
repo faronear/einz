@@ -410,7 +410,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => '邀请';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => '添加我的新设备';
+  String get chatPageInviteDialogTitleAttachSelf => '授权我的新设备';
 
   @override
   String get chatPageInviteDialogTitleReinvite => '重新邀请';
@@ -422,16 +422,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteRegenerate => '重新生成';
 
   @override
-  String get chatPageInviteDialogHintInvite =>
-      '把以下的专属授权码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
-
-  @override
   String get chatPageInviteDialogHintAttachSelf =>
       '使用以下的专属授权码，连接我的其他设备到本秘境。24 小时内一次性有效。';
 
   @override
+  String get chatPageInviteDialogHintInvite =>
+      '把以下授权码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
+
+  @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '如果“$name”丢失了进入本秘境的所有设备，可凭以下的专属授权码重新加入本秘境。24 小时内一次性有效。';
+    return '如果“$name”丢失了进入本秘境的所有设备，可凭以下的专属授权码重新加入。24 小时内一次性有效。';
   }
 
   @override
@@ -743,13 +743,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListFailed => '无法获取其他设备（当前离线？）';
 
   @override
-  String get chatPageEntranceScopeHint => '可将多台设备连接到当前秘境。';
+  String get chatPageEntranceScopeHint => '可授权多台设备连接到当前秘境。';
 
   @override
   String get chatPageEntranceName => 'Current device name';
 
   @override
-  String get chatPageEntranceListNew => '添加我的新设备';
+  String get chatPageEntranceListNew => '授权我的新设备';
 
   @override
   String get chatPagePinLabel => '锁屏码';

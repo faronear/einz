@@ -440,7 +440,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => 'Invite';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => 'Add my new device';
+  String get chatPageInviteDialogTitleAttachSelf => 'Authorize my new device';
 
   @override
   String get chatPageInviteDialogTitleReinvite => 'Re-invite';
@@ -452,12 +452,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteRegenerate => 'Regenerate';
 
   @override
-  String get chatPageInviteDialogHintInvite =>
-      'Send the dedicated authorization code below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
-
-  @override
   String get chatPageInviteDialogHintAttachSelf =>
       'Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.';
+
+  @override
+  String get chatPageInviteDialogHintInvite =>
+      'Send the authorization code below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
@@ -798,7 +798,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceName => 'Current device name';
 
   @override
-  String get chatPageEntranceListNew => 'Add my new device';
+  String get chatPageEntranceListNew => 'Authorize my new device';
 
   @override
   String get chatPagePinLabel => 'PIN';

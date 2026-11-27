@@ -1,0 +1,19 @@
+{
+  "utc": "20261127T001240.123456Z",
+  "time": "2026-11-27 08:15+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "文案修改入库：scope hint 直陈要点、英文入门文档与邀请弹窗同步 device 术语",
+      "detail": [
+        "chatPageEntranceScopeHint 改为直陈要点（en: You can connect multiple devices to this space. / zh: 您能够连接多个设备到当前秘境。）。",
+        "www/howto/get_started/_enus.md 同步术语迁移：entrance code → authorization code、Add a new entrance of mine → Add a new device of mine。",
+        "老板手改邀请弹窗文案：AttachSelf 标题与入口行改 Authorize my new device / 授权我的新设备（授权语义，与授权码呼应）；HintInvite 提前到 AttachSelf 之前。",
+        "老板明确要求提交其文案修改；未推送。"
+      ]
+    }
+  ]
+}
