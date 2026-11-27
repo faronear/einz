@@ -427,7 +427,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '使用以下的专属授权码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
+      '使用以下的专属授权码，连接我的其他设备到本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {

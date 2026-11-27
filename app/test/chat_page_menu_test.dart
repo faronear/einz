@@ -2019,8 +2019,9 @@ void main() {
     expect(find.text('清除本设备全部数据'), findsNothing, reason: '整机清空不该出现在单个空间里');
 
     await tapDeferred(tester, find.text(_zh.advancedDestroyEntrance));
-    expect(find.text('销毁本设备？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
-    expect(find.text('请输入当前设备名称“iPhone”'), findsOneWidget, reason: '闸门框上备注：照抄设备名');
+    expect(find.text(_zh.leaveSpaceTitle), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text(_zh.resetEntranceNameHint('iPhone')),
+        findsOneWidget, reason: '闸门框上备注：照抄设备名');
     expect(find.text('iPhone'), findsWidgets, reason: '框内 hint 显示通道名');
   });
 

@@ -1,0 +1,19 @@
+{
+  "utc": "20261127T005702.459081Z",
+  "time": "2026-11-27 08:57+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "销毁闸门测试断言改用 l10n getter（修复 CI 隐患）",
+      "detail": [
+        "老板指出 chat_page_menu_test.dart:2022 还在断言旧文案 '销毁本设备？'——arb 已改为 '销毁本设备通道？'（leaveSpaceTitle），下次 CI 必挂。",
+        "修法：断言改用 l10n getter——leaveSpaceTitle 与 resetEntranceNameHint('iPhone')（后者带 {name} 占位参数），不再硬编码中文文案，文案再改也不会挂测试。",
+        "顺带：app_localizations_zh.dart 的未提交差异是 gen-l10n 重生成产物（对应已提交的 arb），一并入库保持生成文件与 arb 同步。",
+        "验证：chat_page_menu_test 47 用例全过 + analyze 干净。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
