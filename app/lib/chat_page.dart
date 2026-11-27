@@ -10966,11 +10966,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 沙漏图标与顶栏标记同族（_BurnHourglass，老板 2026-09-28）：
                       // 未焚毁态是翻转动画的实沙漏；尺寸与 devices 图标一致（18）
                       const _BurnHourglass(burned: false, size: 18),
-                      const SizedBox(width: 4),
-                      // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
-                      // 选了具体时长才在右侧显示（老板 2026-09-15）
-                      if (_burnSeconds > 0)
+                      // 间距只在显示档位值时占位（老板 2026-11-27：无值时沙漏
+                      // 右侧多出 4px 空白，与 notifications 图标的右缘不齐）
+                      if (_burnSeconds > 0) ...[
+                        const SizedBox(width: 4),
                         _menuValue(_burnOptionLabel(_burnSeconds, l10n), valueStyle),
+                      ],
                     ],
                   ),
                 ),

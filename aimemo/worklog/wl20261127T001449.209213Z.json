@@ -1,0 +1,18 @@
+{
+  "utc": "20261127T001449.209213Z",
+  "time": "2026-11-27 08:14+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "阅后即焚行：4px 间距仅在显示档位值时占位",
+      "detail": [
+        "老板反馈：未设置阅后即焚时，主菜单里阅后即焚的沙漏图标比新消息通知的铃铛多一段右侧空白。根因：图标后的 SizedBox(width:4) 常驻占位——那是给右侧档位值的间距，无值时仍留着。",
+        "修法：SizedBox(4) 挪进 if (_burnSeconds > 0) 分支，与 notifyValue 的条件展开同款；无值时沙漏右缘与其他菜单图标齐平。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
