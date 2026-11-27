@@ -1,0 +1,17 @@
+{
+  "utc": "20261127T000652.716075Z",
+  "time": "2026-11-27 08:06+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "「新消息通知」移到阅后即焚上方",
+      "detail": [
+        "老板要求：菜单项从阅后即焚之后移到其上方（阅后即焚 → 更多设置 顺序不变）。",
+        "验证：analyze 干净 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

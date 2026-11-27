@@ -10935,25 +10935,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'burn',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuBurnLabel, style: captionStyle),
-                      const Spacer(),
-                      // 沙漏图标与顶栏标记同族（_BurnHourglass，老板 2026-09-28）：
-                      // 未焚毁态是翻转动画的实沙漏；尺寸与 devices 图标一致（18）
-                      const _BurnHourglass(burned: false, size: 18),
-                      const SizedBox(width: 4),
-                      // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
-                      // 选了具体时长才在右侧显示（老板 2026-09-15）
-                      if (_burnSeconds > 0)
-                        _menuValue(_burnOptionLabel(_burnSeconds, l10n), valueStyle),
-                    ],
-                  ),
-                ),
-                // 新消息通知（2026-11-26 改名并移到阅后即焚之后，老板定：即将新增
+                // 新消息通知（2026-11-26 改名并放到阅后即焚上方，老板定：即将新增
                 // Bark 等通知方式，邮件只是渠道之一）。2026-10-01 起：没进应用商店
                 // → 没有后台推送，用邮件把离线的人拉回来。
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
@@ -10971,6 +10953,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         const SizedBox(width: 4),
                         notifyValue,
                       ],
+                    ],
+                  ),
+                ),
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
+                  height: kMenuRowHeight,
+                  value: 'burn',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuBurnLabel, style: captionStyle),
+                      const Spacer(),
+                      // 沙漏图标与顶栏标记同族（_BurnHourglass，老板 2026-09-28）：
+                      // 未焚毁态是翻转动画的实沙漏；尺寸与 devices 图标一致（18）
+                      const _BurnHourglass(burned: false, size: 18),
+                      const SizedBox(width: 4),
+                      // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
+                      // 选了具体时长才在右侧显示（老板 2026-09-15）
+                      if (_burnSeconds > 0)
+                        _menuValue(_burnOptionLabel(_burnSeconds, l10n), valueStyle),
                     ],
                   ),
                 ),
