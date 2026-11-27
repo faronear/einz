@@ -37,7 +37,7 @@
   "wizardJoinPassphraseRequired": "Enter the shared passphrase",
   "wizardStartTitle": "Einz",
   "wizardDetectTitle": "Checking server status…",
-  "wizardDetectHint": "Auto-detects if this is the first entrance",
+  "wizardDetectHint": "Auto-detects if this is the first device",
   "wizardDetectFailed": "Cannot reach server — retrying…",
   "wizardProbeConnecting": "Connecting to {server}…",
   "@wizardProbeConnecting": {
@@ -78,7 +78,7 @@
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
   "wizardTitlePassphrase": "Set passphrase",
   "wizardJoinPassphraseTitle": "Verify passphrase",
-  "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.",
+  "wizardEnrollExists": "This server already has a space (created by another device). Use the Join flow with a one-time authorization code from the other person.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
   "@wizardEnrollFailed": {
@@ -136,7 +136,7 @@
       }
     }
   },
-  "setupTokenRateLimitedNoWait": "Too many requests — try again later (this is not a problem with the entrance token)",
+  "setupTokenRateLimitedNoWait": "Too many requests — try again later (this is not a problem with the authorization code)",
   "@setupTokenAppTooOld": {
     "placeholders": {
       "code": {
@@ -144,14 +144,14 @@
       }
     }
   },
-  "setupTokenTitle": "Verify entrance token",
-  "setupTokenHint": "Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.",
-  "setupTokenInputHint": "Entrance token",
-  "setupTokenNeedInput": "Enter the entrance token",
-  "setupTokenInvalid": "Invalid entrance token",
-  "setupTokenExpired": "Entrance token expired",
-  "setupTokenUsed": "Entrance token already used",
-  "setupTokenSpaceAlreadyAdded": "This device has already an entrance to this space (one device can hold only one entrance to a space)",
+  "setupTokenTitle": "Verify authorization code",
+  "setupTokenHint": "Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified device in the space.",
+  "setupTokenInputHint": "Authorization code",
+  "setupTokenNeedInput": "Enter the authorization code",
+  "setupTokenInvalid": "Invalid authorization code",
+  "setupTokenExpired": "Authorization code expired",
+  "setupTokenUsed": "Authorization code already used",
+  "setupTokenSpaceAlreadyAdded": "This device is already connected to this space (one device can hold only one connection to a space)",
   "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
     "placeholders": {
@@ -176,9 +176,9 @@
   "startupInitClearDataTitle": "Clear local data?",
   "startupInitClearDataMessage": "Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.",
   "startupInitClearedRestart": "Local data cleared. Fully quit and reopen the app.",
-  "setupPageScanInvite": "Scan entrance token QR code",
-  "setupPageScannerHint": "Point the camera at the entrance token QR code",
-  "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first entrance first",
+  "setupPageScanInvite": "Scan authorization code QR code",
+  "setupPageScannerHint": "Point the camera at the authorization code QR code",
+  "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first device first",
   "setupPageEscrowFailed": "❌ Shared passphrase join failed: {error}",
   "@setupPageEscrowFailed": {
     "placeholders": {
@@ -187,7 +187,7 @@
       }
     }
   },
-  "setupJoinEntranceLimitReached": "This space has reached the server's entrance limit — no new entrance can be opened.",
+  "setupJoinEntranceLimitReached": "This space has reached the server's device limit — no new device can be added.",
   "setPinDialogSetPin": "Apply",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
@@ -252,13 +252,13 @@
   "chatPageSetLockCleared": "PIN cleared. Anyone who has access to this device can visit your space.",
   "chatPageLockClearConfirm": "Clear",
   "chatPageInviteDialogTitleInvite": "Invite",
-  "chatPageInviteDialogTitleAttachSelf": "Add my new entrance",
+  "chatPageInviteDialogTitleAttachSelf": "Add my new device",
   "chatPageInviteDialogTitleReinvite": "Re-invite",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
-  "chatPageInviteDialogHintInvite": "Send the dedicated entrance token below to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintAttachSelf": "Use the dedicated entrance token below on my another device to connect to this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintReinvite": "If “{name}” loses all entrances into this space, send the dedicated entrance token below to “{name}” to join again. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintInvite": "Send the dedicated authorization code below to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintAttachSelf": "Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintReinvite": "If “{name}” loses all devices into this space, send the dedicated authorization code below to “{name}” to join again. One-time use, valid for 24 hours.",
   "chatPageInviteDialogReinviteFallbackName": "them",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -268,8 +268,8 @@
     }
   },
   "chatPageInviteLinkCopied": "Invite link copied",
-  "chatPageInviteCodeCopied": "Entrance token copied",
-  "chatPageInviteFailed": "Failed to create the entrance token: {error}",
+  "chatPageInviteCodeCopied": "Authorization code copied",
+  "chatPageInviteFailed": "Failed to create the authorization code: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
       "error": {
@@ -298,9 +298,9 @@
   "chatPageGroupNameTitle": "Group name",
   "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
-  "chatPageRenameEntranceTitle": "Current entrance",
-  "chatPageRenameEntranceHint": "Rename the current entrance, up to 32 characters",
-  "chatPageRenameEntranceEmptyError": "Enter the entrance name",
+  "chatPageRenameEntranceTitle": "Current device",
+  "chatPageRenameEntranceHint": "Rename the current device, up to 32 characters",
+  "chatPageRenameEntranceEmptyError": "Enter the device name",
   "chatPageRenameEntranceInvalidError": "Only Chinese/English letters, digits, _ and - are allowed",
   "chatPageRenameEntranceTooLongError": "At most {max} characters",
   "@chatPageRenameEntranceTooLongError": {
@@ -353,7 +353,7 @@
   "chatPageChangePassphraseSame": "New passphrase cannot be the same as the current one",
   "chatPageChangePassphraseOldRequired": "Enter your current passphrase first",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
-  "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new entrances must use the new one",
+  "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new devices must use the new one",
   "@chatPageChangePassphraseDone": {
     "placeholders": {
       "mode": {
@@ -369,7 +369,7 @@
       }
     }
   },
-  "chatPageEscrowRotatedNotice": "{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create entrance tokens or change it",
+  "chatPageEscrowRotatedNotice": "{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create authorization codes or change it",
   "@chatPageEscrowRotatedNotice": {
     "placeholders": {
       "mode": {
@@ -396,12 +396,12 @@
   "chatPageUiStyleGradient": "Gradient",
   "chatPageUiStyleGradientDesc": "Pink-blue gradient in the brand colors",
   "chatPageMenuBurnLabel": "Burn-after-read",
-  "chatPageMenuEntranceList": "My entrances",
+  "chatPageMenuEntranceList": "My devices",
   "wizardJoinInviteHint": "Invited by “{name}”",
   "wizardJoinInviteHintNoName": "Invited to join a space",
-  "wizardJoinAttachHint": "Add a new entrance of “{name}”",
-  "wizardJoinReinviteHint": "Invited by “{name}” to add a new entrance of “{target}”",
-  "wizardJoinReinviteHintNoName": "Invited to add a new entrance of “{target}”",
+  "wizardJoinAttachHint": "Add a new device of “{name}”",
+  "wizardJoinReinviteHint": "Invited by “{name}” to add a new device of “{target}”",
+  "wizardJoinReinviteHintNoName": "Invited to add a new device of “{target}”",
   "@wizardJoinReinviteHint": {
     "placeholders": {
       "name": {
@@ -481,10 +481,10 @@
       }
     }
   },
-  "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
-  "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your authorized entrances to this space.",
-  "chatPageEntranceListThisDevice": "Current entrance name",
-  "chatPageEntranceListNew": "Add my new entrance",
+  "chatPageEntranceListFailed": "Could not load other devices (offline?)",
+  "chatPageEntranceScopeHint": "You can connect multiple devices to this space.",
+  "chatPageEntranceListThisDevice": "Current device name",
+  "chatPageEntranceListNew": "Add my new device",
   "chatPagePinLabel": "PIN",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "Notifications",
@@ -618,7 +618,7 @@
       }
     }
   },
-  "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.",
+  "chatPageEntranceUnrecognized": "This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.",
   "chatPageMsgsSyncing": "Waiting to sync… Service temporarily unavailable, local messages only",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
@@ -743,7 +743,7 @@
       }
     }
   },
-  "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
+  "chatPageEntranceRevoked": "Device revoked — local data cleared, please set up again",
   "burnOptionOff": "Do not auto-burn",
   "burnSubmit": "Apply",
   "burnPreviewDelay": "{duration}",
@@ -849,9 +849,9 @@
   "aboutDnsPoisonUnknownIp": "unknown",
   "aboutDnsPoisonNote": "Your network is hijacking DNS resolution for this domain (the fake address is shown above); the connection was automatically repaired via encrypted DNS (DoH) and the incident was reported to the server. The real address is protected and not shown",
   "advancedMenuTitle": "Advanced security",
-  "advancedDestroyEntrance": "Destroy this entrance",
+  "advancedDestroyEntrance": "Destroy this device",
   "advancedClearMessages": "Delete all messages",
-  "clearMessagesMessage": "Deletes all messages and attachments saved in the current entrance. The entrance stays usable and will keep receiving new messages. Other entrances are unaffected.",
+  "clearMessagesMessage": "Deletes all messages and attachments saved in the current device. The device stays usable and will keep receiving new messages. Other devices are unaffected.",
   "clearMessagesConfirm": "Delete",
   "clearMessagesDone": "All messages deleted.",
   "clearMessagesFailed": "Delete failed: {error}",
@@ -862,8 +862,8 @@
       }
     }
   },
-  "leaveSpaceTitle": "Destroy this entrance?",
-  "leaveSpaceMessage": "Permanently erases the current entrance, and you can't visit the current space on this device. This cannot be undone!",
+  "leaveSpaceTitle": "Destroy this device?",
+  "leaveSpaceMessage": "Permanently erases the current device, and you can't visit the current space on this device. This cannot be undone!",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {
@@ -872,7 +872,7 @@
       }
     }
   },
-  "resetEntranceNameHint": "Type the current entrance name “{name}”",
+  "resetEntranceNameHint": "Type the current device name “{name}”",
   "@resetEntranceNameHint": {
     "placeholders": {
       "name": {
@@ -880,11 +880,11 @@
       }
     }
   },
-  "resetEntranceNameMismatch": "Enter the correct entrance name to confirm",
+  "resetEntranceNameMismatch": "Enter the correct device name to confirm",
   "resetEntranceConfirmWord": "RESET",
   "resetEntrancePinLabel": "PIN",
   "resetEntrancePinHint": "Enter this device's PIN",
-  "resetEntranceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance",
+  "resetEntranceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; the others may still see this device",
   "spaceListHint": "Tap another space to switch to it",
   "spaceListTitle": "My Einz spaces",
   "spaceListEmpty": "No spaces joined yet",
@@ -915,7 +915,7 @@
   "exitGroupNameMismatch": "Enter the correct group name to confirm",
   "exitGroupConfirmWordHint": "This group has no name yet. Type “{word}” to confirm",
   "@exitGroupConfirmWordHint": {
-    "description": "Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed entrance)",
+    "description": "Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed device)",
     "placeholders": {
       "word": {
         "type": "String"

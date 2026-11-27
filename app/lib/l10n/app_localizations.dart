@@ -221,7 +221,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardDetectHint.
   ///
   /// In en, this message translates to:
-  /// **'Auto-detects if this is the first entrance'**
+  /// **'Auto-detects if this is the first device'**
   String get wizardDetectHint;
 
   /// No description provided for @wizardDetectFailed.
@@ -383,7 +383,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
-  /// **'This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.'**
+  /// **'This server already has a space (created by another device). Use the Join flow with a one-time authorization code from the other person.'**
   String get wizardEnrollExists;
 
   /// No description provided for @wizardEnrollGoJoin.
@@ -521,55 +521,55 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenRateLimitedNoWait.
   ///
   /// In en, this message translates to:
-  /// **'Too many requests — try again later (this is not a problem with the entrance token)'**
+  /// **'Too many requests — try again later (this is not a problem with the authorization code)'**
   String get setupTokenRateLimitedNoWait;
 
   /// No description provided for @setupTokenTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify entrance token'**
+  /// **'Verify authorization code'**
   String get setupTokenTitle;
 
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.'**
+  /// **'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified device in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Entrance token'**
+  /// **'Authorization code'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the entrance token'**
+  /// **'Enter the authorization code'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Invalid entrance token'**
+  /// **'Invalid authorization code'**
   String get setupTokenInvalid;
 
   /// No description provided for @setupTokenExpired.
   ///
   /// In en, this message translates to:
-  /// **'Entrance token expired'**
+  /// **'Authorization code expired'**
   String get setupTokenExpired;
 
   /// No description provided for @setupTokenUsed.
   ///
   /// In en, this message translates to:
-  /// **'Entrance token already used'**
+  /// **'Authorization code already used'**
   String get setupTokenUsed;
 
   /// No description provided for @setupTokenSpaceAlreadyAdded.
   ///
   /// In en, this message translates to:
-  /// **'This device has already an entrance to this space (one device can hold only one entrance to a space)'**
+  /// **'This device is already connected to this space (one device can hold only one connection to a space)'**
   String get setupTokenSpaceAlreadyAdded;
 
   /// No description provided for @setupTokenOtherServer.
@@ -623,19 +623,19 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageScanInvite.
   ///
   /// In en, this message translates to:
-  /// **'Scan entrance token QR code'**
+  /// **'Scan authorization code QR code'**
   String get setupPageScanInvite;
 
   /// No description provided for @setupPageScannerHint.
   ///
   /// In en, this message translates to:
-  /// **'Point the camera at the entrance token QR code'**
+  /// **'Point the camera at the authorization code QR code'**
   String get setupPageScannerHint;
 
   /// No description provided for @setupPageNoEscrow.
   ///
   /// In en, this message translates to:
-  /// **'❌ No escrow package for the shared passphrase on the server — set it on the first entrance first'**
+  /// **'❌ No escrow package for the shared passphrase on the server — set it on the first device first'**
   String get setupPageNoEscrow;
 
   /// No description provided for @setupPageEscrowFailed.
@@ -647,7 +647,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupJoinEntranceLimitReached.
   ///
   /// In en, this message translates to:
-  /// **'This space has reached the server\'s entrance limit — no new entrance can be opened.'**
+  /// **'This space has reached the server\'s device limit — no new device can be added.'**
   String get setupJoinEntranceLimitReached;
 
   /// No description provided for @setPinDialogSetPin.
@@ -827,7 +827,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Add my new entrance'**
+  /// **'Add my new device'**
   String get chatPageInviteDialogTitleAttachSelf;
 
   /// No description provided for @chatPageInviteDialogTitleReinvite.
@@ -851,19 +851,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintInvite.
   ///
   /// In en, this message translates to:
-  /// **'Send the dedicated entrance token below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
+  /// **'Send the dedicated authorization code below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintInvite;
 
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use the dedicated entrance token below on my another device to connect to this space. One-time use, valid for 24 hours.'**
+  /// **'Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'If “{name}” loses all entrances into this space, send the dedicated entrance token below to “{name}” to join again. One-time use, valid for 24 hours.'**
+  /// **'If “{name}” loses all devices into this space, send the dedicated authorization code below to “{name}” to join again. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -881,13 +881,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCodeCopied.
   ///
   /// In en, this message translates to:
-  /// **'Entrance token copied'**
+  /// **'Authorization code copied'**
   String get chatPageInviteCodeCopied;
 
   /// No description provided for @chatPageInviteFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to create the entrance token: {error}'**
+  /// **'Failed to create the authorization code: {error}'**
   String chatPageInviteFailed(String error);
 
   /// No description provided for @chatPageTitleBrand.
@@ -977,19 +977,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameEntranceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Current entrance'**
+  /// **'Current device'**
   String get chatPageRenameEntranceTitle;
 
   /// No description provided for @chatPageRenameEntranceHint.
   ///
   /// In en, this message translates to:
-  /// **'Rename the current entrance, up to 32 characters'**
+  /// **'Rename the current device, up to 32 characters'**
   String get chatPageRenameEntranceHint;
 
   /// No description provided for @chatPageRenameEntranceEmptyError.
   ///
   /// In en, this message translates to:
-  /// **'Enter the entrance name'**
+  /// **'Enter the device name'**
   String get chatPageRenameEntranceEmptyError;
 
   /// No description provided for @chatPageRenameEntranceInvalidError.
@@ -1139,7 +1139,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseDone.
   ///
   /// In en, this message translates to:
-  /// **'✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new entrances must use the new one'**
+  /// **'✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new devices must use the new one'**
   String chatPageChangePassphraseDone(String mode);
 
   /// No description provided for @chatPageChangePassphraseFailed.
@@ -1151,7 +1151,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEscrowRotatedNotice.
   ///
   /// In en, this message translates to:
-  /// **'{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create entrance tokens or change it'**
+  /// **'{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create authorization codes or change it'**
   String chatPageEscrowRotatedNotice(String mode);
 
   /// No description provided for @chatPageMenuLocaleLabel.
@@ -1271,7 +1271,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuEntranceList.
   ///
   /// In en, this message translates to:
-  /// **'My entrances'**
+  /// **'My devices'**
   String get chatPageMenuEntranceList;
 
   /// No description provided for @wizardJoinInviteHint.
@@ -1289,19 +1289,19 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinAttachHint.
   ///
   /// In en, this message translates to:
-  /// **'Add a new entrance of “{name}”'**
+  /// **'Add a new device of “{name}”'**
   String wizardJoinAttachHint(String name);
 
   /// No description provided for @wizardJoinReinviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Invited by “{name}” to add a new entrance of “{target}”'**
+  /// **'Invited by “{name}” to add a new device of “{target}”'**
   String wizardJoinReinviteHint(String name, String target);
 
   /// No description provided for @wizardJoinReinviteHintNoName.
   ///
   /// In en, this message translates to:
-  /// **'Invited to add a new entrance of “{target}”'**
+  /// **'Invited to add a new device of “{target}”'**
   String wizardJoinReinviteHintNoName(String target);
 
   /// No description provided for @chatPageMembersTitle.
@@ -1391,25 +1391,25 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not load other entrances (offline?)'**
+  /// **'Could not load other devices (offline?)'**
   String get chatPageEntranceListFailed;
 
   /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance connects a device to a space. Below are all your authorized entrances to this space.'**
+  /// **'You can connect multiple devices to this space.'**
   String get chatPageEntranceScopeHint;
 
   /// No description provided for @chatPageEntranceListThisDevice.
   ///
   /// In en, this message translates to:
-  /// **'Current entrance name'**
+  /// **'Current device name'**
   String get chatPageEntranceListThisDevice;
 
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'Add my new entrance'**
+  /// **'Add my new device'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPagePinLabel.
@@ -1751,7 +1751,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceUnrecognized.
   ///
   /// In en, this message translates to:
-  /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.'**
+  /// **'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.'**
   String get chatPageEntranceUnrecognized;
 
   /// No description provided for @chatPageMsgsSyncing.
@@ -2123,7 +2123,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceRevoked.
   ///
   /// In en, this message translates to:
-  /// **'Entrance revoked — local data cleared, please set up again'**
+  /// **'Device revoked — local data cleared, please set up again'**
   String get chatPageEntranceRevoked;
 
   /// No description provided for @burnOptionOff.
@@ -2345,7 +2345,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedDestroyEntrance.
   ///
   /// In en, this message translates to:
-  /// **'Destroy this entrance'**
+  /// **'Destroy this device'**
   String get advancedDestroyEntrance;
 
   /// No description provided for @advancedClearMessages.
@@ -2357,7 +2357,7 @@ abstract class AppLocalizations {
   /// No description provided for @clearMessagesMessage.
   ///
   /// In en, this message translates to:
-  /// **'Deletes all messages and attachments saved in the current entrance. The entrance stays usable and will keep receiving new messages. Other entrances are unaffected.'**
+  /// **'Deletes all messages and attachments saved in the current device. The device stays usable and will keep receiving new messages. Other devices are unaffected.'**
   String get clearMessagesMessage;
 
   /// No description provided for @clearMessagesConfirm.
@@ -2381,13 +2381,13 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Destroy this entrance?'**
+  /// **'Destroy this device?'**
   String get leaveSpaceTitle;
 
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases the current entrance, and you can\'t visit the current space on this device. This cannot be undone!'**
+  /// **'Permanently erases the current device, and you can\'t visit the current space on this device. This cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetEntranceNameLabel.
@@ -2399,13 +2399,13 @@ abstract class AppLocalizations {
   /// No description provided for @resetEntranceNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Type the current entrance name “{name}”'**
+  /// **'Type the current device name “{name}”'**
   String resetEntranceNameHint(String name);
 
   /// No description provided for @resetEntranceNameMismatch.
   ///
   /// In en, this message translates to:
-  /// **'Enter the correct entrance name to confirm'**
+  /// **'Enter the correct device name to confirm'**
   String get resetEntranceNameMismatch;
 
   /// No description provided for @resetEntranceConfirmWord.
@@ -2429,7 +2429,7 @@ abstract class AppLocalizations {
   /// No description provided for @resetEntranceServerResidualHint.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance'**
+  /// **'⚠️ Local data erased, but retiring it on the server failed; the others may still see this device'**
   String get resetEntranceServerResidualHint;
 
   /// No description provided for @spaceListHint.
@@ -2516,7 +2516,7 @@ abstract class AppLocalizations {
   /// **'Enter the correct group name to confirm'**
   String get exitGroupNameMismatch;
 
-  /// Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed entrance)
+  /// Hint for the leave-group gate when the group is unnamed (expected input falls back to the fixed confirmation word, same mechanism as an unnamed device)
   ///
   /// In en, this message translates to:
   /// **'This group has no name yet. Type “{word}” to confirm'**

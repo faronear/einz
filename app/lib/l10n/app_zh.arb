@@ -37,7 +37,7 @@
   "wizardJoinPassphraseRequired": "请输入共享口令进行验证",
   "wizardStartTitle": "秘境",
   "wizardDetectTitle": "正在检测服务器状态…",
-  "wizardDetectHint": "自动判断是否全秘境里的首条通道",
+  "wizardDetectHint": "自动判断是否全秘境里的首台设备",
   "wizardDetectFailed": "暂时无法连接服务器，正在自动重试…",
   "wizardProbeConnecting": "正在连接 {server}…",
   "@wizardProbeConnecting": {
@@ -78,7 +78,7 @@
   "wizardSpaceLimit": "秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境",
   "wizardTitlePassphrase": "设置共享口令",
   "wizardJoinPassphraseTitle": "验证共享口令",
-  "wizardEnrollExists": "该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性通道码加入。",
+  "wizardEnrollExists": "该服务器已有秘境（由另一台设备创建）。请改用“加入”向导，凭对方提供的一次性授权码加入。",
   "wizardEnrollGoJoin": "改用“加入”向导",
   "wizardEnrollFailed": "❌ 登记失败: {error}",
   "@wizardEnrollFailed": {
@@ -122,7 +122,7 @@
       }
     }
   },
-  "setupTokenRateLimitedNoWait": "请求太频繁，请稍后再试（这不是通道码本身的问题）",
+  "setupTokenRateLimitedNoWait": "请求太频繁，请稍后再试（这不是授权码本身的问题）",
   "@setupTokenAppTooOld": {
     "placeholders": {
       "code": {
@@ -130,14 +130,14 @@
       }
     }
   },
-  "setupTokenTitle": "验证通道码",
-  "setupTokenHint": "连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。",
-  "setupTokenInputHint": "通道码",
-  "setupTokenNeedInput": "请填写通道码",
-  "setupTokenInvalid": "通道码无效",
-  "setupTokenExpired": "通道码已过期",
-  "setupTokenUsed": "通道码已被使用",
-  "setupTokenSpaceAlreadyAdded": "本机已经有通道加入了这个秘境（一台设备只能有一条通道到同一个秘境）",
+  "setupTokenTitle": "验证授权码",
+  "setupTokenHint": "连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的设备生成。",
+  "setupTokenInputHint": "授权码",
+  "setupTokenNeedInput": "请填写授权码",
+  "setupTokenInvalid": "授权码无效",
+  "setupTokenExpired": "授权码已过期",
+  "setupTokenUsed": "授权码已被使用",
+  "setupTokenSpaceAlreadyAdded": "本机已经有设备加入了这个秘境（一台设备只能有一条线路到同一个秘境）",
   "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}，不能混用",
   "@setupTokenOtherServer": {
     "placeholders": {
@@ -162,8 +162,8 @@
   "startupInitClearDataTitle": "清空本机数据？",
   "startupInitClearDataMessage": "这会清空本机全部本地数据（秘境、消息、附件、锁屏码与密钥），并回到入网向导。仅在反复重试仍失败时使用——不可恢复。",
   "startupInitClearedRestart": "本机数据已清空。请完全退出并重新打开 App。",
-  "setupPageScanInvite": "扫码填入通道码",
-  "setupPageScannerHint": "把通道码二维码对准取景框",
+  "setupPageScanInvite": "扫码填入授权码",
+  "setupPageScannerHint": "把授权码二维码对准取景框",
   "setupPageNoEscrow": "❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。",
   "setupPageEscrowFailed": "❌ 共享口令验证失败。请询问你的同伴。",
   "@setupPageEscrowFailed": {
@@ -173,7 +173,7 @@
       }
     }
   },
-  "setupJoinEntranceLimitReached": "该秘境的通道数量已达服务器上限，无法再开通新通道。",
+  "setupJoinEntranceLimitReached": "该秘境的设备数量已达服务器上限，无法再添加新设备。",
   "setPinDialogSetPin": "启用",
   "setPinDialogPinTooShort": "PIN 至少 6 位数字",
   "setPinDialogPinDigitsOnly": "PIN 只能是数字",
@@ -238,13 +238,13 @@
   "chatPageSetLockCleared": "已清除锁屏码，其他人拿到这台设备就能进入秘境。",
   "chatPageLockClearConfirm": "清除",
   "chatPageInviteDialogTitleInvite": "邀请",
-  "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
+  "chatPageInviteDialogTitleAttachSelf": "添加我的新设备",
   "chatPageInviteDialogTitleReinvite": "重新邀请",
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
-  "chatPageInviteDialogHintInvite": "把以下的专属通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintAttachSelf": "使用以下的专属通道码，在我的其他设备上加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintReinvite": "如果“{name}”丢失了进入本秘境的所有通道，可凭以下的专属通道码重新加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintInvite": "把以下的专属授权码发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintAttachSelf": "使用以下的专属授权码，在我的其他设备上加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintReinvite": "如果“{name}”丢失了进入本秘境的所有设备，可凭以下的专属授权码重新加入本秘境。24 小时内一次性有效。",
   "chatPageInviteDialogReinviteFallbackName": "对方",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -254,8 +254,8 @@
     }
   },
   "chatPageInviteLinkCopied": "邀请链接已复制",
-  "chatPageInviteCodeCopied": "通道码已复制",
-  "chatPageInviteFailed": "通道码生成失败: {error}",
+  "chatPageInviteCodeCopied": "授权码已复制",
+  "chatPageInviteFailed": "授权码生成失败: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
       "error": {
@@ -284,9 +284,9 @@
   "chatPageGroupNameTitle": "群组名称",
   "chatPageGroupNameLabel": "名称",
   "chatPageGenderLabel": "性别",
-  "chatPageRenameEntranceTitle": "当前通道",
-  "chatPageRenameEntranceHint": "修改当前通道名称，不超过32字符",
-  "chatPageRenameEntranceEmptyError": "请填写通道名称",
+  "chatPageRenameEntranceTitle": "当前设备",
+  "chatPageRenameEntranceHint": "修改当前设备名称，不超过32字符",
+  "chatPageRenameEntranceEmptyError": "请填写设备名称",
   "chatPageRenameEntranceInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)",
   "chatPageRenameEntranceTooLongError": "最多 {max} 个字符",
   "@chatPageRenameEntranceTooLongError": {
@@ -368,10 +368,10 @@
   "chatPageUiStyleGradient": "渐变粉蓝",
   "chatPageUiStyleGradientDesc": "粉蓝渐变背景，深情典雅",
   "chatPageMenuBurnLabel": "阅后即焚",
-  "chatPageMenuEntranceList": "我的设备通道",
+  "chatPageMenuEntranceList": "我的设备",
   "wizardJoinInviteHint": "被“{name}”邀请加入秘境",
   "wizardJoinInviteHintNoName": "被邀请加入秘境",
-  "wizardJoinAttachHint": "新增一条“{name}”的通道",
+  "wizardJoinAttachHint": "新增一台“{name}”的设备",
   "wizardJoinReinviteHint": "“{name}”重新邀请“{target}”加入秘境",
   "wizardJoinReinviteHintNoName": "重新邀请“{target}”加入秘境",
   "@wizardJoinReinviteHint": {
@@ -443,10 +443,10 @@
   "chatPagePassphraseVerifyFailed": "验证失败，请重试",
   "chatPageMembersInviteNew": "邀请新同伴",
   "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
-  "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",
-  "chatPageEntranceScopeHint": "您能够绑定多个设备到同一个秘境。以下是您在当前秘境的所有通道。",
-  "chatPageEntranceListThisDevice": "当前通道名称",
-  "chatPageEntranceListNew": "添加我的新通道",
+  "chatPageEntranceListFailed": "无法获取其他设备（当前离线？）",
+  "chatPageEntranceScopeHint": "可将多台设备连接到当前秘境。",
+  "chatPageEntranceListThisDevice": "当前设备名称",
+  "chatPageEntranceListNew": "添加我的新设备",
   "chatPagePinLabel": "锁屏码",
   "chatPagePinMenuValue": "{duration}",
   "chatPageNotifyLabel": "新消息通知",
@@ -580,7 +580,7 @@
       }
     }
   },
-  "chatPageEntranceUnrecognized": "这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。",
+  "chatPageEntranceUnrecognized": "这台设备未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。",
   "chatPageMsgsSyncing": "等待同步中… 暂时无法收发，仅可查看本地消息",
   "chatPageMsgResending": "重发中…",
   "chatPageMsgSpeedingUp": "加速中…",
@@ -705,7 +705,7 @@
       }
     }
   },
-  "chatPageEntranceRevoked": "这条通道已被撤销，本地数据已清空，请重新配置",
+  "chatPageEntranceRevoked": "这台设备已被撤销，本地数据已清空，请重新配置",
   "burnOptionOff": "不再自动焚毁",
   "burnSubmit": "启用",
   "burnPreviewDelay": "{duration}",
@@ -801,9 +801,9 @@
   "aboutDnsPoisonUnknownIp": "未知",
   "aboutDnsPoisonNote": "当前网络在劫持该域名的解析（上面是它给出的假地址）；连接已由加密解析（DoH）自动修复，事件已上报服务器。真地址已保护不展示",
   "advancedMenuTitle": "高级安全",
-  "advancedDestroyEntrance": "销毁本通道",
+  "advancedDestroyEntrance": "销毁本设备",
   "advancedClearMessages": "删除所有消息",
-  "clearMessagesMessage": "删除当前通道保存的所有消息和附件。本通道仍然可用，将继续收到新消息。其他通道不受影响。",
+  "clearMessagesMessage": "删除当前设备保存的所有消息和附件。本设备仍然可用，将继续收到新消息。其他设备不受影响。",
   "clearMessagesConfirm": "删除",
   "clearMessagesDone": "已删除全部消息。",
   "clearMessagesFailed": "删除失败: {error}",
@@ -814,8 +814,8 @@
       }
     }
   },
-  "leaveSpaceTitle": "销毁本通道？",
-  "leaveSpaceMessage": "彻底销毁当前通道，无法再通过本设备访问当前秘境。此操作无法撤销！",
+  "leaveSpaceTitle": "销毁本设备？",
+  "leaveSpaceMessage": "彻底销毁当前设备，无法再通过本设备访问当前秘境。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
     "placeholders": {
@@ -824,7 +824,7 @@
       }
     }
   },
-  "resetEntranceNameHint": "请输入当前通道名称“{name}”",
+  "resetEntranceNameHint": "请输入当前设备名称“{name}”",
   "@resetEntranceNameHint": {
     "placeholders": {
       "name": {
@@ -832,11 +832,11 @@
       }
     }
   },
-  "resetEntranceNameMismatch": "请输入正确的通道名称以确认",
+  "resetEntranceNameMismatch": "请输入正确的设备名称以确认",
   "resetEntranceConfirmWord": "重置",
   "resetEntrancePinLabel": "锁屏码",
   "resetEntrancePinHint": "请输入本机锁屏码",
-  "resetEntranceServerResidualHint": "⚠️ 本地数据已清空，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道",
+  "resetEntranceServerResidualHint": "⚠️ 本地数据已清空，但服务端退役未完成，同伴的设备列表里可能仍留有这台设备",
   "spaceListHint": "点击卡片切换当前秘境",
   "spaceListTitle": "我的秘境",
   "spaceListEmpty": "还没有加入任何秘境",
@@ -867,7 +867,7 @@
   "exitGroupNameMismatch": "请输入正确的群组名称以确认",
   "exitGroupConfirmWordHint": "群组还没有命名。请输入“{word}”以确认",
   "@exitGroupConfirmWordHint": {
-    "description": "群名未设置时退群确认闸门的提示（expected 退化为固定确认词，与未命名通道的销毁流程同机制）",
+    "description": "群名未设置时退群确认闸门的提示（expected 退化为固定确认词，与未命名设备的销毁流程同机制）",
     "placeholders": {
       "word": {
         "type": "String"

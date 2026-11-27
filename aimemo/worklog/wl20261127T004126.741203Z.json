@@ -1,0 +1,19 @@
+{
+  "utc": "20261127T004126.741203Z",
+  "time": "2026-11-27 08:41+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "entrance→device 全量迁移完成 + 测试字面量同步",
+      "detail": [
+        "zh/en arb 全量迁移完成：通道→设备、通道码→授权码、entrance→device（含 token→authorization code），无残留；arb 键名曾误伤（Entrance→Device 连带改了键名），已按 git HEAD 原始键名逐一恢复。",
+        "老板自己改的 chatPageEntranceScopeHint（您能够连接多个设备到当前秘境。/ You can connect multiple devices to this space.）保留在工作区，未纳入本次提交。",
+        "chat_page_menu_test 的销毁闸门断言同步：销毁本通道？→ 销毁本设备？、当前通道名称→当前设备名称。",
+        "验证：flutter analyze 全量干净 + chat_page_menu_test 47 用例全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}

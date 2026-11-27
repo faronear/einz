@@ -74,7 +74,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardDetectTitle => 'Checking server status…';
 
   @override
-  String get wizardDetectHint => 'Auto-detects if this is the first entrance';
+  String get wizardDetectHint => 'Auto-detects if this is the first device';
 
   @override
   String get wizardDetectFailed => 'Cannot reach server — retrying…';
@@ -164,7 +164,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      'This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.';
+      'This server already has a space (created by another device). Use the Join flow with a one-time authorization code from the other person.';
 
   @override
   String get wizardEnrollGoJoin => 'Use Join flow';
@@ -262,33 +262,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenRateLimitedNoWait =>
-      'Too many requests — try again later (this is not a problem with the entrance token)';
+      'Too many requests — try again later (this is not a problem with the authorization code)';
 
   @override
-  String get setupTokenTitle => 'Verify entrance token';
+  String get setupTokenTitle => 'Verify authorization code';
 
   @override
   String get setupTokenHint =>
-      'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.';
+      'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified device in the space.';
 
   @override
-  String get setupTokenInputHint => 'Entrance token';
+  String get setupTokenInputHint => 'Authorization code';
 
   @override
-  String get setupTokenNeedInput => 'Enter the entrance token';
+  String get setupTokenNeedInput => 'Enter the authorization code';
 
   @override
-  String get setupTokenInvalid => 'Invalid entrance token';
+  String get setupTokenInvalid => 'Invalid authorization code';
 
   @override
-  String get setupTokenExpired => 'Entrance token expired';
+  String get setupTokenExpired => 'Authorization code expired';
 
   @override
-  String get setupTokenUsed => 'Entrance token already used';
+  String get setupTokenUsed => 'Authorization code already used';
 
   @override
   String get setupTokenSpaceAlreadyAdded =>
-      'This device has already an entrance to this space (one device can hold only one entrance to a space)';
+      'This device is already connected to this space (one device can hold only one connection to a space)';
 
   @override
   String setupTokenOtherServer(String other, String current) {
@@ -320,15 +320,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Local data cleared. Fully quit and reopen the app.';
 
   @override
-  String get setupPageScanInvite => 'Scan entrance token QR code';
+  String get setupPageScanInvite => 'Scan authorization code QR code';
 
   @override
   String get setupPageScannerHint =>
-      'Point the camera at the entrance token QR code';
+      'Point the camera at the authorization code QR code';
 
   @override
   String get setupPageNoEscrow =>
-      '❌ No escrow package for the shared passphrase on the server — set it on the first entrance first';
+      '❌ No escrow package for the shared passphrase on the server — set it on the first device first';
 
   @override
   String setupPageEscrowFailed(String error) {
@@ -337,7 +337,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupJoinEntranceLimitReached =>
-      'This space has reached the server\'s entrance limit — no new entrance can be opened.';
+      'This space has reached the server\'s device limit — no new device can be added.';
 
   @override
   String get setPinDialogSetPin => 'Apply';
@@ -440,7 +440,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => 'Invite';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => 'Add my new entrance';
+  String get chatPageInviteDialogTitleAttachSelf => 'Add my new device';
 
   @override
   String get chatPageInviteDialogTitleReinvite => 'Re-invite';
@@ -453,15 +453,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      'Send the dedicated entrance token below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
+      'Send the dedicated authorization code below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use the dedicated entrance token below on my another device to connect to this space. One-time use, valid for 24 hours.';
+      'Use the dedicated authorization code below on my another device to connect to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'If “$name” loses all entrances into this space, send the dedicated entrance token below to “$name” to join again. One-time use, valid for 24 hours.';
+    return 'If “$name” loses all devices into this space, send the dedicated authorization code below to “$name” to join again. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -471,11 +471,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
-  String get chatPageInviteCodeCopied => 'Entrance token copied';
+  String get chatPageInviteCodeCopied => 'Authorization code copied';
 
   @override
   String chatPageInviteFailed(String error) {
-    return 'Failed to create the entrance token: $error';
+    return 'Failed to create the authorization code: $error';
   }
 
   @override
@@ -523,14 +523,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
-  String get chatPageRenameEntranceTitle => 'Current entrance';
+  String get chatPageRenameEntranceTitle => 'Current device';
 
   @override
   String get chatPageRenameEntranceHint =>
-      'Rename the current entrance, up to 32 characters';
+      'Rename the current device, up to 32 characters';
 
   @override
-  String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';
+  String get chatPageRenameEntranceEmptyError => 'Enter the device name';
 
   @override
   String get chatPageRenameEntranceInvalidError =>
@@ -624,7 +624,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'duo': 'your companion',
       'other': 'your companions',
     });
-    return '✅ Shared passphrase updated — tell $_temp0; new entrances must use the new one';
+    return '✅ Shared passphrase updated — tell $_temp0; new devices must use the new one';
   }
 
   @override
@@ -638,7 +638,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'duo': 'Your companion',
       'other': 'Your companions',
     });
-    return '$_temp0 reset the shared passphrase — use the new one to create entrance tokens or change it';
+    return '$_temp0 reset the shared passphrase — use the new one to create authorization codes or change it';
   }
 
   @override
@@ -705,7 +705,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuBurnLabel => 'Burn-after-read';
 
   @override
-  String get chatPageMenuEntranceList => 'My entrances';
+  String get chatPageMenuEntranceList => 'My devices';
 
   @override
   String wizardJoinInviteHint(String name, int count) {
@@ -719,17 +719,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String wizardJoinAttachHint(String name) {
-    return 'Add a new entrance of “$name”';
+    return 'Add a new device of “$name”';
   }
 
   @override
   String wizardJoinReinviteHint(String name, String target) {
-    return 'Invited by “$name” to add a new entrance of “$target”';
+    return 'Invited by “$name” to add a new device of “$target”';
   }
 
   @override
   String wizardJoinReinviteHintNoName(String target) {
-    return 'Invited to add a new entrance of “$target”';
+    return 'Invited to add a new device of “$target”';
   }
 
   @override
@@ -788,17 +788,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceListFailed =>
-      'Could not load other entrances (offline?)';
+      'Could not load other devices (offline?)';
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance connects a device to a space. Below are all your authorized entrances to this space.';
+      'You can connect multiple devices to this space.';
 
   @override
-  String get chatPageEntranceListThisDevice => 'Current entrance name';
+  String get chatPageEntranceListThisDevice => 'Current device name';
 
   @override
-  String get chatPageEntranceListNew => 'Add my new entrance';
+  String get chatPageEntranceListNew => 'Add my new device';
 
   @override
   String get chatPagePinLabel => 'PIN';
@@ -1023,7 +1023,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceUnrecognized =>
-      'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.';
+      'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data remains.';
 
   @override
   String get chatPageMsgsSyncing =>
@@ -1238,7 +1238,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceRevoked =>
-      'Entrance revoked — local data cleared, please set up again';
+      'Device revoked — local data cleared, please set up again';
 
   @override
   String get burnOptionOff => 'Do not auto-burn';
@@ -1371,14 +1371,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedMenuTitle => 'Advanced security';
 
   @override
-  String get advancedDestroyEntrance => 'Destroy this entrance';
+  String get advancedDestroyEntrance => 'Destroy this device';
 
   @override
   String get advancedClearMessages => 'Delete all messages';
 
   @override
   String get clearMessagesMessage =>
-      'Deletes all messages and attachments saved in the current entrance. The entrance stays usable and will keep receiving new messages. Other entrances are unaffected.';
+      'Deletes all messages and attachments saved in the current device. The device stays usable and will keep receiving new messages. Other devices are unaffected.';
 
   @override
   String get clearMessagesConfirm => 'Delete';
@@ -1392,11 +1392,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get leaveSpaceTitle => 'Destroy this entrance?';
+  String get leaveSpaceTitle => 'Destroy this device?';
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases the current entrance, and you can\'t visit the current space on this device. This cannot be undone!';
+      'Permanently erases the current device, and you can\'t visit the current space on this device. This cannot be undone!';
 
   @override
   String resetEntranceNameLabel(String name) {
@@ -1405,12 +1405,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String resetEntranceNameHint(String name) {
-    return 'Type the current entrance name “$name”';
+    return 'Type the current device name “$name”';
   }
 
   @override
   String get resetEntranceNameMismatch =>
-      'Enter the correct entrance name to confirm';
+      'Enter the correct device name to confirm';
 
   @override
   String get resetEntranceConfirmWord => 'RESET';
@@ -1423,7 +1423,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetEntranceServerResidualHint =>
-      '⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance';
+      '⚠️ Local data erased, but retiring it on the server failed; the others may still see this device';
 
   @override
   String get spaceListHint => 'Tap another space to switch to it';

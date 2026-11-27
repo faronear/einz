@@ -74,7 +74,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectTitle => '正在检测服务器状态…';
 
   @override
-  String get wizardDetectHint => '自动判断是否全秘境里的首条通道';
+  String get wizardDetectHint => '自动判断是否全秘境里的首台设备';
 
   @override
   String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
@@ -160,7 +160,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性通道码加入。';
+      '该服务器已有秘境（由另一台设备创建）。请改用“加入”向导，凭对方提供的一次性授权码加入。';
 
   @override
   String get wizardEnrollGoJoin => '改用“加入”向导';
@@ -242,31 +242,31 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是通道码本身的问题）';
+  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是授权码本身的问题）';
 
   @override
-  String get setupTokenTitle => '验证通道码';
+  String get setupTokenTitle => '验证授权码';
 
   @override
-  String get setupTokenHint => '连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的设备生成。';
 
   @override
-  String get setupTokenInputHint => '通道码';
+  String get setupTokenInputHint => '授权码';
 
   @override
-  String get setupTokenNeedInput => '请填写通道码';
+  String get setupTokenNeedInput => '请填写授权码';
 
   @override
-  String get setupTokenInvalid => '通道码无效';
+  String get setupTokenInvalid => '授权码无效';
 
   @override
-  String get setupTokenExpired => '通道码已过期';
+  String get setupTokenExpired => '授权码已过期';
 
   @override
-  String get setupTokenUsed => '通道码已被使用';
+  String get setupTokenUsed => '授权码已被使用';
 
   @override
-  String get setupTokenSpaceAlreadyAdded => '本机已经有通道加入了这个秘境（一台设备只能有一条通道到同一个秘境）';
+  String get setupTokenSpaceAlreadyAdded => '本机已经有设备加入了这个秘境（一台设备只能有一条线路到同一个秘境）';
 
   @override
   String setupTokenOtherServer(String other, String current) {
@@ -296,10 +296,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupInitClearedRestart => '本机数据已清空。请完全退出并重新打开 App。';
 
   @override
-  String get setupPageScanInvite => '扫码填入通道码';
+  String get setupPageScanInvite => '扫码填入授权码';
 
   @override
-  String get setupPageScannerHint => '把通道码二维码对准取景框';
+  String get setupPageScannerHint => '把授权码二维码对准取景框';
 
   @override
   String get setupPageNoEscrow => '❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。';
@@ -310,7 +310,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupJoinEntranceLimitReached => '该秘境的通道数量已达服务器上限，无法再开通新通道。';
+  String get setupJoinEntranceLimitReached => '该秘境的设备数量已达服务器上限，无法再添加新设备。';
 
   @override
   String get setPinDialogSetPin => '启用';
@@ -410,7 +410,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => '邀请';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => '添加我的新通道';
+  String get chatPageInviteDialogTitleAttachSelf => '添加我的新设备';
 
   @override
   String get chatPageInviteDialogTitleReinvite => '重新邀请';
@@ -423,15 +423,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      '把以下的专属通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
+      '把以下的专属授权码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '使用以下的专属通道码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
+      '使用以下的专属授权码，在我的其他设备上加入本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '如果“$name”丢失了进入本秘境的所有通道，可凭以下的专属通道码重新加入本秘境。24 小时内一次性有效。';
+    return '如果“$name”丢失了进入本秘境的所有设备，可凭以下的专属授权码重新加入本秘境。24 小时内一次性有效。';
   }
 
   @override
@@ -441,11 +441,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteLinkCopied => '邀请链接已复制';
 
   @override
-  String get chatPageInviteCodeCopied => '通道码已复制';
+  String get chatPageInviteCodeCopied => '授权码已复制';
 
   @override
   String chatPageInviteFailed(String error) {
-    return '通道码生成失败: $error';
+    return '授权码生成失败: $error';
   }
 
   @override
@@ -493,13 +493,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameEntranceTitle => '当前通道';
+  String get chatPageRenameEntranceTitle => '当前设备';
 
   @override
-  String get chatPageRenameEntranceHint => '修改当前通道名称，不超过32字符';
+  String get chatPageRenameEntranceHint => '修改当前设备名称，不超过32字符';
 
   @override
-  String get chatPageRenameEntranceEmptyError => '请填写通道名称';
+  String get chatPageRenameEntranceEmptyError => '请填写设备名称';
 
   @override
   String get chatPageRenameEntranceInvalidError =>
@@ -659,7 +659,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuBurnLabel => '阅后即焚';
 
   @override
-  String get chatPageMenuEntranceList => '我的设备通道';
+  String get chatPageMenuEntranceList => '我的设备';
 
   @override
   String wizardJoinInviteHint(String name, int count) {
@@ -673,7 +673,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String wizardJoinAttachHint(String name) {
-    return '新增一条“$name”的通道';
+    return '新增一台“$name”的设备';
   }
 
   @override
@@ -740,16 +740,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
+  String get chatPageEntranceListFailed => '无法获取其他设备（当前离线？）';
 
   @override
-  String get chatPageEntranceScopeHint => '您能够绑定多个设备到同一个秘境。以下是您在当前秘境的所有通道。';
+  String get chatPageEntranceScopeHint => '可将多台设备连接到当前秘境。';
 
   @override
-  String get chatPageEntranceListThisDevice => '当前通道名称';
+  String get chatPageEntranceListThisDevice => '当前设备名称';
 
   @override
-  String get chatPageEntranceListNew => '添加我的新通道';
+  String get chatPageEntranceListNew => '添加我的新设备';
 
   @override
   String get chatPagePinLabel => '锁屏码';
@@ -964,7 +964,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceUnrecognized =>
-      '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。';
+      '这台设备未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据保留。';
 
   @override
   String get chatPageMsgsSyncing => '等待同步中… 暂时无法收发，仅可查看本地消息';
@@ -1168,7 +1168,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清空，请重新配置';
+  String get chatPageEntranceRevoked => '这台设备已被撤销，本地数据已清空，请重新配置';
 
   @override
   String get burnOptionOff => '不再自动焚毁';
@@ -1299,14 +1299,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedMenuTitle => '高级安全';
 
   @override
-  String get advancedDestroyEntrance => '销毁本通道';
+  String get advancedDestroyEntrance => '销毁本设备';
 
   @override
   String get advancedClearMessages => '删除所有消息';
 
   @override
   String get clearMessagesMessage =>
-      '删除当前通道保存的所有消息和附件。本通道仍然可用，将继续收到新消息。其他通道不受影响。';
+      '删除当前设备保存的所有消息和附件。本设备仍然可用，将继续收到新消息。其他设备不受影响。';
 
   @override
   String get clearMessagesConfirm => '删除';
@@ -1320,10 +1320,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get leaveSpaceTitle => '销毁本通道？';
+  String get leaveSpaceTitle => '销毁本设备？';
 
   @override
-  String get leaveSpaceMessage => '彻底销毁当前通道，无法再通过本设备访问当前秘境。此操作无法撤销！';
+  String get leaveSpaceMessage => '彻底销毁当前设备，无法再通过本设备访问当前秘境。此操作无法撤销！';
 
   @override
   String resetEntranceNameLabel(String name) {
@@ -1332,11 +1332,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String resetEntranceNameHint(String name) {
-    return '请输入当前通道名称“$name”';
+    return '请输入当前设备名称“$name”';
   }
 
   @override
-  String get resetEntranceNameMismatch => '请输入正确的通道名称以确认';
+  String get resetEntranceNameMismatch => '请输入正确的设备名称以确认';
 
   @override
   String get resetEntranceConfirmWord => '重置';
@@ -1349,7 +1349,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetEntranceServerResidualHint =>
-      '⚠️ 本地数据已清空，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
+      '⚠️ 本地数据已清空，但服务端退役未完成，同伴的设备列表里可能仍留有这台设备';
 
   @override
   String get spaceListHint => '点击卡片切换当前秘境';
