@@ -760,10 +760,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageNotifyLabel => '我的邮件通知';
+  String get chatPageNotifyLabel => '新消息通知';
 
   @override
-  String get chatPageNotifyTitle => '我的邮件通知';
+  String get chatPageNotifyTitle => '新消息通知';
 
   @override
   String get chatPageNotifyHint => '你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。';

@@ -10885,27 +10885,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，用邮件把离线的
-                // 人拉回来。2026-10-02 起挪到「我的资料」之后（老板定），属分组②
-                // （身份·通道·内容）。
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'notify',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageNotifyLabel, style: captionStyle),
-                      const Spacer(),
-                      // 图标在值文字左边、图标+文字整体靠右（老板 2026-10-02；
-                      // 与 devices/沙漏行同款右簇排布），尺寸同族 18
-                      Icon(Icons.mark_email_unread_outlined,
-                          size: 18, color: labelStyle.color),
-                      if (notifyValue != null) ...[
-                        const SizedBox(width: 4),
-                        notifyValue,
-                      ],
-                    ],
-                  ),
-                ),
                 // 「通道列表」：我本人在本空间的其他通道（老板 2026-09-25：多设备登录
                 // 时看一眼"我还有哪些线挂着、在不在线"）。2026-10-02 合并原「当前通道」
                 // 菜单项：改名入口收进弹层顶部的当前通道行，菜单只留这一项「我的通道」
@@ -10971,6 +10950,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 选了具体时长才在右侧显示（老板 2026-09-15）
                       if (_burnSeconds > 0)
                         _menuValue(_burnOptionLabel(_burnSeconds, l10n), valueStyle),
+                    ],
+                  ),
+                ),
+                // 新消息通知（2026-11-26 改名并移到阅后即焚之后，老板定：即将新增
+                // Bark 等通知方式，邮件只是渠道之一）。2026-10-01 起：没进应用商店
+                // → 没有后台推送，用邮件把离线的人拉回来。
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
+                  height: kMenuRowHeight,
+                  value: 'notify',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageNotifyLabel, style: captionStyle),
+                      const Spacer(),
+                      // 图标在值文字左边、图标+文字整体靠右（老板 2026-10-02；
+                      // 与 devices/沙漏行同款右簇排布），尺寸同族 18
+                      Icon(Icons.notifications_outlined,
+                          size: 18, color: labelStyle.color),
+                      if (notifyValue != null) ...[
+                        const SizedBox(width: 4),
+                        notifyValue,
+                      ],
                     ],
                   ),
                 ),

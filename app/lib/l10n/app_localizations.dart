@@ -1427,13 +1427,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyLabel.
   ///
   /// In en, this message translates to:
-  /// **'My email alerts'**
+  /// **'Message Notifications'**
   String get chatPageNotifyLabel;
 
   /// No description provided for @chatPageNotifyTitle.
   ///
   /// In en, this message translates to:
-  /// **'My email alerts'**
+  /// **'Message Notifications'**
   String get chatPageNotifyTitle;
 
   /// No description provided for @chatPageNotifyHint.

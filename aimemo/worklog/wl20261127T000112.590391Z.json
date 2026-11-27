@@ -1,0 +1,19 @@
+{
+  "utc": "20261127T000112.590391Z",
+  "time": "2026-11-27 08:01+08:00",
+  "host": "DoomBase",
+  "os": "Darwin",
+  "user": "luk",
+  "agent": "atomcode",
+  "notes": [
+    {
+      "brief": "主菜单「我的邮件通知」改名「新消息通知」并移到阅后即焚之后",
+      "detail": [
+        "老板要求：改名（为即将新增 Bark 等通知方式铺垫）并移到 Burn-after-read 旁；问是否需要复数——建议用复数 Message Notifications（将涵盖邮件+Bark 多渠道，英文设置项惯例用复数），已采用。",
+        "改动：app_en/app_zh arb 的 chatPageNotifyLabel/Title 改值（Message Notifications / 新消息通知）+ gen-l10n 重生成；菜单项从「我的资料」之后移到「阅后即焚」之后；图标 mark_email_unread → notifications_outlined（不再绑定邮件渠道）。",
+        "l10n 键名保持 chatPageNotifyLabel/Title 不动（测试用 getter 引用，改名不破坏测试）。",
+        "验证：analyze 干净 + chat_page_menu_test 47 用例全过 + flutter build macos --debug 成功。按要求只提交不推送。"
+      ]
+    }
+  ]
+}
